@@ -69,4 +69,19 @@ export default defineConfig({
       ],
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'supabase': ['@supabase/supabase-js'],
+          'ui-vendor': ['lucide-react', 'chart.js', 'react-date-range'],
+          'utils-vendor': ['date-fns', 'file-saver', 'zustand'],
+          'pdf-vendor': ['html2pdf.js', 'jspdf'],
+          'capacitor-vendor': ['@capacitor/core', '@capacitor/preferences', '@capacitor/geolocation', '@capacitor/camera', '@capacitor/filesystem']
+        }
+      }
+    }
+  }
 });

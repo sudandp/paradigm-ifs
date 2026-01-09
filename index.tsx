@@ -8,11 +8,14 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
+import { SpeedInsights } from "@vercel/speed-insights/react";
+
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <HashRouter>
       <App />
+      <SpeedInsights />
     </HashRouter>
   </React.StrictMode>
 );
