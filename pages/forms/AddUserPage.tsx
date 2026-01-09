@@ -105,9 +105,13 @@ const AddUserPage: React.FC = () => {
 
   const onSubmit: SubmitHandler<Partial<User> & { password?: string }> = async (data) => {
     setIsSubmitting(true);
+    console.log('🔍 Form submitted with data:', data);
     try {
       if (isEditing && id) {
         const { password, ...rest } = data;
+        console.log('✏️ Updating user with ID:', id);
+        console.log('📝 Update payload:', rest);
+        console.log('🆔 Biometric ID in payload:', rest.biometricId);
         await api.updateUser(id, rest);
         setToast({ message: 'User updated successfully!', type: 'success' });
       } else {
@@ -122,6 +126,7 @@ const AddUserPage: React.FC = () => {
         // 2. Hydrate additional profile data if any (organization, phone, etc.)
         if (rest && Object.keys(rest).length > 0) {
           try {
+            console.log('➕ Creating new user with additional data:', rest);
             await api.updateUser(newUser.id, rest);
           } catch (updateErr) {
             console.warn('Failed to update additional user fields after creation:', updateErr);
