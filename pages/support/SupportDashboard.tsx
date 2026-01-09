@@ -203,8 +203,8 @@ const SupportDashboard: React.FC = () => {
                 <p className="text-sm font-medium text-muted mb-1">{title}</p>
                 <p className={`text-3xl font-bold ${colorClass.replace('bg-', 'text-').split(' ')[0]}`}>{value}</p>
             </div>
-            <div className={`p-3 rounded-full bg-opacity-10 ${colorClass.replace('text-', 'bg-')} ${colorClass}`}>
-                {icon}
+            <div className={`p-3 rounded-full ${colorClass.replace('text-', 'bg-')} bg-opacity-90 shadow-sm`}>
+                {React.cloneElement(icon as React.ReactElement, { className: 'h-6 w-6 text-white' })}
             </div>
         </div>
     );
