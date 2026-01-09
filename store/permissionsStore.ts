@@ -60,6 +60,15 @@ const defaultPermissions: Record<UserRole, Permission[]> = {
   operation_manager: ['view_operations_dashboard', 'view_all_attendance', 'view_own_attendance', 'apply_for_leave', 'manage_leave_requests', 'manage_tasks', 'access_support_desk', 'view_profile'],
   site_manager: ['view_site_dashboard', 'create_enrollment', 'view_own_attendance', 'apply_for_leave', 'access_support_desk', 'view_profile'],
   field_staff: ['create_enrollment', 'view_own_attendance', 'apply_for_leave', 'access_support_desk', 'view_profile'],
+  management: [
+    'view_all_submissions', 'view_entity_management', 'view_operations_dashboard',
+    'view_site_dashboard', 'manage_sites', 'view_invoice_summary', 'view_verification_costing',
+    'view_my_team', 'view_field_reports', 'access_support_desk', 'view_profile'
+  ],
+  bd: [
+    'create_enrollment', 'view_own_attendance', 'view_my_locations', 'apply_for_leave',
+    'access_support_desk', 'view_profile'
+  ],
 };
 
 export const usePermissionsStore = create(

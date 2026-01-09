@@ -1006,6 +1006,9 @@ const AttendanceDashboard: React.FC = () => {
                 setUsers(currentUsers);
             }
 
+            // Filter out management users from attendance tracking and reports
+            const activeStaff = currentUsers.filter(u => u.role !== 'management');
+
             // Determine query range: Union of selected range and Today (to ensure "Today" stats are accurate)
             const today = new Date();
             const queryStart = startDate < today ? startDate : startOfToday();
@@ -1031,7 +1034,8 @@ const AttendanceDashboard: React.FC = () => {
             });
             const onLeaveToday = new Set(todayLeaves.map(l => l.userId)).size;
 
-            const totalEmployees = currentUsers.length;
+            // Use activeStaff count (excluding management) for totalEmployees
+            const totalEmployees = activeStaff.length;
             const absentToday = Math.max(0, totalEmployees - presentToday - onLeaveToday);
 
 
@@ -1170,8 +1174,11 @@ const AttendanceDashboard: React.FC = () => {
         const data: BasicReportDataRow[] = [];
         const days = eachDayOfInterval({ start: dateRange.startDate, end: dateRange.endDate });
 
-        // Filter users based on selection
-        const targetUsers = selectedUser === 'all' ? users : users.filter(u => u.id === selectedUser);
+        // Filter users based on selection, and exclude management users
+        const filteredUsers = selectedUser === 'all' 
+            ? users.filter(u => u.role !== 'management') 
+            : users.filter(u => u.id === selectedUser && u.role !== 'management');
+        const targetUsers = filteredUsers;
 
         targetUsers.forEach(user => {
             days.forEach(day => {
@@ -1302,7 +1309,11 @@ const AttendanceDashboard: React.FC = () => {
     const attendanceLogData: AttendanceLogDataRow[] = useMemo(() => {
         if (!dateRange.startDate || !dateRange.endDate) return [];
 
-        const targetUsers = selectedUser === 'all' ? users : users.filter(u => u.id === selectedUser);
+        // Exclude management users from logs
+        const filteredUsers = selectedUser === 'all' 
+            ? users.filter(u => u.role !== 'management') 
+            : users.filter(u => u.id === selectedUser && u.role !== 'management');
+        const targetUsers = filteredUsers;
         const targetUserIds = new Set(targetUsers.map(u => u.id));
 
         return attendanceEvents
@@ -1336,7 +1347,12 @@ const AttendanceDashboard: React.FC = () => {
         if (!dateRange.startDate || !dateRange.endDate) return [];
 
         const days = eachDayOfInterval({ start: dateRange.startDate, end: dateRange.endDate });
-        const targetUsers = selectedUser === 'all' ? users : users.filter(u => u.id === selectedUser);
+        
+        // Exclude management users from monthly reports
+        const filteredUsers = selectedUser === 'all' 
+            ? users.filter(u => u.role !== 'management') 
+            : users.filter(u => u.id === selectedUser && u.role !== 'management');
+        const targetUsers = filteredUsers;
 
         return targetUsers.map(user => {
             const statuses: string[] = [];

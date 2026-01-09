@@ -260,59 +260,61 @@ const ProfilePage: React.FC = () => {
                         </div>
                     </section>
 
-                    <section>
-                        <h3 className="fo-section-title mb-4">Work Hours Tracking</h3>
-                        <div className="bg-[#0f291e]/80 backdrop-blur-md rounded-2xl border border-white/5 p-5 shadow-xl relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-                            
-                            <div className="flex justify-between mb-6 relative z-10">
-                                <div className="text-center flex-1 border-r border-white/10">
-                                    <p className="text-xs text-gray-400 mb-1 uppercase tracking-wider">Check In</p>
-                                    <p className="text-xl font-bold text-white font-mono">{formatTime(lastCheckInTime)}</p>
+                    {user.role !== 'management' && (
+                        <section>
+                            <h3 className="fo-section-title mb-4">Work Hours Tracking</h3>
+                            <div className="bg-[#0f291e]/80 backdrop-blur-md rounded-2xl border border-white/5 p-5 shadow-xl relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+                                
+                                <div className="flex justify-between mb-6 relative z-10">
+                                    <div className="text-center flex-1 border-r border-white/10">
+                                        <p className="text-xs text-gray-400 mb-1 uppercase tracking-wider">Check In</p>
+                                        <p className="text-xl font-bold text-white font-mono">{formatTime(lastCheckInTime)}</p>
+                                    </div>
+                                    <div className="text-center flex-1">
+                                        <p className="text-xs text-gray-400 mb-1 uppercase tracking-wider">Check Out</p>
+                                        <p className="text-xl font-bold text-white font-mono">{formatTime(lastCheckOutTime)}</p>
+                                    </div>
                                 </div>
-                                <div className="text-center flex-1">
-                                    <p className="text-xs text-gray-400 mb-1 uppercase tracking-wider">Check Out</p>
-                                    <p className="text-xl font-bold text-white font-mono">{formatTime(lastCheckOutTime)}</p>
-                                </div>
+
+                                {isAttendanceLoading ? (
+                                    <div className="flex items-center justify-center text-emerald-500 h-[60px] bg-black/20 rounded-xl border border-white/5"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-4 relative z-10">
+                                        <button
+                                            onClick={() => navigate('/attendance/check-in')}
+                                            disabled={isCheckedIn || isActionInProgress}
+                                            className={`
+                                                relative overflow-hidden rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all duration-300
+                                                ${isCheckedIn 
+                                                    ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
+                                                    : 'bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg shadow-emerald-900/50 border border-emerald-500/30 active:scale-95'
+                                                }
+                                            `}
+                                        >
+                                            <LogIn className={`h-6 w-6 ${!isCheckedIn && 'animate-pulse'}`} />
+                                            <span className="font-bold text-sm">Check In</span>
+                                        </button>
+
+                                        <button
+                                            onClick={() => navigate('/attendance/check-out')}
+                                            disabled={!isCheckedIn || isActionInProgress}
+                                            className={`
+                                                relative overflow-hidden rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all duration-300
+                                                ${!isCheckedIn 
+                                                    ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
+                                                    : 'bg-gradient-to-br from-rose-600 to-rose-800 text-white shadow-lg shadow-rose-900/50 border border-rose-500/30 active:scale-95'
+                                                }
+                                            `}
+                                        >
+                                            <LogOut className="h-6 w-6" />
+                                            <span className="font-bold text-sm">Check Out</span>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-
-                            {isAttendanceLoading ? (
-                                <div className="flex items-center justify-center text-emerald-500 h-[60px] bg-black/20 rounded-xl border border-white/5"><Loader2 className="h-6 w-6 animate-spin" /></div>
-                            ) : (
-                                <div className="grid grid-cols-2 gap-4 relative z-10">
-                                    <button
-                                        onClick={() => navigate('/attendance/check-in')}
-                                        disabled={isCheckedIn || isActionInProgress}
-                                        className={`
-                                            relative overflow-hidden rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all duration-300
-                                            ${isCheckedIn 
-                                                ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
-                                                : 'bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg shadow-emerald-900/50 border border-emerald-500/30 active:scale-95'
-                                            }
-                                        `}
-                                    >
-                                        <LogIn className={`h-6 w-6 ${!isCheckedIn && 'animate-pulse'}`} />
-                                        <span className="font-bold text-sm">Check In</span>
-                                    </button>
-
-                                    <button
-                                        onClick={() => navigate('/attendance/check-out')}
-                                        disabled={!isCheckedIn || isActionInProgress}
-                                        className={`
-                                            relative overflow-hidden rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all duration-300
-                                            ${!isCheckedIn 
-                                                ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
-                                                : 'bg-gradient-to-br from-rose-600 to-rose-800 text-white shadow-lg shadow-rose-900/50 border border-rose-500/30 active:scale-95'
-                                            }
-                                        `}
-                                    >
-                                        <LogOut className="h-6 w-6" />
-                                        <span className="font-bold text-sm">Check Out</span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </section>
+                        </section>
+                    )}
 
                     <section>
                         <h3 className="fo-section-title mb-4">Account Actions</h3>
@@ -451,49 +453,51 @@ const ProfilePage: React.FC = () => {
                         </form>
                     </div>
 
-                    <div className="md:bg-white md:p-6 md:rounded-2xl md:shadow-lg border border-gray-100">
-                        <div className="flex items-center gap-3 mb-5">
-                            <div className="p-1.5 bg-purple-50 rounded-lg">
-                                <ClipboardList className="h-5 w-5 text-purple-600" />
-                            </div>
-                            <h3 className="text-lg md:text-xl font-bold text-gray-900">Work Hours Tracking</h3>
-                        </div>
-                        <div className="space-y-5">
-                            <div className="grid grid-cols-2 gap-5">
-                                <div className="text-center bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200">
-                                    <p className="text-xs md:text-sm font-medium text-gray-500 mb-1">Last Check In</p>
-                                    <p className="text-2xl md:text-3xl font-bold text-emerald-600">{formatTime(lastCheckInTime)}</p>
+                    {user.role !== 'management' && (
+                        <div className="md:bg-white md:p-6 md:rounded-2xl md:shadow-lg border border-gray-100">
+                            <div className="flex items-center gap-3 mb-5">
+                                <div className="p-1.5 bg-purple-50 rounded-lg">
+                                    <ClipboardList className="h-5 w-5 text-purple-600" />
                                 </div>
-                                <div className="text-center bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200">
-                                    <p className="text-xs md:text-sm font-medium text-gray-500 mb-1">Last Check Out</p>
-                                    <p className="text-2xl md:text-3xl font-bold text-rose-600">{formatTime(lastCheckOutTime)}</p>
-                                </div>
+                                <h3 className="text-lg md:text-xl font-bold text-gray-900">Work Hours Tracking</h3>
                             </div>
+                            <div className="space-y-5">
+                                <div className="grid grid-cols-2 gap-5">
+                                    <div className="text-center bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200">
+                                        <p className="text-xs md:text-sm font-medium text-gray-500 mb-1">Last Check In</p>
+                                        <p className="text-2xl md:text-3xl font-bold text-emerald-600">{formatTime(lastCheckInTime)}</p>
+                                    </div>
+                                    <div className="text-center bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200">
+                                        <p className="text-xs md:text-sm font-medium text-gray-500 mb-1">Last Check Out</p>
+                                        <p className="text-2xl md:text-3xl font-bold text-rose-600">{formatTime(lastCheckOutTime)}</p>
+                                    </div>
+                                </div>
 
-                            {isAttendanceLoading ? (
-                                <div className="flex items-center justify-center h-[56px] bg-gray-50 rounded-xl"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
-                            ) : (
-                                <div className="flex gap-4">
-                                    <Button
-                                        onClick={() => navigate('/attendance/check-in')}
-                                        variant="primary"
-                                        className="flex-1 !py-3 text-base md:text-lg shadow-lg shadow-emerald-100 hover:shadow-emerald-200 transition-all"
-                                        disabled={isCheckedIn || isActionInProgress}
-                                    >
-                                        <LogIn className="mr-2 h-5 w-5" /> Check In
-                                    </Button>
-                                    <Button
-                                        onClick={() => navigate('/attendance/check-out')}
-                                        variant="danger"
-                                        className="flex-1 !py-3 text-base md:text-lg shadow-lg shadow-red-100 hover:shadow-red-200 transition-all"
-                                        disabled={!isCheckedIn || isActionInProgress}
-                                    >
-                                        <LogOut className="mr-2 h-5 w-5" /> Check Out
-                                    </Button>
-                                </div>
-                            )}
+                                {isAttendanceLoading ? (
+                                    <div className="flex items-center justify-center h-[56px] bg-gray-50 rounded-xl"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
+                                ) : (
+                                    <div className="flex gap-4">
+                                        <Button
+                                            onClick={() => navigate('/attendance/check-in')}
+                                            variant="primary"
+                                            className="flex-1 !py-3 text-base md:text-lg shadow-lg shadow-emerald-100 hover:shadow-emerald-200 transition-all"
+                                            disabled={isCheckedIn || isActionInProgress}
+                                        >
+                                            <LogIn className="mr-2 h-5 w-5" /> Check In
+                                        </Button>
+                                        <Button
+                                            onClick={() => navigate('/attendance/check-out')}
+                                            variant="danger"
+                                            className="flex-1 !py-3 text-base md:text-lg shadow-lg shadow-red-100 hover:shadow-red-200 transition-all"
+                                            disabled={!isCheckedIn || isActionInProgress}
+                                        >
+                                            <LogOut className="mr-2 h-5 w-5" /> Check Out
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 <div className="space-y-6">
