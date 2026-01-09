@@ -171,6 +171,7 @@ const UserManagement: React.FC = () => {
                                 <td data-label="Name" className="px-6 py-4 font-medium">{user.name}</td>
                                 <td data-label="Email" className="px-6 py-4 text-sm text-muted">{user.email}</td>
                                 <td data-label="Role" className="px-6 py-4 text-sm text-muted">
+                                    {getRoleName(user.role)}
                                     {user.role === 'unverified' && (
                                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 ml-2">Pending Approval</span>
                                     )}
