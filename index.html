@@ -1,0 +1,2296 @@
+<!-- Force reload -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+
+    <!-- PWA Meta Tags -->
+    <meta name="application-name" content="Paradigm Services">
+    <meta
+      name="description"
+      content="Comprehensive employee onboarding and management system for Paradigm Services"
+    >
+    <meta name="theme-color" content="#041b0f">
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Apple iOS PWA Support -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    >
+    <meta name="apple-mobile-web-app-title" content="Paradigm">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png">
+
+    <!-- iOS Splash Screens -->
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/iphone5_splash.png"
+      media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/iphone6_splash.png"
+      media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/iphoneplus_splash.png"
+      media="(device-width: 621px) and (device-height: 1104px) and (-webkit-device-pixel-ratio: 3)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/iphonex_splash.png"
+      media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/iphonexr_splash.png"
+      media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/iphonexsmax_splash.png"
+      media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/ipad_splash.png"
+      media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/ipadpro1_splash.png"
+      media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/ipadpro3_splash.png"
+      media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/ipadpro2_splash.png"
+      media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)"
+    >
+
+    <!-- Windows Tiles -->
+    <meta name="msapplication-TileColor" content="#0d2818">
+    <meta name="msapplication-TileImage" content="/icons/icon-192x192.png">
+    <meta name="msapplication-config" content="/browserconfig.xml">
+
+    <!-- Favicon -->
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/icons/icon-192x192.png"
+    >
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="/icons/icon-192x192.png"
+    >
+    <link rel="shortcut icon" href="/favicon.ico">
+
+    <title>Paradigm Employee Onboarding</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              accent: "#006B3F",
+              "accent-dark": "#005632",
+              page: "#F9FAFB",
+              card: "#FFFFFF",
+              muted: "#6B7280",
+              "primary-text": "#0F172A",
+              border: "#E6EEF3",
+              "accent-light": "rgba(0, 107, 63, 0.1)",
+            },
+            boxShadow: {
+              card: "0 6px 18px rgba(15,23,42,0.06)",
+              md:
+                "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
+            },
+            borderRadius: {
+              xl: "1rem",
+              "2xl": "1.5rem",
+            },
+            fontFamily: {
+              sans: ["Manrope", "system-ui", "sans-serif"],
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    >
+    <link
+      rel="stylesheet"
+      href="https://aistudiocdn.com/react-date-range@^2.0.1/dist/styles.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://aistudiocdn.com/react-date-range@^2.0.1/dist/theme/default.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://aistudiocdn.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      /* Custom map marker styles */
+      .user-marker {
+        position: relative;
+        width: 48px !important;
+        height: 48px !important;
+        border-radius: 8px;
+        border: 3px solid #006b3f;
+        /* accent color */
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        background-size: cover;
+        background-position: center;
+        background-color: #fff;
+      }
+
+      .user-marker::after {
+        content: "";
+        position: absolute;
+        bottom: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-top: 8px solid #006b3f;
+      }
+
+      .user-marker-popup .leaflet-popup-content-wrapper {
+        border-radius: 8px;
+        padding: 0;
+      }
+
+      .user-marker-popup .leaflet-popup-content {
+        margin: 10px;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+
+      .user-marker-popup .popup-name {
+        font-weight: bold;
+        margin-bottom: 4px;
+        color: #0f172a;
+      }
+
+      .user-marker-popup .popup-time {
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      .pro-dark-theme .user-marker-popup .leaflet-popup-content-wrapper {
+        background-color: #0d2c18;
+        color: #e5e7eb;
+        border: 1px solid #123820;
+      }
+
+      .pro-dark-theme .user-marker-popup .popup-name {
+        color: #ffffff;
+      }
+
+      .pro-dark-theme .user-marker-popup .popup-time {
+        color: #d1d5db;
+      }
+
+      .pro-dark-theme .leaflet-popup-tip {
+        background-color: #0d2c18;
+      }
+
+      .pro-dark-theme .leaflet-control-attribution a {
+        color: #86efac;
+        /* A light green from the dark theme */
+      }
+
+      /* A subtle filter for any map tiles in dark mode to reduce brightness */
+      .pro-dark-theme .leaflet-tile-pane {
+        filter: brightness(0.9) contrast(1.1);
+      }
+
+      /* Dark Calendar Styles */
+      .dark-calendar .rdrCalendarWrapper,
+      .dark-calendar .rdrDateDisplayWrapper,
+      .dark-calendar .rdrMonthAndYearWrapper {
+        background-color: #041b0f !important;
+        color: #ffffff !important;
+      }
+
+      .dark-calendar .rdrDayNumber span {
+        color: #ffffff !important;
+      }
+
+      .dark-calendar .rdrDayPassive .rdrDayNumber span {
+        color: #4b5563 !important;
+      }
+
+      .dark-calendar .rdrMonthAndYearPickers select {
+        background-color: #041b0f !important;
+        color: #ffffff !important;
+      }
+
+      .dark-calendar .rdrNextPrevButton {
+        background-color: #064e3b !important;
+      }
+
+      .dark-calendar .rdrNextPrevButton:hover {
+        background-color: #065f46 !important;
+      }
+
+      .dark-calendar .rdrPprevButton i {
+        border-color: transparent #ffffff transparent transparent !important;
+      }
+
+      .dark-calendar .rdrNextButton i {
+        border-color: transparent transparent transparent #ffffff !important;
+      }
+
+      .dark-calendar .rdrWeekDay {
+        color: #9ca3af !important;
+      }
+
+      .dark-calendar .rdrDayToday .rdrDayNumber span:after {
+        background: #10b981 !important;
+      }
+
+      /* Custom Stepper Styles */
+      .stepIndicator {
+        transition:
+          transform 0.28s cubic-bezier(0.2, 0.9, 0.2, 1),
+          background-color 0.2s ease,
+          border-color 0.2s ease;
+        will-change: transform;
+      }
+
+      .stepIndicatorActive {
+        animation: scale-in 0.28s cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+      }
+
+      @keyframes scale-in {
+        0% {
+          transform: scale(0.85);
+        }
+
+        70% {
+          transform: scale(1.05);
+        }
+
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      .stepIcon {
+        transition: opacity 0.22s ease, transform 0.22s ease;
+        will-change: opacity, transform;
+      }
+
+      .stepIconAnimate {
+        animation: fade-slide-in 0.22s ease forwards;
+      }
+
+      @keyframes fade-slide-in {
+        0% {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+
+        100% {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .shake {
+        animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+        transform: translate3d(0, 0, 0);
+      }
+
+      @keyframes shake {
+        10%,
+        90% {
+          transform: translate3d(-1px, 0, 0);
+        }
+
+        20%,
+        80% {
+          transform: translate3d(2px, 0, 0);
+        }
+
+        30%,
+        50%,
+        70% {
+          transform: translate3d(-4px, 0, 0);
+        }
+
+        40%,
+        60% {
+          transform: translate3d(4px, 0, 0);
+        }
+      }
+
+      .splash-logo {
+        animation: splash-logo-pop-up 1.2s
+          cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+      }
+
+      @keyframes splash-logo-pop-up {
+        0% {
+          opacity: 0;
+          transform: scale(0.8);
+        }
+
+        70% {
+          opacity: 1;
+          transform: scale(1.05);
+        }
+
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      @keyframes fade-in-scale {
+        0% {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      .animate-fade-in-scale {
+        animation: fade-in-scale 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+          forwards;
+      }
+
+      @keyframes pulse-bg {
+        0%,
+        100% {
+          background-color: rgba(0, 107, 63, 0.05);
+        }
+
+        50% {
+          background-color: rgba(0, 107, 63, 0.15);
+        }
+      }
+
+      .animate-pulse-bg {
+        animation: pulse-bg 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      .skeleton-pulse {
+        animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        background-color: #e5e7eb;
+        /* gray-200 */
+      }
+
+      @keyframes skeleton-pulse {
+        50% {
+          opacity: 0.6;
+        }
+      }
+
+      /* Navigation bar animations */
+      @keyframes slide-up {
+        from {
+          transform: translateY(100%);
+          opacity: 0;
+        }
+
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0px);
+        }
+
+        50% {
+          transform: translateY(-5px);
+        }
+      }
+
+      @keyframes bounce-subtle {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+
+        50% {
+          transform: scale(1.1);
+        }
+      }
+
+      .animate-slide-up {
+        animation: slide-up 0.4s ease-out;
+      }
+
+      .animate-bounce-subtle {
+        animation: bounce-subtle 0.6s ease-in-out;
+      }
+
+      .pro-dark-theme .skeleton-pulse {
+        background-color: #374151;
+        /* gray-600 */
+      }
+
+      /* HIDE SCROLLBAR BUT KEEP FUNCTIONALITY */
+      /* For Firefox */
+      html {
+        scrollbar-width: none;
+      }
+
+      /* For Chrome, Safari, and Opera */
+      ::-webkit-scrollbar {
+        display: none;
+      }
+
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+
+      .hide-scrollbar {
+        -ms-overflow-style: none;
+        /* IE and Edge */
+        scrollbar-width: none;
+        /* Firefox */
+      }
+
+      /* FIX: Ensure full page background color and prevent black bars on scroll */
+      html {
+        min-height: 100vh;
+      }
+
+      body {
+        background-color: #f9fafb;
+        /* Default light theme color */
+        zoom: 70%;
+        min-height: 143vh;
+      }
+
+      @media (max-width: 768px) {
+        html,
+        body {
+          background-color: #041b0f !important;
+        }
+      }
+
+      #root {
+        min-height: 143vh;
+      }
+
+      @media (max-width: 768px) {
+        #root {
+          background-color: #041b0f !important;
+        }
+      }
+
+      /* Override Tailwind's screen height utilities to account for zoom */
+      .min-h-screen {
+        min-height: 143vh !important;
+      }
+
+      .h-screen {
+        height: 143vh !important;
+      }
+
+      .form-input {
+        background-color: #ffffff;
+        /* bg-card */
+        border: 1px solid #e6eef3;
+        /* border-border */
+        border-radius: 0.5rem;
+        /* rounded-lg */
+        padding: 0.75rem 1rem;
+        width: 100%;
+        font-size: 0.875rem;
+        /* sm:text-sm */
+        color: #0f172a;
+        /* text-primary-text */
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .form-input:focus {
+        outline: none;
+        border-color: #005d22;
+        /* border-accent */
+        box-shadow: 0 0 0 1px #005d22;
+        /* focus:ring-1 focus:ring-accent */
+      }
+
+      .form-input::placeholder {
+        color: #6b7280;
+        /* text-muted */
+      }
+
+      .form-input--error {
+        border-color: #ef4444 !important;
+        /* border-red-500 */
+      }
+
+      .form-input--error:focus {
+        border-color: #ef4444 !important;
+        box-shadow: 0 0 0 1px #ef4444 !important;
+      }
+
+      .form-header-title {
+        position: relative;
+        display: inline-block;
+        padding-bottom: 0.5rem;
+      }
+
+      .form-header-title::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 40%;
+        height: 3px;
+        background-color: #005d22;
+        /* accent */
+        border-radius: 999px;
+      }
+
+      /* Animation for fixing UI glitch */
+      @keyframes fade-in-down {
+        0% {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+
+        100% {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .animate-fade-in-down {
+        animation: fade-in-down 0.2s ease-out forwards;
+      }
+
+      @media print {
+        .no-print {
+          display: none !important;
+        }
+
+        body,
+        .printable-area {
+          margin: 0;
+          padding: 0;
+          box-shadow: none;
+          border: none;
+          background-color: white !important;
+        }
+
+        .page-break {
+          page-break-after: always;
+        }
+
+        .pdf-page {
+          width: 210mm;
+          min-height: 297mm;
+          height: auto;
+          padding: 1cm;
+          box-sizing: border-box;
+        }
+      }
+
+      /* --- Universal UI Component Styles --- */
+      .status-chip,
+      .sync-chip,
+      .leave-status-chip {
+        padding: 0.25rem 0.75rem;
+        display: inline-flex;
+        font-size: 0.75rem;
+        line-height: 1rem;
+        font-weight: 600;
+        border-radius: 9999px;
+        text-transform: capitalize;
+        border: 1px solid transparent;
+      }
+
+      .status-chip--pending {
+        background-color: #fef3c7;
+        color: #92400e;
+      }
+
+      .status-chip--verified {
+        background-color: #d1fae5;
+        color: #065f46;
+      }
+
+      .status-chip--rejected {
+        background-color: #fee2e2;
+        color: #991b1b;
+      }
+
+      .status-chip--draft {
+        background-color: #f3f4f6;
+        color: #374151;
+      }
+
+      .sync-chip--pending_sync {
+        background-color: #dbeafe;
+        color: #1e40af;
+      }
+
+      .sync-chip--synced {
+        background-color: #d1fae5;
+        color: #065f46;
+      }
+
+      .sync-chip--failed {
+        background-color: #fee2e2;
+        color: #991b1b;
+      }
+
+      .leave-status-chip--pending_manager_approval {
+        background-color: #fef3c7;
+        color: #92400e;
+      }
+
+      .leave-status-chip--pending_hr_confirmation {
+        background-color: #dbeafe;
+        color: #1e40af;
+      }
+
+      .leave-status-chip--approved {
+        background-color: #d1fae5;
+        color: #065f46;
+      }
+
+      .leave-status-chip--rejected {
+        background-color: #fee2e2;
+        color: #991b1b;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        border-radius: 9999px;
+        transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid transparent;
+      }
+
+      .btn-sm {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.75rem;
+      }
+
+      .btn-md {
+        padding: 0.5rem 1.5rem;
+        font-size: 0.875rem;
+      }
+
+      .btn-lg {
+        padding: 0.75rem 2rem;
+        font-size: 1rem;
+      }
+
+      .btn-icon {
+        padding: 0.5rem;
+      }
+
+      .btn-icon.btn-sm {
+        padding: 0.375rem;
+      }
+
+      .btn-icon.btn-lg {
+        padding: 0.75rem;
+      }
+
+      .btn-primary {
+        background-color: #006b3f !important;
+        color: #ffffff !important;
+        border: 1px solid #005632 !important;
+      }
+
+      .btn-primary:hover {
+        background-color: #005632 !important;
+      }
+
+      .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      /* Mobile overrides for buttons */
+      @media (max-width: 768px) {
+        /* Universal button styling - Green primary style */
+        button:not(nav button):not(.btn-icon):not(.btn-secondary):not(
+          .google-btn
+        ):not(.signin-btn):not(.btn-danger),
+        .btn:not(nav .btn):not(.btn-icon):not(.btn-secondary):not(
+          .google-btn
+        ):not(.signin-btn):not(.btn-danger),
+        [type="button"]:not(nav [type="button"]):not(.btn-icon):not(
+          .btn-secondary
+        ):not(.google-btn):not(.signin-btn):not(.btn-danger),
+        [type="submit"]:not(.signin-btn):not(.btn-danger),
+        a[class*="btn"]:not(.btn-danger) {
+          background-color: #22c55e !important;
+          color: #ffffff !important;
+          border: none !important;
+          border-radius: 12px !important;
+          padding: 12px 24px !important;
+          font-weight: 600 !important;
+          font-size: 14px !important;
+          box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3) !important;
+          transition: all 0.3s ease !important;
+        }
+
+        button:hover,
+        .btn:hover {
+          background-color: #16a34a !important;
+          box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4) !important;
+          transform: translateY(-1px) !important;
+        }
+
+        button:active,
+        .btn:active {
+          transform: translateY(0) !important;
+        }
+
+        /* Icon buttons - Fix for Bell, Avatar Edit, etc */
+        /* Icon buttons - Fix for Bell, Avatar Edit, etc */
+        button[class*="icon"],
+        .btn-icon {
+          background-color: transparent !important;
+          color: inherit !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 8px !important;
+          width: auto !important;
+          border-radius: 9999px !important;
+          min-width: auto !important;
+        }
+
+        /* CRITICAL: Force icon buttons in tables to NEVER have green background */
+        table button.btn-icon,
+        table button[class*="btn-icon"],
+        td button.btn-icon,
+        td button[class*="btn-icon"],
+        [data-label="Actions"] button,
+        [data-label="Actions"] .btn,
+        [data-label="Actions"] button.btn-icon,
+        .responsive-table button.btn-icon,
+        .responsive-table td button {
+          background-color: transparent !important;
+          color: inherit !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 8px !important;
+          border-radius: 9999px !important;
+          min-width: auto !important;
+          width: auto !important;
+        }
+
+        /* Force flex containers in Actions column to have no background BUT maintain flex layout */
+        [data-label="Actions"] .flex,
+        [data-label="Actions"] div,
+        td[data-label="Actions"] > div,
+        .responsive-table td[data-label="Actions"] > div,
+        .responsive-table tbody tr td[data-label="Actions"] > div,
+        table.responsive-table td[data-label="Actions"] .flex {
+          background-color: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          /* CRITICAL: Ensure proper flex layout for horizontal button spacing */
+          display: flex !important;
+          flex-direction: row !important;
+          align-items: center !important;
+          gap: 12px !important;
+          /* Increased to 12px for better visibility */
+          flex-wrap: nowrap !important;
+          justify-content: flex-end !important;
+        }
+
+        /* Additional specificity for buttons themselves to prevent overlap */
+        [data-label="Actions"] button,
+        td[data-label="Actions"] > div > button,
+        .responsive-table td[data-label="Actions"] button {
+          margin-right: 0 !important;
+          margin-left: 0 !important;
+          position: relative !important;
+          flex-shrink: 0 !important;
+        }
+
+        /* CRITICAL: Remove green background from ALL delete/trash icon buttons globally */
+        button:has(svg.text-red-500),
+        .btn-icon:has(svg.text-red-500),
+        button.btn-icon,
+        button[aria-label*="Delete"],
+        button[aria-label*="Remove"],
+        button[title*="Delete"],
+        button[title*="Remove"] {
+          background-color: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 8px !important;
+          min-width: auto !important;
+          width: auto !important;
+        }
+
+        /* Ensure trash icon buttons keep hover effect but no green background */
+        button:has(svg.text-red-500):hover,
+        .btn-icon:has(svg.text-red-500):hover {
+          background-color: rgba(239, 68, 68, 0.1) !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+
+        /* Specific fix for avatar delete button to keep it white/red */
+        #avatar-delete-button {
+          background-color: #ffffff !important;
+          color: #dc2626 !important;
+          padding: 6px !important;
+          width: 32px !important;
+          height: 32px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          border: none !important;
+          outline: none !important;
+          box-shadow: none !important;
+          border-radius: 50% !important;
+        }
+
+        #avatar-delete-button svg {
+          color: #dc2626 !important;
+          stroke: #dc2626 !important;
+        }
+
+        /* Specific fix for avatar capture button */
+        .avatar-capture-btn {
+          background-color: rgba(255, 255, 255, 0.8) !important;
+          color: #dc2626 !important;
+          border: 1px solid #fecaca !important;
+          box-shadow: none !important;
+          padding: 8px 16px !important;
+          border-radius: 9999px !important;
+          width: auto !important;
+        }
+
+        .notification-dot {
+          background-color: #ef4444 !important;
+          border: 1.5px solid #ffffff !important;
+        }
+
+        /* Secondary/outlined buttons */
+        button[class*="secondary"],
+        button[class*="outline"],
+        .btn-secondary,
+        .btn-outline {
+          background-color: transparent !important;
+          border: 2px solid #22c55e !important;
+          color: #22c55e !important;
+          box-shadow: none !important;
+        }
+
+        button[class*="secondary"]:hover,
+        .btn-secondary:hover {
+          background-color: rgba(34, 197, 94, 0.1) !important;
+          border-color: #16a34a !important;
+        }
+
+        /* Danger/delete buttons */
+        button[class*="danger"],
+        button[class*="delete"],
+        .btn-danger {
+          background-color: #ef4444 !important;
+          box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
+        }
+
+        button[class*="danger"]:hover {
+          background-color: #dc2626 !important;
+        }
+
+        /* Disabled state */
+        button:disabled,
+        .btn:disabled {
+          opacity: 0.5 !important;
+          cursor: not-allowed !important;
+          transform: none !important;
+        }
+
+        /* Input fields - Solid dark style */
+        input,
+        textarea,
+        select {
+          background-color: #0d2c18 !important;
+          border: 1px solid rgba(34, 197, 94, 0.2) !important;
+          border-radius: 12px !important;
+          color: #ffffff !important;
+          padding: 14px 16px !important;
+          font-size: 14px !important;
+          transition: all 0.3s ease !important;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+          background-color: #0d2c18 !important;
+          border-color: #22c55e !important;
+          outline: none !important;
+          box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1) !important;
+        }
+
+        input::placeholder,
+        textarea::placeholder {
+          color: rgba(255, 255, 255, 0.5) !important;
+        }
+
+        /* Cards and containers - Solid background for readability */
+        .bg-white,
+        .md\:bg-white,
+        .bg-card,
+        [class*="card"] {
+          background-color: #041b0f !important;
+          background-image: none !important;
+          opacity: 1 !important;
+          border: none !important;
+          border-radius: 16px !important;
+        }
+
+        /* Page background - Dark green for mobile */
+        body,
+        #root,
+        .bg-page,
+        main,
+        [class*="page"],
+        [class*="container"] {
+          background-color: #041b0f !important;
+        }
+
+        /* Light gray backgrounds to dark green */
+        .bg-gray-50,
+        .bg-gray-100,
+        .bg-page {
+          background-color: #041b0f !important;
+        }
+
+        /* Remove shadows on mobile */
+        .shadow-lg,
+        .shadow-md,
+        .shadow-sm,
+        .shadow-card,
+        .md\:shadow-lg {
+          box-shadow: none !important;
+        }
+
+        /* Make calendar and card components transparent */
+        /* REMOVED: This was causing modals to be transparent */
+        /* .rounded-xl,
+        .rounded-2xl {
+          background-color: transparent !important;
+        } */
+
+        /* Remove any red borders/outlines */
+        nav,
+        nav *,
+        .fixed,
+        button,
+        a {
+          outline: none !important;
+        }
+
+        /* Fix select dropdown styling */
+        select {
+          background-color: rgba(13, 44, 24, 0.4) !important;
+          color: #ffffff !important;
+          border-color: rgba(34, 197, 94, 0.2) !important;
+        }
+
+        select:focus {
+          background-color: rgba(13, 44, 24, 0.6) !important;
+          color: #ffffff !important;
+          outline: none !important;
+        }
+
+        /* Style the dropdown options with WHITE background */
+        option {
+          background-color: #ffffff !important;
+          color: #000000 !important;
+          padding: 12px !important;
+        }
+
+        /* Ensure form containers on mobile have extra padding at the bottom */
+        form,
+        .form-container {
+          padding-bottom: 40px !important;
+        }
+
+        /* FULL SCREEN FIX: Make all pages fill the screen */
+        /* Increase base font size slightly for better readability */
+        body {
+          font-size: 15px !important;
+        }
+
+        /* Make headings larger and bolder on mobile */
+        h1 {
+          font-size: 1.75rem !important;
+          font-weight: 700 !important;
+        }
+
+        h2 {
+          font-size: 1.375rem !important;
+          font-weight: 600 !important;
+        }
+
+        h3 {
+          font-size: 1.125rem !important;
+          font-weight: 600 !important;
+        }
+
+        /* Reduce excessive padding on mobile */
+        .p-8,
+        .p-6 {
+          padding: 1rem !important;
+        }
+
+        /* Make cards fill more space */
+        .space-y-6 > * + * {
+          margin-top: 1rem !important;
+        }
+
+        .space-y-8 > * + * {
+          margin-top: 1.25rem !important;
+        }
+
+        /* Increase icon sizes in buttons for easier tapping */
+        button svg,
+        .btn svg {
+          width: 1.25rem !important;
+          height: 1.25rem !important;
+        }
+
+        /* FORCE MODALS TO BE TRULY FULL SCREEN ON MOBILE */
+        [role="dialog"] > div {
+          width: 100vw !important;
+          height: 100vh !important;
+          max-width: 100vw !important;
+          border-radius: 0 !important;
+        }
+
+        option:checked {
+          background: linear-gradient(#22c55e, #22c55e) !important;
+          background-color: #22c55e !important;
+          color: #ffffff !important;
+        }
+
+        option:hover {
+          background-color: #e6f7ef !important;
+          color: #000000 !important;
+        }
+
+        /* Remove default blue highlight */
+        select::-ms-expand {
+          display: none;
+        }
+
+        /* Fix modal/dialog backgrounds on mobile */
+        /* Transparent backdrop */
+        .fixed.inset-0,
+        [class*="backdrop"],
+        .modal-backdrop,
+        .overlay {
+          background-color: transparent !important;
+          backdrop-filter: none !important;
+        }
+
+        /* Keep modal dialog visible */
+        [role="dialog"],
+        .modal-content,
+        div[role="dialog"],
+        div[role="dialog"] > div,
+        .fixed > div[role="dialog"],
+        [class*="modal"] {
+          background-color: #041b0f !important;
+          border: 1px solid rgba(34, 197, 94, 0.5) !important;
+          border-radius: 20px !important;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
+        }
+
+        /* Modal text color */
+        [role="dialog"] *,
+        .modal-content *,
+        div[role="dialog"] * {
+          color: #ffffff !important;
+        }
+
+        /* Modal title */
+        [role="dialog"] h2,
+        [role="dialog"] h3,
+        .modal-content h2,
+        .modal-content h3,
+        div[role="dialog"] h2,
+        div[role="dialog"] h3 {
+          color: #ffffff !important;
+          font-weight: 700 !important;
+        }
+
+        /* Override any dark background classes */
+        [role="dialog"] .bg-card,
+        [role="dialog"] .bg-white,
+        .modal-content .bg-card,
+        .modal-content .bg-white {
+          background-color: #041b0f !important;
+        }
+
+        /* Fix Work Hours Tracking section */
+        [class*="Work"] {
+          background-color: transparent !important;
+        }
+
+        /* Fix Auth Card Background on Mobile */
+        .auth-card-container {
+          background-color: #000000 !important;
+          backdrop-filter: blur(12px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.1) !important;
+          /* Increase size by 70% total (40% + 30% extra) */
+          transform: scale(1.7) !important;
+          width: 58.8% !important;
+          /* Compensate for scale (100/1.7) */
+          margin-left: auto !important;
+          margin-right: auto !important;
+        }
+
+        /* Fix Avatar Upload Buttons - Override mobile defaults */
+        .avatar-capture-btn {
+          background-color: rgba(255, 255, 255, 0.8) !important;
+          color: #dc2626 !important;
+          border: 1px solid #fecaca !important;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+          padding: 8px 16px !important;
+          border-radius: 9999px !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+
+        .avatar-delete-btn {
+          background-color: rgba(255, 255, 255, 0.9) !important;
+          color: #dc2626 !important;
+          border: none !important;
+          padding: 6px !important;
+          width: 32px !important;
+          height: 32px !important;
+          min-width: 0 !important;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+
+        /* Fix slide to confirm component */
+        .fo-slider--checkin,
+        .fo-slider--checkout,
+        [class*="slider"] {
+          background-color: rgba(13, 44, 24, 0.5) !important;
+          border: 1px solid rgba(34, 197, 94, 0.2) !important;
+          border-radius: 12px !important;
+        }
+
+        /* Fix Attendance Dashboard mobile view */
+        /* Remove white backgrounds from charts and cards */
+        canvas,
+        svg {
+          background-color: transparent !important;
+        }
+
+        /* Fix stat cards */
+        [class*="stat"],
+        [class*="metric"],
+        [class*="card"] {
+          background-color: transparent !important;
+          border-color: #123820 !important;
+        }
+
+        /* Fix buttons in attendance dashboard */
+        button[class*="bg-white"],
+        button[class*="border-gray"] {
+          background-color: #0d2c18 !important;
+          border-color: #123820 !important;
+          color: #ffffff !important;
+        }
+
+        /* Fix date range buttons */
+        button[class*="text-gray"],
+        button[class*="hover:bg-gray"] {
+          color: #ffffff !important;
+          background-color: transparent !important;
+        }
+
+        button[class*="text-gray"]:hover,
+        button[class*="selected"] {
+          background-color: #006b3f !important;
+          color: #ffffff !important;
+        }
+
+        /* Labels */
+        label {
+          color: rgba(255, 255, 255, 0.8) !important;
+          font-size: 13px !important;
+          font-weight: 500 !important;
+          margin-bottom: 6px !important;
+        }
+
+        /* Section headers */
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+          color: #ffffff !important;
+        }
+
+        /* Links */
+        a:not(.btn):not(.auth-link) {
+          color: #22c55e !important;
+        }
+
+        /* Fix form inputs background override */
+        .form-input {
+          background-color: rgba(13, 44, 24, 0.4) !important;
+          border-color: rgba(34, 197, 94, 0.2) !important;
+          color: #ffffff !important;
+        }
+
+        .form-input:focus {
+          background-color: rgba(13, 44, 24, 0.6) !important;
+          border-color: #22c55e !important;
+        }
+
+        /* Remove profile header container/box */
+        /* This removes the visible box around profile picture and Change/Capture buttons */
+        .overflow-hidden.relative,
+        .relative.overflow-hidden,
+        [class*="profile"] > div:first-child,
+        .flex.flex-col.md\:flex-row.items-center {
+          background-color: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 0 !important;
+        }
+
+        /* Remove rounded container backgrounds */
+        .md\:p-6,
+        .md\:rounded-2xl {
+          background-color: transparent !important;
+          border: none !important;
+        }
+
+        /* REMOVE ALL BORDERS on mobile */
+        *:not(input):not(textarea):not(select) {
+          border: none !important;
+        }
+
+        /* Keep only input borders with subtle styling */
+        input,
+        textarea,
+        select {
+          border: 1px solid rgba(34, 197, 94, 0.2) !important;
+        }
+
+        /* Remove borders and backgrounds from table action buttons */
+        table button,
+        table .btn,
+        table button[class*="btn"],
+        td button,
+        td .btn,
+        [data-label="Actions"] button,
+        [data-label="Actions"] .btn {
+          border: none !important;
+          background-color: transparent !important;
+          box-shadow: none !important;
+          padding: 8px !important;
+        }
+
+        /* Keep icon buttons transparent in tables */
+        table .btn-icon,
+        td .btn-icon {
+          background-color: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 8px !important;
+        }
+
+        /* Specific fixes for delete buttons in tables - keep red color */
+        table button:has(svg.text-red-500),
+        td button:has(svg.text-red-500),
+        [data-label="Actions"] button:has(svg.text-red-500) {
+          background-color: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 8px !important;
+        }
+
+        /* Hover state for delete icon buttons in tables */
+        table button:has(svg.text-red-500):hover,
+        td button:has(svg.text-red-500):hover {
+          background-color: rgba(239, 68, 68, 0.1) !important;
+          border: none !important;
+        }
+
+        /* Edit icon buttons in tables */
+        table button:has(.h-4.w-4),
+        td button.btn-icon {
+          background-color: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+
+        /* Override any remaining button styles in Actions column */
+        [data-label="Actions"] *,
+        [data-label="Actions"] button *,
+        [data-label="Actions"] .btn * {
+          border: none !important;
+        }
+
+        /* Remove borders from specific common elements */
+        div,
+        section,
+        article,
+        aside,
+        main,
+        header,
+        footer,
+        nav,
+        .card,
+        .container,
+        .wrapper,
+        .box,
+        [class*="border"] {
+          border: none !important;
+        }
+
+        /* SMOOTH ANIMATIONS FOR MOBILE */
+        /* Fade in from bottom for all major sections */
+        section,
+        [class*="card"],
+        [class*="container"]:not(nav),
+        .bg-card {
+          animation: fadeInUp 0.6s ease-out forwards;
+          opacity: 0;
+          animation-delay: 0.1s;
+        }
+
+        /* Stagger animation for child elements */
+        section > div,
+        [class*="card"] > div {
+          animation: fadeInUp 0.5s ease-out forwards;
+          opacity: 0;
+        }
+
+        section > div:nth-child(1),
+        [class*="card"] > div:nth-child(1) {
+          animation-delay: 0.2s;
+        }
+
+        section > div:nth-child(2),
+        [class*="card"] > div:nth-child(2) {
+          animation-delay: 0.3s;
+        }
+
+        section > div:nth-child(3),
+        [class*="card"] > div:nth-child(3) {
+          animation-delay: 0.4s;
+        }
+
+        section > div:nth-child(4),
+        [class*="card"] > div:nth-child(4) {
+          animation-delay: 0.5s;
+        }
+
+        /* Smooth transitions for all interactive elements */
+        button,
+        input,
+        textarea,
+        select,
+        a {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+
+        /* Hover scale effect for buttons */
+        button:active,
+        .btn:active {
+          transform: scale(0.95) !important;
+        }
+
+        /* Checkbox and toggle animations */
+        input[type="checkbox"] {
+          transition: all 0.2s ease !important;
+        }
+
+        input[type="checkbox"]:checked {
+          animation: checkBounce 0.3s ease;
+        }
+
+        /* Smooth scroll behavior */
+        * {
+          scroll-behavior: smooth !important;
+        }
+
+        /* Page transition fade */
+        body {
+          animation: fadeIn 0.3s ease-out;
+        }
+
+        /* Fix mobile menu bottom bar */
+        /* Style the "Close Menu" bar and navigation in mobile menu */
+        [class*="Close"],
+        button:has(> *:contains("Close")) {
+          background-color: rgba(13, 44, 24, 0.95) !important;
+          border-top: 1px solid rgba(34, 197, 94, 0.3) !important;
+          color: #ffffff !important;
+        }
+
+        /* Fix mobile menu overlay and sidebar */
+        [class*="menu"],
+        [class*="sidebar"],
+        aside {
+          background-color: rgba(13, 44, 24, 0.98) !important;
+        }
+
+        /* Menu items in mobile drawer */
+        nav a,
+        nav button:not(.btn) {
+          transition: all 0.3s ease !important;
+        }
+
+        /* Fix delete button on profile picture */
+        button[class*="delete"],
+        button[class*="remove"],
+        button[aria-label*="delete" i],
+        button[aria-label*="remove" i],
+        [class*="absolute"][class*="top"] button:has(svg) {
+          background-color: transparent !important;
+          width: 32px !important;
+          height: 32px !important;
+          border-radius: 50% !important;
+          padding: 6px !important;
+          box-shadow: none !important;
+          border: none !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          position: absolute !important;
+        }
+
+        button[class*="delete"]:hover,
+        button[class*="remove"]:hover {
+          background-color: rgba(239, 68, 68, 0.1) !important;
+          transform: scale(1.1) !important;
+        }
+
+        button[class*="delete"] svg,
+        button[class*="remove"] svg {
+          color: #ef4444 !important;
+          width: 20px !important;
+          height: 20px !important;
+        }
+
+        /* Remove background from header icon buttons */
+        /* Back button and notification icons */
+        header button,
+        [class*="header"] button,
+        button[class*="icon"],
+        .btn-icon,
+        button:has(> svg:only-child) {
+          background-color: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 8px !important;
+        }
+
+        /* Icon colors */
+        header button svg,
+        button[class*="icon"] svg {
+          color: #22c55e !important;
+        }
+
+        /* Notification badge */
+        [class*="badge"],
+        .badge {
+          background-color: #22c55e !important;
+          color: #ffffff !important;
+          border: 2px solid #041b0f !important;
+        }
+
+        /* Camera icon - make it red */
+        button[aria-label*="camera" i] svg,
+        button[aria-label*="capture" i] svg,
+        [class*="camera"] svg,
+        svg[class*="camera"] {
+          color: #ef4444 !important;
+        }
+
+        /* Slide to Check In/Out slider styling */
+        .fo-slider--checkin,
+        .fo-slider--checkout,
+        [class*="slider"],
+        [class*="Slide"],
+        .fo-slider {
+          border: 1px solid rgba(34, 197, 94, 0.3) !important;
+          background-color: rgba(13, 44, 24, 0.6) !important;
+          border-radius: 50px !important;
+          padding: 4px !important;
+          position: relative !important;
+          height: 56px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+
+        /* Slider thumb (circular handle) */
+        .fo-slider-thumb {
+          background-color: #ffffff !important;
+          width: 48px !important;
+          height: 48px !important;
+          border-radius: 50% !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          cursor: grab !important;
+          position: absolute !important;
+          top: 4px !important;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+          z-index: 2 !important;
+        }
+
+        .fo-slider-thumb:active {
+          cursor: grabbing !important;
+        }
+
+        /* Chevron icon inside thumb */
+        .fo-slider-thumb svg {
+          color: #22c55e !important;
+          width: 24px !important;
+          height: 24px !important;
+        }
+
+        /* Slider text */
+        .fo-slider-text {
+          color: #22c55e !important;
+          font-size: 14px !important;
+          font-weight: 600 !important;
+          user-select: none !important;
+          z-index: 1 !important;
+          text-align: center !important;
+          width: 100% !important;
+          position: absolute !important;
+          left: 0 !important;
+          right: 0 !important;
+        }
+
+        /* Remove backgrounds from slider children except thumb */
+        [class*="slider"] > *:not(.fo-slider-thumb) {
+          background-color: transparent !important;
+        }
+
+        /* Remove ALL borders from slider inner elements */
+        .fo-slider *,
+        .fo-slider::before,
+        .fo-slider::after,
+        .fo-slider-text,
+        .fo-slider > div:not(.fo-slider-thumb),
+        [class*="slider"] > div:not(.fo-slider-thumb),
+        [class*="slider"] span {
+          border: none !important;
+          background-color: transparent !important;
+          box-shadow: none !important;
+        }
+
+        /* --- ICON SIZE INCREASES (30%) --- */
+
+        /* 1. Header Icons (Back & Notification) */
+        header button svg,
+        [class*="header"] button svg,
+        button[class*="icon"] svg,
+        .btn-icon svg {
+          width: 32px !important;
+          height: 32px !important;
+        }
+
+        /* 2. Profile Delete Icon */
+        .avatar-delete-btn {
+          width: 66px !important;
+          height: 66px !important;
+          padding: 14px !important;
+          background-color: #ffffff !important;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+          /* Optional: adds a bit of depth */
+        }
+
+        .avatar-delete-btn svg {
+          width: 35px !important;
+          height: 35px !important;
+        }
+
+        /* 3. Bottom Navigation Icons */
+        nav.fixed.bottom-0 svg {
+          width: 32px !important;
+          height: 32px !important;
+        }
+
+        /* Home Button (Center) - Container & Icon */
+        nav.fixed.bottom-0 a[href*="profile"] > div,
+        nav.fixed.bottom-0 a[href*="home"] > div {
+          width: 72px !important;
+          height: 72px !important;
+        }
+
+        nav.fixed.bottom-0 a[href*="profile"] svg,
+        nav.fixed.bottom-0 a[href*="home"] svg {
+          width: 38px !important;
+          height: 38px !important;
+        }
+      }
+
+      /* Animation Keyframes */
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+
+        to {
+          opacity: 1;
+        }
+      }
+
+      @keyframes checkBounce {
+        0% {
+          transform: scale(1);
+        }
+
+        50% {
+          transform: scale(1.2);
+        }
+
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      .btn-secondary {
+        background-color: #e6eef3;
+        color: #0f172a;
+      }
+
+      .btn-secondary:hover {
+        background-color: #d1d5db;
+      }
+
+      .btn-outline {
+        border-color: #006b3f;
+        color: #006b3f;
+      }
+
+      .btn-outline:hover {
+        background-color: rgba(0, 107, 63, 0.1);
+      }
+
+      .btn-danger {
+        background-color: #ef4444;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background-color: #dc2626;
+      }
+
+      .btn-icon {
+        color: #6b7280;
+      }
+
+      .btn-icon:hover {
+        background-color: #f3f4f6;
+      }
+
+      .api-setting-item-bg {
+        background-color: #f9fafb;
+      }
+
+      .auth-separator {
+        display: flex;
+        align-items: center;
+        text-align: center;
+        color: #d1d5db;
+        /* gray-300 */
+        font-size: 0.875rem;
+      }
+
+      .auth-separator::before,
+      .auth-separator::after {
+        content: "";
+        flex: 1;
+        border-bottom: 1px solid #4b5563;
+        /* gray-600 */
+      }
+
+      .auth-separator:not(:empty)::before {
+        margin-right: 0.5em;
+      }
+
+      .auth-separator:not(:empty)::after {
+        margin-left: 0.5em;
+      }
+
+      .google-signin-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background-color: #ffffff;
+        color: #1f2937;
+        /* gray-800 */
+        font-weight: 600;
+        border: 1px solid #d1d5db;
+        /* gray-300 */
+        border-radius: 9999px;
+        /* rounded-full */
+        transition: background-color 0.2s ease;
+        font-size: 1rem;
+        /* lg */
+      }
+
+      .google-signin-btn:hover {
+        background-color: #f3f4f6;
+        /* gray-100 */
+      }
+
+      .google-signin-btn svg {
+        width: 1.25rem;
+        height: 1.25rem;
+        margin-right: 0.75rem;
+      }
+
+      /* --- Professional Dark Theme --- */
+      .pro-dark-theme {
+        background-color: #041b0f !important;
+        color: #e5e7eb;
+      }
+
+      body.pro-dark-theme,
+      body.pro-dark-theme #root,
+      .pro-dark-theme .bg-page {
+        background-color: #041b0f !important;
+        color: #e5e7eb;
+      }
+
+      .pro-dark-theme .bg-card {
+        background-color: #0d2c18;
+        border: 1px solid #123820;
+        border-radius: 1.5rem;
+      }
+
+      .pro-dark-theme .shadow-card {
+        box-shadow: none;
+      }
+
+      .pro-dark-theme .text-primary-text {
+        color: #ffffff;
+      }
+
+      .pro-dark-theme .text-muted {
+        color: #d1d5db;
+      }
+
+      .pro-dark-theme .border-border {
+        border-color: #123820;
+      }
+
+      .pro-dark-theme .form-header-title::after {
+        background-color: #006b3f;
+      }
+
+      .pro-dark-theme .form-input {
+        background-color: #0d2c18;
+        border-color: #123820;
+        color: #ffffff;
+      }
+
+      .pro-dark-theme .form-input::placeholder {
+        color: #d1d5db;
+      }
+
+      .pro-dark-theme .form-input:focus {
+        border-color: #006b3f;
+        box-shadow: 0 0 0 1px #006b3f;
+      }
+
+      .pro-dark-theme .form-input--error {
+        border-color: #ef4444 !important;
+      }
+
+      .pro-dark-theme .form-input--error:focus {
+        box-shadow: 0 0 0 1px #ef4444 !important;
+      }
+
+      .pro-dark-theme .btn-primary {
+        background-color: #006b3f !important;
+        color: #ffffff !important;
+        font-weight: 600;
+        font-size: 14px;
+        padding: 12px 24px;
+        text-transform: capitalize;
+        border: 1px solid #005632 !important;
+      }
+
+      .pro-dark-theme .btn-primary:hover {
+        background-color: #005632 !important;
+      }
+
+      .pro-dark-theme .btn-secondary {
+        background-color: #374151;
+        color: #e5e7eb;
+        border: 1px solid transparent;
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      .pro-dark-theme .btn-secondary:hover {
+        background-color: #4b5563;
+      }
+
+      .pro-dark-theme .btn-outline {
+        border-color: #006b3f;
+        color: #006b3f;
+      }
+
+      .pro-dark-theme .btn-outline:hover {
+        background-color: rgba(0, 107, 63, 0.1);
+      }
+
+      .pro-dark-theme .btn-danger {
+        background-color: #ef4444;
+        color: white;
+      }
+
+      .pro-dark-theme .btn-danger:hover {
+        background-color: #dc2626;
+      }
+
+      .pro-dark-theme .btn-icon {
+        color: #4ade80;
+      }
+
+      .pro-dark-theme .btn-icon:hover {
+        background-color: #374151;
+        color: #86efac;
+      }
+
+      .pro-dark-theme .status-chip,
+      .pro-dark-theme .sync-chip,
+      .pro-dark-theme .leave-status-chip {
+        font-size: 0.75rem;
+        border-color: transparent;
+      }
+
+      .pro-dark-theme .status-chip--pending {
+        background-color: rgba(234, 179, 8, 0.2);
+        color: #facc15;
+      }
+
+      .pro-dark-theme .status-chip--verified {
+        background-color: rgba(34, 197, 94, 0.2);
+        color: #4ade80;
+      }
+
+      .pro-dark-theme .status-chip--rejected {
+        background-color: rgba(239, 68, 68, 0.2);
+        color: #f87171;
+      }
+
+      .pro-dark-theme .status-chip--draft {
+        background-color: rgba(156, 163, 175, 0.2);
+        color: #9ca3af;
+      }
+
+      .pro-dark-theme .sync-chip--pending_sync {
+        background-color: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+      }
+
+      .pro-dark-theme .sync-chip--synced {
+        background-color: rgba(34, 197, 94, 0.2);
+        color: #4ade80;
+      }
+
+      .pro-dark-theme .sync-chip--failed {
+        background-color: rgba(239, 68, 68, 0.2);
+        color: #f87171;
+      }
+
+      .pro-dark-theme .leave-status-chip--pending_manager_approval {
+        background-color: rgba(234, 179, 8, 0.2);
+        color: #facc15;
+      }
+
+      .pro-dark-theme .leave-status-chip--pending_hr_confirmation {
+        background-color: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+      }
+
+      .pro-dark-theme .leave-status-chip--approved {
+        background-color: rgba(34, 197, 94, 0.2);
+        color: #4ade80;
+      }
+
+      .pro-dark-theme .leave-status-chip--rejected {
+        background-color: rgba(239, 68, 68, 0.2);
+        color: #f87171;
+      }
+
+      .pro-dark-theme .bg-accent-light {
+        background-color: rgba(50, 205, 50, 0.1);
+      }
+
+      .pro-dark-theme .text-accent-dark {
+        color: #32cd32;
+      }
+
+      .pro-dark-theme .api-setting-item-bg {
+        background-color: #0d2c18;
+      }
+
+      .pro-dark-theme .bg-blue-50 {
+        background-color: rgba(59, 130, 246, 0.1);
+        border-color: rgba(59, 130, 246, 0.3);
+      }
+
+      .pro-dark-theme .text-blue-800 {
+        color: #bfdbfe;
+      }
+
+      .pro-dark-theme .text-blue-500 {
+        color: #60a5fa;
+      }
+
+      .pro-dark-theme header .text-muted {
+        color: #ffffff;
+      }
+
+      .pro-dark-theme header button:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+      }
+
+      @media (max-width: 767px) {
+        body.pro-dark-theme .flex-col > header.bg-card {
+          border-radius: 0 !important;
+          background-color: transparent !important;
+          border: none !important;
+        }
+      }
+
+      .pro-dark-theme .pro-select,
+      .pro-dark-theme .pro-select-arrow {
+        background-color: #243524;
+        border: 1px solid #374151;
+        color: #e5e7eb;
+        border-radius: 9999px;
+        padding: 14px;
+        width: 100%;
+        font-size: 15px;
+        min-height: 44px;
+        box-sizing: border-box;
+        display: block;
+      }
+
+      .pro-dark-theme .pro-select:focus,
+      .pro-dark-theme .pro-select-arrow:focus {
+        outline: none;
+        border-color: #32cd32;
+        box-shadow: 0 0 0 1px #32cd32;
+      }
+
+      .pro-dark-theme .pro-select-arrow {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca89c' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+        background-position: right 0.75rem center;
+        background-repeat: no-repeat;
+        background-size: 1.5em 1.5em;
+        padding-right: 3rem;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+      }
+
+      .pro-dark-theme .fo-attendance-card {
+        background-color: #041b0f;
+        border: 1px solid #374151;
+        border-radius: 12px;
+        padding: 1rem;
+      }
+
+      .pro-dark-theme .fo-attendance-time {
+        font-size: 0.875rem;
+        /* 14px */
+        color: #9ca89c;
+        /* text-muted */
+      }
+
+      .pro-dark-theme .fo-attendance-time strong {
+        color: #e5e7eb;
+        /* default text color */
+        font-weight: 600;
+      }
+
+      .pro-dark-theme .fo-slider {
+        position: relative;
+        width: 100%;
+        height: 56px;
+        border-radius: 9999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        cursor: grab;
+        user-select: none;
+        -webkit-user-select: none;
+        /* For Safari */
+        transition: background-color 0.3s ease;
+      }
+
+      .pro-dark-theme .fo-slider:active {
+        cursor: grabbing;
+      }
+
+      .pro-dark-theme .fo-slider-thumb {
+        position: absolute;
+        top: 4px;
+        width: 48px;
+        height: 48px;
+        background-color: #ffffff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      }
+
+      .pro-dark-theme .fo-slider-text {
+        font-weight: 600;
+        z-index: 5;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+      }
+
+      .pro-dark-theme .fo-slider--checkin {
+        background-color: #0d2c18;
+        border: 1px solid #006b3f;
+      }
+
+      .pro-dark-theme .fo-slider--checkin .fo-slider-text {
+        color: #006b3f;
+      }
+
+      .pro-dark-theme .fo-slider--checkin .fo-slider-thumb {
+        left: 4px;
+      }
+
+      .pro-dark-theme .fo-slider--checkin .fo-slider-thumb svg {
+        color: #006b3f;
+      }
+
+      .pro-dark-theme .fo-slider--checkin.success {
+        background-color: #006b3f;
+      }
+
+      .pro-dark-theme .fo-slider--checkin.success .fo-slider-text {
+        color: #0d1a0d;
+      }
+
+      .pro-dark-theme .fo-slider--checkout {
+        background-color: #243524;
+        border: 1px solid #ef4444;
+      }
+
+      .pro-dark-theme .fo-slider--checkout .fo-slider-text {
+        color: #ef4444;
+      }
+
+      .pro-dark-theme .fo-slider--checkout .fo-slider-thumb {
+        right: 4px;
+      }
+
+      .pro-dark-theme .fo-slider--checkout .fo-slider-thumb svg {
+        color: #ef4444;
+      }
+
+      .pro-dark-theme .fo-slider--checkout.success {
+        background-color: #ef4444;
+      }
+
+      .pro-dark-theme .fo-slider--checkout.success .fo-slider-text {
+        color: #ffffff;
+      }
+
+      /* Responsive Tables */
+      @media (max-width: 767px) {
+        .responsive-table thead {
+          display: none;
+        }
+
+        .responsive-table tbody,
+        .responsive-table tr,
+        .responsive-table td {
+          display: block;
+          width: 100%;
+        }
+
+        .responsive-table tr {
+          margin-bottom: 1rem;
+          border-radius: 1.5rem;
+          /* rounded-2xl */
+          overflow: hidden;
+          background-color: #ffffff;
+          /* card */
+          padding: 0;
+          /* Padding is now on TDs */
+          border: 1px solid #e6eef3;
+          /* border-border */
+          box-shadow: none;
+        }
+
+        /* This rule applies the flexbox layout for label-value pairs, but not to full-width cells like loading/empty messages. */
+        .responsive-table td:not([colSpan]) {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.75rem 1rem;
+          /* Padding inside each row */
+          margin-bottom: 0;
+        }
+
+        /* This rule adds dividers between rows within a card, but not for the card itself. */
+        .responsive-table td:not([colSpan]) + td:not([colSpan]) {
+          border-top: 1px solid #e6eef3;
+          /* border-border */
+        }
+
+        /* This rule shows the data-label for each cell as a pseudo-element. */
+        .responsive-table td:not([colSpan])::before {
+          content: attr(data-label);
+          font-weight: 600;
+          color: #0f172a;
+          /* primary-text */
+          padding-right: 1rem;
+          /* Add some space */
+          font-size: 0.875rem;
+        }
+
+        /* This rule removes the horizontal lines between cards on mobile view for tables that use divide-y */
+        .responsive-table tbody.divide-y > :not([hidden]) ~ :not([hidden]) {
+          border-top-width: 0;
+          border-bottom-width: 0;
+        }
+      }
+
+      .pro-dark-theme .responsive-table tr {
+        background-color: #0d2c18;
+        border: 1px solid #123820;
+        box-shadow: none;
+        border-radius: 1.5rem;
+        padding: 0;
+        margin-bottom: 1rem;
+      }
+
+      .pro-dark-theme .responsive-table td:not([colSpan]) {
+        background-color: #0d2c18;
+        /* Match TR background to prevent green box effect */
+      }
+
+      .pro-dark-theme
+        .responsive-table
+        td:not([colSpan])
+        + td:not([colSpan]) {
+        border-top-color: #123820;
+      }
+
+      .pro-dark-theme .responsive-table td:not([colSpan])::before {
+        color: #ffffff;
+      }
+
+      /* Fix for divider color in dark themes */
+      .pro-dark-theme
+        .divide-y.divide-border
+        > :not([hidden])
+        ~ :not([hidden]) {
+        border-color: #374151;
+      }
+
+      .pro-dark-theme aside .bg-accent {
+        background-color: #006b3f;
+        /* Custom green */
+        color: #ffffff;
+        /* White text */
+      }
+    </style>
+    <link rel="stylesheet" href="/index.css">
+  </head>
+
+  <body class="text-primary-text">
+    <div id="root"></div>
+    <div id="modal-root"></div>
+    <script type="module" src="/index.tsx"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js")
+            .then((reg) =>
+              console.log("Service Worker registered:", reg)
+            )
+            .catch((err) =>
+              console.log("Service Worker registration failed:", err)
+            );
+        });
+      }
+    </script>
+  </body>
+</html>
