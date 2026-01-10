@@ -3,6 +3,7 @@ import React from 'react';
 import { useIdleTimer } from '../../hooks/useIdleTimer';
 import { useAuthStore } from '../../store/authStore';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { Capacitor } from '@capacitor/core';
 import { useNavigate } from 'react-router-dom';
 import Button from '../ui/Button';
 import { ShieldAlert } from 'lucide-react';
@@ -21,7 +22,7 @@ export const IdleTimeoutManager: React.FC = () => {
         navigate('/auth/login', { replace: true });
     };
 
-    const isMobile = useMediaQuery('(max-width: 768px)');
+    const isMobile = useMediaQuery('(max-width: 768px)') || Capacitor.getPlatform() !== 'web';
 
     const { isIdle, countdown, reset } = useIdleTimer({
         onIdle: handleIdle,

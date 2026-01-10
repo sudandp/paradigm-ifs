@@ -258,16 +258,23 @@ const App: React.FC = () => {
         }
 
         // 1. Check for long-term "Remember Me" token if no session is found
-        // 1. Check for long-term "Remember Me" token if no session is found
+        // NOTE: We only do this if Supabase didn't already found a session in CapacitorStorage.
         if (!session) {
           const { value: refreshToken } = await Preferences.get({ key: 'supabase.auth.rememberMe' });
           if (refreshToken) {
             console.log('Attempting to restore session from long-term token...');
             try {
-              const { data: refreshData, error: refreshError } = await supabase.auth.setSession({ refresh_token: refreshToken } as any);
+              // We use withTimeout to prevent hanging on poor mobile networks
+              const { data: refreshData, error: refreshError } = await withTimeout(
+                supabase.auth.setSession({ refresh_token: refreshToken } as any),
+                10000,
+                'Session restoration timed out'
+              ).catch(e => ({ data: { session: null }, error: { message: e.message } }));
+
               if (refreshError) {
                 console.error('Failed to restore session from long-term token:', refreshError.message);
-                await Preferences.remove({ key: 'supabase.auth.rememberMe' });
+                // Don't remove the token immediately, it might be a transient network error
+                // await Preferences.remove({ key: 'supabase.auth.rememberMe' });
               } else {
                 session = refreshData.session;
               }
@@ -358,37 +365,43 @@ const App: React.FC = () => {
         // schedule fetching the full profile after the callback returns
         setTimeout(async () => {
           try {
-            const appUser = await authService.getAppUserProfile(session.user);
-            if (isMounted) {
+            const appUser = await withTimeout(
+              authService.getAppUserProfile(session.user),
+              15000,
+              'Profile fetch timed out'
+            ).catch(err => {
+              console.warn('Transient error fetching profile:', err.message);
+              // Return the current user if profile fetch fails due to timeout/network
+              // to avoid kicking the user out of the app.
+              return user; 
+            });
+
+            if (isMounted && appUser) {
               setUser(appUser);
               // Send a one‑time greeting notification when a user logs in via OAuth or any method
-              if (appUser) {
-                try {
-                  const greetKey = `greetingSent_${appUser.id}`;
-                  if (!localStorage.getItem(greetKey)) {
-                    await apiService.createNotification({
-                      userId: appUser.id,
-                      message: `Good morning, ${appUser.name || 'there'}! Welcome to Paradigm Services.`,
-                      type: 'greeting',
-                    });
-                    localStorage.setItem(greetKey, '1');
-                  }
-                } catch (err) {
-                  console.error('Failed to send login greeting notification', err);
+              try {
+                const greetKey = `greetingSent_${appUser.id}`;
+                if (!localStorage.getItem(greetKey)) {
+                  await apiService.createNotification({
+                    userId: appUser.id,
+                    message: `Good morning, ${appUser.name || 'there'}! Welcome to Paradigm Services.`,
+                    type: 'greeting',
+                  });
+                  localStorage.setItem(greetKey, '1');
                 }
+              } catch (err) {
+                console.error('Failed to send login greeting notification', err);
               }
             }
           } catch (err) {
             console.error('Failed to fetch user profile after auth change:', err);
-            if (isMounted) {
-              setUser(null);
-              resetAttendance();
-              useOnboardingStore.getState().reset();
-            }
+            // ONLY clear session if user is explicitly null (logged out)
+            // or if it's a definitive "user not found" error.
+            // For now, we prefer keeping the user logged in.
           }
         }, 0);
-      } else {
-        // If no session, clear the user immediately
+      } else if (event === 'SIGNED_OUT') {
+        // Only clear the user immediately ON SIGNED_OUT event
         if (isMounted) {
           setUser(null);
           resetAttendance();
