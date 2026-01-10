@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Search, MapPin, Clock, ChevronRight, User as UserIcon, Navigation, Users } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, isToday } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
@@ -99,7 +99,9 @@ const MyTeamPage: React.FC = () => {
   const fetchTeamData = async () => {
     if (!user) return;
     try {
-      setLoading(true);
+      // Keep loading true only if we have no data at all
+      if (teamMembers.length === 0) setLoading(true);
+      
       let members: User[] = [];
       
       // Fetch members based on user role
@@ -109,16 +111,20 @@ const MyTeamPage: React.FC = () => {
         members = await api.getTeamMembers(user.id);
       }
       
-      // Fetch locations in parallel with setting state if possible, 
-      // but we need member IDs first.
-      const userIds = members.map(m => m.id);
-      const locations = await api.getLatestLocations(userIds);
-      
+      // Set team members immediately to show the list "instantly"
       setTeamMembers(members);
-      setLatestLocations(locations);
+      setLoading(false);
+      
+      // Fetch locations in the background
+      const userIds = members.map(m => m.id);
+      api.getLatestLocations(userIds).then(locations => {
+        setLatestLocations(locations);
+      }).catch(err => {
+        console.error('Error fetching latest locations:', err);
+      });
+
     } catch (err) {
       console.error('Error fetching team data:', err);
-    } finally {
       setLoading(false);
     }
   };
@@ -194,13 +200,16 @@ const MyTeamPage: React.FC = () => {
       if (loc && loc.latitude && loc.longitude) {
         const initials = member.name.split(' ').map(n => n[0]).join('').substring(0, 2);
         
-        const html = member.photoUrl 
-          ? `<div class="custom-user-marker" style="background-image: url(${member.photoUrl})"></div>`
-          : `<div class="custom-user-marker"><div class="user-marker-initials">${initials}</div></div>`;
+        const isActiveToday = loc && isToday(new Date(loc.timestamp));
+        const indicatorColor = isActiveToday ? '#10b981' : '#ef4444';
+
+        const mapHtml = member.photoUrl 
+          ? `<div class="custom-user-marker" style="background-image: url(${member.photoUrl}); border-color: ${indicatorColor}"></div>`
+          : `<div class="custom-user-marker" style="border-color: ${indicatorColor}"><div class="user-marker-initials" style="color: ${indicatorColor}">${initials}</div></div>`;
 
         const customIcon = L.divIcon({
           className: '',
-          html,
+          html: mapHtml,
           iconSize: [48, 48],
           iconAnchor: [24, 58],
           popupAnchor: [0, -58]
@@ -298,18 +307,21 @@ const MyTeamPage: React.FC = () => {
               >
                 <div className="flex items-start gap-4">
                   <div className="relative">
-                    {member.photoUrl ? (
-                      <img 
-                        src={member.photoUrl} 
-                        alt={member.name}
-                        className="w-12 h-12 rounded-xl object-cover ring-2 ring-background"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-xl bg-accent/10 text-accent flex items-center justify-center font-bold text-lg ring-2 ring-background">
-                        {member.name.charAt(0)}
-                      </div>
-                    )}
-                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-card ${loc ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-gray-400'}`} />
+                    <div className="w-12 h-12 rounded-xl bg-accent/10 text-accent flex items-center justify-center font-bold text-lg ring-2 ring-background overflow-hidden relative">
+                      {member.name.charAt(0)}
+                      {member.photoUrl && (
+                        <img 
+                          src={member.photoUrl} 
+                          alt={member.name}
+                          className="absolute inset-0 w-full h-full object-cover z-10"
+                        />
+                      )}
+                    </div>
+                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-card z-20 ${
+                      loc && isToday(new Date(loc.timestamp))
+                        ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' 
+                        : 'bg-red-500 shadow-[0_0_8px_rgba(239,44,44,0.4)]'
+                    }`} />
                   </div>
                   
                   <div className="flex-1 min-w-0">

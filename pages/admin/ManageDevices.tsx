@@ -98,7 +98,7 @@ const ManageDevices: React.FC = () => {
     <div className="p-4 md:p-8">
       {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
 
-      <div className="max-w-7xl mx-auto">
+      <div className="">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-border">
           <div>
             <h1 className="text-3xl font-extrabold text-primary-text tracking-tight">Biometric Devices</h1>

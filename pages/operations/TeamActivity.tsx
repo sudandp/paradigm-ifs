@@ -178,7 +178,7 @@ const TeamActivity: React.FC = () => {
                             ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.8)]'
                             : member.isPresent
                                 ? 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.8)]'
-                                : 'bg-gray-400'
+                                : 'bg-red-500 shadow-[0_0_10px_rgba(239,44,44,0.8)]'
                         }`} />
                 </div>
 
@@ -202,8 +202,8 @@ const TeamActivity: React.FC = () => {
                                 </>
                             ) : (
                                 <>
-                                    <XCircle className="h-3 w-3 text-gray-400" />
-                                    <span className="text-gray-400">Absent</span>
+                                    <XCircle className="h-3 w-3 text-red-500" />
+                                    <span className="text-red-500">Absent</span>
                                 </>
                             )}
                         </div>
@@ -320,7 +320,7 @@ const TeamActivity: React.FC = () => {
                         <span className="text-xs font-medium text-muted">Status</span>
                     </div>
                     <p className={`text-lg font-bold ${member.isCurrentlyWorking ? 'text-green-500' :
-                            member.isPresent ? 'text-yellow-500' : 'text-gray-400'
+                            member.isPresent ? 'text-yellow-500' : 'text-red-500'
                         }`}>
                         {member.isCurrentlyWorking ? 'Working' :
                             member.isPresent ? 'Checked Out' : 'Absent'}
@@ -424,10 +424,10 @@ const TeamActivity: React.FC = () => {
 
                 <div className="bg-card border border-border rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-2">
-                        <XCircle className="h-4 w-4 text-gray-400" />
+                        <XCircle className="h-4 w-4 text-red-500" />
                         <span className="text-xs font-medium text-muted">Absent</span>
                     </div>
-                    <p className="text-2xl font-bold text-gray-400">
+                    <p className="text-2xl font-bold text-red-500">
                         {teamMembers.filter(m => !m.isPresent).length}
                     </p>
                 </div>
