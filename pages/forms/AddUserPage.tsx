@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm, SubmitHandler, Resolver } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import type { User, UserRole, Organization, Role } from '../../types';
+import type { User, UserRole, Organization, Role, BiometricDevice } from '../../types';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Button from '../../components/ui/Button';
@@ -30,7 +30,7 @@ const createUserSchema = yup.object({
   organizationName: yup.string().optional(),
   reportingManagerId: yup.string().optional(),
   photoUrl: yup.string().optional().nullable(),
-  biometricId: yup.string().optional(),
+  biometricId: yup.string().optional().nullable(),
 }).defined();
 
 const editUserSchema = yup.object({
@@ -47,7 +47,7 @@ const editUserSchema = yup.object({
   organizationName: yup.string().optional(),
   reportingManagerId: yup.string().optional(),
   photoUrl: yup.string().optional().nullable(),
-  biometricId: yup.string().optional(),
+  biometricId: yup.string().optional().nullable(),
 }).defined();
 
 const AddUserPage: React.FC = () => {
@@ -59,6 +59,7 @@ const AddUserPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [allDevices, setAllDevices] = useState<BiometricDevice[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [initialData, setInitialData] = useState<User | null>(null);
 
@@ -72,12 +73,14 @@ const AddUserPage: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [orgs, fetchedRoles] = await Promise.all([
+        const [orgs, fetchedRoles, fetchedDevices] = await Promise.all([
           api.getOrganizations(),
-          api.getRoles()
+          api.getRoles(),
+          api.getBiometricDevices ? api.getBiometricDevices() : Promise.resolve([])
         ]);
         setOrganizations(orgs);
         setRoles(fetchedRoles);
+        setAllDevices(fetchedDevices);
 
         if (isEditing && id) {
           const users = await api.getUsers();
@@ -105,29 +108,41 @@ const AddUserPage: React.FC = () => {
 
   const onSubmit: SubmitHandler<Partial<User> & { password?: string }> = async (data) => {
     setIsSubmitting(true);
-    console.log('🔍 Form submitted with data:', data);
+    
+    // Convert empty strings to null for database compatibility
+    const processedData = { ...data };
+    if (processedData.biometricId === '') processedData.biometricId = undefined; // Let Yup or API handle null
+    if (processedData.organizationId === '') processedData.organizationId = undefined;
+
+    console.log('🔍 Form submitted with data:', processedData);
     try {
       if (isEditing && id) {
-        const { password, ...rest } = data;
-        console.log('✏️ Updating user with ID:', id);
-        console.log('📝 Update payload:', rest);
-        console.log('🆔 Biometric ID in payload:', rest.biometricId);
-        await api.updateUser(id, rest);
+        const { password, ...rest } = processedData;
+        
+        // Final surgical cleanup: ensuring biometricId is null if absolutely empty
+        const payload: any = { ...rest };
+        if (payload.biometricId === '' || payload.biometricId === undefined) payload.biometricId = null;
+        if (payload.organizationId === '' || payload.organizationId === undefined) payload.organizationId = null;
+
+        await api.updateUser(id, payload);
         setToast({ message: 'User updated successfully!', type: 'success' });
       } else {
-        const { name, email, password, role, ...rest } = data;
+        const { name, email, password, role, ...rest } = processedData;
         if (!password) {
           throw new Error('Password is required when creating a new user');
         }
         
-        // 1. Create the Auth user (handles Edge function vs Fallback)
+        // 1. Create the Auth user
         const newUser = await api.createAuthUser({ name, email, password, role });
         
-        // 2. Hydrate additional profile data if any (organization, phone, etc.)
-        if (rest && Object.keys(rest).length > 0) {
+        // 2. Hydrate additional profile data
+        const payload: any = { ...rest };
+        if (payload.biometricId === '' || payload.biometricId === undefined) payload.biometricId = null;
+        if (payload.organizationId === '' || payload.organizationId === undefined) payload.organizationId = null;
+
+        if (Object.keys(payload).length > 0) {
           try {
-            console.log('➕ Creating new user with additional data:', rest);
-            await api.updateUser(newUser.id, rest);
+            await api.updateUser(newUser.id, payload);
           } catch (updateErr) {
             console.warn('Failed to update additional user fields after creation:', updateErr);
           }
@@ -181,7 +196,9 @@ const AddUserPage: React.FC = () => {
                   <option key={r.id} value={r.id}>{r.displayName}</option>
                 ))}
               </Select>
-              <Input label="Biometric Device ID (eSSL ID)" id="biometricId" registration={register('biometricId')} error={(errors as any).biometricId?.message} placeholder="e.g. 101" />
+              {watch('organizationId') && allDevices.filter(d => d.organizationId === watch('organizationId')).length > 0 && (
+                <Input label="Biometric Device ID (eSSL ID) (Optional)" id="biometricId" registration={register('biometricId')} error={(errors as any).biometricId?.message} placeholder="e.g. 101" />
+              )}
               {!isEditing && (
                 <Input
                   label="Password"
@@ -191,11 +208,34 @@ const AddUserPage: React.FC = () => {
                   error={(errors as any).password?.message}
                 />
               )}
-              {role === 'site_manager' && (
-                <Select label="Assigned Site" id="organizationId" {...register('organizationId')} error={errors.organizationId?.message} onChange={handleOrgChange}>
-                  <option value="">Select a Site</option>
-                  {organizations.map(org => <option key={org.id} value={org.id}>{org.shortName}</option>)}
-                </Select>
+              <Select label="Assigned Site" id="organizationId" registration={register('organizationId')} error={errors.organizationId?.message} onChange={handleOrgChange}>
+                <option value="">Select a Site</option>
+                {organizations.map(org => <option key={org.id} value={org.id}>{org.shortName}</option>)}
+              </Select>
+              {watch('organizationId') && (
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-2">
+                  <h4 className="text-sm font-semibold text-primary-text mb-2 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-accent"></span>
+                    Devices at Site
+                  </h4>
+                  <div className="space-y-1">
+                    {allDevices.filter(d => d.organizationId === watch('organizationId')).length > 0 ? (
+                      allDevices.filter(d => d.organizationId === watch('organizationId')).map(device => (
+                        <p key={device.id} className="text-xs text-muted flex justify-between">
+                          <span>{device.name}</span>
+                          <span className="font-mono">{device.sn}</span>
+                        </p>
+                      ))
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted italic">No biometric devices found.</p>
+                        <p className="text-[10px] text-accent-dark bg-accent/5 p-2 rounded border border-accent/10">
+                          Mobile app check-in/out will be used for this site. Biometric ID is not mandatory.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </form>
           </div>
@@ -246,7 +286,9 @@ const AddUserPage: React.FC = () => {
               <option key={r.id} value={r.id}>{r.displayName}</option>
             ))}
           </Select>
-          <Input label="Biometric Device ID (eSSL ID)" id="biometricId" registration={register('biometricId')} error={(errors as any).biometricId?.message} placeholder="e.g. 101" />
+          {watch('organizationId') && allDevices.filter(d => d.organizationId === watch('organizationId')).length > 0 && (
+            <Input label="Biometric Device ID (eSSL ID) (Optional)" id="biometricId" registration={register('biometricId')} error={(errors as any).biometricId?.message} placeholder="e.g. 101" />
+          )}
           {!isEditing && (
             <Input
               label="Password"
@@ -256,11 +298,35 @@ const AddUserPage: React.FC = () => {
               error={(errors as any).password?.message}
             />
           )}
-          {role === 'site_manager' && (
-            <Select label="Assigned Site" id="organizationId" {...register('organizationId')} error={errors.organizationId?.message} onChange={handleOrgChange}>
-              <option value="">Select a Site</option>
-              {organizations.map(org => <option key={org.id} value={org.id}>{org.shortName}</option>)}
-            </Select>
+          <Select label="Assigned Site" id="organizationId" registration={register('organizationId')} error={errors.organizationId?.message} onChange={handleOrgChange}>
+            <option value="">Select a Site (Location)</option>
+            {organizations.map(org => <option key={org.id} value={org.id}>{org.shortName}</option>)}
+          </Select>
+
+          {watch('organizationId') && (
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h4 className="text-sm font-semibold text-primary-text mb-2 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-accent"></span>
+                Biometric Devices at this Site
+              </h4>
+              <div className="space-y-2">
+                {allDevices.filter(d => d.organizationId === watch('organizationId')).length > 0 ? (
+                  allDevices.filter(d => d.organizationId === watch('organizationId')).map(device => (
+                    <div key={device.id} className="text-xs flex justify-between items-center bg-white p-2 rounded border border-gray-100">
+                      <span className="font-medium">{device.name}</span>
+                      <span className="text-muted font-mono">{device.sn}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted italic">No biometric devices found at this site.</p>
+                    <p className="text-xs text-accent-dark bg-accent/5 p-3 rounded-lg border border-accent/20">
+                      <strong>Note:</strong> Mobile app check-in/out will be used for this site as no biometric devices are available. You can leave the Biometric Device ID empty.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           <div className="mt-8 pt-6 border-t flex justify-end gap-3">

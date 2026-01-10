@@ -95,82 +95,113 @@ const ManageDevices: React.FC = () => {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl">
+    <div className="p-4 md:p-8">
       {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
 
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-primary-text">Biometric Devices</h1>
-          <p className="text-muted">Manage your eSSL AiFace-Mars devices across all sites.</p>
-        </div>
-        <Button onClick={() => { setEditingDevice(null); setIsAddModalOpen(true); }} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" /> Add Device
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoading ? (
-          Array(3).fill(0).map((_, i) => (
-            <div key={i} className="animate-pulse bg-card rounded-xl h-48"></div>
-          ))
-        ) : devices.length === 0 ? (
-          <div className="col-span-full py-12 text-center bg-card rounded-xl border border-dashed border-border">
-            <Cpu className="h-12 w-12 mx-auto text-muted mb-4" />
-            <p className="text-muted text-lg">No devices found. Add your first device to get started.</p>
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-border">
+          <div>
+            <h1 className="text-3xl font-extrabold text-primary-text tracking-tight">Biometric Devices</h1>
+            <p className="text-muted mt-1">Manage eSSL AiFace-Mars hardware across site locations.</p>
           </div>
-        ) : (
+          <Button 
+            onClick={() => { setEditingDevice(null); setIsAddModalOpen(true); }} 
+            className="flex items-center justify-center gap-2 h-11 px-6 shadow-lg shadow-accent/20"
+          >
+            <Plus className="h-5 w-5" /> Add New Device
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {isLoading ? (
+            Array(3).fill(0).map((_, i) => (
+              <div key={i} className="animate-pulse bg-card rounded-2xl h-56 border border-border"></div>
+            ))
+          ) : devices.length === 0 ? (
+            <div className="col-span-full py-20 flex flex-col items-center justify-center bg-card rounded-3xl border border-dashed border-border/60 shadow-sm">
+              <div className="h-20 w-20 bg-accent/5 rounded-full flex items-center justify-center mb-6">
+                <Cpu className="h-10 w-10 text-accent/40" />
+              </div>
+              <h3 className="text-xl font-bold text-primary-text mb-2">No Devices Configured</h3>
+              <p className="text-muted text-center max-w-sm mb-8 px-6">
+                You haven't added any biometric devices yet. Connect your first eSSL device to start tracking attendance.
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => { setEditingDevice(null); setIsAddModalOpen(true); }}
+                className="hover:bg-accent hover:text-white transition-all"
+              >
+                Register Your First Device
+              </Button>
+            </div>
+          ) : (
           devices.map((device) => (
-            <div key={device.id} className="bg-card rounded-xl shadow-card p-6 border border-border hover:border-accent transition-colors relative">
-              <div className="flex justify-between items-start mb-4">
-                <div className={`p-3 rounded-lg ${device.status === 'online' ? 'bg-emerald-500/10' : 'bg-gray-500/10'}`}>
-                  {device.status === 'online' ? (
-                    <Wifi className="h-6 w-6 text-emerald-500" />
-                  ) : (
-                    <WifiOff className="h-6 w-6 text-gray-400" />
-                  )}
+            <div key={device.id} className="bg-card rounded-2xl shadow-sm border border-border hover:border-accent hover:shadow-md transition-all relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-1 pt-24 bg-accent/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-6">
+                  <div className={`p-4 rounded-2xl ${device.status === 'online' ? 'bg-emerald-500/10' : 'bg-gray-500/10'}`}>
+                    {device.status === 'online' ? (
+                      <Wifi className="h-6 w-6 text-emerald-500" />
+                    ) : (
+                      <WifiOff className="h-6 w-6 text-gray-400" />
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEditDevice(device)}
+                      className="p-2 text-muted hover:text-accent hover:bg-accent/5 rounded-xl transition-all"
+                      title="Edit Device"
+                    >
+                      <Settings className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteDevice(device.id)}
+                      className="p-2 text-muted hover:text-red-500 hover:bg-red-500/5 rounded-xl transition-all"
+                      title="Delete Device"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => handleEditDevice(device)}
-                    className="p-2 text-muted hover:text-accent transition-colors"
-                  >
-                    <Settings className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteDevice(device.id)}
-                    className="p-2 text-muted hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
 
-              <h3 className="text-lg font-bold text-primary-text mb-1">{device.name}</h3>
-              <p className="text-sm font-mono text-muted mb-4">SN: {device.sn}</p>
-
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-sm text-muted">
-                  <MapPin className="h-4 w-4" />
-                  <span>{device.locationName || device.organization?.shortName || 'Unassigned Site'}</span>
+                <div className="space-y-1 mb-6">
+                  <h3 className="text-xl font-bold text-primary-text tracking-tight">{device.name}</h3>
+                  <div className="flex items-center gap-2 text-xs font-mono text-muted bg-gray-50 px-2 py-1 rounded w-fit capitalize">
+                    <span>SN: {device.sn}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-muted">
-                  <RefreshCw className="h-4 w-4" />
-                  <span>Last seen: {device.lastSeen ? new Date(device.lastSeen).toLocaleString() : 'Never'}</span>
-                </div>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <span className={`h-2 w-2 rounded-full ${device.status === 'online' ? 'bg-emerald-500' : 'bg-gray-400'}`}></span>
-                <span className={`text-xs font-semibold uppercase tracking-wider ${device.status === 'online' ? 'text-emerald-500' : 'text-gray-400'}`}>
-                  {device.status}
-                </span>
+                <div className="space-y-3 mb-6 pt-6 border-t border-gray-50">
+                  <div className="flex items-center gap-3 text-sm text-primary-text/80">
+                    <div className="h-8 w-8 rounded-lg bg-gray-50 flex items-center justify-center">
+                      <MapPin className="h-4 w-4 text-muted" />
+                    </div>
+                    <span className="font-medium">{device.locationName || device.organization?.shortName || 'Unassigned Site'}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-primary-text/80">
+                    <div className="h-8 w-8 rounded-lg bg-gray-50 flex items-center justify-center">
+                      <RefreshCw className="h-4 w-4 text-muted" />
+                    </div>
+                    <span className="text-xs">Last seen: <span className="text-muted">{device.lastSeen ? new Date(device.lastSeen).toLocaleString() : 'Never'}</span></span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 w-fit">
+                  <span className={`h-2 w-2 rounded-full animate-pulse ${device.status === 'online' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-gray-400'}`}></span>
+                  <span className={`text-[10px] font-bold uppercase tracking-widest ${device.status === 'online' ? 'text-emerald-600' : 'text-gray-500'}`}>
+                    {device.status}
+                  </span>
+                </div>
               </div>
             </div>
           ))
         )}
       </div>
+    </div>
 
-      <Modal
+    <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onConfirm={handleSaveDevice}

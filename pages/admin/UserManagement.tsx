@@ -157,6 +157,7 @@ const UserManagement: React.FC = () => {
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Name</th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Email</th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Role</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Site</th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Biometric ID</th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Actions</th>
                         </tr>
@@ -164,8 +165,8 @@ const UserManagement: React.FC = () => {
                     <tbody className="divide-y divide-border md:bg-card md:divide-y-0">
                         {isLoading ? (
                             isMobile
-                                ? <tr><td colSpan={4}><TableSkeleton rows={3} cols={4} isMobile /></td></tr>
-                                : <TableSkeleton rows={5} cols={4} />
+                                ? <tr><td colSpan={6}><TableSkeleton rows={3} cols={6} isMobile /></td></tr>
+                                : <TableSkeleton rows={5} cols={6} />
                         ) : users.map((user) => (
                             <tr key={user.id}>
                                 <td data-label="Name" className="px-6 py-4 font-medium">{user.name}</td>
@@ -176,6 +177,9 @@ const UserManagement: React.FC = () => {
                                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 ml-2">Pending Approval</span>
                                     )}
                                 </td>
+                                <td data-label="Site" className="px-6 py-4 text-sm text-muted">
+                                    {user.organizationName || '-'}
+                                </td>
                                 <td data-label="Biometric ID" className="px-6 py-4 text-sm font-mono text-muted">
                                     {user.biometricId || '-'}
                                 </td>
@@ -185,6 +189,7 @@ const UserManagement: React.FC = () => {
                                             <Button variant="outline" size="sm" onClick={() => handleApprove(user)} aria-label={`Approve user ${user.name}`} title={`Approve user ${user.name}`}><UserCheck className="h-4 w-4 mr-2" />Approve</Button>
                                         )}
                                         <Button variant="icon" size="sm" onClick={() => handleEdit(user)} aria-label={`Edit user ${user.name}`} title={`Edit user ${user.name}`}><Edit className="h-4 w-4" /></Button>
+                                        <Button variant="icon" size="sm" onClick={() => handleManageLocations(user)} aria-label={`Manage Geofencing for ${user.name}`} title={`Manage Geofencing for ${user.name}`}><MapPin className="h-4 w-4 text-emerald-500" /></Button>
                                         <Button variant="icon" onClick={() => handleDelete(user)} aria-label={`Delete user ${user.name}`} title={`Delete user ${user.name}`} className="p-2 hover:bg-red-500/10 rounded-full transition-colors"><Trash2 className="h-5 w-5 text-red-500" /></Button>
                                     </div>
                                 </td>
