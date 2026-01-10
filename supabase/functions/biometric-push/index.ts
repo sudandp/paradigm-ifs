@@ -67,6 +67,7 @@ Deno.serve(async (req: Request) => {
     if (table === 'ATTLOG') {
       const logs = payload.split('\n').filter((l: string) => l.trim());
       let successCount = 0;
+      const errors: Record<string, unknown>[] = [];
 
       for (const log of logs) {
         // eSSL ATTLOG Format: [BiometricID]\t[Timestamp]\t[Status]\t[VerifyType]\t[DeviceID]\t[WorkCode]
@@ -80,7 +81,7 @@ Deno.serve(async (req: Request) => {
         // 1. Find User by BiometricID
         const { data: user } = await supabaseAdmin
           .from('users')
-          .select('id, name, organization_id, reporting_manager_id')
+          .select('id, name, organization_id, reporting_manager_id, role_id')
           .eq('biometric_id', biometricId)
           .single();
 
@@ -95,13 +96,14 @@ Deno.serve(async (req: Request) => {
           const locationName = device?.location_name || (device as { organizations?: { full_name?: string } })?.organizations?.full_name || 'Biometric Device';
 
           // 3. Insert Attendance Event
-          const eventType = status === '0' || status === '4' ? 'check_in' : 'check_out';
+          // Custom Mapping: 1=CheckIn, 0=CheckOut (User Requested)
+          const eventType = status === '1' ? 'check_in' : 'check_out';
           const { error: attError } = await supabaseAdmin
             .from('attendance_events')
             .insert({
               user_id: user.id,
-              event_time: timestamp,
-              event_type: eventType,
+              timestamp: timestamp,
+              type: eventType,
               device_id: device?.id,
               location_name: locationName
             });
@@ -155,10 +157,15 @@ Deno.serve(async (req: Request) => {
             } catch (notifyErr) {
               console.warn('Failed to send notifications for biometric event:', notifyErr);
             }
+          } else {
+             console.error('Attendance Insert Error:', attError);
+             errors.push({ log, error: attError });
           }
+        } else {
+             errors.push({ log, error: 'User not found', id: biometricId });
         }
       }
-      return new Response(`OK: ${successCount}`, { status: 200, headers: corsHeaders });
+      return new Response(`OK: ${successCount}. Errors: ${JSON.stringify(errors)}`, { status: 200, headers: corsHeaders });
     }
 
     if (table === 'USER') {
@@ -180,6 +187,7 @@ Deno.serve(async (req: Request) => {
         const rawSiteName = deviceTyped?.location_name || deviceTyped?.organizations?.short_name || 'site';
         const sanitizedSiteName = rawSiteName.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+        const errors: Record<string, unknown>[] = [];
         for (const line of lines) {
             const parts = line.split('\t');
             const biometricId = parts[0];
@@ -207,6 +215,7 @@ Deno.serve(async (req: Request) => {
 
                 if (authError) {
                     console.error(`Auth Creation Failed for ${email}:`, authError);
+                    errors.push({ email, error: authError });
                     continue;
                 }
 
@@ -228,11 +237,14 @@ Deno.serve(async (req: Request) => {
                         createdCount++;
                     } else {
                         console.error('Profile Creation Failed:', profileError);
+                        errors.push({ profile: name, error: profileError });
                     }
                 }
+            } else {
+                 errors.push({ msg: 'User exists', id: biometricId });
             }
         }
-        return new Response(`OK: ${createdCount} created`, { status: 200, headers: corsHeaders });
+        return new Response(`OK: ${createdCount} created. Errors: ${JSON.stringify(errors)}`, { status: 200, headers: corsHeaders });
     }
 
     if (table === 'USERPIC') {
