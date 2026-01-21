@@ -1,0 +1,383 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useForm, SubmitHandler, Resolver } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
+import type { User, UserRole, Organization, Role, BiometricDevice } from '../../types';
+import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
+import Button from '../../components/ui/Button';
+import Toast from '../../components/ui/Toast';
+import { api } from '../../services/api';
+import { UserPlus, ArrowLeft } from 'lucide-react';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+
+const createUserSchema = yup.object({
+  id: yup.string().optional(),
+  name: yup.string().required('Name is required'),
+  email: yup.string().email('Invalid email').required('Email is required'),
+  role: yup.string<UserRole>().required('Role is required'),
+  password: yup
+    .string()
+    .min(6, 'Password must be at least 6 characters')
+    .required('Password is required for new users'),
+  phone: yup.string().optional().nullable(),
+  noSiteAssignment: yup.boolean().optional(),
+  organizationId: yup.string().when(['role', 'noSiteAssignment'], {
+    is: (role: any, noSiteAssignment: any) => role === 'site_manager' && !noSiteAssignment,
+    then: schema => schema.required('Site manager must be assigned to a site.'),
+    otherwise: schema => schema.optional(),
+  }).nullable(),
+  organizationName: yup.string().optional().nullable(),
+  reportingManagerId: yup.string().optional().nullable(),
+  photoUrl: yup.string().optional().nullable(),
+  biometricId: yup.string().optional().nullable(),
+}).defined();
+
+const editUserSchema = yup.object({
+  id: yup.string().optional(),
+  name: yup.string().required('Name is required'),
+  email: yup.string().email('Invalid email').required('Email is required'),
+  role: yup.string<UserRole>().required('Role is required'),
+  phone: yup.string().optional().nullable(),
+  noSiteAssignment: yup.boolean().optional(),
+  organizationId: yup.string().when(['role', 'noSiteAssignment'], {
+    is: (role: any, noSiteAssignment: any) => role === 'site_manager' && !noSiteAssignment,
+    then: schema => schema.required('Site manager must be assigned to a site.'),
+    otherwise: schema => schema.optional(),
+  }).nullable(),
+  organizationName: yup.string().optional().nullable(),
+  reportingManagerId: yup.string().optional().nullable(),
+  photoUrl: yup.string().optional().nullable(),
+  biometricId: yup.string().optional().nullable(),
+}).defined();
+
+const AddUserPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const isEditing = !!id;
+  const isMobile = useMediaQuery('(max-width: 767px)');
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [allDevices, setAllDevices] = useState<BiometricDevice[]>([]);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [initialData, setInitialData] = useState<User | null>(null);
+
+  const schema = isEditing ? editUserSchema : createUserSchema;
+  const { register, handleSubmit, formState: { errors }, reset, watch, setValue } = useForm<Partial<User> & { password?: string; noSiteAssignment?: boolean }>({
+    resolver: yupResolver(schema) as unknown as Resolver<Partial<User> & { password?: string; noSiteAssignment?: boolean }>,
+  });
+
+  const role = watch('role');
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [orgs, fetchedRoles, fetchedDevices] = await Promise.all([
+          api.getOrganizations(),
+          api.getRoles(),
+          api.getBiometricDevices ? api.getBiometricDevices() : Promise.resolve([])
+        ]);
+        setOrganizations(orgs);
+        setRoles(fetchedRoles);
+        setAllDevices(fetchedDevices);
+
+        if (isEditing && id) {
+          const users = await api.getUsers();
+          const user = users.find(u => u.id === id);
+          if (user) {
+            setInitialData(user);
+            reset(user);
+          }
+        } else {
+          reset({ name: '', email: '', role: 'field_staff' });
+        }
+      } catch (error) {
+        setToast({ message: 'Failed to load form data.', type: 'error' });
+      }
+    };
+    fetchData();
+  }, [id, isEditing, reset]);
+
+  const handleOrgChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const orgId = e.target.value;
+    const org = organizations.find(o => o.id === orgId);
+    setValue('organizationId', orgId);
+    setValue('organizationName', org?.shortName || '');
+    if (orgId) {
+      setValue('noSiteAssignment', false);
+    }
+  };
+
+  const onSubmit: SubmitHandler<Partial<User> & { password?: string; noSiteAssignment?: boolean }> = async (data) => {
+    setIsSubmitting(true);
+    
+    // Convert empty strings to null for database compatibility
+    const processedData = { ...data };
+    if (processedData.biometricId === '') processedData.biometricId = undefined; // Let Yup or API handle null
+    if (processedData.organizationId === '') processedData.organizationId = undefined;
+
+    try {
+      if (isEditing && id) {
+        const { password, noSiteAssignment, ...rest } = processedData;
+        
+        // Final surgical cleanup: ensuring biometricId is null if absolutely empty
+        const payload: any = { ...rest };
+        if (payload.biometricId === '' || payload.biometricId === undefined) payload.biometricId = null;
+        if (payload.organizationId === '' || payload.organizationId === undefined) payload.organizationId = null;
+
+        await api.updateUser(id, payload);
+        setToast({ message: 'User updated successfully!', type: 'success' });
+      } else {
+        const { name, email, password, role, noSiteAssignment, ...rest } = processedData;
+        if (!password) {
+          throw new Error('Password is required when creating a new user');
+        }
+        
+        // 1. Create the Auth user
+        const newUser = await api.createAuthUser({ name, email, password, role });
+        
+        // 2. Hydrate additional profile data
+        const payload: any = { ...rest };
+        if (payload.biometricId === '' || payload.biometricId === undefined) payload.biometricId = null;
+        if (payload.organizationId === '' || payload.organizationId === undefined) payload.organizationId = null;
+
+        if (Object.keys(payload).length > 0) {
+          try {
+            await api.updateUser(newUser.id, payload);
+          } catch (updateErr) {
+            console.warn('Failed to update additional user fields after creation:', updateErr);
+          }
+        }
+        
+        // 3. Attempt to create a welcome notification
+        // Wrapped in try-catch so notification failure doesn't block the main flow
+        try {
+          await api.createNotification({
+            userId: newUser.id,
+            message: `Welcome ${newUser.name}! Your account has been created.`,
+            type: 'greeting',
+          });
+        } catch (notifErr) {
+          console.warn('Failed to create welcome notification (possible RLS violation):', notifErr);
+        }
+        
+        setToast({ message: 'User created successfully! They can now sign in with their credentials.', type: 'success' });
+      }
+      setTimeout(() => navigate('/admin/users'), 2000);
+    } catch (error: any) {
+      console.error('Submit Error:', error);
+      setToast({ message: error.message || 'Failed to save user.', type: 'error' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isMobile) {
+    return (
+      <div className="h-full flex flex-col">
+        <header className="p-4 flex-shrink-0 fo-mobile-header">
+          <h1>{isEditing ? 'Edit User' : 'Add User'}</h1>
+        </header>
+        <main className="flex-1 overflow-y-auto p-4">
+          <div className="bg-card rounded-2xl p-6 space-y-6">
+            <div className="text-center">
+              <div className="inline-block bg-accent-light p-3 rounded-full mb-2">
+                <UserPlus className="h-8 w-8 text-accent-dark" />
+              </div>
+              <h2 className="text-xl font-bold text-primary-text">{isEditing ? 'Edit User' : 'Add New User'}</h2>
+              <p className="text-sm text-gray-400">
+                {isEditing ? 'Update user information below.' : 'Create a new user account with initial credentials.'}
+              </p>
+            </div>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <Input label="Full Name" id="name" registration={register('name')} error={errors.name?.message} />
+              <Input label="Email" id="email" type="email" registration={register('email')} error={errors.email?.message} />
+              <Select label="Role" id="role" registration={register('role')} error={errors.role?.message}>
+                {roles.map(r => (
+                  <option key={r.id} value={r.id}>{r.displayName}</option>
+                ))}
+              </Select>
+              {watch('organizationId') && allDevices.filter(d => d.organizationId === watch('organizationId')).length > 0 && (
+                <Input label="Biometric Device ID (eSSL ID) (Optional)" id="biometricId" registration={register('biometricId')} error={(errors as any).biometricId?.message} placeholder="e.g. 101" />
+              )}
+              {!isEditing && (
+                <Input
+                  label="Password"
+                  id="password"
+                  type="password"
+                  registration={register('password')}
+                  error={(errors as any).password?.message}
+                />
+              )}
+              <Select label="Assigned Site" id="organizationId" registration={register('organizationId')} error={errors.organizationId?.message} onChange={handleOrgChange} disabled={watch('noSiteAssignment')}>
+                <option value="">Select a Site</option>
+                {organizations.map(org => <option key={org.id} value={org.id}>{org.shortName}</option>)}
+              </Select>
+              {!watch('organizationId') && (
+                <div className="flex items-center gap-2 mt-2 px-1">
+                  <input
+                    type="checkbox"
+                    id="noSiteAssignment"
+                    {...register('noSiteAssignment')}
+                    className="h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent"
+                  />
+                  <label htmlFor="noSiteAssignment" className="text-sm text-muted cursor-pointer">
+                    This user does not require a site assignment
+                  </label>
+                </div>
+              )}
+              {watch('organizationId') && (
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-2">
+                  <h4 className="text-sm font-semibold text-primary-text mb-2 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-accent"></span>
+                    Devices at Site
+                  </h4>
+                  <div className="space-y-1">
+                    {allDevices.filter(d => d.organizationId === watch('organizationId')).length > 0 ? (
+                      allDevices.filter(d => d.organizationId === watch('organizationId')).map(device => (
+                        <p key={device.id} className="text-xs text-muted flex justify-between">
+                          <span>{device.name}</span>
+                          <span className="font-mono">{device.sn}</span>
+                        </p>
+                      ))
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted italic">No biometric devices found.</p>
+                        <p className="text-[10px] text-accent-dark bg-accent/5 p-2 rounded border border-accent/10">
+                          Mobile app check-in/out will be used for this site. Biometric ID is not mandatory.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </form>
+          </div>
+        </main>
+        <footer className="p-4 flex-shrink-0 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => navigate('/admin/users')}
+            disabled={isSubmitting}
+            className="fo-btn-secondary px-6"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            onClick={handleSubmit(onSubmit)}
+            disabled={isSubmitting}
+            className="fo-btn-primary flex-1"
+          >
+            {isSubmitting ? 'Saving...' : isEditing ? 'Save Changes' : 'Create User'}
+          </button>
+        </footer>
+        {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 md:p-6">
+      <div className="bg-card p-8 rounded-xl shadow-card w-full max-w-2xl mx-auto">
+        <div className="flex items-center mb-6">
+          <div className="bg-accent-light p-3 rounded-full mr-4">
+            <UserPlus className="h-8 w-8 text-accent-dark" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-primary-text">{isEditing ? 'Edit User' : 'Add New User'}</h2>
+            <p className="text-muted">
+              {isEditing ? 'Update user information below.' : 'Create a new user account with initial credentials.'}
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <Input label="Full Name" id="name" registration={register('name')} error={errors.name?.message} />
+          <Input label="Email" id="email" type="email" registration={register('email')} error={errors.email?.message} />
+          <Select label="Role" id="role" registration={register('role')} error={errors.role?.message}>
+            {roles.map(r => (
+              <option key={r.id} value={r.id}>{r.displayName}</option>
+            ))}
+          </Select>
+          {watch('organizationId') && allDevices.filter(d => d.organizationId === watch('organizationId')).length > 0 && (
+            <Input label="Biometric Device ID (eSSL ID) (Optional)" id="biometricId" registration={register('biometricId')} error={(errors as any).biometricId?.message} placeholder="e.g. 101" />
+          )}
+          {!isEditing && (
+            <Input
+              label="Password"
+              id="password"
+              type="password"
+              registration={register('password')}
+              error={(errors as any).password?.message}
+            />
+          )}
+          <Select label="Assigned Site" id="organizationId" registration={register('organizationId')} error={errors.organizationId?.message} onChange={handleOrgChange} disabled={watch('noSiteAssignment')}>
+            <option value="">Select a Site (Location)</option>
+            {organizations.map(org => <option key={org.id} value={org.id}>{org.shortName}</option>)}
+          </Select>
+
+          {!watch('organizationId') && (
+            <div className="flex items-center gap-2 mt-2 px-1 bg-amber-50/50 p-2 rounded-lg border border-amber-100/50">
+              <input
+                type="checkbox"
+                id="noSiteAssignmentDesktop"
+                {...register('noSiteAssignment')}
+                className="h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent"
+              />
+              <label htmlFor="noSiteAssignmentDesktop" className="text-sm text-amber-800 cursor-pointer font-medium">
+                I confirm this user does not require a site assignment (Declaration)
+              </label>
+            </div>
+          )}
+
+          {watch('organizationId') && (
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h4 className="text-sm font-semibold text-primary-text mb-2 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-accent"></span>
+                Biometric Devices at this Site
+              </h4>
+              <div className="space-y-2">
+                {allDevices.filter(d => d.organizationId === watch('organizationId')).length > 0 ? (
+                  allDevices.filter(d => d.organizationId === watch('organizationId')).map(device => (
+                    <div key={device.id} className="text-xs flex justify-between items-center bg-white p-2 rounded border border-gray-100">
+                      <span className="font-medium">{device.name}</span>
+                      <span className="text-muted font-mono">{device.sn}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted italic">No biometric devices found at this site.</p>
+                    <p className="text-xs text-accent-dark bg-accent/5 p-3 rounded-lg border border-accent/20">
+                      <strong>Note:</strong> Mobile app check-in/out will be used for this site as no biometric devices are available. You can leave the Biometric Device ID empty.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-8 pt-6 border-t flex justify-end gap-3">
+            <Button
+              type="button"
+              onClick={() => navigate('/admin/users')}
+              variant="secondary"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" isLoading={isSubmitting}>
+              {isEditing ? 'Save Changes' : 'Create User'}
+            </Button>
+          </div>
+        </form>
+      </div>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
+    </div>
+  );
+};
+
+export default AddUserPage;

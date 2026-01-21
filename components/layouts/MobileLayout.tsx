@@ -1,0 +1,66 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import Header from './Header';
+import BottomNav from './BottomNav';
+
+const MobileLayout: React.FC = () => {
+    const location = useLocation();
+    const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+    const lastScrollY = useRef(0);
+    const ticking = useRef(false);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            if (!ticking.current) {
+                window.requestAnimationFrame(() => {
+                    const currentScrollY = window.scrollY;
+
+                    // Show header when scrolling up or at top
+                    // Hide header IMMEDIATELY when scrolling down
+                    if (currentScrollY < lastScrollY.current || currentScrollY < 10) {
+                        setIsHeaderVisible(true);
+                    } else if (currentScrollY > lastScrollY.current && currentScrollY > 10) {
+                        // Hide immediately after scrolling down past 10px
+                        setIsHeaderVisible(false);
+                    }
+
+                    lastScrollY.current = currentScrollY;
+                    ticking.current = false;
+                });
+                ticking.current = true;
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    return (
+        <div className="flex flex-col min-h-screen bg-[#041b0f]">
+            {/* Mobile Header - Auto-hide on scroll (FAST) */}
+            {/* Hide global header for specific standalone pages like Apply for Leave */}
+            {!location.pathname.startsWith('/leaves/apply') && (
+                <div
+                    className={`sticky top-0 z-50 transition-transform duration-200 ${isHeaderVisible ? 'translate-y-0' : '-translate-y-full'
+                        }`}
+                >
+                    <Header />
+                </div>
+            )}
+
+            {/* Main Content Area */}
+            {/* Increased bottom padding by 30% (9.1rem = 7rem * 1.3) for more clearance */}
+            <main
+                className="flex-1 overflow-y-auto px-4 pt-2"
+                style={{ paddingBottom: 'calc(9.1rem + env(safe-area-inset-bottom))' }}
+            >
+                <Outlet />
+            </main>
+
+            {/* Bottom Navigation */}
+            <BottomNav />
+        </div>
+    );
+};
+
+export default MobileLayout;

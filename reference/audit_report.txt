@@ -1,0 +1,24 @@
+﻿# npm audit report
+
+jspdf  <=3.0.4
+Severity: critical
+jsPDF has Local File Inclusion/Path Traversal vulnerability - https://github.com/advisories/GHSA-f8cm-6447-x5h2
+No fix available
+node_modules/jspdf
+  html2pdf.js  *
+  Depends on vulnerable versions of jspdf
+  node_modules/html2pdf.js
+
+qs  <6.14.1
+Severity: high
+qs's arrayLimit bypass in its bracket notation allows DoS via memory exhaustion - https://github.com/advisories/GHSA-6rw7-vpxm-498p
+fix available via `npm audit fix`
+node_modules/qs
+
+3 vulnerabilities (1 high, 2 critical)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+Some issues need review, and may require choosing
+a different dependency.

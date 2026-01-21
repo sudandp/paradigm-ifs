@@ -1,0 +1,146 @@
+<!-- Force reload -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" as="style">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="/index.css">
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+
+    <!-- PWA Meta Tags -->
+    <meta name="application-name" content="Paradigm Services">
+    <meta
+      name="description"
+      content="Comprehensive employee onboarding and management system for Paradigm Services"
+    >
+    <meta name="theme-color" content="#041b0f">
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Apple iOS PWA Support -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    >
+    <meta name="apple-mobile-web-app-title" content="Paradigm">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png">
+
+    <!-- iOS Splash Screens -->
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/iphone5_splash.png"
+      media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/iphone6_splash.png"
+      media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/iphoneplus_splash.png"
+      media="(device-width: 621px) and (device-height: 1104px) and (-webkit-device-pixel-ratio: 3)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/iphonex_splash.png"
+      media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/iphonexr_splash.png"
+      media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/iphonexsmax_splash.png"
+      media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/ipad_splash.png"
+      media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/ipadpro1_splash.png"
+      media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/ipadpro3_splash.png"
+      media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)"
+    >
+    <link
+      rel="apple-touch-startup-image"
+      href="/splash/ipadpro2_splash.png"
+      media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)"
+    >
+
+    <!-- Windows Tiles -->
+    <meta name="msapplication-TileColor" content="#0d2818">
+    <meta name="msapplication-TileImage" content="/icons/icon-192x192.png">
+    <meta name="msapplication-config" content="/browserconfig.xml">
+
+    <!-- Favicon -->
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/icons/icon-192x192.png"
+    >
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="/icons/icon-192x192.png"
+    >
+    <link rel="shortcut icon" href="/favicon.ico">
+
+    <title>Paradigm Employee Onboarding</title>
+    
+
+    <link
+      rel="stylesheet"
+      href="https://aistudiocdn.com/react-date-range@^2.0.1/dist/styles.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://aistudiocdn.com/react-date-range@^2.0.1/dist/theme/default.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://aistudiocdn.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+  </head>
+
+  <body class="text-primary-text">
+    <div id="root"></div>
+    <div id="modal-root"></div>
+    <script type="module" src="/index.tsx"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js")
+            .then((reg) =>
+              console.log("Service Worker registered:", reg)
+            )
+            .catch((err) =>
+              console.log("Service Worker registration failed:", err)
+            );
+        });
+      }
+    </script>
+  </body>
+</html>
