@@ -1089,7 +1089,7 @@ export const api = {
     if (error) throw error;
   },
   getLeaveRequests: async (filter?: { userId?: string, userIds?: string[], status?: string, forApproverId?: string, startDate?: string, endDate?: string }): Promise<LeaveRequest[]> => {
-    let query = supabase.from('leave_requests').select('*, users(name)');
+    let query = supabase.from('leave_requests').select('*, employee:users!user_id(name), approver:users!current_approver_id(name)');
     if (filter?.userId) query = query.eq('user_id', filter.userId);
     if (filter?.userIds) query = query.in('user_id', filter.userIds);
     if (filter?.status) query = query.eq('status', filter.status);
@@ -1101,10 +1101,12 @@ export const api = {
     return (data || []).map(item => {
       const camelItem = toCamelCase(item);
       // Handle both object and array response for the joined table
-      const userObj = Array.isArray(item.users) ? item.users[0] : item.users;
+      const employeeObj = Array.isArray(item.employee) ? item.employee[0] : item.employee;
+      const approverObj = Array.isArray(item.approver) ? item.approver[0] : item.approver;
       return {
         ...camelItem,
-        userName: userObj?.name || 'Unknown'
+        userName: employeeObj?.name || 'Unknown',
+        currentApproverName: approverObj?.name || null
       };
     });
   },
@@ -1388,16 +1390,39 @@ export const api = {
     if (error) throw error;
   },
   approveLeaveRequest: async (id: string, approverId: string): Promise<void> => {
-    const { data: request, error: fetchError } = await supabase.from('leave_requests').select('approval_history').eq('id', id).single();
+    // Fetch request data including user_id to check if approver is the reporting manager
+    const { data: request, error: fetchError } = await supabase.from('leave_requests').select('approval_history, user_id').eq('id', id).single();
     if (fetchError) throw fetchError;
+    
     const { finalConfirmationRole } = await api.getApprovalWorkflowSettings();
-    const { data: finalApprover } = await supabase.from('users').select('id').eq('role_id', finalConfirmationRole).limit(1).single();
     const { data: approverData, error: nameError } = await supabase.from('users').select('name').eq('id', approverId).single();
     if (nameError) throw nameError;
+    
+    // Check if approver is the employee's reporting manager
+    const { data: employeeData } = await supabase.from('users').select('reporting_manager_id').eq('id', request.user_id).single();
+    const isReportingManager = employeeData?.reporting_manager_id === approverId;
+    
     const newHistoryRecord = { approver_id: approverId, approver_name: approverData.name, status: 'approved', timestamp: new Date().toISOString() };
     const updatedHistory = [...((request.approval_history as any[]) || []), newHistoryRecord];
-    const { error } = await supabase.from('leave_requests').update({ status: 'pending_hr_confirmation', current_approver_id: finalApprover?.id, approval_history: updatedHistory }).eq('id', id);
-    if (error) throw error;
+    
+    // If finalConfirmationRole is 'reporting_manager' and the approver IS the reporting manager, approve directly
+    if (finalConfirmationRole === 'reporting_manager' && isReportingManager) {
+      const { error } = await supabase.from('leave_requests').update({ 
+        status: 'approved', 
+        current_approver_id: null, 
+        approval_history: updatedHistory 
+      }).eq('id', id);
+      if (error) throw error;
+    } else {
+      // Otherwise, send to final approver (HR/Admin) for confirmation
+      const { data: finalApprover } = await supabase.from('users').select('id').eq('role_id', finalConfirmationRole).limit(1).single();
+      const { error } = await supabase.from('leave_requests').update({ 
+        status: 'pending_hr_confirmation', 
+        current_approver_id: finalApprover?.id, 
+        approval_history: updatedHistory 
+      }).eq('id', id);
+      if (error) throw error;
+    }
   },
   rejectLeaveRequest: async (id: string, approverId: string, reason = ''): Promise<void> => {
     const { data: request, error: fetchError } = await supabase.from('leave_requests').select('approval_history').eq('id', id).single();

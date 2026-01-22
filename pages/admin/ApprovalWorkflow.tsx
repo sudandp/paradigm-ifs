@@ -35,8 +35,11 @@ const ApprovalWorkflow: React.FC = () => {
             ]);
             setUsers(usersData);
             setFinalConfirmationRole(settingsData.finalConfirmationRole);
-            // Filter to only show roles that can be approvers
-            setRoles(rolesData.filter(r => ['admin', 'hr', 'operation_manager'].includes(r.id)));
+            // Filter to only show roles that can be approvers, plus the special "reporting_manager" option
+            const approverRoles = rolesData.filter(r => ['admin', 'hr', 'operation_manager'].includes(r.id));
+            // Add special "Reporting Manager" option
+            approverRoles.push({ id: 'reporting_manager', displayName: 'Reporting Manager', permissions: [] });
+            setRoles(approverRoles);
         } catch (error) {
             setToast({ message: 'Failed to load workflow data.', type: 'error' });
         } finally {

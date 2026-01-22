@@ -14,15 +14,27 @@ import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import RejectClaimModal from '../../components/hr/RejectClaimModal';
 import { isAdmin } from '../../utils/auth';
 
-const StatusChip: React.FC<{ status: LeaveRequestStatus }> = ({ status }) => {
+const StatusChip: React.FC<{ status: LeaveRequestStatus; approverName?: string | null; approvalHistory?: any[] }> = ({ status, approverName, approvalHistory }) => {
     const styles: Record<LeaveRequestStatus, string> = {
         pending_manager_approval: 'bg-yellow-100 text-yellow-800',
         pending_hr_confirmation: 'bg-blue-100 text-blue-800',
         approved: 'bg-green-100 text-green-800',
         rejected: 'bg-red-100 text-red-800',
     };
-    const text = status.replace(/_/g, ' ');
-    return <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${styles[status]}`}>{text}</span>;
+    
+    let displayText = status.replace(/_/g, ' ');
+    
+    // Show approver name for pending statuses
+    if ((status === 'pending_manager_approval' || status === 'pending_hr_confirmation') && approverName) {
+        displayText = `Pending from ${approverName}`;
+    }
+    // Show who approved for approved status
+    else if (status === 'approved' && approvalHistory && approvalHistory.length > 0) {
+        const lastApprover = approvalHistory[approvalHistory.length - 1];
+        displayText = `Approved by ${lastApprover.approverName || lastApprover.approver_name}`;
+    }
+    
+    return <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${styles[status]}`}>{displayText}</span>;
 };
 
 const ClaimStatusChip: React.FC<{ status: ExtraWorkLog['status'] }> = ({ status }) => {
@@ -312,7 +324,7 @@ const LeaveManagement: React.FC = () => {
                                         <td data-label="Dates" className="px-4 py-3 text-muted">{format(new Date(req.startDate.replace(/-/g, '/')), 'dd MMM')} - {format(new Date(req.endDate.replace(/-/g, '/')), 'dd MMM')}</td>
                                         <td data-label="Raised On" className="px-4 py-3 text-muted">{(req as any).createdAt ? format(new Date((req as any).createdAt), 'dd MMM, hh:mm a') : 'N/A'}</td>
                                         <td data-label="Reason" className="px-4 py-3 text-muted max-w-xs truncate">{req.reason}</td>
-                                        <td data-label="Status" className="px-4 py-3"><StatusChip status={req.status} /></td>
+                                        <td data-label="Status" className="px-4 py-3"><StatusChip status={req.status} approverName={req.currentApproverName} approvalHistory={req.approvalHistory} /></td>
                                         <td data-label="Actions" className="px-4 py-3">
                                             <div className="flex md:justify-start justify-end">
                                                 {actioningId === req.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ActionButtons request={req} />}

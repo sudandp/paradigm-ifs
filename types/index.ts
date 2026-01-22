@@ -873,6 +873,7 @@ export interface LeaveRequest {
   status: LeaveRequestStatus;
   dayOption?: 'full' | 'half'; // only for single-day earned leave
   currentApproverId: string | null;
+  currentApproverName?: string | null;
   approvalHistory: ApprovalRecord[];
   doctorCertificate?: UploadedFile | null;
 }
