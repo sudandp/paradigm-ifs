@@ -97,34 +97,9 @@ const MyLocations: React.FC = () => {
   const handleUseCurrentLocation = async () => {
     setAdding(true);
     try {
-      // Acquire high accuracy position
-      const pos = await getPrecisePosition().catch(() => null);
-      let lat: number | undefined;
-      let lon: number | undefined;
-
-      if (pos && pos.coords) {
-        lat = pos.coords.latitude;
-        lon = pos.coords.longitude;
-      }
-
-      // Fallback to one-shot geolocation
-      if (lat === undefined || lon === undefined) {
-        const fallback = await new Promise<GeolocationPosition | null>((resolve) => {
-          navigator.geolocation.getCurrentPosition(
-            (p) => resolve(p),
-            () => resolve(null),
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-          );
-        });
-        if (fallback && fallback.coords) {
-          lat = fallback.coords.latitude;
-          lon = fallback.coords.longitude;
-        }
-      }
-
-      if (lat === undefined || lon === undefined) {
-        throw new Error('Unable to retrieve current location.');
-      }
+      // Robust acquisition - getPrecisePosition now handles fallbacks internally
+      const pos = await getPrecisePosition();
+      const { latitude: lat, longitude: lon } = pos.coords;
 
       // Set coordinates
       setLatitude(lat.toString());

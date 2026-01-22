@@ -107,15 +107,38 @@ export async function getPrecisePosition(accuracyThreshold: number = 50, timeout
     let bestPos: GeolocationPosition | null = null;
     let watchId: string | null = null;
 
-    // Set up a timeout to end the watch after the specified period
+    // Set up a overall timeout to return whatever we have
     const timer = setTimeout(async () => {
       if (watchId) {
         await Geolocation.clearWatch({ id: watchId });
       }
+
       if (bestPos) {
+        console.log('getPrecisePosition: Timeout reached, returning best position found:', bestPos.coords.accuracy);
         resolve(bestPos);
       } else {
-        reject(new Error('Unable to acquire a precise position within the timeout period'));
+        // Fallback: If watch yielded nothing, try a one-shot getCurrentPosition
+        try {
+          console.log('getPrecisePosition: Watch yielded nothing, trying one-shot getCurrentPosition (High Accuracy)');
+          const pos = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 30000
+          });
+          resolve(pos as unknown as GeolocationPosition);
+        } catch (err) {
+          try {
+            console.log('getPrecisePosition: High accuracy failed, trying low accuracy fallback');
+            const pos = await Geolocation.getCurrentPosition({
+              enableHighAccuracy: false,
+              timeout: 5000,
+              maximumAge: 60000
+            });
+            resolve(pos as unknown as GeolocationPosition);
+          } catch (finalErr) {
+            reject(new Error('Unable to acquire any position after multiple attempts'));
+          }
+        }
       }
     }, timeoutMs);
 
@@ -128,33 +151,31 @@ export async function getPrecisePosition(accuracyThreshold: number = 50, timeout
         },
         (position, err) => {
           if (err) {
-            clearTimeout(timer);
-            if (watchId) {
-              Geolocation.clearWatch({ id: watchId });
-            }
-            reject(err);
+            console.warn('watchPosition error:', err);
+            // Don't reject yet, let the timer handle the fallback
             return;
           }
 
           if (position) {
+            const pos = position as unknown as GeolocationPosition;
             // Keep track of the best (lowest accuracy) position
-            if (!bestPos || (position.coords.accuracy && position.coords.accuracy < (bestPos.coords.accuracy || Infinity))) {
-              bestPos = position;
+            if (!bestPos || (pos.coords.accuracy && pos.coords.accuracy < (bestPos.coords.accuracy || Infinity))) {
+              bestPos = pos;
             }
             // If the accuracy meets our threshold, clear the watch and resolve immediately
-            if (position.coords.accuracy && position.coords.accuracy <= accuracyThreshold) {
+            if (pos.coords.accuracy && pos.coords.accuracy <= accuracyThreshold) {
               clearTimeout(timer);
               if (watchId) {
                 Geolocation.clearWatch({ id: watchId });
               }
-              resolve(position);
+              resolve(pos);
             }
           }
         }
       );
     } catch (err) {
-      clearTimeout(timer);
-      reject(err);
+      console.error('Failed to start watchPosition:', err);
+      // Wait for timer to try fallback
     }
   });
 }

@@ -394,37 +394,12 @@ export const useAuthStore = create<AuthState>()(
                 let locationStatus: string | null = null;
 
                 try {
-                    // Stage 1: Primary - High-accuracy Precise Position (15s timeout)
+                    // Stage 1: Primary - Robust Position Acquisition with internal fallbacks
                     position = await getPrecisePosition(150, 15000);
                 } catch (err: any) {
-                    console.warn('Stage 1 (Precise) failed:', err.message);
-
-                    try {
-                        // Stage 2: Secondary - High-accuracy Current Position using Capacitor
-                        const capPosition = await Geolocation.getCurrentPosition({
-                            enableHighAccuracy: true,
-                            timeout: 10000,
-                            maximumAge: 30000
-                        });
-                        position = capPosition as unknown as GeolocationPosition;
-                    } catch (err2: any) {
-                        console.warn('Stage 2 (Cached High-Accuracy) failed:', err2.message);
-
-                        try {
-                            // Stage 3: Tertiary - Low-accuracy (Coarse) Current Position
-                            // This often works when GPS is unavailable but network is present.
-                            const capPosition = await Geolocation.getCurrentPosition({
-                                enableHighAccuracy: false,
-                                timeout: 5000,
-                                maximumAge: 60000
-                            });
-                            position = capPosition as unknown as GeolocationPosition;
-                        } catch (err3: any) {
-                            console.error('Stage 3 (Coarse) failed:', err3.message);
-                            // Determine the final failure reason
-                            locationStatus = 'GPS Unavailable';
-                        }
-                    }
+                    console.warn('Location acquisition failed:', err.message);
+                    // Determine the final failure reason
+                    locationStatus = 'GPS Unavailable';
                 }
 
                 // Helper to finalize attendance
