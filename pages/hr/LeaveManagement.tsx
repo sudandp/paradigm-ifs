@@ -60,6 +60,7 @@ const LeaveManagement: React.FC = () => {
     const [isCompOffFeatureEnabled, setIsCompOffFeatureEnabled] = useState(true);
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [claimToReject, setClaimToReject] = useState<ExtraWorkLog | null>(null);
+    const [finalConfirmationRole, setFinalConfirmationRole] = useState<string>('hr');
 
     useEffect(() => {
         const checkFeature = async () => {
@@ -70,7 +71,16 @@ const LeaveManagement: React.FC = () => {
                 setIsCompOffFeatureEnabled(false);
             }
         };
+        const fetchSettings = async () => {
+            try {
+                const settings = await api.getApprovalWorkflowSettings();
+                setFinalConfirmationRole(settings.finalConfirmationRole);
+            } catch (e) {
+                console.error('Failed to fetch approval settings:', e);
+            }
+        };
         checkFeature();
+        fetchSettings();
     }, []);
 
     const fetchData = useCallback(async () => {
@@ -166,7 +176,15 @@ const LeaveManagement: React.FC = () => {
         }
     };
 
-    const filterTabs: Array<LeaveRequestStatus | 'all' | 'claims'> = ['pending_manager_approval', 'claims', 'pending_hr_confirmation', 'approved', 'rejected', 'all'];
+
+    const filterTabs: Array<LeaveRequestStatus | 'all' | 'claims'> = ['pending_manager_approval', 'claims', 'pending_hr_confirmation', 'approved', 'rejected', 'all']
+        .filter(tab => {
+            // Hide 'pending_hr_confirmation' tab if finalConfirmationRole is 'reporting_manager'
+            if (tab === 'pending_hr_confirmation' && finalConfirmationRole === 'reporting_manager') {
+                return false;
+            }
+            return true;
+        }) as Array<LeaveRequestStatus | 'all' | 'claims'>;
 
     const ActionButtons: React.FC<{ request: LeaveRequest }> = ({ request }) => {
         if (!user || request.status === 'approved' || request.status === 'rejected') return null;

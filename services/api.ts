@@ -1089,7 +1089,7 @@ export const api = {
     if (error) throw error;
   },
   getLeaveRequests: async (filter?: { userId?: string, userIds?: string[], status?: string, forApproverId?: string, startDate?: string, endDate?: string }): Promise<LeaveRequest[]> => {
-    let query = supabase.from('leave_requests').select('*, employee:users!user_id(name), approver:users!current_approver_id(name)');
+    let query = supabase.from('leave_requests').select('*, users(name)');
     if (filter?.userId) query = query.eq('user_id', filter.userId);
     if (filter?.userIds) query = query.in('user_id', filter.userIds);
     if (filter?.status) query = query.eq('status', filter.status);
@@ -1098,15 +1098,25 @@ export const api = {
       query = query.lte('start_date', filter.endDate).gte('end_date', filter.startDate);
     }
     const data = await fetchAll<any>(query.order('start_date', { ascending: false }));
+    
+    // Get unique approver IDs
+    const approverIds = [...new Set((data || []).map(item => item.current_approver_id).filter(Boolean))];
+    
+    // Fetch approver names if there are any
+    let approverMap: Record<string, string> = {};
+    if (approverIds.length > 0) {
+      const { data: approvers } = await supabase.from('users').select('id, name').in('id', approverIds);
+      approverMap = (approvers || []).reduce((acc, user) => ({ ...acc, [user.id]: user.name }), {});
+    }
+    
     return (data || []).map(item => {
       const camelItem = toCamelCase(item);
       // Handle both object and array response for the joined table
-      const employeeObj = Array.isArray(item.employee) ? item.employee[0] : item.employee;
-      const approverObj = Array.isArray(item.approver) ? item.approver[0] : item.approver;
+      const userObj = Array.isArray(item.users) ? item.users[0] : item.users;
       return {
         ...camelItem,
-        userName: employeeObj?.name || 'Unknown',
-        currentApproverName: approverObj?.name || null
+        userName: userObj?.name || 'Unknown',
+        currentApproverName: item.current_approver_id ? (approverMap[item.current_approver_id] || null) : null
       };
     });
   },
