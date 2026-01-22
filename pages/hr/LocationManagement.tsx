@@ -107,9 +107,12 @@ const LocationManagement: React.FC = () => {
       } catch (err) {
         console.warn('Reverse geocode failed', err);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setToast({ message: 'Unable to retrieve current location.', type: 'error' });
+      const msg = err.message?.toLowerCase().includes('permission') 
+        ? 'Location permission denied. Please enable it in settings.' 
+        : 'Unable to acquire location fix. Please ensure GPS is on and you are in an open area.';
+      setToast({ message: msg, type: 'error' });
     }
   };
 
@@ -130,13 +133,14 @@ const LocationManagement: React.FC = () => {
 
       if (!editingLocationId) {
         // Check for duplicate location before creating (within 10 meters)
-        const isDuplicate = locations.some(loc => {
+        const duplicate = locations.find(loc => {
           const distance = calculateDistance(latNum, lonNum, loc.latitude, loc.longitude);
           return distance < 10; // Consider as duplicate if within 10 meters
         });
 
-        if (isDuplicate) {
-          setToast({ message: 'A location already exists at these coordinates. Please use a different location.', type: 'error' });
+        if (duplicate) {
+          const locName = duplicate.name || duplicate.address || 'Unnamed Location';
+          setToast({ message: `A location already exists at these coordinates: "${locName}".`, type: 'error' });
           return;
         }
       }

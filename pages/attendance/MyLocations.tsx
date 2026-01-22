@@ -116,7 +116,10 @@ const MyLocations: React.FC = () => {
       setToast({ message: 'Coordinates and address filled. Please enter a location name.', type: 'success' });
     } catch (err: any) {
       console.error(err);
-      setToast({ message: err.message || 'Failed to get current location.', type: 'error' });
+      const msg = err.message?.toLowerCase().includes('permission') 
+        ? 'Location permission denied. Please enable it in settings.' 
+        : 'Unable to acquire location fix. Please ensure GPS is on and you are in an open area.';
+      setToast({ message: msg, type: 'error' });
     } finally {
       setAdding(false);
     }
@@ -201,7 +204,8 @@ const MyLocations: React.FC = () => {
       });
 
       if (duplicateCoords) {
-        setToast({ message: 'A location already exists at these coordinates.', type: 'error' });
+        const locName = duplicateCoords.name || duplicateCoords.address || 'Unnamed Location';
+        setToast({ message: `A location already exists at these coordinates: "${locName}".`, type: 'error' });
         return;
       }
     }
