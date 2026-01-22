@@ -433,7 +433,7 @@ const ProfilePage: React.FC = () => {
                 <div className="text-center md:text-left relative z-10 flex-1 mt-16 md:mt-0">
                     <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight drop-shadow-sm">{user.name}</h2>
                     <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
-                        <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-white border border-white/20 text-xs md:text-sm font-semibold backdrop-blur-sm">
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-sm border border-emerald-500 text-xs md:text-sm font-bold">
                             {getRoleName(user.role)}
                         </span>
                     </div>

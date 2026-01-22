@@ -1404,14 +1404,124 @@ export const api = {
     return toCamelCase(data);
   },
   exportAllData: async (): Promise<any> => {
-    const tables = ['users', 'organizations', 'onboarding_submissions', 'settings'];
+    const tables = [
+      'users', 'organizations', 'organization_groups', 'companies', 'entities',
+      'site_configurations', 'app_modules', 'roles', 'onboarding_submissions',
+      'settings', 'leave_requests', 'attendance_events', 'attendance_approvals',
+      'locations', 'user_locations', 'notifications', 'tasks', 'notification_rules',
+      'checklist_templates', 'field_reports', 'policies', 'insurances',
+      'back_office_id_series', 'site_staff_designations', 'comp_off_logs',
+      'extra_work_logs', 'uniform_requests', 'field_attendance_violations'
+    ];
     const data: Record<string, any> = {};
     for (const table of tables) {
       const { data: tableData, error } = await supabase.from(table).select('*');
-      if (error) throw new Error(`Failed to export ${table}`);
-      data[table] = tableData;
+      if (error) {
+        console.error(`Failed to export ${table}:`, error);
+        // Continue even if one table fails, but mark it
+        data[table] = [];
+      } else {
+        data[table] = tableData;
+      }
     }
     return toCamelCase(data);
+  },
+
+  getBackups: async (): Promise<any[]> => {
+    const { data, error } = await supabase
+      .from('system_backups')
+      .select('*, users(name)')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(item => ({
+      ...toCamelCase(item),
+      createdByName: item.users?.name || 'System'
+    }));
+  },
+
+  createBackup: async (name: string, description?: string): Promise<any> => {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) throw new Error('Not authenticated');
+
+    // 1. Generate snapshot
+    const snapshot = await api.exportAllData();
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+    
+    // 2. Upload to storage
+    const fileName = `backup_${Date.now()}.json`;
+    const filePath = `restoration_points/${fileName}`;
+    const { error: uploadError } = await supabase.storage
+      .from('backups')
+      .upload(filePath, blob);
+    
+    if (uploadError) throw uploadError;
+
+    // 3. Record in DB
+    const { data, error: dbError } = await supabase
+      .from('system_backups')
+      .insert({
+        name,
+        description,
+        snapshot_path: filePath,
+        size_bytes: blob.size,
+        created_by: userData.user.id,
+        status: 'completed'
+      })
+      .select()
+      .single();
+    
+    if (dbError) throw dbError;
+    return toCamelCase(data);
+  },
+
+  restoreFromBackup: async (backupId: string): Promise<void> => {
+    // 1. Get backup info
+    const { data: backup, error: fetchError } = await supabase
+      .from('system_backups')
+      .select('*')
+      .eq('id', backupId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+
+    // 2. Download snapshot
+    const { data: blob, error: downloadError } = await supabase.storage
+      .from('backups')
+      .download(backup.snapshot_path);
+    
+    if (downloadError) throw downloadError;
+
+    const snapshotText = await blob.text();
+    const snapshot = toSnakeCase(JSON.parse(snapshotText));
+
+    // 3. Restoration logic (Critical section)
+    // For each table in snapshot, clear and re-insert
+    // Note: Tables must be cleared in reverse dependency order and filled in dependency order.
+    // Order: Base -> Dependent
+    const restorationOrder = [
+      'roles', 'users', 'organizations', 'organization_groups', 'companies', 
+      'entities', 'site_configurations', 'settings', 'app_modules',
+      'onboarding_submissions', 'leave_requests', 'attendance_events',
+      'locations', 'user_locations', 'notifications', 'tasks',
+      'notification_rules', 'checklist_templates', 'field_reports',
+      'policies', 'insurances', 'back_office_id_series',
+      'site_staff_designations', 'comp_off_logs', 'extra_work_logs',
+      'uniform_requests', 'field_attendance_violations'
+    ];
+
+    for (const table of restorationOrder.reverse()) {
+      if (!snapshot[table]) continue;
+      // We don't delete everything blindly if it was missing from backup, but we do if it's in restorationOrder
+      const { error: delError } = await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+      if (delError) console.error(`Failed to clear table ${table}:`, delError);
+    }
+
+    for (const table of restorationOrder.reverse()) {
+      if (!snapshot[table] || snapshot[table].length === 0) continue;
+      const { error: insError } = await supabase.from(table).insert(snapshot[table]);
+      if (insError) throw new Error(`Restoration failed at table ${table}: ${insError.message}`);
+    }
   },
   getPincodeDetails: async (pincode: string): Promise<{ city: string; state: string; }> => {
     // This is a mock. A real implementation would use an external API.

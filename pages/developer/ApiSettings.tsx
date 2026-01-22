@@ -31,6 +31,20 @@ export const ApiSettings: React.FC = () => {
     const [isExporting, setIsExporting] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isInterfaceModalOpen, setIsInterfaceModalOpen] = useState(false);
+    const [backups, setBackups] = useState<any[]>([]);
+
+    const loadBackups = async () => {
+        try {
+            const data = await api.getBackups();
+            setBackups(data);
+        } catch (err) {
+            console.error('Failed to load backups:', err);
+        }
+    };
+
+    React.useEffect(() => {
+        loadBackups();
+    }, []);
 
     const handleExport = async () => {
         setIsExporting(true);
@@ -81,7 +95,7 @@ export const ApiSettings: React.FC = () => {
                                     label="Enable Gemini API OCR Verification"
                                     description="Use Google's Gemini API for document data extraction. This is a powerful fallback or primary OCR. API key must be configured on the backend."
                                     checked={store.geminiApi.enabled}
-                                    onChange={val => store.updateGeminiApiSettings({ enabled: val })}
+                                    onChange={e => store.updateGeminiApiSettings({ enabled: e.target.checked })}
                                 />
                             </div>
                             {/* Perfios API */}
@@ -91,7 +105,7 @@ export const ApiSettings: React.FC = () => {
                                     label="Enable Perfios API Verification"
                                     description="Use Perfios for Bank, Aadhaar, and UAN verification."
                                     checked={store.perfiosApi.enabled}
-                                    onChange={val => store.updatePerfiosApiSettings({ enabled: val })}
+                                    onChange={e => store.updatePerfiosApiSettings({ enabled: e.target.checked })}
                                 />
                                 <div className={`mt-4 space-y-4 transition-opacity ${store.perfiosApi.enabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
                                     <Input label="Perfios Client ID" value={store.perfiosApi.clientId} onChange={e => store.updatePerfiosApiSettings({ clientId: e.target.value })} />
@@ -109,7 +123,7 @@ export const ApiSettings: React.FC = () => {
                                 label="Enable OTP Phone Sign-In"
                                 description="Allow users to sign in using a one-time password sent via SMS."
                                 checked={store.otp.enabled}
-                                onChange={val => store.updateOtpSettings({ enabled: val })}
+                                onChange={e => store.updateOtpSettings({ enabled: e.target.checked })}
                             />
                         </div>
                     </SettingsCard>
@@ -125,21 +139,115 @@ export const ApiSettings: React.FC = () => {
                                 label="Enable Provisional Site Creation"
                                 description="Allows HR/Admins to create a site with just a name, providing a 90-day grace period to complete the full configuration for easier onboarding."
                                 checked={store.siteManagement.enableProvisionalSites}
-                                onChange={val => store.updateSiteManagementSettings({ enableProvisionalSites: val })}
+                                onChange={e => store.updateSiteManagementSettings({ enableProvisionalSites: e.target.checked })}
                             />
                         </div>
                     </SettingsCard>
                     <SettingsCard title="System & Data" icon={Settings}>
                         <p className="text-sm text-muted -mt-2">Manage core system settings and data operations.</p>
                         <div className="space-y-6 pt-4">
-                            <Checkbox id="pincode-verification" label="Enable Pincode API Verification" description="Auto-fill City/State from pincode during onboarding." checked={store.address.enablePincodeVerification} onChange={val => store.updateAddressSettings({ enablePincodeVerification: val })} />
+                            <Checkbox id="pincode-verification" label="Enable Pincode API Verification" description="Auto-fill City/State from pincode during onboarding." checked={store.address.enablePincodeVerification} onChange={e => store.updateAddressSettings({ enablePincodeVerification: e.target.checked })} />
 
                             <div className="pt-4 border-t">
-                                <h4 className="font-semibold text-primary-text mb-2">Backup & Export</h4>
-                                <p className="text-sm text-muted mb-4">Download all data from the active data source (Mock Data).</p>
-                                <Button type="button" variant="outline" onClick={handleExport} isLoading={isExporting}>
-                                    <Download className="mr-2 h-4 w-4" /> Export All Data
-                                </Button>
+                                <h4 className="font-semibold text-primary-text mb-2">Database Backups</h4>
+                                <p className="text-sm text-muted mb-4">Manage system restoration points. Backups are stored securely in Supabase.</p>
+                                
+                                <div className="space-y-4">
+                                    <div className="flex gap-2">
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={async () => {
+                                                const name = prompt("Enter a name for this restoration point:");
+                                                if (!name) return;
+                                                setIsExporting(true);
+                                                try {
+                                                    await api.createBackup(name);
+                                                    setToast({ message: 'Restoration point created!', type: 'success' });
+                                                    // Refresh backups list
+                                                    loadBackups();
+                                                } catch (err) {
+                                                    setToast({ message: 'Failed to create backup.', type: 'error' });
+                                                } finally {
+                                                    setIsExporting(false);
+                                                }
+                                            }}
+                                            isLoading={isExporting}
+                                        >
+                                            <Server className="mr-2 h-4 w-4" /> Create Restoration Point
+                                        </Button>
+                                        <Button type="button" variant="outline" size="sm" onClick={handleExport}>
+                                            <Download className="mr-2 h-4 w-4" /> Instant Export (JSON)
+                                        </Button>
+                                    </div>
+
+                                    <div className="bg-page rounded-lg border border-border overflow-hidden">
+                                        <div className="px-4 py-2 bg-muted/30 border-b border-border text-xs font-bold text-muted uppercase tracking-wider">
+                                            Recent Restoration Points
+                                        </div>
+                                        <div className="max-h-60 overflow-y-auto">
+                                            {backups.length === 0 ? (
+                                                <div className="p-8 text-center text-sm text-muted">
+                                                    No restoration points found.
+                                                </div>
+                                            ) : (
+                                                <div className="divide-y divide-border">
+                                                    {backups.map((b) => (
+                                                        <div key={b.id} className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors">
+                                                            <div>
+                                                                <div className="font-bold text-primary-text">{b.name}</div>
+                                                                <div className="text-xs text-muted">
+                                                                    {new Date(b.createdAt).toLocaleString()} • {Math.round(b.sizeBytes / 1024)} KB • By {b.createdByName}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    title="Restore from this point"
+                                                                    className="p-2 hover:bg-accent/10 rounded-lg text-accent-dark transition-colors"
+                                                                    onClick={async () => {
+                                                                        if (!confirm(`CAUTION: This will overwrite CURRENT data with the snapshot from ${b.name}. Action cannot be undone. Proceed?`)) return;
+                                                                        setIsExporting(true);
+                                                                        try {
+                                                                            await api.restoreFromBackup(b.id);
+                                                                            setToast({ message: 'System restored successfully!', type: 'success' });
+                                                                            setTimeout(() => window.location.reload(), 2000);
+                                                                        } catch (err: any) {
+                                                                            setToast({ message: `Restore failed: ${err.message}`, type: 'error' });
+                                                                        } finally {
+                                                                            setIsExporting(false);
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <Server className="h-4 w-4" />
+                                                                </button>
+                                                                <button
+                                                                    title="Download snapshot"
+                                                                    className="p-2 hover:bg-primary/10 rounded-lg text-primary transition-colors"
+                                                                    onClick={async () => {
+                                                                        try {
+                                                                            const { data: blob } = await (api as any).supabase.storage
+                                                                                .from('backups')
+                                                                                .download(b.snapshotPath);
+                                                                            const url = window.URL.createObjectURL(blob);
+                                                                            const a = document.createElement('a');
+                                                                            a.href = url;
+                                                                            a.download = `backup_${b.name.replace(/\s+/g, '_')}.json`;
+                                                                            a.click();
+                                                                        } catch (err) {
+                                                                            setToast({ message: 'Download failed.', type: 'error' });
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <Download className="h-4 w-4" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </SettingsCard>
@@ -152,7 +260,7 @@ export const ApiSettings: React.FC = () => {
                                 label="Enable Email Notifications"
                                 description="Send emails for important events like task assignments. SMTP must be configured on the backend."
                                 checked={store.notifications.email.enabled}
-                                onChange={val => store.updateNotificationSettings({ email: { enabled: val } })}
+                                onChange={e => store.updateNotificationSettings({ email: { enabled: e.target.checked } })}
                             />
                         </div>
                     </SettingsCard>
