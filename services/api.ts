@@ -1010,12 +1010,20 @@ export const api = {
     const staffType = getStaffType(userData.role_id);
     const rules = (toCamelCase(settingsData.attendance_settings) as AttendanceSettings)[staffType];
 
+    const currentYear = new Date().getFullYear();
+    const yearStart = `${currentYear}-01-01`;
+    const yearEnd = `${currentYear}-12-31`;
+
     const [
       { data: approvedLeaves, error: leavesError },
       { data: compOffData, error: compOffError },
       { data: otData, error: otError }
     ] = await Promise.all([
-      supabase.from('leave_requests').select('leave_type, start_date, end_date, day_option').eq('user_id', userId).eq('status', 'approved'),
+      supabase.from('leave_requests')
+        .select('leave_type, start_date, end_date, day_option')
+        .eq('user_id', userId)
+        .eq('status', 'approved')
+        .gte('start_date', yearStart), // Only current year leaves
       supabase.from('comp_off_logs').select('*').eq('user_id', userId),
       supabase.from('extra_work_logs').select('hours_worked').eq('user_id', userId).eq('claim_type', 'OT').eq('status', 'Approved').gte('work_date', format(startOfMonth(new Date()), 'yyyy-MM-dd')).lte('work_date', format(endOfMonth(new Date()), 'yyyy-MM-dd'))
     ]);
@@ -1027,12 +1035,15 @@ export const api = {
       earnedTotal: rules.annualEarnedLeaves || 0, earnedUsed: 0,
       sickTotal: rules.annualSickLeaves || 0, sickUsed: 0,
       floatingTotal: (rules.monthlyFloatingLeaves || 0) * 12, floatingUsed: 0,
-      compOffTotal: (compOffData || []).length, compOffUsed: (compOffData || []).filter(log => log.status === 'used').length,
+      compOffTotal: (compOffData || []).filter(log => log.status === 'earned').length, 
+      compOffUsed: (compOffData || []).filter(log => log.status === 'used').length,
       otHoursThisMonth: (otData || []).reduce((sum, log) => sum + (log.hours_worked || 0), 0),
     };
 
     (approvedLeaves || []).forEach(leave => {
       const leaveAmount = leave.day_option === 'half' ? 0.5 : differenceInCalendarDays(new Date(leave.end_date), new Date(leave.start_date)) + 1;
+      // Reset only Sick and Floating annually. Earned might carry over depending on policy, 
+      // but for now we follow the user's specific request for Sick leave reset.
       if (leave.leave_type === 'Earned') balance.earnedUsed += leaveAmount;
       if (leave.leave_type === 'Sick') balance.sickUsed += leaveAmount;
       if (leave.leave_type === 'Floating') balance.floatingUsed += leaveAmount;
@@ -1400,10 +1411,27 @@ export const api = {
     if (error) throw error;
   },
   approveLeaveRequest: async (id: string, approverId: string): Promise<void> => {
-    // Fetch request data including user_id to check if approver is the reporting manager
-    const { data: request, error: fetchError } = await supabase.from('leave_requests').select('approval_history, user_id').eq('id', id).single();
+    // Fetch request data including user_id, leave_type and dates
+    const { data: request, error: fetchError } = await supabase.from('leave_requests').select('approval_history, user_id, leave_type, start_date, end_date, day_option').eq('id', id).single();
     if (fetchError) throw fetchError;
     
+    // Check balance
+    const balance = await api.getLeaveBalancesForUser(request.user_id);
+    const leaveDays = request.day_option === 'half' ? 0.5 : differenceInCalendarDays(new Date(request.end_date), new Date(request.start_date)) + 1;
+    
+    const typeKeyStr = `${request.leave_type.toLowerCase()}Total`.replace('earnedtotal', 'earnedTotal').replace('sicktotal', 'sickTotal').replace('floatingtotal', 'floatingTotal').replace('compofftotal', 'compOffTotal');
+    const typeKey = typeKeyStr as keyof LeaveBalance;
+    const usedKey = typeKeyStr.replace('Total', 'Used') as keyof LeaveBalance;
+    
+    const available = (balance[typeKey] as number) - (balance[usedKey] as number);
+    
+    if (available < leaveDays) {
+      // Auto-decline if insufficient leaves
+      const reason = `Insufficient ${request.leave_type} balance. Available: ${available} days, Requested: ${leaveDays} days.`;
+      await api.rejectLeaveRequest(id, approverId, reason);
+      return;
+    }
+
     const { finalConfirmationRole } = await api.getApprovalWorkflowSettings();
     const { data: approverData, error: nameError } = await supabase.from('users').select('name').eq('id', approverId).single();
     if (nameError) throw nameError;
@@ -1423,6 +1451,14 @@ export const api = {
         approval_history: updatedHistory 
       }).eq('id', id);
       if (error) throw error;
+      
+      // If it's a Comp Off leave, mark a log as used
+      if (request.leave_type === 'Comp Off') {
+        const { data: compOffLogs } = await supabase.from('comp_off_logs').select('id').eq('user_id', request.user_id).eq('status', 'earned').limit(Math.ceil(leaveDays));
+        if (compOffLogs && compOffLogs.length > 0) {
+           await supabase.from('comp_off_logs').update({ status: 'used', leave_request_id: id }).in('id', compOffLogs.map(l => l.id));
+        }
+      }
     } else {
       // Otherwise, send to final approver (HR/Admin) for confirmation
       const { data: finalApprover } = await supabase.from('users').select('id').eq('role_id', finalConfirmationRole).limit(1).single();
@@ -1444,6 +1480,32 @@ export const api = {
     const { error } = await supabase.from('leave_requests').update({ status: 'rejected', current_approver_id: null, approval_history: updatedHistory }).eq('id', id);
     if (error) throw error;
   },
+  cancelApprovedLeave: async (id: string, cancellerId: string, reason: string): Promise<void> => {
+    const { data: request, error: fetchError } = await supabase.from('leave_requests').select('approval_history, user_id, leave_type').eq('id', id).single();
+    if (fetchError) throw fetchError;
+    
+    const { data: cancellerData } = await supabase.from('users').select('name').eq('id', cancellerId).single();
+    
+    const newHistoryRecord = { approver_id: cancellerId, approver_name: cancellerData?.name || 'System', status: 'cancelled', timestamp: new Date().toISOString(), comments: reason };
+    const updatedHistory = [...((request.approval_history as any[]) || []), newHistoryRecord];
+    
+    const { error } = await supabase.from('leave_requests').update({ status: 'cancelled', current_approver_id: null, approval_history: updatedHistory }).eq('id', id);
+    if (error) throw error;
+    
+    // Restore comp off if applicable
+    if (request.leave_type === 'Comp Off') {
+      await supabase.from('comp_off_logs').update({ status: 'earned', leave_request_id: null }).eq('leave_request_id', id);
+    }
+  },
+  withdrawLeaveRequest: async (id: string, userId: string): Promise<void> => {
+    const { data: request, error: fetchError } = await supabase.from('leave_requests').select('user_id, status').eq('id', id).single();
+    if (fetchError) throw fetchError;
+    if (request.user_id !== userId) throw new Error('Unauthorized to withdraw this request.');
+    if (['approved', 'rejected', 'cancelled'].includes(request.status)) throw new Error('Cannot withdraw an already processed request.');
+    
+    const { error } = await supabase.from('leave_requests').update({ status: 'withdrawn', current_approver_id: null }).eq('id', id);
+    if (error) throw error;
+  },
   confirmLeaveByHR: async (id: string, hrId: string): Promise<void> => {
     const { data: request, error: fetchError } = await supabase.from('leave_requests').select('leave_type, user_id, approval_history').eq('id', id).single();
     if (fetchError) throw fetchError;
@@ -1463,10 +1525,12 @@ export const api = {
     const { error } = await supabase.from('extra_work_logs').insert(toSnakeCase({ ...claimData, status: 'Pending' }));
     if (error) throw error;
   },
-  getExtraWorkLogs: async (userId?: string): Promise<ExtraWorkLog[]> => {
+  getExtraWorkLogs: async (filter?: { userId?: string, status?: string, workDate?: string }): Promise<ExtraWorkLog[]> => {
     let query = supabase.from('extra_work_logs').select('*');
-    if (userId) query = query.eq('user_id', userId);
-    else query = query.eq('status', 'Pending');
+    if (filter?.userId) query = query.eq('user_id', filter.userId);
+    if (filter?.status) query = query.eq('status', filter.status);
+    if (filter?.workDate) query = query.eq('work_date', filter.workDate);
+    
     const { data, error } = await query.order('work_date', { ascending: false });
     if (error) throw error;
     return (data || []).map(toCamelCase);

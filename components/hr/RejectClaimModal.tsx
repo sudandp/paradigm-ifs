@@ -7,9 +7,20 @@ interface RejectClaimModalProps {
   onClose: () => void;
   onConfirm: (reason: string) => void;
   isConfirming?: boolean;
+  title?: string;
+  label?: string;
+  confirmButtonText?: string;
 }
 
-const RejectClaimModal: React.FC<RejectClaimModalProps> = ({ isOpen, onClose, onConfirm, isConfirming }) => {
+const RejectClaimModal: React.FC<RejectClaimModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  isConfirming,
+  title = "Reject Claim",
+  label = "Please provide a reason for rejecting this claim. This will be visible to the employee.",
+  confirmButtonText = "Confirm Rejection"
+}) => {
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
 
@@ -34,12 +45,12 @@ const RejectClaimModal: React.FC<RejectClaimModalProps> = ({ isOpen, onClose, on
       isOpen={isOpen}
       onClose={handleClose}
       onConfirm={handleConfirm}
-      title="Reject Claim"
-      confirmButtonText="Confirm Rejection"
+      title={title}
+      confirmButtonText={confirmButtonText}
       isConfirming={isConfirming}
     >
       <div className="space-y-4">
-        <p>Please provide a reason for rejecting this claim. This will be visible to the employee.</p>
+        <p>{label}</p>
         <div>
           <textarea
             value={reason}

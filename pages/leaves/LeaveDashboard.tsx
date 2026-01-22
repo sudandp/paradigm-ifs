@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
 import type { LeaveBalance, LeaveRequest, LeaveType, LeaveRequestStatus, UploadedFile, CompOffLog, AttendanceEvent } from '../../types';
-import { Loader2, Plus, ArrowLeft, AlertTriangle, Briefcase, HeartPulse, Plane, CalendarClock, Clock, Edit, Trash2 } from 'lucide-react';
+import { Loader2, Plus, ArrowLeft, AlertTriangle, Briefcase, HeartPulse, Plane, CalendarClock, Clock, Edit, Trash2, XCircle, Search } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import Select from '../../components/ui/Select';
@@ -39,7 +39,9 @@ const LeaveStatusChip: React.FC<{ status: LeaveRequestStatus }> = ({ status }) =
         pending_manager_approval: 'leave-status-chip--pending_manager_approval',
         pending_hr_confirmation: 'leave-status-chip--pending_hr_confirmation',
         approved: 'leave-status-chip--approved',
-        rejected: 'leave-status-chip--rejected'
+        rejected: 'leave-status-chip--rejected',
+        cancelled: 'leave-status-chip--cancelled',
+        withdrawn: 'leave-status-chip--withdrawn'
     };
     const text = status.replace(/_/g, ' ');
     return <span className={`leave-status-chip ${statusClasses[status]}`}>{text}</span>;
@@ -189,15 +191,15 @@ const LeaveDashboard: React.FC = () => {
     };
 
     const handleCancelRequest = async (id: string) => {
-        if (!window.confirm('Are you sure you want to cancel this leave request? This action cannot be undone.')) return;
+        if (!window.confirm('Are you sure you want to withdraw this leave request?')) return;
         
         setActioningRequestId(id);
         try {
-            await api.cancelLeaveRequest(id);
-            setToast({ message: 'Leave request cancelled successfully.', type: 'success' });
+            await api.withdrawLeaveRequest(id, user!.id);
+            setToast({ message: 'Leave request withdrawn successfully.', type: 'success' });
             fetchData();
         } catch (error) {
-            setToast({ message: 'Failed to cancel leave request.', type: 'error' });
+            setToast({ message: 'Failed to withdraw leave request.', type: 'error' });
         } finally {
             setActioningRequestId(null);
         }
@@ -207,10 +209,10 @@ const LeaveDashboard: React.FC = () => {
     const filterTabs: Array<LeaveRequestStatus | 'all'> = ['all', 'pending_manager_approval', 'pending_hr_confirmation', 'approved', 'rejected'];
 
     const balanceCards = balance ? [
-        { title: 'Earned Leave', value: `${balance.earnedTotal - balance.earnedUsed} / ${balance.earnedTotal}`, icon: Briefcase },
-        { title: 'Sick Leave', value: `${balance.sickTotal - balance.sickUsed} / ${balance.sickTotal}`, icon: HeartPulse },
-        { title: 'Floating Holiday', value: `${balance.floatingTotal - balance.floatingUsed} / ${balance.floatingTotal}`, icon: Plane },
-        { title: 'Compensatory Off', value: `${balance.compOffTotal - balance.compOffUsed} / ${balance.compOffTotal}`, icon: CalendarClock },
+        { title: 'Earned Leave', value: `${Math.max(0, balance.earnedTotal - balance.earnedUsed)} / ${balance.earnedTotal}`, icon: Briefcase },
+        { title: 'Sick Leave', value: `${Math.max(0, balance.sickTotal - balance.sickUsed)} / ${balance.sickTotal}`, icon: HeartPulse },
+        { title: 'Floating Holiday', value: `${Math.max(0, balance.floatingTotal - balance.floatingUsed)} / ${balance.floatingTotal}`, icon: Plane },
+        { title: 'Compensatory Off', value: `${Math.max(0, balance.compOffTotal - balance.compOffUsed)} / ${balance.compOffTotal}`, icon: CalendarClock },
     ] : [];
 
     return (

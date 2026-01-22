@@ -826,7 +826,7 @@ export interface DailyAttendanceRecord {
 
 // Types for Leave Management
 export type LeaveType = 'Earned' | 'Sick' | 'Floating' | 'Comp Off';
-export type LeaveRequestStatus = 'pending_manager_approval' | 'pending_hr_confirmation' | 'approved' | 'rejected';
+export type LeaveRequestStatus = 'pending_manager_approval' | 'pending_hr_confirmation' | 'approved' | 'rejected' | 'cancelled' | 'withdrawn';
 
 export interface ApprovalRecord {
   approverId: string;

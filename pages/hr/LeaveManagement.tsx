@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { LeaveRequest, LeaveRequestStatus, ExtraWorkLog } from '../../types';
-import { Loader2, Check, X, Plus } from 'lucide-react';
+import { Loader2, Check, X, Plus, XCircle, User, Calendar, FilterX } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { format } from 'date-fns';
@@ -20,6 +20,8 @@ const StatusChip: React.FC<{ status: LeaveRequestStatus; approverName?: string |
         pending_hr_confirmation: 'bg-blue-100 text-blue-800',
         approved: 'bg-green-100 text-green-800',
         rejected: 'bg-red-100 text-red-800',
+        cancelled: 'bg-gray-100 text-gray-800',
+        withdrawn: 'bg-gray-100 text-gray-600',
     };
     
     let displayText = status.replace(/_/g, ' ');
@@ -54,12 +56,17 @@ const LeaveManagement: React.FC = () => {
     const [claims, setClaims] = useState<ExtraWorkLog[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filter, setFilter] = useState<LeaveRequestStatus | 'all' | 'claims'>('pending_manager_approval');
+    const [allUsers, setAllUsers] = useState<{ id: string; name: string }[]>([]);
+    const [selectedUserId, setSelectedUserId] = useState<string>('all');
+    const [selectedDate, setSelectedDate] = useState<string>('');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [actioningId, setActioningId] = useState<string | null>(null);
     const isMobile = useMediaQuery('(max-width: 767px)');
     const [isCompOffFeatureEnabled, setIsCompOffFeatureEnabled] = useState(true);
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
     const [claimToReject, setClaimToReject] = useState<ExtraWorkLog | null>(null);
+    const [requestToCancel, setRequestToCancel] = useState<LeaveRequest | null>(null);
     const [finalConfirmationRole, setFinalConfirmationRole] = useState<string>('hr');
 
     useEffect(() => {
@@ -79,8 +86,17 @@ const LeaveManagement: React.FC = () => {
                 console.error('Failed to fetch approval settings:', e);
             }
         };
+        const fetchUsers = async () => {
+            try {
+                const users = await api.getUsers();
+                setAllUsers(users.map(u => ({ id: u.id, name: u.name })).sort((a, b) => a.name.localeCompare(b.name)));
+            } catch (e) {
+                console.error('Failed to fetch users:', e);
+            }
+        };
         checkFeature();
         fetchSettings();
+        fetchUsers();
     }, []);
 
     const fetchData = useCallback(async () => {
@@ -91,7 +107,10 @@ const LeaveManagement: React.FC = () => {
             
             // Determine filter based on role and current filter tab
             let leaveFilter: any = { 
-                status: (filter !== 'all' && filter !== 'claims') ? filter : undefined 
+                status: (filter !== 'all' && filter !== 'claims') ? filter : undefined,
+                userId: selectedUserId !== 'all' ? selectedUserId : undefined,
+                startDate: selectedDate || undefined,
+                endDate: selectedDate || undefined
             };
 
             // Admin and HR see all requests. Managers see only their team's requests.
@@ -100,13 +119,23 @@ const LeaveManagement: React.FC = () => {
                 const teamMembers = await api.getTeamMembers(user.id);
                 const teamIds = teamMembers.map(m => m.id);
                 
-                // Also include requests where the manager is the current approver 
-                leaveFilter.userIds = teamIds;
+                // If a specific user is selected, ensure they are in the team
+                if (selectedUserId !== 'all') {
+                    leaveFilter.userId = teamIds.includes(selectedUserId) ? selectedUserId : 'none';
+                } else {
+                    leaveFilter.userIds = teamIds;
+                }
             }
+
+            const claimsFilter = {
+                status: isApprover ? 'Pending' : undefined,
+                userId: selectedUserId !== 'all' ? selectedUserId : undefined,
+                workDate: selectedDate || undefined
+            };
 
             const [leaveData, claimsData] = await Promise.all([
                 api.getLeaveRequests(leaveFilter),
-                isApprover ? api.getExtraWorkLogs() : Promise.resolve([])
+                isApprover ? api.getExtraWorkLogs(claimsFilter) : Promise.resolve([])
             ]);
 
             setRequests(leaveData);
@@ -120,7 +149,7 @@ const LeaveManagement: React.FC = () => {
 
     useEffect(() => {
         fetchData();
-    }, [fetchData]);
+    }, [fetchData, selectedUserId, selectedDate]);
 
     const handleAction = async (id: string, action: 'approve' | 'reject' | 'confirm') => {
         if (!user) return;
@@ -177,6 +206,22 @@ const LeaveManagement: React.FC = () => {
     };
 
 
+    const handleCancelLeave = async (reason: string) => {
+        if (!user || !requestToCancel) return;
+        setActioningId(requestToCancel.id);
+        try {
+            await api.cancelApprovedLeave(requestToCancel.id, user.id, reason);
+            setToast({ message: 'Leave request cancelled successfully.', type: 'success' });
+            fetchData();
+        } catch (error) {
+            setToast({ message: 'Failed to cancel leave request.', type: 'error' });
+        } finally {
+            setActioningId(null);
+            setIsCancelModalOpen(false);
+            setRequestToCancel(null);
+        }
+    };
+
     const filterTabs: Array<LeaveRequestStatus | 'all' | 'claims'> = ['pending_manager_approval', 'claims', 'pending_hr_confirmation', 'approved', 'rejected', 'all']
         .filter(tab => {
             // Hide 'pending_hr_confirmation' tab if finalConfirmationRole is 'reporting_manager'
@@ -187,8 +232,30 @@ const LeaveManagement: React.FC = () => {
         }) as Array<LeaveRequestStatus | 'all' | 'claims'>;
 
     const ActionButtons: React.FC<{ request: LeaveRequest }> = ({ request }) => {
-        if (!user || request.status === 'approved' || request.status === 'rejected') return null;
-        if (user.role === 'hr') return null; // HR is read-only
+        if (!user) return null;
+        if (user.role === 'hr' && request.status !== 'pending_hr_confirmation') return null; // HR is mostly read-only
+
+        // Allow cancellation of approved leaves by manager/admin
+        if (request.status === 'approved') {
+            const canCancel = (['admin', 'operation_manager', 'hr'].includes(user.role)) || (request.currentApproverId === user.id);
+            if (canCancel) {
+                return (
+                    <Button 
+                        size="sm" 
+                        variant="icon" 
+                        onClick={() => { setRequestToCancel(request); setIsCancelModalOpen(true); }} 
+                        disabled={actioningId === request.id} 
+                        title="Cancel Approved Leave" 
+                        aria-label="Cancel approved leave"
+                    >
+                        <XCircle className="h-4 w-4 text-orange-600" />
+                    </Button>
+                );
+            }
+            return null;
+        }
+
+        if (request.status === 'rejected' || request.status === 'cancelled' || request.status === 'withdrawn') return null;
 
         const isMyTurn = request.currentApproverId === user.id || user.role === 'admin';
 
@@ -224,6 +291,15 @@ const LeaveManagement: React.FC = () => {
                 onConfirm={handleRejectClaim}
                 isConfirming={!!actioningId}
             />
+            
+            <RejectClaimModal
+                isOpen={isCancelModalOpen}
+                onClose={() => { setIsCancelModalOpen(false); setRequestToCancel(null); }}
+                onConfirm={handleCancelLeave}
+                isConfirming={!!actioningId}
+                title="Cancel Approved Leave"
+                label="Reason for cancellation"
+            />
 
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-primary-text">Leave Approval Inbox</h2>
@@ -254,6 +330,61 @@ const LeaveManagement: React.FC = () => {
                 </div>
             )}
 
+            {/* Filter Bar */}
+            <div className="bg-page/50 p-4 rounded-xl border border-border mb-6">
+                <div className="flex flex-col md:flex-row gap-4 items-end">
+                    <div className="w-full md:w-64">
+                        <label className="block text-xs font-semibold text-muted uppercase mb-1.5 ml-1">Filter by Employee</label>
+                        <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none" />
+                            <select 
+                                value={selectedUserId}
+                                onChange={(e) => setSelectedUserId(e.target.value)}
+                                className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-card border border-border text-primary-text focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all appearance-none"
+                            >
+                                <option value="all">All Employees</option>
+                                {allUsers.map(u => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
+                            </select>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <svg className="h-4 w-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="w-full md:w-48">
+                        <label className="block text-xs font-semibold text-muted uppercase mb-1.5 ml-1">Filter by Date</label>
+                        <div className="relative">
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none" />
+                            <input 
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="w-full pl-9 pr-4 py-2 rounded-lg bg-card border border-border text-primary-text focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <Button 
+                            variant="secondary" 
+                            onClick={() => { setSelectedUserId('all'); setSelectedDate(''); }}
+                            className="h-[42px] px-4"
+                            disabled={selectedUserId === 'all' && !selectedDate}
+                        >
+                            <FilterX className="h-4 w-4 mr-2" /> Clear
+                        </Button>
+                        <Button 
+                            variant="primary" 
+                            onClick={fetchData}
+                            className="h-[42px] px-4"
+                        >
+                            Refresh
+                        </Button>
+                    </div>
+                </div>
+            </div>
 
             <div className="mb-6">
                 <div className="w-full sm:w-auto md:border-b border-border">

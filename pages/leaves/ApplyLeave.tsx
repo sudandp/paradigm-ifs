@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
-import type { LeaveType, UploadedFile } from '../../types';
+import type { LeaveType, UploadedFile, LeaveBalance } from '../../types';
 import { ArrowLeft } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
@@ -122,6 +122,24 @@ const ApplyLeave: React.FC = () => {
     const onSubmit: SubmitHandler<LeaveRequestFormData> = async (formData) => {
         if (!user) return;
         try {
+            // Check balance before submitting (only for new requests)
+            if (!isEditMode) {
+                const balance = await api.getLeaveBalancesForUser(user.id);
+                const startDate = new Date(formData.startDate.replace(/-/g, '/'));
+                const endDate = new Date(formData.endDate.replace(/-/g, '/'));
+                const duration = formData.dayOption === 'half' ? 0.5 : differenceInCalendarDays(endDate, startDate) + 1;
+                
+                const typeKeyStr = `${formData.leaveType.toLowerCase()}Total`.replace('earnedtotal', 'earnedTotal').replace('sicktotal', 'sickTotal').replace('floatingtotal', 'floatingTotal').replace('compofftotal', 'compOffTotal');
+                const usedKeyStr = typeKeyStr.replace('Total', 'Used');
+                
+                const available = (balance[typeKeyStr as keyof LeaveBalance] as number) - (balance[usedKeyStr as keyof LeaveBalance] as number);
+                
+                if (available < duration) {
+                    setToast({ message: `Insufficient ${formData.leaveType} balance. You have ${available} days available, but requested ${duration} days.`, type: 'error' });
+                    return;
+                }
+            }
+
             if (isEditMode && editId) {
                 await api.updateLeaveRequest(editId, formData);
                 setToast({ message: 'Leave request updated successfully!', type: 'success' });
