@@ -432,7 +432,14 @@ const App: React.FC = () => {
           initSettings({
             holidays: holidays,
             attendanceSettings: settings.attendanceSettings,
-            recurringHolidays: recurringHolidays || []
+            recurringHolidays: recurringHolidays || [],
+            apiSettings: settings.apiSettings,
+            addressSettings: settings.addressSettings,
+            geminiApiSettings: settings.geminiApiSettings,
+            perfiosApiSettings: settings.perfiosApiSettings,
+            otpSettings: settings.otpSettings,
+            siteManagementSettings: settings.siteManagementSettings,
+            notificationSettings: settings.notificationSettings,
           });
         }
       } catch (error) {
@@ -443,6 +450,11 @@ const App: React.FC = () => {
     if (user && isInitialized) { // Ensure we only fetch after initialization is complete
       fetchInitialData();
       useAuthStore.getState().checkAttendanceStatus();
+      
+      // Trigger daily auto-backup check for admins
+      if (user.role === 'admin' || user.role === 'hr' || user.role === 'super_admin' || user.role === 'developer') {
+        apiService.autoBackupCheck();
+      }
     }
   }, [user, isInitialized, initEnrollmentRules, initRoles, initSettings]);
 

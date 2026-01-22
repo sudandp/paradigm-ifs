@@ -391,6 +391,19 @@ export interface OtpSettings {
   enabled: boolean;
 }
 
+export interface BackupSchedule {
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  startTime: string; // "HH:mm"
+  startDate: string; // "YYYY-MM-DD"
+  nextRun?: string;  // ISO string
+  lastRun?: string;  // ISO string
+}
+
+export interface ApiSettings {
+  autoBackupEnabled: boolean;
+  backupSchedule?: BackupSchedule;
+}
+
 export interface NotificationSettings {
   email: {
     enabled: boolean;

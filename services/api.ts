@@ -898,6 +898,66 @@ export const api = {
       throw error;
     }
   },
+  saveApiSettings: async (settings: any): Promise<void> => {
+    const { error } = await supabase
+      .from('settings')
+      .upsert(
+        {
+          id: 'singleton',
+          api_settings: toSnakeCase(settings)
+        },
+        { onConflict: 'id' }
+      );
+    if (error) {
+      console.error("Error saving API settings:", error);
+      throw error;
+    }
+  },
+  saveAddressSettings: async (settings: any): Promise<void> => {
+    const { error } = await supabase
+      .from('settings')
+      .upsert(
+        {
+          id: 'singleton',
+          address_settings: toSnakeCase(settings)
+        },
+        { onConflict: 'id' }
+      );
+    if (error) {
+      console.error("Error saving address settings:", error);
+      throw error;
+    }
+  },
+  saveGeminiApiSettings: async (settings: any): Promise<void> => {
+    const { error } = await supabase
+      .from('settings')
+      .upsert({ id: 'singleton', gemini_api_settings: toSnakeCase(settings) }, { onConflict: 'id' });
+    if (error) throw error;
+  },
+  savePerfiosApiSettings: async (settings: any): Promise<void> => {
+    const { error } = await supabase
+      .from('settings')
+      .upsert({ id: 'singleton', perfios_api_settings: toSnakeCase(settings) }, { onConflict: 'id' });
+    if (error) throw error;
+  },
+  saveOtpSettings: async (settings: any): Promise<void> => {
+    const { error } = await supabase
+      .from('settings')
+      .upsert({ id: 'singleton', otp_settings: toSnakeCase(settings) }, { onConflict: 'id' });
+    if (error) throw error;
+  },
+  saveSiteManagementSettings: async (settings: any): Promise<void> => {
+    const { error } = await supabase
+      .from('settings')
+      .upsert({ id: 'singleton', site_management_settings: toSnakeCase(settings) }, { onConflict: 'id' });
+    if (error) throw error;
+  },
+  saveNotificationSettings: async (settings: any): Promise<void> => {
+    const { error } = await supabase
+      .from('settings')
+      .upsert({ id: 'singleton', notification_settings: toSnakeCase(settings) }, { onConflict: 'id' });
+    if (error) throw error;
+  },
 
   getRecurringHolidays: async (): Promise<RecurringHolidayRule[]> => {
     const { data, error } = await supabase.from('recurring_holidays').select('*');
@@ -1405,24 +1465,24 @@ export const api = {
   },
   exportAllData: async (): Promise<any> => {
     const tables = [
-      'users', 'organizations', 'organization_groups', 'companies', 'entities',
-      'site_configurations', 'app_modules', 'roles', 'onboarding_submissions',
+      'roles', 'organization_groups', 'companies', 'organizations', 'entities',
+      'users', 'site_configurations', 'app_modules', 'onboarding_submissions',
       'settings', 'leave_requests', 'attendance_events', 'attendance_approvals',
       'locations', 'user_locations', 'notifications', 'tasks', 'notification_rules',
       'checklist_templates', 'field_reports', 'policies', 'insurances',
-      'back_office_id_series', 'site_staff_designations', 'comp_off_logs',
-      'extra_work_logs', 'uniform_requests', 'field_attendance_violations'
+      'comp_off_logs', 'extra_work_logs', 'uniform_requests', 'field_attendance_violations',
+      'biometric_devices', 'holidays', 'recurring_holidays', 'site_gents_uniform_configs',
+      'site_ladies_uniform_configs', 'site_uniform_details_configs', 'support_tickets',
+      'ticket_posts', 'ticket_comments', 'attendance_audit_logs'
     ];
     const data: Record<string, any> = {};
     for (const table of tables) {
       const { data: tableData, error } = await supabase.from(table).select('*');
       if (error) {
-        console.error(`Failed to export ${table}:`, error);
-        // Continue even if one table fails, but mark it
-        data[table] = [];
-      } else {
-        data[table] = tableData;
+        console.warn(`Skipping table ${table}:`, error.message);
+        continue;
       }
+      data[table] = tableData;
     }
     return toCamelCase(data);
   },
@@ -1440,9 +1500,24 @@ export const api = {
     }));
   },
 
-  createBackup: async (name: string, description?: string): Promise<any> => {
+  createBackup: async (name?: string, description?: string): Promise<any> => {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) throw new Error('Not authenticated');
+
+    // Default name format: Paradigm DD-M-YYYY backup X
+    let backupName = name;
+    if (!backupName) {
+      const now = new Date();
+      const dateStr = `${now.getDate()}-${now.getMonth() + 1}-${now.getFullYear()}`;
+      
+      // Count existing backups for today to determine 'X'
+      const { count } = await supabase
+        .from('system_backups')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', new Date().toISOString().split('T')[0]);
+      
+      backupName = `Paradigm ${dateStr} backup ${(count || 0) + 1}`;
+    }
 
     // 1. Generate snapshot
     const snapshot = await api.exportAllData();
@@ -1455,13 +1530,19 @@ export const api = {
       .from('backups')
       .upload(filePath, blob);
     
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('Storage Upload Error:', uploadError);
+      if (uploadError.message.includes('not found') || (uploadError as any).status === 400) {
+        throw new Error('Storage bucket "backups" not found. Please create it in the Supabase Dashboard.');
+      }
+      throw uploadError;
+    }
 
     // 3. Record in DB
     const { data, error: dbError } = await supabase
       .from('system_backups')
       .insert({
-        name,
+        name: backupName,
         description,
         snapshot_path: filePath,
         size_bytes: blob.size,
@@ -1473,6 +1554,33 @@ export const api = {
     
     if (dbError) throw dbError;
     return toCamelCase(data);
+  },
+
+  autoBackupCheck: async (): Promise<void> => {
+    try {
+      // 1. Check if enabled in settings
+      const { data: settings } = await supabase
+        .from('settings')
+        .select('api_settings')
+        .eq('id', 'singleton')
+        .single();
+      
+      if (!settings?.api_settings?.auto_backup_enabled) return;
+
+      // 2. Check if a backup already exists for today
+      const { count } = await supabase
+        .from('system_backups')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', new Date().toISOString().split('T')[0]);
+      
+      if (count && count > 0) return;
+
+      // 3. Create backup if missing
+      console.log('Triggering automated backup...');
+      await api.createBackup();
+    } catch (err) {
+      console.error('Auto-backup failed:', err);
+    }
   },
 
   restoreFromBackup: async (backupId: string): Promise<void> => {
@@ -1500,14 +1608,15 @@ export const api = {
     // Note: Tables must be cleared in reverse dependency order and filled in dependency order.
     // Order: Base -> Dependent
     const restorationOrder = [
-      'roles', 'users', 'organizations', 'organization_groups', 'companies', 
-      'entities', 'site_configurations', 'settings', 'app_modules',
-      'onboarding_submissions', 'leave_requests', 'attendance_events',
-      'locations', 'user_locations', 'notifications', 'tasks',
-      'notification_rules', 'checklist_templates', 'field_reports',
-      'policies', 'insurances', 'back_office_id_series',
-      'site_staff_designations', 'comp_off_logs', 'extra_work_logs',
-      'uniform_requests', 'field_attendance_violations'
+      'roles', 'organization_groups', 'companies', 'organizations', 'entities',
+      'users', 'site_configurations', 'app_modules', 'onboarding_submissions',
+      'settings', 'leave_requests', 'attendance_events', 'attendance_approvals',
+      'locations', 'user_locations', 'notifications', 'tasks', 'notification_rules',
+      'checklist_templates', 'field_reports', 'policies', 'insurances',
+      'comp_off_logs', 'extra_work_logs', 'uniform_requests', 'field_attendance_violations',
+      'biometric_devices', 'holidays', 'recurring_holidays', 'site_gents_uniform_configs',
+      'site_ladies_uniform_configs', 'site_uniform_details_configs', 'support_tickets',
+      'ticket_posts', 'ticket_comments', 'attendance_audit_logs'
     ];
 
     for (const table of restorationOrder.reverse()) {

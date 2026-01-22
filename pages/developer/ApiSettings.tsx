@@ -73,6 +73,32 @@ export const ApiSettings: React.FC = () => {
 
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <h2 className="text-2xl font-bold text-primary-text">System Settings</h2>
+                <div className="flex gap-3">
+                    <Button 
+                        onClick={async () => {
+                            try {
+                                setIsExporting(true);
+                                await api.saveApiSettings(store.apiSettings);
+                                await api.saveGeminiApiSettings(store.geminiApi);
+                                await api.savePerfiosApiSettings(store.perfiosApi);
+                                await api.saveOtpSettings(store.otp);
+                                await api.saveSiteManagementSettings(store.siteManagement);
+                                await api.saveAddressSettings(store.address);
+                                await api.saveNotificationSettings(store.notifications);
+                                
+                                setToast({ message: 'Settings saved to database!', type: 'success' });
+                            } catch (err) {
+                                console.error('Failed to save settings:', err);
+                                setToast({ message: 'Failed to save settings to database.', type: 'error' });
+                            } finally {
+                                setIsExporting(false);
+                            }
+                        }}
+                        isLoading={isExporting}
+                    >
+                        Save Changes
+                    </Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
@@ -147,6 +173,8 @@ export const ApiSettings: React.FC = () => {
                         <p className="text-sm text-muted -mt-2">Manage core system settings and data operations.</p>
                         <div className="space-y-6 pt-4">
                             <Checkbox id="pincode-verification" label="Enable Pincode API Verification" description="Auto-fill City/State from pincode during onboarding." checked={store.address.enablePincodeVerification} onChange={e => store.updateAddressSettings({ enablePincodeVerification: e.target.checked })} />
+                            
+                            <Checkbox id="auto-backup" label="Enable Automated Daily Backups" description="Automatically create a restoration point once a day when an admin is active." checked={store.apiSettings.autoBackupEnabled || false} onChange={e => store.updateApiSettings({ autoBackupEnabled: e.target.checked })} />
 
                             <div className="pt-4 border-t">
                                 <h4 className="font-semibold text-primary-text mb-2">Database Backups</h4>
