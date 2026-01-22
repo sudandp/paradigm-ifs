@@ -173,8 +173,165 @@ export const ApiSettings: React.FC = () => {
                         <p className="text-sm text-muted -mt-2">Manage core system settings and data operations.</p>
                         <div className="space-y-6 pt-4">
                             <Checkbox id="pincode-verification" label="Enable Pincode API Verification" description="Auto-fill City/State from pincode during onboarding." checked={store.address.enablePincodeVerification} onChange={e => store.updateAddressSettings({ enablePincodeVerification: e.target.checked })} />
-                            
-                            <Checkbox id="auto-backup" label="Enable Automated Daily Backups" description="Automatically create a restoration point once a day when an admin is active." checked={store.apiSettings.autoBackupEnabled || false} onChange={e => store.updateApiSettings({ autoBackupEnabled: e.target.checked })} />
+                                                       <div className="p-4 border border-border rounded-lg api-setting-item-bg">
+                                <Checkbox 
+                                    id="auto-backup" 
+                                    label="Enable Automated Backups" 
+                                    description="Automatically create a restoration point according to the chosen schedule." 
+                                    checked={store.apiSettings.autoBackupEnabled || false} 
+                                    onChange={e => store.updateApiSettings({ autoBackupEnabled: e.target.checked })} 
+                                />
+                                
+                                {store.apiSettings.autoBackupEnabled && (
+                                    <div className="mt-4 pt-4 border-t border-border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Frequency</label>
+                                            <select 
+                                                className="w-full h-10 px-3 rounded-lg border border-border bg-page text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
+                                                value={store.apiSettings.backupSchedule?.frequency || 'daily'}
+                                                onChange={e => store.updateApiSettings({ 
+                                                    backupSchedule: { 
+                                                        ...(store.apiSettings.backupSchedule || { startTime: '00:00', interval: 1 }), 
+                                                        frequency: e.target.value as any 
+                                                    } 
+                                                })}
+                                            >
+                                                <option value="daily">Daily</option>
+                                                <option value="weekly">Weekly</option>
+                                                <option value="monthly">Monthly</option>
+                                                <option value="yearly">Yearly</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Frequency Specific Fields */}
+                                        {store.apiSettings.backupSchedule?.frequency === 'weekly' && (
+                                            <div>
+                                                <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Day of Week</label>
+                                                <select 
+                                                    className="w-full h-10 px-3 rounded-lg border border-border bg-page text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
+                                                    value={store.apiSettings.backupSchedule?.dayOfWeek ?? 0}
+                                                    onChange={e => store.updateApiSettings({ 
+                                                        backupSchedule: { 
+                                                            ...(store.apiSettings.backupSchedule || { frequency: 'weekly', startTime: '00:00' }), 
+                                                            dayOfWeek: parseInt(e.target.value) 
+                                                        } 
+                                                    })}
+                                                >
+                                                    <option value={0}>Sunday</option>
+                                                    <option value={1}>Monday</option>
+                                                    <option value={2}>Tuesday</option>
+                                                    <option value={3}>Wednesday</option>
+                                                    <option value={4}>Thursday</option>
+                                                    <option value={5}>Friday</option>
+                                                    <option value={6}>Saturday</option>
+                                                </select>
+                                            </div>
+                                        )}
+
+                                        {store.apiSettings.backupSchedule?.frequency === 'monthly' && (
+                                            <>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Interval</label>
+                                                    <select 
+                                                        className="w-full h-10 px-3 rounded-lg border border-border bg-page text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
+                                                        value={store.apiSettings.backupSchedule?.interval ?? 1}
+                                                        onChange={e => store.updateApiSettings({ 
+                                                            backupSchedule: { 
+                                                                ...(store.apiSettings.backupSchedule || { frequency: 'monthly', startTime: '00:00' }), 
+                                                                interval: parseInt(e.target.value) 
+                                                            } 
+                                                        })}
+                                                    >
+                                                        <option value={1}>Every Month</option>
+                                                        <option value={3}>Every 3 Months</option>
+                                                        <option value={6}>Every 6 Months</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Day of Month</label>
+                                                    <Input 
+                                                        type="number"
+                                                        min={1}
+                                                        max={31}
+                                                        value={store.apiSettings.backupSchedule?.dayOfMonth ?? 1}
+                                                        onChange={e => store.updateApiSettings({ 
+                                                            backupSchedule: { 
+                                                                ...(store.apiSettings.backupSchedule || { frequency: 'monthly', startTime: '00:00' }), 
+                                                                dayOfMonth: parseInt(e.target.value) 
+                                                            } 
+                                                        })}
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {store.apiSettings.backupSchedule?.frequency === 'yearly' && (
+                                            <>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Month</label>
+                                                    <select 
+                                                        className="w-full h-10 px-3 rounded-lg border border-border bg-page text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
+                                                        value={store.apiSettings.backupSchedule?.monthOfYear ?? 1}
+                                                        onChange={e => store.updateApiSettings({ 
+                                                            backupSchedule: { 
+                                                                ...(store.apiSettings.backupSchedule || { frequency: 'yearly', startTime: '00:00' }), 
+                                                                monthOfYear: parseInt(e.target.value) 
+                                                            } 
+                                                        })}
+                                                    >
+                                                        <option value={1}>January</option>
+                                                        <option value={2}>February</option>
+                                                        <option value={3}>March</option>
+                                                        <option value={4}>April</option>
+                                                        <option value={5}>May</option>
+                                                        <option value={6}>June</option>
+                                                        <option value={7}>July</option>
+                                                        <option value={8}>August</option>
+                                                        <option value={9}>September</option>
+                                                        <option value={10}>October</option>
+                                                        <option value={11}>November</option>
+                                                        <option value={12}>December</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Day</label>
+                                                    <Input 
+                                                        type="number"
+                                                        min={1}
+                                                        max={31}
+                                                        value={store.apiSettings.backupSchedule?.dayOfMonth ?? 1}
+                                                        onChange={e => store.updateApiSettings({ 
+                                                            backupSchedule: { 
+                                                                ...(store.apiSettings.backupSchedule || { frequency: 'yearly', startTime: '00:00' }), 
+                                                                dayOfMonth: parseInt(e.target.value) 
+                                                            } 
+                                                        })}
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Start Time</label>
+                                            <Input 
+                                                type="time"
+                                                value={store.apiSettings.backupSchedule?.startTime || '00:00'}
+                                                onChange={e => store.updateApiSettings({ 
+                                                    backupSchedule: { 
+                                                        ...(store.apiSettings.backupSchedule || { frequency: 'daily' }), 
+                                                        startTime: e.target.value 
+                                                    } 
+                                                })}
+                                            />
+                                        </div>
+                                        <div className="flex items-end col-span-1 sm:col-span-2 lg:col-span-3">
+                                            <div className="text-xs text-muted mb-2 italic p-2 bg-muted/20 rounded-lg w-full">
+                                                Next run: {store.apiSettings.backupSchedule?.nextRun ? new Date(store.apiSettings.backupSchedule.nextRun).toLocaleString() : 'Saving will calculate the next run based on this schedule'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
                             <div className="pt-4 border-t">
                                 <h4 className="font-semibold text-primary-text mb-2">Database Backups</h4>

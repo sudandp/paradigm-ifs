@@ -394,7 +394,10 @@ export interface OtpSettings {
 export interface BackupSchedule {
   frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
   startTime: string; // "HH:mm"
-  startDate: string; // "YYYY-MM-DD"
+  interval?: number; // e.g., Every 1 month, every 3 months
+  dayOfWeek?: number; // 0-6 (Sunday-Saturday)
+  dayOfMonth?: number; // 1-31
+  monthOfYear?: number; // 1-12
   nextRun?: string;  // ISO string
   lastRun?: string;  // ISO string
 }

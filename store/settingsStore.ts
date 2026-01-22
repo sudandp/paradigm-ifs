@@ -161,7 +161,10 @@ const initialApiSettings: ApiSettings = {
   backupSchedule: {
     frequency: 'daily',
     startTime: '00:00',
-    startDate: new Date().toISOString().split('T')[0],
+    interval: 1,
+    dayOfWeek: 0,
+    dayOfMonth: 1,
+    monthOfYear: 1,
   }
 };
 
