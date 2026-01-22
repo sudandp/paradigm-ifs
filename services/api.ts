@@ -365,10 +365,25 @@ export const api = {
   },
 
   // --- Users & Orgs ---
-  getUsers: async (): Promise<User[]> => {
-    const query = supabase.from('users').select('*, role_id');
-    const data = await fetchAll<any>(query);
-    return (data || []).map(u => toCamelCase({ ...u, role: u.role_id }));
+  getUsers: async (filter?: { page?: number, pageSize?: number }): Promise<any> => {
+    let query = supabase.from('users').select('*, role_id', { count: 'exact' });
+    
+    const isPaginated = filter?.page !== undefined && filter?.pageSize !== undefined;
+    if (isPaginated) {
+      const from = (filter!.page! - 1) * filter!.pageSize!;
+      const to = from + filter!.pageSize! - 1;
+      query = query.range(from, to);
+    }
+    
+    const { data, count, error } = await query;
+    if (error) throw error;
+    
+    const formattedData = (data || []).map(u => toCamelCase({ ...u, role: u.role_id }));
+    
+    if (isPaginated) {
+      return { data: formattedData, total: count || 0 };
+    }
+    return formattedData;
   },
   getUserById: async (id: string): Promise<User | null> => {
     const { data, error } = await supabase
@@ -423,7 +438,7 @@ export const api = {
   getLocationHistory: async (userId: string, startTs: string, endTs: string): Promise<AttendanceEvent[]> => {
     return api.getAttendanceEvents(userId, startTs, endTs);
   },
-  getFieldStaff: async () => api.getUsers().then(users => users.filter(u => u.role === 'field_staff')),
+  getFieldStaff: async () => api.getUsers().then(users => users.filter((u: any) => u.role === 'field_staff')),
   /**
    * Fetch users who should receive check‑in/out notifications.
    * Includes HR, operations managers, admins, developers and site managers.
@@ -539,10 +554,24 @@ export const api = {
     if (error) throw error;
   },
 
-  getOrganizations: async (): Promise<Organization[]> => {
-    const { data, error } = await supabase.from('organizations').select('*').order('short_name');
+  getOrganizations: async (filter?: { page?: number, pageSize?: number }): Promise<any> => {
+    let query = supabase.from('organizations').select('*', { count: 'exact' });
+    
+    const isPaginated = filter?.page !== undefined && filter?.pageSize !== undefined;
+    if (isPaginated) {
+      const from = (filter!.page! - 1) * filter!.pageSize!;
+      const to = from + filter!.pageSize! - 1;
+      query = query.range(from, to);
+    }
+    
+    const { data, count, error } = await query.order('short_name');
     if (error) throw error;
-    return (data || []).map(toCamelCase);
+    
+    const formattedData = (data || []).map(toCamelCase);
+    if (isPaginated) {
+      return { data: formattedData, total: count || 0 };
+    }
+    return formattedData;
   },
   createOrganization: async (org: Organization): Promise<Organization> => {
     const { data, error } = await supabase.from('organizations').insert(toSnakeCase(org)).select().single();
@@ -1099,8 +1128,8 @@ export const api = {
     const { error } = await supabase.from('leave_requests').delete().eq('id', id);
     if (error) throw error;
   },
-  getLeaveRequests: async (filter?: { userId?: string, userIds?: string[], status?: string, forApproverId?: string, startDate?: string, endDate?: string }): Promise<LeaveRequest[]> => {
-    let query = supabase.from('leave_requests').select('*, users(name)');
+  getLeaveRequests: async (filter?: { userId?: string, userIds?: string[], status?: string, forApproverId?: string, startDate?: string, endDate?: string, page?: number, pageSize?: number }): Promise<{ data: LeaveRequest[], total: number }> => {
+    let query = supabase.from('leave_requests').select('*, users(name)', { count: 'exact' });
     if (filter?.userId) query = query.eq('user_id', filter.userId);
     if (filter?.userIds) query = query.in('user_id', filter.userIds);
     if (filter?.status) query = query.eq('status', filter.status);
@@ -1108,7 +1137,15 @@ export const api = {
     if (filter?.startDate && filter?.endDate) {
       query = query.lte('start_date', filter.endDate).gte('end_date', filter.startDate);
     }
-    const data = await fetchAll<any>(query.order('start_date', { ascending: false }));
+
+    if (filter?.page && filter?.pageSize) {
+      const from = (filter.page - 1) * filter.pageSize;
+      const to = from + filter.pageSize - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, count, error } = await query.order('start_date', { ascending: false });
+    if (error) throw error;
     
     // Get unique approver IDs
     const approverIds = [...new Set((data || []).map(item => item.current_approver_id).filter(Boolean))];
@@ -1120,9 +1157,8 @@ export const api = {
       approverMap = (approvers || []).reduce((acc, user) => ({ ...acc, [user.id]: user.name }), {});
     }
     
-    return (data || []).map(item => {
+    const formattedData = (data || []).map(item => {
       const camelItem = toCamelCase(item);
-      // Handle both object and array response for the joined table
       const userObj = Array.isArray(item.users) ? item.users[0] : item.users;
       return {
         ...camelItem,
@@ -1130,11 +1166,27 @@ export const api = {
         currentApproverName: item.current_approver_id ? (approverMap[item.current_approver_id] || null) : null
       };
     });
+
+    return { data: formattedData, total: count || 0 };
   },
-  getTasks: async (): Promise<Task[]> => {
-    const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+  getTasks: async (filter?: { page?: number, pageSize?: number }): Promise<any> => {
+    let query = supabase.from('tasks').select('*', { count: 'exact' });
+    
+    const isPaginated = filter?.page !== undefined && filter?.pageSize !== undefined;
+    if (isPaginated) {
+      const from = (filter!.page! - 1) * filter!.pageSize!;
+      const to = from + filter!.pageSize! - 1;
+      query = query.range(from, to);
+    }
+    
+    const { data, count, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
-    return (data || []).map(toCamelCase);
+    
+    const formattedData = (data || []).map(toCamelCase);
+    if (isPaginated) {
+      return { data: formattedData, total: count || 0 };
+    }
+    return formattedData;
   },
   createTask: async (taskData: Partial<Task>): Promise<Task> => {
     const { data, error } = await supabase.from('tasks').insert(toSnakeCase({ ...taskData, status: 'To Do', escalationStatus: 'None' })).select().single();
@@ -1265,13 +1317,27 @@ export const api = {
     return toCamelCase(data);
   },
 
-  getFieldReports: async (startDate?: string, endDate?: string): Promise<FieldReport[]> => {
-    let query = supabase.from('field_reports').select('*');
-    if (startDate) query = query.gte('created_at', startDate);
-    if (endDate) query = query.lte('created_at', endDate);
-    const { data, error } = await query.order('created_at', { ascending: false });
+  getFieldReports: async (filter?: { startDate?: string, endDate?: string, page?: number, pageSize?: number }): Promise<any> => {
+    let query = supabase.from('field_reports').select('*', { count: 'exact' });
+    if (filter?.startDate) query = query.gte('created_at', filter.startDate);
+    if (filter?.endDate) query = query.lte('created_at', filter.endDate);
+    
+    const isPaginated = filter?.page !== undefined && filter?.pageSize !== undefined;
+    if (isPaginated) {
+      const from = (filter!.page! - 1) * filter!.pageSize!;
+      const to = from + filter!.pageSize! - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, count, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
-    return (data || []).map(toCamelCase);
+    
+    const formattedData = (data || []).map(toCamelCase);
+    
+    if (isPaginated) {
+      return { data: formattedData, total: count || 0 };
+    }
+    return formattedData;
   },
 
   getFieldReportById: async (id: string): Promise<FieldReport | null> => {
@@ -1525,15 +1591,21 @@ export const api = {
     const { error } = await supabase.from('extra_work_logs').insert(toSnakeCase({ ...claimData, status: 'Pending' }));
     if (error) throw error;
   },
-  getExtraWorkLogs: async (filter?: { userId?: string, status?: string, workDate?: string }): Promise<ExtraWorkLog[]> => {
-    let query = supabase.from('extra_work_logs').select('*');
+  getExtraWorkLogs: async (filter?: { userId?: string, status?: string, workDate?: string, page?: number, pageSize?: number }): Promise<{ data: ExtraWorkLog[], total: number }> => {
+    let query = supabase.from('extra_work_logs').select('*', { count: 'exact' });
     if (filter?.userId) query = query.eq('user_id', filter.userId);
     if (filter?.status) query = query.eq('status', filter.status);
     if (filter?.workDate) query = query.eq('work_date', filter.workDate);
     
-    const { data, error } = await query.order('work_date', { ascending: false });
+    if (filter?.page && filter?.pageSize) {
+      const from = (filter.page - 1) * filter.pageSize;
+      const to = from + filter.pageSize - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, count, error } = await query.order('work_date', { ascending: false });
     if (error) throw error;
-    return (data || []).map(toCamelCase);
+    return { data: (data || []).map(toCamelCase), total: count || 0 };
   },
   approveExtraWorkClaim: async (claimId: string, approverId: string): Promise<void> => {
     const { data: approverData, error: nameError } = await supabase.from('users').select('name').eq('id', approverId).single();

@@ -6,9 +6,10 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
-import { MapPin, Users as UsersIcon, Pin, Plus, Save, Edit, Trash2 } from 'lucide-react';
+import { MapPin, Users as UsersIcon, Pin, Plus, Save, Edit, Trash2, Search } from 'lucide-react';
 import { reverseGeocode, getPrecisePosition } from '../../utils/locationUtils';
 import { useAuthStore } from '../../store/authStore';
+import Pagination from '../../components/ui/Pagination';
 
 /**
  * LocationManagement component
@@ -50,6 +51,10 @@ const LocationManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Track when editing an existing location.  If set, the form will
   // function as an edit form instead of create.  Stores the id of the
@@ -335,70 +340,98 @@ const LocationManagement: React.FC = () => {
           <h3 className="text-xl font-semibold text-primary-text mb-4 flex items-center">
             <MapPin className="h-5 w-5 mr-2 text-muted" /> Existing Locations
           </h3>
+
+          <div className="mb-4">
+            <Input 
+              placeholder="Search locations by name..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              icon={<Search className="h-4 w-4" />}
+            />
+          </div>
+
           {isLoading ? (
             <p>Loading...</p>
           ) : locations.length === 0 ? (
             <p className="text-muted text-center md:text-left">No locations defined yet.</p>
-          ) : (
-            <div className="space-y-4 md:space-y-0">
-              {/* Mobile Card View */}
-              <div className="md:hidden space-y-4">
-                {locations.map((loc) => (
-                  <div key={loc.id} className="bg-card rounded-lg shadow-card p-4 border border-border">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-bold text-primary-text">{loc.name || 'Unnamed Location'}</h4>
-                        <p className="text-sm text-muted">{loc.address}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button type="button" className="text-blue-500 hover:text-blue-700 p-1" title="Edit" onClick={() => handleEditLocation(loc)}><Edit className="h-5 w-5" /></button>
-                        <button type="button" className="p-2 hover:bg-red-500/10 rounded-full transition-colors" title="Delete" onClick={() => handleDeleteLocation(loc.id)}><Trash2 className="h-5 w-5 text-red-500" /></button>
-                      </div>
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 gap-4 text-sm">
-                      <div><p className="text-muted">Radius</p><p>{loc.radius}m</p></div>
-                      <div><p className="text-muted">Coordinates</p><p>{loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}</p></div>
-                      <div><p className="text-muted">Created By</p><p>{loc.createdByName || userMap.get(loc.createdBy || '') || '-'}</p></div>
-                      <div><p className="text-muted">Created At</p><p>{loc.createdAt ? new Date(loc.createdAt).toLocaleDateString() : '-'}</p></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          ) : (() => {
+            const filteredLocations = locations.filter(loc => 
+              searchTerm === '' || 
+              (loc.name && loc.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+              (loc.address && loc.address.toLowerCase().includes(searchTerm.toLowerCase()))
+            );
+            const paginatedLocations = filteredLocations.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-              {/* Desktop Table View */}
-              <div className="hidden md:block overflow-x-auto border border-border rounded-lg">
-                <table className="min-w-full border-collapse text-sm">
-                  <thead className="bg-page text-primary-text">
-                    <tr>
-                      <th className="p-3 border-b border-border text-left">Name</th>
-                      <th className="p-3 border-b border-border text-left">Radius (m)</th>
-                      <th className="p-3 border-b border-border text-left">Coordinates</th>
-                      <th className="p-3 border-b border-border text-left">Address</th>
-                      <th className="p-3 border-b border-border text-left">Created By</th>
-                      <th className="p-3 border-b border-border text-left">Created At</th>
-                      <th className="p-3 border-b border-border text-left">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {locations.map((loc) => (
-                      <tr key={loc.id} className="border-b border-border">
-                        <td className="p-3">{loc.name || '-'}</td>
-                        <td className="p-3">{loc.radius}</td>
-                        <td className="p-3">{loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}</td>
-                        <td className="p-3">{loc.address || '-'}</td>
-                        <td className="p-3">{loc.createdByName || userMap.get(loc.createdBy || '') || '-'}</td>
-                        <td className="p-3">{loc.createdAt ? new Date(loc.createdAt).toLocaleString() : '-'}</td>
-                        <td className="p-3 whitespace-nowrap">
-                          <button type="button" className="text-blue-600 hover:text-blue-800 mr-3" title="Edit" onClick={() => handleEditLocation(loc)}><Edit className="h-4 w-4" /></button>
+            return (
+              <div className="space-y-4 md:space-y-0">
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-4">
+                  {paginatedLocations.map((loc) => (
+                    <div key={loc.id} className="bg-card rounded-lg shadow-card p-4 border border-border">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-bold text-primary-text">{loc.name || 'Unnamed Location'}</h4>
+                          <p className="text-sm text-muted">{loc.address}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button type="button" className="text-blue-500 hover:text-blue-700 p-1" title="Edit" onClick={() => handleEditLocation(loc)}><Edit className="h-5 w-5" /></button>
                           <button type="button" className="p-2 hover:bg-red-500/10 rounded-full transition-colors" title="Delete" onClick={() => handleDeleteLocation(loc.id)}><Trash2 className="h-5 w-5 text-red-500" /></button>
-                        </td>
+                        </div>
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 gap-4 text-sm">
+                        <div><p className="text-muted">Radius</p><p>{loc.radius}m</p></div>
+                        <div><p className="text-muted">Coordinates</p><p>{loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}</p></div>
+                        <div><p className="text-muted">Created By</p><p>{loc.createdByName || userMap.get(loc.createdBy || '') || '-'}</p></div>
+                        <div><p className="text-muted">Created At</p><p>{loc.createdAt ? new Date(loc.createdAt).toLocaleDateString() : '-'}</p></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto border border-border rounded-lg">
+                  <table className="min-w-full border-collapse text-sm">
+                    <thead className="bg-page text-primary-text">
+                      <tr>
+                        <th className="p-3 border-b border-border text-left">Name</th>
+                        <th className="p-3 border-b border-border text-left">Radius (m)</th>
+                        <th className="p-3 border-b border-border text-left">Coordinates</th>
+                        <th className="p-3 border-b border-border text-left">Address</th>
+                        <th className="p-3 border-b border-border text-left">Created By</th>
+                        <th className="p-3 border-b border-border text-left">Created At</th>
+                        <th className="p-3 border-b border-border text-left">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {paginatedLocations.map((loc) => (
+                        <tr key={loc.id} className="border-b border-border">
+                          <td className="p-3">{loc.name || '-'}</td>
+                          <td className="p-3">{loc.radius}</td>
+                          <td className="p-3">{loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}</td>
+                          <td className="p-3">{loc.address || '-'}</td>
+                          <td className="p-3">{loc.createdByName || userMap.get(loc.createdBy || '') || '-'}</td>
+                          <td className="p-3">{loc.createdAt ? new Date(loc.createdAt).toLocaleString() : '-'}</td>
+                          <td className="p-3 whitespace-nowrap">
+                            <button type="button" className="text-blue-600 hover:text-blue-800 mr-3" title="Edit" onClick={() => handleEditLocation(loc)}><Edit className="h-4 w-4" /></button>
+                            <button type="button" className="p-2 hover:bg-red-500/10 rounded-full transition-colors" title="Delete" onClick={() => handleDeleteLocation(loc.id)}><Trash2 className="h-5 w-5 text-red-500" /></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pagination 
+                  currentPage={currentPage}
+                  totalItems={filteredLocations.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+                  className="mt-4"
+                />
               </div>
-            </div>
-          )}
+            );
+          })()}
         </section>
       </div>
     </div>

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { User } from '../../types';
-import { ShieldCheck, Plus, Edit, Trash2, Info, UserCheck, MapPin } from 'lucide-react';
+import { ShieldCheck, Plus, Edit, Trash2, Info, UserCheck, MapPin, Search, FilterX } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Toast from '../../components/ui/Toast';
@@ -13,10 +13,16 @@ import TableSkeleton from '../../components/skeletons/TableSkeleton';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import ApprovalModal from '../../components/admin/ApprovalModal';
 import LocationAssignmentModal from '../../components/admin/LocationAssignmentModal';
+import Pagination from '../../components/ui/Pagination';
+import Input from '../../components/ui/Input';
 
 const UserManagement: React.FC = () => {
     const navigate = useNavigate();
     const [users, setUsers] = useState<User[]>([]);
+    const [totalUsers, setTotalUsers] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+    const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -32,14 +38,19 @@ const UserManagement: React.FC = () => {
     const fetchUsers = useCallback(async () => {
         setIsLoading(true);
         try {
-            const data = await api.getUsers();
-            setUsers(data);
+            const res = await api.getUsers({ page: currentPage, pageSize });
+            setUsers(res.data);
+            setTotalUsers(res.total);
         } catch (error) {
             setToast({ message: 'Failed to fetch users.', type: 'error' });
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [currentPage, pageSize]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [pageSize]);
 
     useEffect(() => {
         fetchUsers();
@@ -150,6 +161,20 @@ const UserManagement: React.FC = () => {
                 </div>
             </div>
 
+            <div className="flex flex-col md:flex-row gap-4 mb-6 items-end">
+                <div className="flex-grow">
+                    <Input 
+                        placeholder="Search users by name or email..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        icon={<Search className="h-4 w-4" />}
+                    />
+                </div>
+                <Button variant="secondary" onClick={() => setSearchTerm('')} disabled={!searchTerm}>
+                    <FilterX className="h-4 w-4 mr-2" /> Clear
+                </Button>
+            </div>
+
             <div className="overflow-x-auto">
                 <table className="min-w-full responsive-table">
                     <thead>
@@ -167,7 +192,10 @@ const UserManagement: React.FC = () => {
                             isMobile
                                 ? <tr><td colSpan={6}><TableSkeleton rows={3} cols={6} isMobile /></td></tr>
                                 : <TableSkeleton rows={5} cols={6} />
-                        ) : users.map((user) => (
+                        ) : (
+                            users
+                            .filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()))
+                            .map((user) => (
                             <tr key={user.id}>
                                 <td data-label="Name" className="px-6 py-4 font-medium">{user.name}</td>
                                 <td data-label="Email" className="px-6 py-4 text-sm text-muted">{user.email}</td>
@@ -194,10 +222,19 @@ const UserManagement: React.FC = () => {
                                     </div>
                                 </td>
                             </tr>
-                        ))}
+                        )))}
                     </tbody>
                 </table>
             </div>
+
+            <Pagination 
+                currentPage={currentPage}
+                totalItems={totalUsers}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                className="mt-6"
+            />
         </div>
     );
 };

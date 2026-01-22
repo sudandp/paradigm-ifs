@@ -5,8 +5,9 @@ import type { Location } from '../../types';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Toast from '../../components/ui/Toast';
-import { Pin, MapPin, Trash2, Edit } from 'lucide-react';
+import { Pin, MapPin, Trash2, Edit, Search } from 'lucide-react';
 import { reverseGeocode, getPrecisePosition } from '../../utils/locationUtils';
+import Pagination from '../../components/ui/Pagination';
 
 // Helper function to convert text to Title Case
 const toTitleCase = (str: string): string => {
@@ -61,6 +62,9 @@ const MyLocations: React.FC = () => {
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // Check if user can manage locations (admin or HR)
   const canManageLocations = user && ['admin', 'hr', 'operation_manager'].includes(user.role);
@@ -490,100 +494,131 @@ const MyLocations: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-1 md:gap-4">
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-4">
-              {uniqueLocations.map((loc) => (
-                <div key={loc.id} className="bg-card rounded-lg shadow-card p-4 border border-border">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-bold text-primary-text">{loc.name || loc.address || 'Unnamed Location'}</h3>
-                      <p className="text-sm text-muted">{loc.address}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      {/* All users can edit name */}
-                      <button
-                        type="button"
-                        className="text-blue-500 hover:text-blue-700 p-1"
-                        title={canManageLocations ? "Edit Location" : "Edit Name"}
-                        onClick={() => handleEdit(loc)}
-                      >
-                        <Edit className="h-5 w-5" />
-                      </button>
-                      {/* Only admin/HR can delete */}
-                      {canManageLocations && (
-                        <button
-                          type="button"
-                          className="text-red-500 hover:text-red-700 p-1"
-                          title="Delete Location"
-                          onClick={() => handleDelete(loc.id)}
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted">Radius</p>
-                      <p>{loc.radius}m</p>
-                    </div>
-                    <div>
-                      <p className="text-muted">Coordinates</p>
-                      <p>{loc.latitude?.toFixed(4)}, {loc.longitude?.toFixed(4)}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
+          <>
+            <div className="mb-4">
+              <Input 
+                placeholder="Search locations by name or address..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                icon={<Search className="h-4 w-4" />}
+              />
             </div>
 
-            {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto border border-border rounded-lg">
-              <table className="min-w-full border-collapse text-sm">
-                <thead className="bg-page text-primary-text">
-                  <tr>
-                    <th className="p-3 border-b border-border text-left">Name</th>
-                    <th className="p-3 border-b border-border text-left">Radius (m)</th>
-                    <th className="p-3 border-b border-border text-left">Coordinates</th>
-                    <th className="p-3 border-b border-border text-left">Address</th>
-                    <th className="p-3 border-b border-border text-left">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {uniqueLocations.map((loc) => (
-                    <tr key={loc.id} className="border-b border-border">
-                      <td className="p-3">{loc.name || '-'}</td>
-                      <td className="p-3">{loc.radius}</td>
-                      <td className="p-3">{loc.latitude?.toFixed(4)}, {loc.longitude?.toFixed(4)}</td>
-                      <td className="p-3">{loc.address || '-'}</td>
-                      <td className="p-3 flex gap-2">
-                        {/* All users can edit name */}
-                        <button
-                          type="button"
-                          className="text-blue-600 hover:text-blue-800"
-                          title={canManageLocations ? "Edit Location" : "Edit Name"}
-                          onClick={() => handleEdit(loc)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        {/* Only admin/HR can delete */}
-                        {canManageLocations && (
-                          <button
-                            type="button"
-                            className="text-red-600 hover:text-red-800"
-                            title="Delete Location"
-                            onClick={() => handleDelete(loc.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+            {(() => {
+              const filteredLocations = uniqueLocations.filter(loc => 
+                searchTerm === '' || 
+                (loc.name && loc.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (loc.address && loc.address.toLowerCase().includes(searchTerm.toLowerCase()))
+              );
+              const paginatedLocations = filteredLocations.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+              return (
+                <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-1 md:gap-4">
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-4">
+                    {paginatedLocations.map((loc) => (
+                      <div key={loc.id} className="bg-card rounded-lg shadow-card p-4 border border-border">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-bold text-primary-text">{loc.name || loc.address || 'Unnamed Location'}</h3>
+                            <p className="text-sm text-muted">{loc.address}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            {/* All users can edit name */}
+                            <button
+                              type="button"
+                              className="text-blue-500 hover:text-blue-700 p-1"
+                              title={canManageLocations ? "Edit Location" : "Edit Name"}
+                              onClick={() => handleEdit(loc)}
+                            >
+                              <Edit className="h-5 w-5" />
+                            </button>
+                            {/* Only admin/HR can delete */}
+                            {canManageLocations && (
+                              <button
+                                type="button"
+                                className="text-red-500 hover:text-red-700 p-1"
+                                title="Delete Location"
+                                onClick={() => handleDelete(loc.id)}
+                              >
+                                <Trash2 className="h-5 w-5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted">Radius</p>
+                            <p>{loc.radius}m</p>
+                          </div>
+                          <div>
+                            <p className="text-muted">Coordinates</p>
+                            <p>{loc.latitude?.toFixed(4)}, {loc.longitude?.toFixed(4)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto border border-border rounded-lg">
+                    <table className="min-w-full border-collapse text-sm">
+                      <thead className="bg-page text-primary-text">
+                        <tr>
+                          <th className="p-3 border-b border-border text-left">Name</th>
+                          <th className="p-3 border-b border-border text-left">Radius (m)</th>
+                          <th className="p-3 border-b border-border text-left">Coordinates</th>
+                          <th className="p-3 border-b border-border text-left">Address</th>
+                          <th className="p-3 border-b border-border text-left">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedLocations.map((loc) => (
+                          <tr key={loc.id} className="border-b border-border">
+                            <td className="p-3">{loc.name || '-'}</td>
+                            <td className="p-3">{loc.radius}</td>
+                            <td className="p-3">{loc.latitude?.toFixed(4)}, {loc.longitude?.toFixed(4)}</td>
+                            <td className="p-3">{loc.address || '-'}</td>
+                            <td className="p-3 flex gap-2">
+                              {/* All users can edit name */}
+                              <button
+                                type="button"
+                                className="text-blue-600 hover:text-blue-800"
+                                title={canManageLocations ? "Edit Location" : "Edit Name"}
+                                onClick={() => handleEdit(loc)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                              {/* Only admin/HR can delete */}
+                              {canManageLocations && (
+                                <button
+                                  type="button"
+                                  className="text-red-600 hover:text-red-800"
+                                  title="Delete Location"
+                                  onClick={() => handleDelete(loc.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <Pagination 
+                    currentPage={currentPage}
+                    totalItems={filteredLocations.length}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                    className="mt-4"
+                  />
+                </div>
+              );
+            })()}
+          </>
         )}
       </div>
     </div>

@@ -8,6 +8,8 @@ import { Loader2, Download, Eye, X } from 'lucide-react';
 import { format } from 'date-fns';
 import Logo from '../../components/ui/Logo';
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
+import Pagination from '../../components/ui/Pagination';
+import { Search, FilterX } from 'lucide-react';
 
 // New component for status chip
 type InvoiceStatus = 'Not Generated' | 'Generated' | 'Sent' | 'Paid';
@@ -177,6 +179,11 @@ const InvoiceSummary: React.FC = () => {
     const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
     const [statuses, setStatuses] = useState<Record<string, InvoiceStatus>>({});
 
+    const [totalSites, setTotalSites] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+    const [searchTerm, setSearchTerm] = useState('');
+
     // Modal State
     const [modalState, setModalState] = useState<{
         isOpen: boolean;
@@ -193,11 +200,19 @@ const InvoiceSummary: React.FC = () => {
     const [isGenerating, setIsGenerating] = useState(false);
 
     useEffect(() => {
-        api.getOrganizations()
-            .then(orgs => setSites(orgs.sort((a, b) => a.shortName.localeCompare(b.shortName))))
+        setIsLoadingSites(true);
+        api.getOrganizations({ page: currentPage, pageSize })
+            .then(res => {
+                setSites(res.data);
+                setTotalSites(res.total);
+            })
             .catch(() => setToast({ message: "Failed to load sites.", type: 'error' }))
             .finally(() => setIsLoadingSites(false));
-    }, []);
+    }, [currentPage, pageSize]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [pageSize]);
 
     const fetchStatuses = useCallback(async (month: string) => {
         setIsLoadingStatuses(true);
@@ -276,9 +291,21 @@ const InvoiceSummary: React.FC = () => {
 
                 <div className="space-y-6">
                     <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-                        <h3 className="text-xl font-semibold text-primary-text">Monthly Invoice Status</h3>
-                        <div className="md:w-56">
-                            <Input label="" id="month-select" type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
+                        <div className="flex-grow flex flex-col md:flex-row gap-4 items-end">
+                            <div className="flex-grow">
+                                <Input 
+                                    placeholder="Search by site name..." 
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    icon={<Search className="h-4 w-4" />}
+                                />
+                            </div>
+                            <div className="w-full md:w-56">
+                                <Input label="" id="month-select" type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
+                            </div>
+                            <Button variant="secondary" onClick={() => setSearchTerm('')} disabled={!searchTerm}>
+                                <FilterX className="h-4 w-4" />
+                            </Button>
                         </div>
                     </div>
 
@@ -292,7 +319,9 @@ const InvoiceSummary: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border md:bg-card md:divide-y-0">
-                                {sites.map(site => (
+                                {sites
+                                .filter(site => site.shortName.toLowerCase().includes(searchTerm.toLowerCase()))
+                                .map(site => (
                                     <tr key={site.id}>
                                         <td data-label="Site Name" className="px-4 py-3 font-medium">{site.shortName}</td>
                                         <td data-label="Status" className="px-4 py-3">
@@ -313,6 +342,15 @@ const InvoiceSummary: React.FC = () => {
                             </tbody>
                         </table>
                     </div>
+
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalItems={totalSites}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={setPageSize}
+                        className="mt-6"
+                    />
                 </div>
             </div>
 

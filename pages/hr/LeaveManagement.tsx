@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { LeaveRequest, LeaveRequestStatus, ExtraWorkLog } from '../../types';
-import { Loader2, Check, X, Plus, XCircle, User, Calendar, FilterX } from 'lucide-react';
+import { Loader2, Check, X, Plus, XCircle, User, Calendar, FilterX, ChevronLeft, ChevronRight } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { format } from 'date-fns';
@@ -54,6 +54,9 @@ const LeaveManagement: React.FC = () => {
     const { user } = useAuthStore();
     const [requests, setRequests] = useState<LeaveRequest[]>([]);
     const [claims, setClaims] = useState<ExtraWorkLog[]>([]);
+    const [totalItems, setTotalItems] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [isLoading, setIsLoading] = useState(true);
     const [filter, setFilter] = useState<LeaveRequestStatus | 'all' | 'claims'>('pending_manager_approval');
     const [allUsers, setAllUsers] = useState<{ id: string; name: string }[]>([]);
@@ -110,7 +113,9 @@ const LeaveManagement: React.FC = () => {
                 status: (filter !== 'all' && filter !== 'claims') ? filter : undefined,
                 userId: selectedUserId !== 'all' ? selectedUserId : undefined,
                 startDate: selectedDate || undefined,
-                endDate: selectedDate || undefined
+                endDate: selectedDate || undefined,
+                page: currentPage,
+                pageSize: pageSize
             };
 
             // Admin and HR see all requests. Managers see only their team's requests.
@@ -130,26 +135,33 @@ const LeaveManagement: React.FC = () => {
             const claimsFilter = {
                 status: isApprover ? 'Pending' : undefined,
                 userId: selectedUserId !== 'all' ? selectedUserId : undefined,
-                workDate: selectedDate || undefined
+                workDate: selectedDate || undefined,
+                page: currentPage,
+                pageSize: pageSize
             };
 
-            const [leaveData, claimsData] = await Promise.all([
+            const [leaveRes, claimsRes] = await Promise.all([
                 api.getLeaveRequests(leaveFilter),
-                isApprover ? api.getExtraWorkLogs(claimsFilter) : Promise.resolve([])
+                filter === 'claims' && isApprover ? api.getExtraWorkLogs(claimsFilter) : Promise.resolve({ data: [], total: 0 })
             ]);
 
-            setRequests(leaveData);
-            setClaims(claimsData);
+            setRequests(leaveRes.data);
+            setClaims(claimsRes.data);
+            setTotalItems(filter === 'claims' ? claimsRes.total : leaveRes.total);
         } catch (error) {
             setToast({ message: 'Failed to load approval data.', type: 'error' });
         } finally {
             setIsLoading(false);
         }
-    }, [user, filter]);
+    }, [user, filter, currentPage, pageSize, selectedUserId, selectedDate]);
+
+    useEffect(() => {
+        setCurrentPage(1); // Reset to page 1 when filter changes
+    }, [filter, selectedUserId, selectedDate]);
 
     useEffect(() => {
         fetchData();
-    }, [fetchData, selectedUserId, selectedDate]);
+    }, [fetchData]);
 
     const handleAction = async (id: string, action: 'approve' | 'reject' | 'confirm') => {
         if (!user) return;
@@ -331,55 +343,56 @@ const LeaveManagement: React.FC = () => {
             )}
 
             {/* Filter Bar */}
-            <div className="bg-page/50 p-4 rounded-xl border border-border mb-6">
-                <div className="flex flex-col md:flex-row gap-4 items-end">
-                    <div className="w-full md:w-64">
-                        <label className="block text-xs font-semibold text-muted uppercase mb-1.5 ml-1">Filter by Employee</label>
+            <div className="bg-card p-5 rounded-xl border border-border shadow-sm mb-8">
+                <div className="flex flex-col lg:flex-row gap-5 items-end">
+                    <div className="w-full lg:w-72">
+                        <label className="block text-xs font-bold text-muted uppercase mb-2 ml-1 tracking-wider">Filter by Employee</label>
                         <div className="relative">
-                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none" />
+                            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none" />
                             <select 
                                 value={selectedUserId}
                                 onChange={(e) => setSelectedUserId(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-card border border-border text-primary-text focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all appearance-none"
+                                className="w-full pl-10 pr-10 h-11 rounded-xl bg-page border border-border text-primary-text focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all appearance-none text-sm font-medium"
                             >
                                 <option value="all">All Employees</option>
                                 {allUsers.map(u => (
                                     <option key={u.id} value={u.id}>{u.name}</option>
                                 ))}
                             </select>
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
                                 <svg className="h-4 w-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                             </div>
                         </div>
                     </div>
                     
-                    <div className="w-full md:w-48">
-                        <label className="block text-xs font-semibold text-muted uppercase mb-1.5 ml-1">Filter by Date</label>
+                    <div className="w-full lg:w-56">
+                        <label className="block text-xs font-bold text-muted uppercase mb-2 ml-1 tracking-wider">Filter by Date</label>
                         <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none" />
+                            <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none" />
                             <input 
                                 type="date"
                                 value={selectedDate}
                                 onChange={(e) => setSelectedDate(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 rounded-lg bg-card border border-border text-primary-text focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                                className="w-full pl-10 pr-4 h-11 rounded-xl bg-page border border-border text-primary-text focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm font-medium"
                             />
                         </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-3 w-full lg:w-auto">
                         <Button 
                             variant="secondary" 
                             onClick={() => { setSelectedUserId('all'); setSelectedDate(''); }}
-                            className="h-[42px] px-4"
+                            className="h-11 px-5 rounded-xl flex-1 lg:flex-none font-semibold border-border bg-page hover:bg-page/80"
                             disabled={selectedUserId === 'all' && !selectedDate}
                         >
                             <FilterX className="h-4 w-4 mr-2" /> Clear
                         </Button>
                         <Button 
-                            variant="primary" 
                             onClick={fetchData}
-                            className="h-[42px] px-4"
+                            className="h-11 px-6 rounded-xl flex-1 lg:flex-none font-semibold text-white shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                            style={{ backgroundColor: '#10b981' }} // Emerald 500
                         >
+                            <Loader2 className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : 'hidden'}`} />
                             Refresh
                         </Button>
                     </div>
@@ -484,6 +497,59 @@ const LeaveManagement: React.FC = () => {
                             )}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {/* Pagination Controls */}
+            {!isLoading && totalItems > 0 && (
+                <div className="mt-8 flex flex-col md:flex-row justify-between items-center bg-card p-4 rounded-xl border border-border gap-4">
+                    <div className="flex items-center gap-3">
+                        <span className="text-sm text-muted">Show</span>
+                        <select 
+                            value={pageSize}
+                            onChange={(e) => {
+                                setPageSize(Number(e.target.value));
+                                setCurrentPage(1);
+                            }}
+                            className="bg-page border border-border text-primary-text text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-1.5 transition-all outline-none"
+                        >
+                            <option value={20}>20</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                        </select>
+                        <span className="text-sm text-muted">per page</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            className="p-2 h-9 w-9 rounded-lg"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        
+                        <div className="flex items-center gap-1 mx-2">
+                            <span className="text-sm font-semibold text-primary-text">Page {currentPage}</span>
+                            <span className="text-sm text-muted">of {Math.ceil(totalItems / pageSize)}</span>
+                        </div>
+
+                        <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalItems / pageSize), prev + 1))}
+                            disabled={currentPage >= Math.ceil(totalItems / pageSize)}
+                            className="p-2 h-9 w-9 rounded-lg"
+                        >
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                    </div>
+
+                    <div className="text-sm text-muted">
+                        Total {totalItems} entries
+                    </div>
                 </div>
             )}
         </div>

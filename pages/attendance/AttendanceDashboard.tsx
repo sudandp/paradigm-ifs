@@ -997,13 +997,15 @@ const AttendanceDashboard: React.FC = () => {
             const queryStart = startDate < today ? startDate : startOfToday();
             const queryEnd = endDate > today ? endDate : endOfToday();
 
-            const [events, leaves] = await Promise.all([
+            const [events, leavesResponse] = await Promise.all([
                 api.getAllAttendanceEvents(queryStart.toISOString(), queryEnd.toISOString()),
                 api.getLeaveRequests({ startDate: queryStart.toISOString(), endDate: queryEnd.toISOString(), status: 'approved' })
             ]);
 
             setAttendanceEvents(events);
-            setLeaves(leaves);
+            // Extract the data array from the paginated response
+            const leavesData = Array.isArray(leavesResponse) ? leavesResponse : leavesResponse.data;
+            setLeaves(leavesData);
 
             // --- Calculate "Today" Stats ---
             const todayStr = format(today, 'yyyy-MM-dd');

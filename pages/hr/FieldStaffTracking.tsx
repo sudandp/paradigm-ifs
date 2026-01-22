@@ -409,10 +409,10 @@ const FieldStaffTracking: React.FC = () => {
                 <table className="min-w-full divide-y divide-border responsive-table">
                     <thead className="bg-page">
                         <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">User</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Event</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Timestamp</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Location</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase" style={{width: '15%'}}>User</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase" style={{width: '12%'}}>Event</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase" style={{width: '18%'}}>Timestamp</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase" style={{width: '55%', maxWidth: '400px'}}>Location</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -421,13 +421,13 @@ const FieldStaffTracking: React.FC = () => {
                         ) : (
                             filteredEvents.map((event) => (
                                 <tr key={event.id}>
-                                    <td data-label="User" className="px-6 py-4 whitespace-nowrap font-medium">{event.userName}</td>
-                                    <td data-label="Event" className="px-6 py-4 whitespace-nowrap capitalize">{event.type.replace('-', ' ')}</td>
-                                    <td data-label="Timestamp" className="px-6 py-4 whitespace-nowrap text-sm text-muted">{format(new Date(event.timestamp), 'dd MMM, yyyy - hh:mm a')}</td>
-                                    <td data-label="Location" className="px-6 py-4 whitespace-nowrap text-sm text-muted">
-                                        <div className="flex flex-col gap-1">
+                                    <td data-label="User" className="px-6 py-4 font-medium" style={{width: '15%'}}>{event.userName}</td>
+                                    <td data-label="Event" className="px-6 py-4 capitalize" style={{width: '12%'}}>{event.type.replace('-', ' ')}</td>
+                                    <td data-label="Timestamp" className="px-6 py-4 text-sm text-muted" style={{width: '18%'}}>{format(new Date(event.timestamp), 'dd MMM, yyyy - hh:mm a')}</td>
+                                    <td data-label="Location" className="px-6 py-4 text-sm text-muted" style={{width: '55%', maxWidth: '400px'}}>
+                                        <div className="flex flex-col gap-1 break-words">
                                             {event.latitude && event.longitude ? (
-                                                <div className="font-medium text-primary-text">
+                                                <div className="font-medium text-primary-text break-words">
                                                     <ResolveAddress 
                                                         lat={event.latitude} 
                                                         lng={event.longitude} 
@@ -436,12 +436,12 @@ const FieldStaffTracking: React.FC = () => {
                                                     />
                                                 </div>
                                             ) : event.locationName && (
-                                                <span className="font-medium text-primary-text">{event.locationName}</span>
+                                                <span className="font-medium text-primary-text break-words">{event.locationName}</span>
                                             )}
                                             
                                             {event.latitude && event.longitude ? (
-                                                <a href={`https://www.google.com/maps/search/?api=1&query=${event.latitude},${event.longitude}`} target="_blank" rel="noopener noreferrer" className="flex items-center text-accent hover:underline text-xs">
-                                                    <MapPin className="h-3 w-3 mr-1" /> View Map
+                                                <a href={`https://www.google.com/maps/search/?api=1&query=${event.latitude},${event.longitude}`} target="_blank" rel="noopener noreferrer" className="flex items-center text-accent hover:underline text-xs flex-shrink-0">
+                                                    <MapPin className="h-3 w-3 mr-1 flex-shrink-0" /> View Map
                                                 </a>
                                             ) : (!event.locationName && '-')}
                                         </div>
@@ -460,10 +460,14 @@ const FieldStaffTracking: React.FC = () => {
             <div className="mb-6">
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                     <h2 className="text-2xl font-bold text-primary-text flex-shrink-0">User Activity Tracking</h2>
-                    <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
-                        <div className="w-full sm:w-40"><DatePicker label="" id="start-date" value={startDate} onChange={setStartDate} /></div>
-                        <div className="w-full sm:w-40"><DatePicker label="" id="end-date" value={endDate} onChange={setEndDate} /></div>
-                        <div className="w-full sm:w-48">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full flex-1 justify-end flex-wrap max-w-full">
+                        <div className="w-full sm:w-32">
+                            <DatePicker label="" id="start-date" value={startDate} onChange={setStartDate} />
+                        </div>
+                        <div className="w-full sm:w-32">
+                            <DatePicker label="" id="end-date" value={endDate} onChange={setEndDate} />
+                        </div>
+                        <div className="w-full sm:w-40">
                             <Select label="" id="user-select" value={selectedUser} onChange={e => setSelectedUser(e.target.value)}>
                                 <option value="all">All Users</option>
                                 {fieldStaff.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -472,7 +476,7 @@ const FieldStaffTracking: React.FC = () => {
                     </div>
                 </div>
                 <div className="mt-4">
-                    <div className="bg-page p-1 rounded-full flex items-center w-fit">
+                    <div className="bg-page p-1 rounded-full flex items-center flex-wrap w-full justify-start gap-1">
                         {/* List View Toggle */}
                         <button
                             onClick={() => setViewMode('list')}

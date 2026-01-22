@@ -6,23 +6,32 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   registration?: UseFormRegisterReturn;
+  icon?: React.ReactNode;
 }
 
-const Input: React.FC<InputProps> = ({ label, id, error, registration, ...props }) => {
+const Input: React.FC<InputProps> = ({ label, id, error, registration, icon, ...props }) => {
   const { className, ...otherProps } = props;
   
   const baseClass = 'form-input';
   const errorClass = 'form-input--error';
-  const finalClassName = `${baseClass} ${error ? errorClass : ''} ${className || ''}`;
+  const finalClassName = `${baseClass} ${error ? errorClass : ''} ${icon ? 'pl-16' : ''} ${className || ''}`;
   
   const inputElement = (
-    <input
-      id={id}
-      className={finalClassName}
-      aria-invalid={!!error}
-      {...registration}
-      {...otherProps}
-    />
+    <div className="relative">
+      {icon && (
+        <div className="absolute left-5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
+          {icon}
+        </div>
+      )}
+      <input
+        id={id}
+        className={finalClassName}
+        style={icon ? { paddingLeft: '3.5rem' } : undefined}
+        aria-invalid={!!error}
+        {...registration}
+        {...otherProps}
+      />
+    </div>
   );
 
   return (

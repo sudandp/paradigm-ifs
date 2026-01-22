@@ -3,15 +3,17 @@ import Modal from '../../components/ui/Modal';
 import { api } from '../../services/api';
 import type { AttendanceEvent, User, FieldReport, ChecklistTemplate } from '../../types';
 import { useAuthStore } from '../../store/authStore';
-import { FileText, Download, Calendar, User as UserIcon, MapPin, Building, Briefcase, ChevronDown, ChevronUp, Image as ImageIcon, ClipboardCheck, Send } from 'lucide-react';
+import { FileText, Download, Calendar, User as UserIcon, MapPin, Building, Briefcase, ChevronDown, ChevronUp, Image as ImageIcon, ClipboardCheck, Send, FilterX, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import Button from '../../components/ui/Button';
+import Pagination from '../../components/ui/Pagination';
+import Input from '../../components/ui/Input';
 
 // --- PDF Preview Component ---
 const PdfPreviewModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
-    report: FieldReport & { userName: string } | null;
+    report: (FieldReport & { userName: string }) | null;
     template: ChecklistTemplate | undefined;
 }> = ({ isOpen, onClose, report, template }) => {
     const { user } = useAuthStore();
@@ -28,7 +30,7 @@ const PdfPreviewModal: React.FC<{
         const opt = {
             margin: 0.5,
             filename: `FieldReport_${report.siteName.replace(/\s+/g, '_')}_${format(new Date(report.createdAt), 'yyyyMMdd')}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
+            image: { type: 'jpeg' as const, quality: 0.98 },
             html2canvas: { 
                 scale: 2, 
                 useCORS: true, 
@@ -36,7 +38,7 @@ const PdfPreviewModal: React.FC<{
                 letterRendering: false,
                 windowWidth: 800
             },
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
         };
 
         const pdf = html2pdf().set(opt).from(contentRef.current);
@@ -54,9 +56,9 @@ const PdfPreviewModal: React.FC<{
             const opt = {
                 margin: 0.5,
                 filename: `FieldReport_${report.siteName.replace(/\s+/g, '_')}_${format(new Date(report.createdAt), 'yyyyMMdd')}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
+                image: { type: 'jpeg' as const, quality: 0.98 },
                 html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: false, windowWidth: 800 },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
             };
             await html2pdf().set(opt).from(contentRef.current).save();
             onClose();
@@ -243,6 +245,12 @@ const FieldReports: React.FC = () => {
     const { user } = useAuthStore();
     const [reports, setReports] = useState<(FieldReport & { userName: string; userRole: string })[]>([]);
     const [templates, setTemplates] = useState<Record<string, ChecklistTemplate>>({});
+    const [totalReports, setTotalReports] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+    const [startDate, setStartDate] = useState(format(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+    const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
     const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
     const [previewReport, setPreviewReport] = useState<(FieldReport & { userName: string }) | null>(null);
@@ -251,19 +259,20 @@ const FieldReports: React.FC = () => {
         const fetchReports = async () => {
             setLoading(true);
             try {
-                const today = new Date();
-                const thirtyDaysAgo = new Date();
-                thirtyDaysAgo.setDate(today.getDate() - 30);
-                
-                const [fieldReports, users] = await Promise.all([
-                    api.getFieldReports(thirtyDaysAgo.toISOString(), today.toISOString()),
+                const [res, users] = await Promise.all([
+                    api.getFieldReports({ 
+                        startDate: new Date(startDate).toISOString(), 
+                        endDate: new Date(endDate).toISOString(),
+                        page: currentPage,
+                        pageSize
+                    }),
                     api.getUsers()
                 ]);
 
                 const userMap = new Map(users.map(u => [u.id, u]));
 
-                const enrichedReports = fieldReports.map(report => {
-                    const u = userMap.get(report.userId);
+                const enrichedReports = res.data.map(report => {
+                    const u = userMap.get(report.userId) as User | undefined;
                     return {
                         ...report,
                         userName: u?.name || 'Unknown User',
@@ -272,13 +281,11 @@ const FieldReports: React.FC = () => {
                 });
 
                 setReports(enrichedReports);
+                setTotalReports(res.total);
 
                 // Pre-fetch unique templates used in these reports
-                const templateIds = Array.from(new Set(fieldReports.map(r => r.templateId)));
-                // Note: We don't have a getTemplateById, but we can infer or fetch all if needed.
-                // For now, we'll fetch by jobType to resolve templates.
-                const jobTypes = Array.from(new Set(fieldReports.map(r => r.jobType)));
-                const templatePromises = jobTypes.map(type => api.getChecklistTemplates(type));
+                const jobTypes = Array.from(new Set(res.data.map(r => r.jobType)));
+                const templatePromises = jobTypes.map(type => api.getChecklistTemplates(type as string));
                 const templateResults = await Promise.all(templatePromises);
                 const templateMap: Record<string, ChecklistTemplate> = {};
                 templateResults.flat().forEach(t => {
@@ -294,7 +301,11 @@ const FieldReports: React.FC = () => {
         };
 
         fetchReports();
-    }, []);
+    }, [currentPage, pageSize, startDate, endDate]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [pageSize, startDate, endDate]);
 
     const toggleReportDetails = (id: string) => {
         setExpandedReportId(expandedReportId === id ? null : id);
@@ -315,9 +326,28 @@ const FieldReports: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex items-center gap-2 text-sm bg-accent/10 text-accent px-4 py-2 rounded-lg border border-accent/20">
-                <ClipboardCheck className="h-4 w-4" />
-                <span>Showing verified reports from the last 30 days</span>
+            <div className="bg-card p-5 rounded-xl border border-border shadow-sm flex flex-col md:flex-row gap-4 items-end">
+                <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-2">
+                        <Input 
+                            placeholder="Search by worker name, site or job type..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            icon={<Search className="h-4 w-4" />}
+                        />
+                    </div>
+                    <div className="flex gap-2">
+                        <div className="flex-1">
+                            <Input label="" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                        </div>
+                        <div className="flex-1">
+                            <Input label="" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                        </div>
+                    </div>
+                </div>
+                <Button variant="secondary" onClick={() => { setSearchTerm(''); setStartDate(format(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')); setEndDate(format(new Date(), 'yyyy-MM-dd')); }}>
+                    <FilterX className="h-4 w-4 mr-2" /> Reset
+                </Button>
             </div>
 
             <div className="grid grid-cols-1 gap-6">
@@ -328,7 +358,13 @@ const FieldReports: React.FC = () => {
                         <p className="text-muted mt-2">Field reports submitted will appear here.</p>
                     </div>
                 ) : (
-                    reports.map(report => {
+                    reports
+                    .filter(r => 
+                        r.userName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        r.siteName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        r.jobType.toLowerCase().includes(searchTerm.toLowerCase())
+                    )
+                    .map(report => {
                         const isExpanded = expandedReportId === report.id;
                         const template = templates[report.templateId];
                         
@@ -483,6 +519,15 @@ const FieldReports: React.FC = () => {
                     })
                 )}
             </div>
+
+            <Pagination 
+                currentPage={currentPage}
+                totalItems={totalReports}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                className="mt-8"
+            />
 
             {/* PDF Preview Modal */}
             <PdfPreviewModal 

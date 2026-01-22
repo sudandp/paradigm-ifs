@@ -1,20 +1,20 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTaskStore } from '../../store/taskStore';
 import { useAuthStore } from '../../store/authStore';
-import { Plus, Edit, Trash2, Loader2, CheckCircle, AlertTriangle, X } from 'lucide-react';
+import { Plus, Edit, Trash2, CheckCircle, X, Search } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
-import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import Modal from '../../components/ui/Modal';
 import CompleteTaskForm from '../../components/tasks/CompleteTaskForm';
 import type { Task, EscalationStatus, TaskPriority, TaskStatus, User } from '../../types';
 import { api } from '../../services/api';
 import { format, addDays } from 'date-fns';
 import { useThemeStore } from '../../store/themeStore';
-import Select from '../../components/ui/Select';
 import TableSkeleton from '../../components/skeletons/TableSkeleton';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import Pagination from '../../components/ui/Pagination';
+import Input from '../../components/ui/Input';
 
 const getNextDueDateInfo = (task: Task): { date: string | null; isOverdue: boolean } => {
     const today = new Date();
@@ -67,12 +67,15 @@ const TaskManagement: React.FC = () => {
     const { theme } = useThemeStore();
     const isDark = theme === 'dark';
 
-
-
     const [isCompleteFormOpen, setIsCompleteFormOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [currentTask, setCurrentTask] = useState<Task | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+    const [totalTasks, setTotalTasks] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const [users, setUsers] = useState<User[]>([]);
     const [statusFilter, setStatusFilter] = useState<'all' | TaskStatus>('all');
@@ -80,24 +83,36 @@ const TaskManagement: React.FC = () => {
     const [assignedToFilter, setAssignedToFilter] = useState<'all' | string>('all');
     const isMobile = useMediaQuery('(max-width: 767px)');
 
+    const loadTasks = useCallback(async () => {
+        try {
+            const res = await api.getTasks({ page: currentPage, pageSize });
+            useTaskStore.setState({ tasks: res.data, isLoading: false });
+            setTotalTasks(res.total);
+        } catch (error) {
+            setToast({ message: 'Failed to fetch tasks.', type: 'error' });
+        }
+    }, [currentPage, pageSize]);
+
     useEffect(() => {
         const init = async () => {
             if (user) {
                 const isPrivileged = ['admin', 'hr', 'developer'].includes(user.role);
                 if (isPrivileged) {
-                    api.getUsers().then(setUsers);
+                    api.getUsers().then(u => setUsers(u as User[]));
                 } else {
-                    // Get subordinates and add self to the list
                     const team = await api.getTeamMembers(user.id);
-                    // Ensure the manager themselves is included for filtering/assignment
                     setUsers([user, ...team]);
                 }
             }
-            await fetchTasks();
+            await loadTasks();
             await runAutomaticEscalations();
         }
         init();
-    }, [user, fetchTasks, runAutomaticEscalations]);
+    }, [user, loadTasks, runAutomaticEscalations]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [pageSize]);
 
     const handleAdd = () => {
         navigate('/tasks/add');
@@ -134,7 +149,6 @@ const TaskManagement: React.FC = () => {
         const allowedUserIds = users.map(u => u.id);
 
         return tasks.filter(task => {
-            // Role-based visibility: Non-privileged users only see tasks assigned to them or their team
             if (!isPrivileged && task.assignedToId && !allowedUserIds.includes(task.assignedToId)) {
                 return false;
             }
@@ -150,9 +164,14 @@ const TaskManagement: React.FC = () => {
             } else if (assignedToFilter !== 'all' && task.assignedToId !== assignedToFilter) {
                 return false;
             }
+            
+            if (searchTerm && !task.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+                return false;
+            }
+            
             return true;
         });
-    }, [tasks, statusFilter, priorityFilter, assignedToFilter, user, users]);
+    }, [tasks, statusFilter, priorityFilter, assignedToFilter, user, users, searchTerm]);
 
     const clearFilters = () => {
         setStatusFilter('all');
@@ -161,7 +180,6 @@ const TaskManagement: React.FC = () => {
     };
 
     const areFiltersActive = statusFilter !== 'all' || priorityFilter !== 'all' || assignedToFilter !== 'all';
-
 
     const getPriorityChip = (priority: Task['priority']) => {
         const styles = {
@@ -196,8 +214,6 @@ const TaskManagement: React.FC = () => {
         <div className={`min-h-screen ${isMobile ? 'bg-[#041b0f] text-white p-4 pb-24' : `p-4 ${isDark ? 'bg-[#041b0f] border border-white/10' : 'md:bg-card'} md:p-6 md:rounded-xl md:shadow-card`}`}>
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
 
-            {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
-
             {isCompleteFormOpen && currentTask && (
                 <CompleteTaskForm
                     isOpen={isCompleteFormOpen}
@@ -229,10 +245,10 @@ const TaskManagement: React.FC = () => {
                             value={statusFilter}
                             onChange={e => setStatusFilter(e.target.value as any)}
                         >
-                            <option value="all" className={isMobile || isDark ? 'bg-[#041b0f]' : ''}>All Statuses</option>
-                            <option value="To Do" className={isMobile || isDark ? 'bg-[#041b0f]' : ''}>To Do</option>
-                            <option value="In Progress" className={isMobile || isDark ? 'bg-[#041b0f]' : ''}>In Progress</option>
-                            <option value="Done" className={isMobile || isDark ? 'bg-[#041b0f]' : ''}>Done</option>
+                            <option value="all">All Statuses</option>
+                            <option value="To Do">To Do</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Done">Done</option>
                         </select>
                     </div>
                     <div className="space-y-1">
@@ -242,10 +258,10 @@ const TaskManagement: React.FC = () => {
                             value={priorityFilter}
                             onChange={e => setPriorityFilter(e.target.value as any)}
                         >
-                            <option value="all" className={isMobile || isDark ? 'bg-[#041b0f]' : ''}>All Priorities</option>
-                            <option value="Low" className={isMobile || isDark ? 'bg-[#041b0f]' : ''}>Low</option>
-                            <option value="Medium" className={isMobile || isDark ? 'bg-[#041b0f]' : ''}>Medium</option>
-                            <option value="High" className={isMobile || isDark ? 'bg-[#041b0f]' : ''}>High</option>
+                            <option value="all">All Priorities</option>
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
                         </select>
                     </div>
                     <div className="space-y-1">
@@ -255,25 +271,34 @@ const TaskManagement: React.FC = () => {
                             value={assignedToFilter}
                             onChange={e => setAssignedToFilter(e.target.value)}
                         >
-                            <option value="all" className={isMobile || isDark ? 'bg-[#041b0f]' : ''}>All Users</option>
-                            <option value="unassigned" className={isMobile || isDark ? 'bg-[#041b0f]' : ''}>Unassigned</option>
-                            {users.map(u => <option key={u.id} value={u.id} className={isMobile || isDark ? 'bg-[#041b0f]' : ''}>{u.name}</option>)}
+                            <option value="all">All Users</option>
+                            <option value="unassigned">Unassigned</option>
+                            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                         </select>
                     </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0 mt-4 md:mt-0">
-                    {areFiltersActive && (
-                        <Button variant="secondary" onClick={clearFilters} className={isMobile || isDark ? '!bg-[#152b1b] !text-white !border-white/10' : ''}>
-                            <X className="mr-2 h-4 w-4" /> Clear Filters
+                    { (areFiltersActive || searchTerm) && (
+                        <Button variant="secondary" onClick={() => { clearFilters(); setSearchTerm(''); }}>
+                            <X className="mr-2 h-4 w-4" /> Clear All
                         </Button>
                     )}
                     <button
                         onClick={handleAdd}
-                        className={`flex items-center justify-center transition-colors ${isMobile ? '!bg-[#32CD32] hover:!bg-[#28a428] !text-[#0D1A0D] !font-bold !border-none shadow-none text-sm py-3 px-6 rounded-xl' : 'bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg px-6 py-2.5 font-medium'}`}
+                        className={`flex items-center justify-center transition-colors ${isMobile ? 'bg-[#32CD32] hover:bg-[#28a428] text-[#0D1A0D] font-bold border-none shadow-none text-sm py-3 px-6 rounded-xl' : 'bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg px-6 py-2.5 font-medium'}`}
                     >
                         <Plus className="mr-2 h-5 w-5" /> Add Task
                     </button>
                 </div>
+            </div>
+
+            <div className="mb-6">
+                <Input 
+                    placeholder="Search tasks by name..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    icon={<Search className="h-4 w-4" />}
+                />
             </div>
 
             {error && <p className="text-red-500 mb-4">{error}</p>}
@@ -356,13 +381,16 @@ const TaskManagement: React.FC = () => {
                         })}
                     </tbody>
                 </table>
-                {!isLoading && filteredTasks.length === 0 && (
-                    <div className="text-center py-10 text-muted">
-                        <p className={isMobile || isDark ? 'text-gray-400' : ''}>No tasks found matching your criteria.</p>
-                        {areFiltersActive && <Button variant="secondary" size="sm" className="mt-2" onClick={clearFilters}>Clear filters</Button>}
-                    </div>
-                )}
             </div>
+
+            <Pagination 
+                currentPage={currentPage}
+                totalItems={totalTasks}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                className="mt-6"
+            />
         </div>
     );
 };

@@ -18,6 +18,8 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useSettingsStore } from '../../store/settingsStore';
 import { differenceInDays } from 'date-fns';
 import Input from '../../components/ui/Input';
+import Pagination from '../../components/ui/Pagination';
+import { Search } from 'lucide-react';
 
 const siteCsvColumns = ['id', 'shortName', 'fullName', 'address', 'manpowerApprovedCount', 'reportingManagerName', 'managerName', 'fieldStaffNames', 'backendFieldStaffName'];
 
@@ -75,6 +77,11 @@ export const SiteManagement: React.FC = () => {
     const [siteStaffDesignations, setSiteStaffDesignations] = useState<SiteStaffDesignation[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+    const [totalSites, setTotalSites] = useState(0);
+    const [searchTerm, setSearchTerm] = useState('');
+
 
 
     const [isSiteConfigFormOpen, setIsSiteConfigFormOpen] = useState(false);
@@ -107,6 +114,7 @@ export const SiteManagement: React.FC = () => {
             ]);
 
             setOrganizations(orgsResult);
+            setTotalSites(orgsResult.length);
             setSiteConfigs(sitesResult);
             setSiteStaffDesignations(designationsResult);
             const clients = structureResult.flatMap(group =>
@@ -122,6 +130,10 @@ export const SiteManagement: React.FC = () => {
             setIsLoading(false);
         }
     }, []);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [pageSize]);
 
     useEffect(() => {
         fetchData();
@@ -366,7 +378,14 @@ export const SiteManagement: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {organizations.map((org) => {
+                                {organizations
+                                .filter(org => 
+                                    searchTerm === '' || 
+                                    org.shortName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                    org.fullName.toLowerCase().includes(searchTerm.toLowerCase())
+                                )
+                                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                .map((org) => {
                                     const config = siteConfigs.find(c => c.organizationId === org.id);
                                     const isProvisional = !!org.provisionalCreationDate;
                                     const daysLeft = isProvisional && org.provisionalCreationDate
@@ -458,6 +477,19 @@ export const SiteManagement: React.FC = () => {
                                 })}
                             </tbody>
                         </table>
+
+                        <Pagination 
+                            currentPage={currentPage}
+                            totalItems={organizations.filter(org => 
+                                searchTerm === '' || 
+                                org.shortName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                org.fullName.toLowerCase().includes(searchTerm.toLowerCase())
+                            ).length}
+                            pageSize={pageSize}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={setPageSize}
+                            className="mt-4"
+                        />
                     </div>
                 )}
             </div>
