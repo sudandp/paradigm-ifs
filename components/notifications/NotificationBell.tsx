@@ -13,7 +13,8 @@ import {
     Check, 
     MoreHorizontal,
     Inbox,
-    Clock
+    Clock,
+    ArrowLeft
 } from 'lucide-react';
 import { formatDistanceToNow, isToday, isYesterday, parseISO } from 'date-fns';
 import type { Notification, NotificationType } from '../../types';
@@ -126,20 +127,29 @@ const NotificationBell: React.FC<{ className?: string }> = ({ className = '' }) 
 
                     <div
                         ref={panelRef}
-                        className="fixed inset-x-4 top-24 bottom-20 z-[100] flex flex-col bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 md:absolute md:inset-auto md:top-16 md:right-0 md:mt-2 md:w-[420px] md:h-auto md:max-h-[640px] md:bottom-auto animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-300 overflow-hidden"
+                        className="fixed inset-0 pt-safe z-[100] flex flex-col bg-[#0A3D2E] md:bg-white md:rounded-2xl md:shadow-[0_20px_50px_rgba(0,0,0,0.15)] md:border md:border-gray-100 md:absolute md:inset-auto md:top-16 md:right-0 md:mt-2 md:w-[420px] md:h-auto md:max-h-[640px] md:bottom-auto md:pt-0 animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-300 overflow-hidden"
                         style={{ position: window.innerWidth >= 768 ? 'absolute' : 'fixed' }}
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between px-6 py-5 bg-white border-b border-gray-50">
-                            <div>
-                                <h4 className="font-bold text-xl text-gray-900 flex items-center gap-2">
-                                    Notifications
-                                    {unreadCount > 0 && (
-                                        <span className="px-2 py-0.5 bg-accent/10 text-accent text-xs rounded-full">
-                                            {unreadCount} New
-                                        </span>
-                                    )}
-                                </h4>
+                        <div className="flex items-center justify-between px-4 py-4 md:px-6 md:py-5 bg-white border-b border-gray-100">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setIsOpen(false)}
+                                    className="md:hidden flex items-center gap-1 -ml-2 px-2 py-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                >
+                                    <ArrowLeft className="h-5 w-5" />
+                                    <span className="text-base font-medium">Back</span>
+                                </button>
+                                <div className="md:block hidden">
+                                    <h4 className="font-bold text-xl text-gray-900 flex items-center gap-2">
+                                        Notifications
+                                        {unreadCount > 0 && (
+                                            <span className="px-2 py-0.5 bg-accent/10 text-accent text-xs rounded-full">
+                                                {unreadCount} New
+                                            </span>
+                                        )}
+                                    </h4>
+                                </div>
                             </div>
                             {unreadCount > 0 && (
                                 <button
@@ -147,19 +157,19 @@ const NotificationBell: React.FC<{ className?: string }> = ({ className = '' }) 
                                     className="text-xs font-bold text-accent hover:bg-accent/5 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
                                 >
                                     <Check className="h-4 w-4" />
-                                    Mark all as read
+                                    <span className="hidden md:inline">Mark all as read</span>
                                 </button>
                             )}
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 overflow-y-auto custom-scrollbar pb-4 bg-white">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pb-4 bg-[#0A3D2E] md:bg-white">
                             {groupedNotifications.length > 0 ? (
                                 <div className="space-y-6 pt-4">
                                     {groupedNotifications.map((group) => (
                                         <div key={group.title} className="space-y-1">
                                             <div className="px-6 flex items-center justify-between">
-                                                <h5 className="text-[10px] font-black uppercase tracking-[0.15em] text-muted/60 flex items-center gap-2">
+                                                <h5 className="text-[10px] font-black uppercase tracking-[0.15em] text-white/70 md:text-muted/60 flex items-center gap-2">
                                                     <div className="w-1 h-3 bg-accent/40 rounded-full" />
                                                     {group.title}
                                                 </h5>
@@ -183,15 +193,15 @@ const NotificationBell: React.FC<{ className?: string }> = ({ className = '' }) 
                                                         <NotificationIcon type={notif.type} />
                                                         
                                                         <div className="flex-1 min-w-0">
-                                                            <p className={`text-[14px] leading-relaxed mb-1.5 ${
+                                                            <p className={`text-[14px] leading-relaxed mb-1.5 md:${
                                                                 !notif.isRead 
                                                                 ? 'text-gray-900 font-semibold' 
                                                                 : 'text-gray-600'
-                                                            }`}>
+                                                            } text-white font-medium`}>
                                                                 {notif.message}
                                                             </p>
                                                             <div className="flex items-center gap-3">
-                                                                <span className="text-[11px] text-muted flex items-center gap-1">
+                                                                <span className="text-[11px] text-white/80 md:text-muted flex items-center gap-1">
                                                                     <Clock className="h-3 w-3" />
                                                                     {formatDistanceToNow(parseISO(notif.createdAt), { addSuffix: true })}
                                                                 </span>
@@ -236,8 +246,8 @@ const NotificationBell: React.FC<{ className?: string }> = ({ className = '' }) 
                         
                         {/* Footer */}
                         {notifications.length > 0 && (
-                            <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
-                                <button className="text-xs font-bold text-muted hover:text-primary-text transition-colors">
+                            <div className="p-4 bg-[#0A3D2E] md:bg-gray-50 border-t border-white/10 md:border-gray-100 text-center">
+                                <button className="text-xs font-bold text-white md:text-muted hover:text-white/80 md:hover:text-primary-text transition-colors">
                                     All Notifications
                                 </button>
                             </div>

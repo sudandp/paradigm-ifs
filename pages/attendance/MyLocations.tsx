@@ -96,6 +96,7 @@ const MyLocations: React.FC = () => {
 
   const handleUseCurrentLocation = async () => {
     setAdding(true);
+    setToast({ message: 'Acquiring your location, please wait...', type: 'success' });
     try {
       // Robust acquisition - getPrecisePosition now handles fallbacks internally
       const pos = await getPrecisePosition();
@@ -113,7 +114,7 @@ const MyLocations: React.FC = () => {
         console.warn('Reverse geocode failed:', geocodeErr);
       }
 
-      setToast({ message: 'Coordinates and address filled. Please enter a location name.', type: 'success' });
+      setToast({ message: 'Location acquired successfully! Please enter a location name.', type: 'success' });
     } catch (err: any) {
       console.error(err);
       const msg = err.message?.toLowerCase().includes('permission') 

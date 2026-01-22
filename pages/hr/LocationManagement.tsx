@@ -49,6 +49,7 @@ const LocationManagement: React.FC = () => {
   const [assignLocationIds, setAssignLocationIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
 
   // Track when editing an existing location.  If set, the form will
   // function as an edit form instead of create.  Stores the id of the
@@ -94,6 +95,8 @@ const LocationManagement: React.FC = () => {
   };
 
   const handleUseCurrentLocation = async () => {
+    setIsFetchingLocation(true);
+    setToast({ message: 'Acquiring your location, please wait...', type: 'success' });
     try {
       const pos = await getPrecisePosition();
       const { latitude, longitude } = pos.coords;
@@ -107,12 +110,15 @@ const LocationManagement: React.FC = () => {
       } catch (err) {
         console.warn('Reverse geocode failed', err);
       }
+      setToast({ message: 'Location acquired successfully! Coordinates and address have been filled.', type: 'success' });
     } catch (err: any) {
       console.error(err);
       const msg = err.message?.toLowerCase().includes('permission') 
         ? 'Location permission denied. Please enable it in settings.' 
         : 'Unable to acquire location fix. Please ensure GPS is on and you are in an open area.';
       setToast({ message: msg, type: 'error' });
+    } finally {
+      setIsFetchingLocation(false);
     }
   };
 
@@ -262,7 +268,7 @@ const LocationManagement: React.FC = () => {
             <Input label="Address (optional)" id="locAddr" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Street, City, State" />
           </div>
           <div className="flex flex-wrap mt-4 gap-4">
-            <Button variant="secondary" onClick={handleUseCurrentLocation}>
+            <Button variant="secondary" onClick={handleUseCurrentLocation} isLoading={isFetchingLocation} disabled={isFetchingLocation}>
               <Pin className="h-4 w-4 mr-2" /> Use Current Location
             </Button>
             {editingLocationId ? (
