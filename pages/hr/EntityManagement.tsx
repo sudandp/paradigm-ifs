@@ -258,67 +258,103 @@ const EntityManagement: React.FC = () => {
     const toggleExpand = (id: string) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
     const handleSaveAll = () => {
-        // In a real app, this would be a single API call. Here we just show a success message.
-        setToast({ message: 'All changes saved successfully (mocked).', type: 'success' });
+        setToast({ message: 'All changes are already synchronized with the database.', type: 'success' });
     };
 
     // Client/Entity handlers
     const handleAddClient = (companyName: string) => setEntityFormState({ isOpen: true, initialData: null, companyName });
     const handleEditClient = (entity: Entity, companyName: string) => setEntityFormState({ isOpen: true, initialData: entity, companyName });
-    const handleSaveClient = (clientData: Entity) => {
-        // Logic to find the correct company and add/update the client
-        setToast({ message: clientData.id.startsWith('new_') ? 'Client added.' : 'Client updated.', type: 'success' });
-        setEntityFormState({ isOpen: false, initialData: null, companyName: '' });
+    const handleSaveClient = async (clientData: Entity) => {
+        try {
+            const company = groups.flatMap(g => g.companies).find(c => c.name === entityFormState.companyName);
+            if (!company) throw new Error("Company not found");
+
+            const savedClient = await api.saveEntity({ ...clientData, companyId: company.id });
+            
+            setGroups(prev => prev.map(group => ({
+                ...group,
+                companies: group.companies.map(c => {
+                    if (c.id === company.id) {
+                        const exists = c.entities.some(e => e.id === savedClient.id);
+                        return {
+                            ...c,
+                            entities: exists 
+                                ? c.entities.map(e => e.id === savedClient.id ? savedClient : e)
+                                : [...c.entities, savedClient]
+                        };
+                    }
+                    return c;
+                })
+            })));
+
+            setToast({ message: clientData.id.startsWith('new_') ? 'Client added.' : 'Client updated.', type: 'success' });
+            setEntityFormState({ isOpen: false, initialData: null, companyName: '' });
+        } catch (error) {
+            setToast({ message: 'Failed to save client.', type: 'error' });
+        }
     };
 
     const handleDeleteClick = (type: 'group' | 'company' | 'client', id: string, name: string) => setDeleteModalState({ isOpen: true, type, id, name });
 
-    const handleConfirmDelete = () => {
+    const handleConfirmDelete = async () => {
         const { type, id, name } = deleteModalState;
-        if (type === 'group') {
-            setGroups(prev => prev.filter(g => g.id !== id));
-        } else if (type === 'company') {
-            setGroups(prev => prev.map(group => ({
-                ...group,
-                companies: group.companies.filter(c => c.id !== id)
-            })));
-        } else if (type === 'client') {
-            setGroups(prev => prev.map(group => ({
-                ...group,
-                companies: group.companies.map(company => ({
-                    ...company,
-                    entities: company.entities.filter(e => e.id !== id)
-                }))
-            })));
+        try {
+            if (type === 'group') {
+                await api.deleteOrganizationGroup(id);
+                setGroups(prev => prev.filter(g => g.id !== id));
+            } else if (type === 'company') {
+                await api.deleteCompany(id);
+                setGroups(prev => prev.map(group => ({
+                    ...group,
+                    companies: group.companies.filter(c => c.id !== id)
+                })));
+            } else if (type === 'client') {
+                await api.deleteEntity(id);
+                setGroups(prev => prev.map(group => ({
+                    ...group,
+                    companies: group.companies.map(company => ({
+                        ...company,
+                        entities: company.entities.filter(e => e.id !== id)
+                    }))
+                })));
+            }
+            setToast({ message: `${type.charAt(0).toUpperCase() + type.slice(1)} '${name}' deleted.`, type: 'success' });
+        } catch (error) {
+            setToast({ message: `Failed to delete ${type}.`, type: 'error' });
         }
-        setToast({ message: `${type.charAt(0).toUpperCase() + type.slice(1)} '${name}' deleted.`, type: 'success' });
         setDeleteModalState({ isOpen: false, type: 'group', id: '', name: '' });
     };
 
-    const handleSaveName = (name: string) => {
+    const handleSaveName = async (name: string) => {
         const { mode, type, id, groupId } = nameModalState;
-        if (mode === 'add') {
-            if (type === 'group') {
-                const newGroup: OrganizationGroup = { id: `group_${Date.now()}`, name, locations: [], companies: [] };
-                setGroups(prev => [...prev, newGroup]);
-                setToast({ message: `Group '${name}' added.`, type: 'success' });
-            } else if (type === 'company' && groupId) {
-                const newCompany: Company = { id: `comp_${Date.now()}`, name, entities: [] };
-                setGroups(prev => prev.map(g => g.id === groupId ? { ...g, companies: [...g.companies, newCompany] } : g));
-                setToast({ message: `Company '${name}' added.`, type: 'success' });
+        try {
+            if (mode === 'add') {
+                if (type === 'group') {
+                    const saved = await api.createOrganizationGroup({ id: `group_${Date.now()}`, name });
+                    setGroups(prev => [...prev, { ...saved, companies: [], locations: [] }]);
+                    setToast({ message: `Group '${name}' added.`, type: 'success' });
+                } else if (type === 'company' && groupId) {
+                    const saved = await api.createCompany({ id: `comp_${Date.now()}`, name, groupId });
+                    setGroups(prev => prev.map(g => g.id === groupId ? { ...g, companies: [...g.companies, { ...saved, entities: [] }] } : g));
+                    setToast({ message: `Company '${name}' added.`, type: 'success' });
+                }
+            } else { // mode === 'edit'
+                if (type === 'group' && id) {
+                    await api.updateOrganizationGroup(id, { name });
+                    setGroups(prev => prev.map(g => g.id === id ? { ...g, name } : g));
+                    setToast({ message: 'Group updated.', type: 'success' });
+                } else if (type === 'company' && id && groupId) {
+                    await api.updateCompany(id, { name });
+                    setGroups(prev => prev.map(g =>
+                        g.id === groupId
+                            ? { ...g, companies: g.companies.map(c => c.id === id ? { ...c, name } : c) }
+                            : g
+                    ));
+                    setToast({ message: 'Company updated.', type: 'success' });
+                }
             }
-        } else { // mode === 'edit'
-            if (type === 'group' && id) {
-                setGroups(prev => prev.map(g => g.id === id ? { ...g, name } : g));
-                setToast({ message: 'Group updated.', type: 'success' });
-            } else if (type === 'company' && id && groupId) {
-                setGroups(prev => prev.map(g =>
-                    g.id === groupId
-                        ? { ...g, companies: g.companies.map(c => c.id === id ? { ...c, name } : c) }
-                        : g
-                ));
-                setToast({ message: 'Company updated.', type: 'success' });
-            }
+        } catch (error) {
+            setToast({ message: `Failed to ${mode} ${type}.`, type: 'error' });
         }
         setNameModalState({ isOpen: false, mode: 'add', type: 'group', title: '', label: '' }); // Reset and close
     };
@@ -672,7 +708,33 @@ const EntityManagement: React.FC = () => {
             <Modal isOpen={deleteModalState.isOpen} onClose={() => setDeleteModalState(p => ({ ...p, isOpen: false }))} onConfirm={handleConfirmDelete} title="Confirm Deletion">
                 Are you sure you want to delete the {deleteModalState.type} "{deleteModalState.name}"? This action cannot be undone.
             </Modal>
-            {siteConfigForm.isOpen && siteConfigForm.org && <SiteConfigurationForm isOpen={siteConfigForm.isOpen} onClose={() => setSiteConfigForm({ isOpen: false, org: null })} onSave={() => { }} organization={siteConfigForm.org} allClients={allClients} initialData={siteConfigs.find(c => c.organizationId === siteConfigForm.org?.id)} />}
+            {siteConfigForm.isOpen && siteConfigForm.org && (
+                <SiteConfigurationForm 
+                    isOpen={siteConfigForm.isOpen} 
+                    onClose={() => setSiteConfigForm({ isOpen: false, org: null })} 
+                    onSave={async (orgId, data) => {
+                        try {
+                            await api.saveSiteConfiguration(orgId, data);
+                            setSiteConfigs(prev => {
+                                const index = prev.findIndex(c => c.organizationId === orgId);
+                                if (index > -1) {
+                                    const updated = [...prev];
+                                    updated[index] = data;
+                                    return updated;
+                                }
+                                return [...prev, data];
+                            });
+                            setToast({ message: 'Site configuration saved.', type: 'success' });
+                            setSiteConfigForm({ isOpen: false, org: null });
+                        } catch (error) {
+                            setToast({ message: 'Failed to save site configuration.', type: 'error' });
+                        }
+                    }} 
+                    organization={siteConfigForm.org} 
+                    allClients={allClients} 
+                    initialData={siteConfigs.find(c => c.organizationId === siteConfigForm.org?.id)} 
+                />
+            )}
             {viewingClients && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60" onClick={() => setViewingClients(null)}>
                     <div className="bg-card rounded-xl shadow-card p-6 w-full max-w-md m-4 animate-fade-in-scale" onClick={e => e.stopPropagation()}>

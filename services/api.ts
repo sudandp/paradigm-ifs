@@ -9,7 +9,7 @@ import type {
   SubmissionCostBreakdown, AppModule, Role, SupportTicket, TicketPost, TicketComment, VerificationResult, CompOffLog,
   ExtraWorkLog, PerfiosVerificationData, HolidayListItem, UniformRequestItem, IssuedTool, RecurringHolidayRule,
   BiometricDevice, ChecklistTemplate, FieldReport, FieldAttendanceViolation,
-  NotificationRule, NotificationType
+  NotificationRule, NotificationType, Company, GmcPolicySettings
 } from '../types';
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { differenceInCalendarDays, format, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
@@ -600,10 +600,67 @@ export const api = {
 
     return camelGroups.map(group => ({ ...group, companies: companyMap.get(group.id) || [], locations: [] }));
   },
+  createOrganizationGroup: async (group: Partial<OrganizationGroup>): Promise<OrganizationGroup> => {
+    const { data, error } = await supabase.from('organization_groups').insert(toSnakeCase(group)).select().single();
+    if (error) throw error;
+    return toCamelCase(data);
+  },
+  updateOrganizationGroup: async (id: string, updates: Partial<OrganizationGroup>): Promise<OrganizationGroup> => {
+    const { data, error } = await supabase.from('organization_groups').update(toSnakeCase(updates)).eq('id', id).select().single();
+    if (error) throw error;
+    return toCamelCase(data);
+  },
+  deleteOrganizationGroup: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('organization_groups').delete().eq('id', id);
+    if (error) throw error;
+  },
+  createCompany: async (company: Partial<Company>): Promise<Company> => {
+    const { entities, ...rest } = company;
+    const { data, error } = await supabase.from('companies').insert(toSnakeCase(rest)).select().single();
+    if (error) throw error;
+    return toCamelCase({ ...data, entities: [] });
+  },
+  updateCompany: async (id: string, updates: Partial<Company>): Promise<Company> => {
+    const { entities, ...rest } = updates;
+    const { data, error } = await supabase.from('companies').update(toSnakeCase(rest)).eq('id', id).select().single();
+    if (error) throw error;
+    return toCamelCase(data);
+  },
+  deleteCompany: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('companies').delete().eq('id', id);
+    if (error) throw error;
+  },
+  saveEntity: async (entity: Partial<Entity>): Promise<Entity> => {
+    const { id, ...rest } = entity;
+    const dbData = toSnakeCase(rest);
+    let query;
+    if (id && !id.startsWith('new_')) {
+      query = supabase.from('entities').update(dbData).eq('id', id);
+    } else {
+      query = supabase.from('entities').insert({ ...dbData, id: id?.startsWith('new_') ? `ent_${Date.now()}` : id });
+    }
+    const { data, error } = await query.select().single();
+    if (error) throw error;
+    return toCamelCase(data);
+  },
+  deleteEntity: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('entities').delete().eq('id', id);
+    if (error) throw error;
+  },
+  saveSiteConfiguration: async (organizationId: string, config: SiteConfiguration): Promise<void> => {
+    const { data, error } = await supabase.from('site_configurations').upsert({
+      organization_id: organizationId,
+      config_data: config
+    }, { onConflict: 'organization_id' });
+    if (error) throw error;
+  },
   getSiteConfigurations: async (): Promise<SiteConfiguration[]> => {
     const { data, error } = await supabase.from('site_configurations').select('*');
     if (error) throw error;
-    return (data || []).map(toCamelCase);
+    return (data || []).map(row => ({
+      ...toCamelCase(row.config_data),
+      organizationId: row.organization_id
+    }));
   },
   bulkUploadOrganizations: async (orgs: Organization[]): Promise<{ count: number }> => {
     const { count, error } = await supabase.from('organizations').upsert(toSnakeCase(orgs), { onConflict: 'id' });
@@ -1021,6 +1078,7 @@ export const api = {
     if (error) throw error;
   },
   createAssignment: async (officerId: string, siteId: string, date: string): Promise<void> => {
+    // 1. Create a task for the officer
     const site = (await api.getOrganizations()).find(o => o.id === siteId);
     await api.createTask({
       name: `Visit ${site?.shortName || 'site'} for verification`,
@@ -1029,6 +1087,14 @@ export const api = {
       priority: 'Medium',
       assignedToId: officerId,
     });
+
+    // 2. Persist the assignment state
+    const { error } = await supabase.from('site_assignments').insert({
+      officer_id: officerId,
+      site_id: siteId,
+      assignment_date: date
+    });
+    if (error && error.code !== '23505') throw error; // Ignore duplicates
   },
   getLeaveBalancesForUser: async (userId: string): Promise<LeaveBalance> => {
     const getStaffType = (role: UserRole): 'office' | 'field' => (['hr', 'admin', 'finance'].includes(role) ? 'office' : 'field');
@@ -1625,11 +1691,18 @@ export const api = {
     if (error) throw error;
   },
   getManpowerDetails: async (siteId: string): Promise<ManpowerDetail[]> => {
-    const { data, error } = await supabase.rpc('get_manpower_details', { site_id_param: siteId });
-    if (error) throw error;
-    return toCamelCase(data);
+    const { data, error } = await supabase.from('site_manpower').select('manpower_details').eq('organization_id', siteId).single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return toCamelCase(data?.manpower_details || []);
   },
-  // Fix: Add all missing functions to the api object.
+  updateManpowerDetails: async (siteId: string, details: ManpowerDetail[]): Promise<void> => {
+    const { error } = await supabase.from('site_manpower').upsert({
+      organization_id: siteId,
+      manpower_details: toSnakeCase(details),
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'organization_id' });
+    if (error) throw error;
+  },
   addCompOffLog: async (logData: Omit<CompOffLog, 'id'>): Promise<CompOffLog> => {
     const { data, error } = await supabase.from('comp_off_logs').insert(toSnakeCase(logData)).select().single();
     if (error) throw error;
@@ -1949,15 +2022,6 @@ export const api = {
     }
     throw new Error("AI did not return an enhanced image.");
   },
-  getSiteStaffDesignations: async (): Promise<SiteStaffDesignation[]> => {
-    const { data, error } = await supabase.from('site_staff_designations').select('*');
-    if (error) throw error;
-    return (data || []).map(toCamelCase);
-  },
-  updateManpowerDetails: async (siteId: string, details: ManpowerDetail[]): Promise<void> => {
-    console.log("Mock updating manpower for", siteId, details);
-    await new Promise(resolve => setTimeout(resolve, 500));
-  },
   getCompOffLogs: async (userId: string): Promise<CompOffLog[]> => {
     const { data, error } = await supabase.from('comp_off_logs').select('*').eq('user_id', userId).order('date_earned', { ascending: false });
     if (error) throw error;
@@ -1968,11 +2032,21 @@ export const api = {
     if (error) throw error;
   },
   getAllSiteAssets: async (): Promise<Record<string, Asset[]>> => {
-    return Promise.resolve({}); // mock
+    const { data, error } = await supabase.from('site_assets').select('organization_id, assets');
+    if (error) throw error;
+    const result: Record<string, Asset[]> = {};
+    data.forEach(item => {
+      result[item.organization_id] = toCamelCase(item.assets);
+    });
+    return result;
   },
   updateSiteAssets: async (siteId: string, assets: Asset[]): Promise<void> => {
-    console.log('Mock updating assets for site', siteId, assets);
-    return Promise.resolve();
+    const { error } = await supabase.from('site_assets').upsert({
+      organization_id: siteId,
+      assets: toSnakeCase(assets),
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'organization_id' });
+    if (error) throw error;
   },
   getBackOfficeIdSeries: async (): Promise<BackOfficeIdSeries[]> => {
     const { data, error } = await supabase.from('back_office_id_series').select('*');
@@ -1983,42 +2057,94 @@ export const api = {
     const { error } = await supabase.from('back_office_id_series').upsert(toSnakeCase(series), { onConflict: 'id' });
     if (error) throw error;
   },
+  getSiteStaffDesignations: async (): Promise<SiteStaffDesignation[]> => {
+    const { data, error } = await supabase.from('site_staff_designations').select('*');
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
   updateSiteStaffDesignations: async (designations: SiteStaffDesignation[]): Promise<void> => {
     const { error } = await supabase.from('site_staff_designations').upsert(toSnakeCase(designations), { onConflict: 'id' });
     if (error) throw error;
   },
   getAllSiteIssuedTools: async (): Promise<Record<string, IssuedTool[]>> => {
-    return Promise.resolve({});
+    const { data, error } = await supabase.from('site_issued_tools').select('organization_id, tools');
+    if (error) throw error;
+    const result: Record<string, IssuedTool[]> = {};
+    data.forEach(item => {
+      result[item.organization_id] = toCamelCase(item.tools);
+    });
+    return result;
   },
   getToolsList: async (): Promise<MasterToolsList> => {
-    return Promise.resolve({});
+    const { data, error } = await supabase.from('settings').select('master_tools').eq('id', 'singleton').single();
+    if (error) throw error;
+    return toCamelCase(data.master_tools);
   },
   updateSiteIssuedTools: async (siteId: string, tools: IssuedTool[]): Promise<void> => {
-    console.log('Mock updating tools for site', siteId, tools);
+    const { error } = await supabase.from('site_issued_tools').upsert({
+      organization_id: siteId,
+      tools: toSnakeCase(tools),
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'organization_id' });
+    if (error) throw error;
   },
   getAllSiteGentsUniforms: async (): Promise<Record<string, SiteGentsUniformConfig>> => {
-    return Promise.resolve({});
+    const { data, error } = await supabase.from('site_gents_uniform_configs').select('organization_id, config_data');
+    if (error) throw error;
+    const result: Record<string, SiteGentsUniformConfig> = {};
+    data.forEach(item => {
+      result[item.organization_id] = toCamelCase(item.config_data);
+    });
+    return result;
   },
   getMasterGentsUniforms: async (): Promise<MasterGentsUniforms> => {
-    return Promise.resolve({ pants: [], shirts: [] });
+    const { data, error } = await supabase.from('settings').select('master_gents_uniforms').eq('id', 'singleton').single();
+    if (error) throw error;
+    return toCamelCase(data.master_gents_uniforms || { pants: [], shirts: [] });
   },
   updateSiteGentsUniforms: async (siteId: string, config: SiteGentsUniformConfig): Promise<void> => {
-    console.log('Mock updating gents uniforms for', siteId, config);
+    const { error } = await supabase.from('site_gents_uniform_configs').upsert({
+      organization_id: siteId,
+      config_data: toSnakeCase(config)
+    }, { onConflict: 'organization_id' });
+    if (error) throw error;
   },
   getAllSiteUniformDetails: async (): Promise<Record<string, SiteUniformDetailsConfig>> => {
-    return Promise.resolve({});
+    const { data, error } = await supabase.from('site_uniform_details_configs').select('organization_id, config_data');
+    if (error) throw error;
+    const result: Record<string, SiteUniformDetailsConfig> = {};
+    data.forEach(item => {
+      result[item.organization_id] = toCamelCase(item.config_data);
+    });
+    return result;
   },
   updateSiteUniformDetails: async (siteId: string, config: SiteUniformDetailsConfig): Promise<void> => {
-    console.log('Mock updating uniform details for', siteId, config);
+    const { error } = await supabase.from('site_uniform_details_configs').upsert({
+      organization_id: siteId,
+      config_data: toSnakeCase(config)
+    }, { onConflict: 'organization_id' });
+    if (error) throw error;
   },
   getAllSiteLadiesUniforms: async (): Promise<Record<string, SiteLadiesUniformConfig>> => {
-    return Promise.resolve({});
+    const { data, error } = await supabase.from('site_ladies_uniform_configs').select('organization_id, config_data');
+    if (error) throw error;
+    const result: Record<string, SiteLadiesUniformConfig> = {};
+    data.forEach(item => {
+      result[item.organization_id] = toCamelCase(item.config_data);
+    });
+    return result;
   },
   getMasterLadiesUniforms: async (): Promise<MasterLadiesUniforms> => {
-    return Promise.resolve({ pants: [], shirts: [] });
+    const { data, error } = await supabase.from('settings').select('master_ladies_uniforms').eq('id', 'singleton').single();
+    if (error) throw error;
+    return toCamelCase(data.master_ladies_uniforms || { pants: [], shirts: [] });
   },
   updateSiteLadiesUniforms: async (siteId: string, config: SiteLadiesUniformConfig): Promise<void> => {
-    console.log('Mock updating ladies uniforms for', siteId, config);
+    const { error } = await supabase.from('site_ladies_uniform_configs').upsert({
+      organization_id: siteId,
+      config_data: toSnakeCase(config)
+    }, { onConflict: 'organization_id' });
+    if (error) throw error;
   },
   getUniformRequests: async (): Promise<UniformRequest[]> => {
     const { data, error } = await supabase.from('uniform_requests').select('*');

@@ -435,6 +435,7 @@ export interface Entity {
   psaraValidTill?: string | null;
   insuranceIds?: string[];
   policyIds?: string[];
+  companyId?: string;
 }
 
 export interface Company {

@@ -23,12 +23,9 @@ const AddGroupPage: React.FC = () => {
             // Create a new group
             const newGroup = {
                 id: `group_${Date.now()}`,
-                name: name.trim(),
-                locations: [],
-                companies: []
+                name: name.trim()
             };
-            // In production, this would call: await api.createOrganizationGroup(newGroup);
-            // For now, we'll just simulate success
+            await api.createOrganizationGroup(newGroup);
             setToast({ message: 'Group created successfully!', type: 'success' });
             setTimeout(() => navigate('/hr/entity-management'), 1500);
         } catch (error) {

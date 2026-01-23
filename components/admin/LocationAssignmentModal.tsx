@@ -97,7 +97,7 @@ const LocationAssignmentModal: React.FC<LocationAssignmentModalProps> = ({
     return (
         <>
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
-            <Modal isOpen={isOpen} onClose={onClose} title={`Manage Locations for ${userName}`}>
+            <Modal isOpen={isOpen} onClose={onClose} title={`Manage Locations for ${userName}`} hideFooter={true}>
                 <div className="space-y-6">
                     <div>
                         <h3 className="text-sm font-semibold text-primary-text mb-3">Assigned Locations ({userLocations.length})</h3>

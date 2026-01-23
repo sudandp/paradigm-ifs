@@ -4,7 +4,7 @@ import Button from './Button';
 interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: () => void;
+    onConfirm?: () => void;
     title: string;
     children: React.ReactNode;
     confirmButtonVariant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'icon';
@@ -13,9 +13,10 @@ interface ModalProps {
     isLoading?: boolean; // Alias for isConfirming
     maxWidth?: string; // Optional custom max-width
     extraActions?: React.ReactNode; // Optional extra buttons
+    hideFooter?: boolean;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, onConfirm, title, children, confirmButtonVariant = 'danger', confirmButtonText = 'Confirm', isConfirming = false, isLoading, maxWidth = 'md:max-w-md', extraActions }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, onConfirm, title, children, confirmButtonVariant = 'danger', confirmButtonText = 'Confirm', isConfirming = false, isLoading, maxWidth = 'md:max-w-md', extraActions, hideFooter = false }) => {
     if (!isOpen) return null;
 
     // Use isLoading if provided, otherwise fall back to isConfirming
@@ -38,6 +39,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, onConfirm, title, childr
                 </div>
 
                 {/* Footer with Buttons */}
+                {!hideFooter && (
                 <div className="flex-shrink-0 p-6 border-t border-border bg-card">
                     <div className="flex justify-end space-x-3">
                         {extraActions}
@@ -48,15 +50,18 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, onConfirm, title, childr
                         >
                             Cancel
                         </Button>
-                        <Button
-                            onClick={onConfirm}
-                            variant={confirmButtonVariant}
-                            isLoading={loading}
-                        >
-                            {confirmButtonText}
-                        </Button>
+                        {onConfirm && (
+                            <Button
+                                onClick={onConfirm}
+                                variant={confirmButtonVariant}
+                                isLoading={loading}
+                            >
+                                {confirmButtonText}
+                            </Button>
+                        )}
                     </div>
                 </div>
+                )}
             </div>
         </div>
     );
