@@ -1384,10 +1384,12 @@ export const api = {
     return toCamelCase(data);
   },
 
-  getFieldReports: async (filter?: { startDate?: string, endDate?: string, page?: number, pageSize?: number }): Promise<any> => {
+  getFieldReports: async (filter?: { startDate?: string, endDate?: string, page?: number, pageSize?: number, userId?: string, siteName?: string }): Promise<any> => {
     let query = supabase.from('field_reports').select('*', { count: 'exact' });
     if (filter?.startDate) query = query.gte('created_at', filter.startDate);
     if (filter?.endDate) query = query.lte('created_at', filter.endDate);
+    if (filter?.userId && filter.userId !== 'all') query = query.eq('user_id', filter.userId);
+    if (filter?.siteName && filter.siteName !== 'all') query = query.eq('site_name', filter.siteName);
     
     const isPaginated = filter?.page !== undefined && filter?.pageSize !== undefined;
     if (isPaginated) {
@@ -1405,6 +1407,29 @@ export const api = {
       return { data: formattedData, total: count || 0 };
     }
     return formattedData;
+  },
+
+  getFieldReportFilterOptions: async (): Promise<{ users: { id: string, name: string }[], sites: string[] }> => {
+    const { data: reports, error: reportsError } = await supabase
+      .from('field_reports')
+      .select('user_id, site_name');
+    
+    if (reportsError) throw reportsError;
+
+    const uniqueUserIds = Array.from(new Set(reports.map(r => r.user_id)));
+    const uniqueSites = Array.from(new Set(reports.map(r => r.site_name))).sort() as string[];
+
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id, name')
+      .in('id', uniqueUserIds);
+    
+    if (usersError) throw usersError;
+
+    return {
+      users: (users || []).map(toCamelCase).sort((a: any, b: any) => a.name.localeCompare(b.name)),
+      sites: uniqueSites
+    };
   },
 
   getFieldReportById: async (id: string): Promise<FieldReport | null> => {

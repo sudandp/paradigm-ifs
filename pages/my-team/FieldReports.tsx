@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import Button from '../../components/ui/Button';
 import Pagination from '../../components/ui/Pagination';
 import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
 
 // --- PDF Preview Component ---
 const PdfPreviewModal: React.FC<{
@@ -254,6 +255,23 @@ const FieldReports: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
     const [previewReport, setPreviewReport] = useState<(FieldReport & { userName: string }) | null>(null);
+    const [allUsers, setAllUsers] = useState<User[]>([]);
+    const [allSites, setAllSites] = useState<{ id: string, name: string }[]>([]);
+    const [selectedUserId, setSelectedUserId] = useState('all');
+    const [selectedSiteName, setSelectedSiteName] = useState('all');
+
+    useEffect(() => {
+        const loadInitialData = async () => {
+            try {
+                const { users, sites } = await api.getFieldReportFilterOptions();
+                setAllUsers(users);
+                setAllSites(sites.map(s => ({ id: s, name: s })));
+            } catch (err) {
+                console.error("Failed to load filter options:", err);
+            }
+        };
+        loadInitialData();
+    }, []);
 
     useEffect(() => {
         const fetchReports = async () => {
@@ -264,7 +282,9 @@ const FieldReports: React.FC = () => {
                         startDate: new Date(startDate).toISOString(), 
                         endDate: new Date(endDate).toISOString(),
                         page: currentPage,
-                        pageSize
+                        pageSize,
+                        userId: selectedUserId,
+                        siteName: selectedSiteName
                     }),
                     api.getUsers()
                 ]);
@@ -301,7 +321,7 @@ const FieldReports: React.FC = () => {
         };
 
         fetchReports();
-    }, [currentPage, pageSize, startDate, endDate]);
+    }, [currentPage, pageSize, startDate, endDate, selectedUserId, selectedSiteName]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -326,28 +346,68 @@ const FieldReports: React.FC = () => {
                 </div>
             </div>
 
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm flex flex-col md:flex-row gap-4 items-end">
-                <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-2">
-                        <Input 
-                            placeholder="Search by worker name, site or job type..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            icon={<Search className="h-4 w-4" />}
-                        />
+            <div className="bg-card p-5 rounded-xl border border-border shadow-sm space-y-4">
+                <div className="flex flex-col md:flex-row gap-4 items-end">
+                    <div className="flex-grow grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="lg:col-span-2">
+                            <Input 
+                                placeholder="Search by summary or job type..." 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                icon={<Search className="h-4 w-4" />}
+                            />
+                        </div>
+                        <div>
+                            <Select 
+                                value={selectedUserId}
+                                onChange={e => setSelectedUserId(e.target.value)}
+                                icon={<UserIcon className="h-4 w-4" />}
+                            >
+                                <option value="all">All Workers</option>
+                                {allUsers.map(u => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
+                            </Select>
+                        </div>
+                        <div>
+                            <Select 
+                                value={selectedSiteName}
+                                onChange={e => setSelectedSiteName(e.target.value)}
+                                icon={<MapPin className="h-4 w-4" />}
+                            >
+                                <option value="all">All Sites</option>
+                                {allSites.map(s => (
+                                    <option key={s.id} value={s.name}>{s.name}</option>
+                                ))}
+                            </Select>
+                        </div>
                     </div>
-                    <div className="flex gap-2">
-                        <div className="flex-1">
+                    <Button variant="secondary" onClick={() => { 
+                        setSearchTerm(''); 
+                        setStartDate(format(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')); 
+                        setEndDate(format(new Date(), 'yyyy-MM-dd')); 
+                        setSelectedUserId('all');
+                        setSelectedSiteName('all');
+                    }} className="flex-shrink-0">
+                        <FilterX className="h-4 w-4 mr-2" /> Reset
+                    </Button>
+                </div>
+                
+                <div className="flex flex-col md:flex-row items-center gap-4 pt-4 border-t border-border/50">
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                        <Calendar className="h-4 w-4 text-muted" />
+                        <span className="text-xs font-bold text-muted uppercase tracking-wider">Date Range:</span>
+                    </div>
+                    <div className="flex gap-2 w-full md:w-auto">
+                        <div className="w-full md:w-40">
                             <Input label="" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
                         </div>
-                        <div className="flex-1">
+                        <div className="flex items-center text-muted">to</div>
+                        <div className="w-full md:w-40">
                             <Input label="" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
                         </div>
                     </div>
                 </div>
-                <Button variant="secondary" onClick={() => { setSearchTerm(''); setStartDate(format(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')); setEndDate(format(new Date(), 'yyyy-MM-dd')); }}>
-                    <FilterX className="h-4 w-4 mr-2" /> Reset
-                </Button>
             </div>
 
             <div className="grid grid-cols-1 gap-6">
@@ -360,8 +420,7 @@ const FieldReports: React.FC = () => {
                 ) : (
                     reports
                     .filter(r => 
-                        r.userName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                        r.siteName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        r.summary.toLowerCase().includes(searchTerm.toLowerCase()) || 
                         r.jobType.toLowerCase().includes(searchTerm.toLowerCase())
                     )
                     .map(report => {

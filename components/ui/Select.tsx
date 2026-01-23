@@ -6,29 +6,38 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
   registration?: UseFormRegisterReturn;
+  icon?: React.ReactNode;
   children: React.ReactNode;
 }
 
-const Select: React.FC<SelectProps> = ({ label, id, error, registration, children, ...props }) => {
+const Select: React.FC<SelectProps> = ({ label, id, error, registration, icon, children, ...props }) => {
   const generatedId = useId();
   const selectId = id || generatedId;
   const { className, ...otherProps } = props;
   
   const baseClass = 'form-input';
   const errorClass = 'form-input--error';
-  const finalClassName = `${baseClass} ${error ? errorClass : ''} ${className || ''}`;
+  const finalClassName = `${baseClass} ${error ? errorClass : ''} ${icon ? '!pl-10' : ''} ${className || ''}`;
 
   const selectElement = (
-    <select
-      id={selectId}
-      name={props.name || registration?.name || selectId}
-      className={finalClassName}
-      aria-invalid={!!error}
-      {...registration}
-      {...otherProps}
-    >
-      {children}
-    </select>
+    <div className="relative">
+      {icon && (
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none z-10">
+          {icon}
+        </div>
+      )}
+      <select
+        id={selectId}
+        name={props.name || registration?.name || selectId}
+        className={finalClassName}
+        style={icon ? { paddingLeft: '2.5rem' } : undefined}
+        aria-invalid={!!error}
+        {...registration}
+        {...otherProps}
+      >
+        {children}
+      </select>
+    </div>
   );
 
   return (
