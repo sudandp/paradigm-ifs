@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 // Fix: Changed `import type` to inline `import { type ... }` for UseFormRegisterReturn to fix namespace-as-type error.
 import { type UseFormRegisterReturn } from 'react-hook-form';
 
@@ -10,6 +10,8 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 const Input: React.FC<InputProps> = ({ label, id, error, registration, icon, ...props }) => {
+  const generatedId = useId();
+  const inputId = id || generatedId;
   const { className, ...otherProps } = props;
   
   const baseClass = 'form-input';
@@ -24,7 +26,8 @@ const Input: React.FC<InputProps> = ({ label, id, error, registration, icon, ...
         </div>
       )}
       <input
-        id={id}
+        id={inputId}
+        name={props.name || registration?.name || inputId}
         className={finalClassName}
         style={icon ? { paddingLeft: '3.5rem' } : undefined}
         aria-invalid={!!error}
@@ -37,7 +40,7 @@ const Input: React.FC<InputProps> = ({ label, id, error, registration, icon, ...
   return (
     <div>
       {label && (
-        <label htmlFor={id} className="block text-sm font-medium text-muted">
+        <label htmlFor={inputId} className="block text-sm font-medium text-muted">
           {label}
         </label>
       )}

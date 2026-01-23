@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, useId } from 'react';
 import { isAdmin } from '../../utils/auth';
 
 // This component has been extended to support manual date entry for the attendance dashboard, enforce whole
@@ -1108,6 +1108,13 @@ const AttendanceDashboard: React.FC = () => {
         }
     }, [isEmployeeView]);
 
+    const reportTypeId = useId();
+    const employeeId = useId();
+    const statusId = useId();
+    const recordTypeId = useId();
+    const startDateId = useId();
+    const endDateId = useId();
+
     useEffect(() => {
         if (dateRange.startDate && dateRange.endDate) {
             fetchDashboardData(dateRange.startDate, dateRange.endDate);
@@ -1839,6 +1846,8 @@ const AttendanceDashboard: React.FC = () => {
                             <div className="absolute top-full left-0 mt-2 z-10 bg-card border rounded-lg shadow-lg">
                                 <div className="flex items-center gap-2 p-3">
                                     <input
+                                        id={startDateId}
+                                        name="startDate"
                                         type="date"
                                         className="border rounded px-2 py-1 text-sm"
                                         value={format(dateRange.startDate!, 'yyyy-MM-dd')}
@@ -1855,6 +1864,8 @@ const AttendanceDashboard: React.FC = () => {
                                     />
                                     <span className="text-sm">to</span>
                                     <input
+                                        id={endDateId}
+                                        name="endDate"
                                         type="date"
                                         className="border rounded px-2 py-1 text-sm"
                                         value={format(dateRange.endDate!, 'yyyy-MM-dd')}
@@ -1885,8 +1896,10 @@ const AttendanceDashboard: React.FC = () => {
                 {/* Report Type & Employee Selectors Group */}
                 <div className="flex flex-wrap items-center gap-4">
                     <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Report Type</label>
+                        <label htmlFor={reportTypeId} className="block text-xs font-medium text-gray-500 mb-1">Report Type</label>
                         <select
+                            id={reportTypeId}
+                            name="reportType"
                             className="border rounded-md px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-green-500 outline-none"
                             value={reportType}
                             onChange={(e) => setReportType(e.target.value as any)}
@@ -1900,8 +1913,10 @@ const AttendanceDashboard: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Employee</label>
+                        <label htmlFor={employeeId} className="block text-xs font-medium text-gray-500 mb-1">Employee</label>
                         <select
+                            id={employeeId}
+                            name="employee"
                             className="border rounded-md px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-green-500 outline-none max-w-[200px]"
                             value={selectedUser}
                             onChange={(e) => setSelectedUser(e.target.value)}
@@ -1914,8 +1929,10 @@ const AttendanceDashboard: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+                        <label htmlFor={statusId} className="block text-xs font-medium text-gray-500 mb-1">Status</label>
                         <select
+                            id={statusId}
+                            name="status"
                             className="border rounded-md px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-green-500 outline-none max-w-[200px]"
                             value={selectedStatus}
                             onChange={(e) => setSelectedStatus(e.target.value)}
@@ -1936,8 +1953,10 @@ const AttendanceDashboard: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Record Type</label>
+                        <label htmlFor={recordTypeId} className="block text-xs font-medium text-gray-500 mb-1">Record Type</label>
                         <select
+                            id={recordTypeId}
+                            name="recordType"
                             className="border rounded-md px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-green-500 outline-none max-w-[200px]"
                             value={selectedRecordType}
                             onChange={(e) => setSelectedRecordType(e.target.value)}

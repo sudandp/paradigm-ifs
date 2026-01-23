@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useId } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTaskStore } from '../../store/taskStore';
 import { useAuthStore } from '../../store/authStore';
@@ -115,6 +115,10 @@ const TaskManagement: React.FC = () => {
         }
         init();
     }, [user, loadTasks, runAutomaticEscalations]);
+
+    const statusFilterId = useId();
+    const priorityFilterId = useId();
+    const assignedToFilterId = useId();
 
     useEffect(() => {
         setCurrentPage(1);
@@ -249,8 +253,10 @@ const TaskManagement: React.FC = () => {
             <div className="flex flex-col md:flex-row gap-4 mb-6 md:items-end justify-between">
                 <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="space-y-1">
-                        <label className={`text-sm font-medium ${isMobile || isDark ? 'text-gray-300' : 'text-gray-700'}`}>Filter by Status</label>
+                        <label htmlFor={statusFilterId} className={`text-sm font-medium ${isMobile || isDark ? 'text-gray-300' : 'text-gray-700'}`}>Filter by Status</label>
                         <select
+                            id={statusFilterId}
+                            name="statusFilter"
                             className={`w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500 ${isMobile || isDark ? 'bg-[#152b1b] border-white/10 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                             value={statusFilter}
                             onChange={e => setStatusFilter(e.target.value as any)}
@@ -262,8 +268,10 @@ const TaskManagement: React.FC = () => {
                         </select>
                     </div>
                     <div className="space-y-1">
-                        <label className={`text-sm font-medium ${isMobile || isDark ? 'text-gray-300' : 'text-gray-700'}`}>Filter by Priority</label>
+                        <label htmlFor={priorityFilterId} className={`text-sm font-medium ${isMobile || isDark ? 'text-gray-300' : 'text-gray-700'}`}>Filter by Priority</label>
                         <select
+                            id={priorityFilterId}
+                            name="priorityFilter"
                             className={`w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500 ${isMobile || isDark ? 'bg-[#152b1b] border-white/10 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                             value={priorityFilter}
                             onChange={e => setPriorityFilter(e.target.value as any)}
@@ -275,8 +283,10 @@ const TaskManagement: React.FC = () => {
                         </select>
                     </div>
                     <div className="space-y-1">
-                        <label className={`text-sm font-medium ${isMobile || isDark ? 'text-gray-300' : 'text-gray-700'}`}>Filter by Assignee</label>
+                        <label htmlFor={assignedToFilterId} className={`text-sm font-medium ${isMobile || isDark ? 'text-gray-300' : 'text-gray-700'}`}>Filter by Assignee</label>
                         <select
+                            id={assignedToFilterId}
+                            name="assignedToFilter"
                             className={`w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500 ${isMobile || isDark ? 'bg-[#152b1b] border-white/10 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                             value={assignedToFilter}
                             onChange={e => setAssignedToFilter(e.target.value)}

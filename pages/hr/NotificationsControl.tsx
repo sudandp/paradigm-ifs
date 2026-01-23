@@ -333,20 +333,19 @@ const NotificationsControl: React.FC = () => {
                                     <label className="text-sm font-medium text-primary-text">Select Recipients</label>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-3 border border-border rounded-xl bg-page/50">
                                         {users.map(user => (
-                                            <label key={user.id} className="flex items-center gap-2 p-1.5 hover:bg-white rounded-lg cursor-pointer transition-colors">
-                                                <input 
-                                                    type="checkbox" 
-                                                    className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                                                    checked={broadcastData.userIds.includes(user.id)}
-                                                    onChange={(e) => {
-                                                        const userIds = e.target.checked 
-                                                            ? [...broadcastData.userIds, user.id]
-                                                            : broadcastData.userIds.filter(id => id !== user.id);
-                                                        setBroadcastData({ ...broadcastData, userIds });
-                                                    }}
-                                                />
-                                                <span className="text-xs truncate">{user.name}</span>
-                                            </label>
+                                            <Checkbox 
+                                                key={user.id}
+                                                label={user.name}
+                                                className="hover:bg-white rounded-lg transition-colors p-1"
+                                                labelClassName="text-xs truncate"
+                                                checked={broadcastData.userIds.includes(user.id)}
+                                                onChange={(e) => {
+                                                    const userIds = e.target.checked 
+                                                        ? [...broadcastData.userIds, user.id]
+                                                        : broadcastData.userIds.filter(id => id !== user.id);
+                                                    setBroadcastData({ ...broadcastData, userIds });
+                                                }}
+                                            />
                                         ))}
                                     </div>
                                 </div>

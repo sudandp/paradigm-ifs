@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 // Fix: Changed `import type` to inline `import { type ... }` for UseFormRegisterReturn to fix namespace-as-type error.
 import { type UseFormRegisterReturn } from 'react-hook-form';
 
@@ -10,6 +10,8 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 const Select: React.FC<SelectProps> = ({ label, id, error, registration, children, ...props }) => {
+  const generatedId = useId();
+  const selectId = id || generatedId;
   const { className, ...otherProps } = props;
   
   const baseClass = 'form-input';
@@ -18,7 +20,8 @@ const Select: React.FC<SelectProps> = ({ label, id, error, registration, childre
 
   const selectElement = (
     <select
-      id={id}
+      id={selectId}
+      name={props.name || registration?.name || selectId}
       className={finalClassName}
       aria-invalid={!!error}
       {...registration}
@@ -31,7 +34,7 @@ const Select: React.FC<SelectProps> = ({ label, id, error, registration, childre
   return (
     <div>
       {label && (
-        <label htmlFor={id} className="block text-sm font-medium text-muted">
+        <label htmlFor={selectId} className="block text-sm font-medium text-muted">
           {label}
         </label>
       )}
