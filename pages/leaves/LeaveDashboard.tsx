@@ -109,7 +109,7 @@ const LeaveDashboard: React.FC = () => {
                 api.getLeaveRequests({
                     userId: user.id,
                     status: filter === 'all' ? undefined : filter
-                }),
+                }).then(res => res.data),
                 api.getCompOffLogs(user.id).catch(error => {
                     if (error && error.message && (error.message.includes('comp_off_logs') || error.message.includes("relation \"public.comp_off_logs\" does not exist"))) {
                         setIsCompOffHistoryDisabled(true);

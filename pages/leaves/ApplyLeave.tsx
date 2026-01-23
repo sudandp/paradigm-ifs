@@ -91,7 +91,8 @@ const ApplyLeave: React.FC = () => {
             if (!editId || !user) return;
             try {
                 // We need to find the specific request. getLeaveRequests can filter by userId.
-                const userRequests = await api.getLeaveRequests({ userId: user.id });
+                const response = await api.getLeaveRequests({ userId: user.id });
+                const userRequests = response.data || [];
                 const requestToEdit = userRequests.find(r => r.id === editId);
                 
                 if (requestToEdit) {

@@ -104,8 +104,8 @@ const TeamMemberProfile: React.FC = () => {
       const user = await api.getUserById(id!);
       if (user) {
         setMember(user);
-        const leaves = await api.getLeaveRequests({ userId: user.id });
-        setLeaveRequests(leaves);
+        const response = await api.getLeaveRequests({ userId: user.id });
+        setLeaveRequests(response.data || []);
       }
     } catch (err) {
       console.error('Error fetching user details:', err);

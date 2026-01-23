@@ -423,7 +423,7 @@ export const api = {
           .not('latitude', 'is', null)
           .order('timestamp', { ascending: false })
           .limit(1)
-          .single()
+          .maybeSingle()
       )
     );
 
