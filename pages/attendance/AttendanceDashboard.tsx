@@ -66,6 +66,7 @@ import {
     MonthlyReportRow,
     GenericReportColumn
 } from '../../utils/excelExport';
+import LoadingScreen from '../../components/ui/LoadingScreen';
 import {
     Chart,
     BarController,
@@ -388,7 +389,7 @@ const AttendanceLogPdfComponent: React.FC<{ data: AttendanceLogDataRow[]; dateRa
  * - Removed negative marginTop on title to avoid clipping/overlap
  * - Keeps fixed minHeight so each page height is consistent
  */
-const BasicReportPdfLayout: React.FC<{ data: BasicReportDataRow[]; dateRange: Range; generatedBy?: string }> = ({ data, dateRange, generatedBy }) => {
+const BasicReportPdfLayout: React.FC<{ data: BasicReportDataRow[]; dateRange: Range; generatedBy?: string; isPreview?: boolean }> = ({ data, dateRange, generatedBy, isPreview = false }) => {
     const rowsPerPage = 15;
     const pages: BasicReportDataRow[][] = [];
     for (let i = 0; i < data.length; i += rowsPerPage) {
@@ -414,8 +415,8 @@ const BasicReportPdfLayout: React.FC<{ data: BasicReportDataRow[]; dateRange: Ra
                             fontSize: '14px', // Slightly larger for 1123px width
                             color: '#000',
                             backgroundColor: '#fff',
-                            width: '1123px', // A4 Landscape width in px (96dpi)
-                            height: '794px', // A4 Landscape height in px (96dpi)
+                            width: isPreview ? '100%' : '1123px', // A4 Landscape width in px (96dpi)
+                            height: isPreview ? 'auto' : '794px', // A4 Landscape height in px (96dpi)
                             boxSizing: 'border-box',
                             letterSpacing: '0.5px',
                             pageBreakAfter: isLastPage ? 'auto' : 'always',
@@ -748,6 +749,9 @@ const AttendanceDashboard: React.FC = () => {
     const { recurringHolidays } = useSettingsStore();
 
     const [users, setUsers] = useState<User[]>([]);
+    const usersRef = useRef<User[]>([]);
+    useEffect(() => { usersRef.current = users; }, [users]);
+
     const [attendanceEvents, setAttendanceEvents] = useState<AttendanceEvent[]>([]);
     const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
     const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -972,6 +976,8 @@ const AttendanceDashboard: React.FC = () => {
             } catch (error) {
                 console.error("Failed to fetch employee attendance", error);
             } finally {
+                // Minimum 10 second loading time
+                await new Promise(resolve => setTimeout(resolve, 10000));
                 setIsLoading(false);
             }
         };
@@ -980,19 +986,22 @@ const AttendanceDashboard: React.FC = () => {
     }, [isEmployeeView, user, dateRange, recurringHolidays]);
 
     const fetchDashboardData = useCallback(async (startDate: Date, endDate: Date) => {
+        if (isEmployeeView) return;
         setIsLoading(true);
         try {
             // Ensure we have users data
-            let currentUsers = users;
+            let currentUsers = usersRef.current;
             if (currentUsers.length === 0) {
                 currentUsers = await api.getUsers();
                 setUsers(currentUsers);
+                // Update ref immediately for this execution context
+                usersRef.current = currentUsers;
             }
 
             // Filter out management users from attendance tracking and reports
             const activeStaff = currentUsers.filter(u => u.role !== 'management');
 
-            // Determine query range: Union of selected range and Today (to ensure "Today" stats are accurate)
+            // Determine query range
             const today = new Date();
             const queryStart = startDate < today ? startDate : startOfToday();
             const queryEnd = endDate > today ? endDate : endOfToday();
@@ -1012,7 +1021,7 @@ const AttendanceDashboard: React.FC = () => {
             const todayEvents = events.filter(e => format(new Date(e.timestamp), 'yyyy-MM-dd') === todayStr);
             const presentToday = new Set(todayEvents.map(e => e.userId)).size;
 
-            const todayLeaves = leaves.filter(l => {
+            const todayLeaves = leavesData.filter(l => {
                 const start = new Date(l.startDate);
                 const end = new Date(l.endDate);
                 return today >= start && today <= end;
@@ -1039,7 +1048,7 @@ const AttendanceDashboard: React.FC = () => {
                 const uniqueUsersPresent = new Set(dayEvents.map(e => e.userId)).size;
 
                 // On Leave
-                const activeLeaves = leaves.filter(l => {
+                const activeLeaves = leavesData.filter(l => {
                     const start = new Date(l.startDate);
                     const end = new Date(l.endDate);
                     return day >= start && day <= end;
@@ -1047,8 +1056,6 @@ const AttendanceDashboard: React.FC = () => {
                 const usersOnLeave = new Set(activeLeaves.map(l => l.userId)).size;
 
                 // Absent
-                // Note: This simple calculation assumes all users are expected to work every day.
-                // For more accuracy, we would check weekends/holidays, but for the trend chart, this is usually acceptable.
                 const absent = Math.max(0, totalEmployees - uniqueUsersPresent - usersOnLeave);
 
                 presentTrend.push(uniqueUsersPresent);
@@ -1065,16 +1072,11 @@ const AttendanceDashboard: React.FC = () => {
                 Object.values(userEvents).forEach(ue => {
                     ue.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
                     const checkIn = ue.find(e => e.type === 'check-in');
-                    // Use the last check-out of the day
                     const checkOut = [...ue].reverse().find(e => e.type === 'check-out');
 
                     if (checkIn && checkOut) {
                         const diff = differenceInMinutes(new Date(checkOut.timestamp), new Date(checkIn.timestamp));
                         totalHours += diff / 60;
-                    } else if (checkIn) {
-                        // If currently checked in (today), calculate hours until now? 
-                        // Or just ignore incomplete sessions for productivity trend?
-                        // Ignoring incomplete sessions is safer for historical data.
                     }
                 });
 
@@ -1100,9 +1102,11 @@ const AttendanceDashboard: React.FC = () => {
         } catch (error) {
             console.error("Failed to load dashboard data", error);
         } finally {
+            // Minimum 10 second loading time
+            await new Promise(resolve => setTimeout(resolve, 10000));
             setIsLoading(false);
         }
-    }, [users]);
+    }, [isEmployeeView]);
 
     useEffect(() => {
         if (dateRange.startDate && dateRange.endDate) {
@@ -1502,10 +1506,10 @@ const AttendanceDashboard: React.FC = () => {
 
 
     // Determine which PDF component to render
-    const pdfContent = useMemo(() => {
+    const renderReportContent = useCallback((isPreview: boolean = false) => {
         const generatedBy = user?.name || 'Unknown User';
         if (reportType === 'basic') {
-            return <BasicReportPdfLayout data={basicReportData} dateRange={dateRange} generatedBy={generatedBy} />;
+            return <BasicReportPdfLayout data={basicReportData} dateRange={dateRange} generatedBy={generatedBy} isPreview={isPreview} />;
         } else if (reportType === 'log') {
             return <AttendanceLogPdfComponent data={attendanceLogData} dateRange={dateRange} generatedBy={generatedBy} />;
         } else if (reportType === 'monthly') {
@@ -1517,6 +1521,9 @@ const AttendanceDashboard: React.FC = () => {
             }
             return null;
         }, [reportType, basicReportData, attendanceLogData, monthlyReportData, dateRange, auditLogs, user?.name]);
+
+    const pdfContent = useMemo(() => renderReportContent(false), [renderReportContent]);
+    const previewContent = useMemo(() => renderReportContent(true), [renderReportContent]);
 
 
 
@@ -1633,7 +1640,7 @@ const AttendanceDashboard: React.FC = () => {
     };
 
     if (isLoading && !dashboardData && !isEmployeeView) {
-        return <div className="flex justify-center items-center h-96"><Loader2 className="h-8 w-8 animate-spin text-accent" /></div>;
+        return <LoadingScreen message="Fetching attendance data..." />;
     }
 
     if (isEmployeeView) {
@@ -2005,8 +2012,8 @@ const AttendanceDashboard: React.FC = () => {
                         </div>
                     )}
                     <div className="w-full max-w-full overflow-x-auto">
-                        <div className="min-w-[1123px] transform scale-[0.6] sm:scale-[0.7] md:scale-[0.8] lg:scale-100 origin-top">
-                           {pdfContent}
+                        <div className={`origin-top ${reportType === 'basic' ? 'w-full' : 'min-w-[1123px] transform scale-[0.6] sm:scale-[0.7] md:scale-[0.8] lg:scale-100'}`}>
+                           {previewContent}
                         </div>
                     </div>
                 </div>

@@ -10,6 +10,7 @@ import { MapPin, Users as UsersIcon, Pin, Plus, Save, Edit, Trash2, Search } fro
 import { reverseGeocode, getPrecisePosition } from '../../utils/locationUtils';
 import { useAuthStore } from '../../store/authStore';
 import Pagination from '../../components/ui/Pagination';
+import LoadingScreen from '../../components/ui/LoadingScreen';
 
 /**
  * LocationManagement component
@@ -72,6 +73,8 @@ const LocationManagement: React.FC = () => {
         console.error(err);
         setToast({ message: 'Failed to load locations or users.', type: 'error' });
       } finally {
+        // Minimum 10 second loading time
+        await new Promise(resolve => setTimeout(resolve, 10000));
         setIsLoading(false);
       }
     };
@@ -251,6 +254,10 @@ const LocationManagement: React.FC = () => {
     }
   };
 
+  if (isLoading) {
+    return <LoadingScreen message="Loading locations..." />;
+  }
+
   return (
     <div className="p-4 md:p-6 w-full">
       {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
@@ -350,9 +357,7 @@ const LocationManagement: React.FC = () => {
             />
           </div>
 
-          {isLoading ? (
-            <p>Loading...</p>
-          ) : locations.length === 0 ? (
+          {locations.length === 0 ? (
             <p className="text-muted text-center md:text-left">No locations defined yet.</p>
           ) : (() => {
             const filteredLocations = locations.filter(loc => 

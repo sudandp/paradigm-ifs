@@ -13,6 +13,7 @@ import TableSkeleton from '../../components/skeletons/TableSkeleton';
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import RejectClaimModal from '../../components/hr/RejectClaimModal';
 import { isAdmin } from '../../utils/auth';
+import LoadingScreen from '../../components/ui/LoadingScreen';
 
 const StatusChip: React.FC<{ status: LeaveRequestStatus; approverName?: string | null; approvalHistory?: any[] }> = ({ status, approverName, approvalHistory }) => {
     const styles: Record<LeaveRequestStatus, string> = {
@@ -151,6 +152,8 @@ const LeaveManagement: React.FC = () => {
         } catch (error) {
             setToast({ message: 'Failed to load approval data.', type: 'error' });
         } finally {
+            // Minimum 10 second loading time
+            await new Promise(resolve => setTimeout(resolve, 10000));
             setIsLoading(false);
         }
     }, [user, filter, currentPage, pageSize, selectedUserId, selectedDate]);
@@ -294,6 +297,10 @@ const LeaveManagement: React.FC = () => {
 
     const formatTabName = (tab: string) => tab.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
+    if (isLoading) {
+        return <LoadingScreen message="Loading approval data..." />;
+    }
+
     return (
         <div className="p-4 border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
@@ -433,9 +440,7 @@ const LeaveManagement: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border md:bg-card md:divide-y-0">
-                            {isLoading ? (
-                                <tr><td colSpan={6} className="text-center py-10"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></td></tr>
-                            ) : claims.length === 0 ? (
+                            {claims.length === 0 ? (
                                 <tr><td colSpan={6} className="text-center py-10 text-muted">No pending claims found.</td></tr>
                             ) : (
                                 claims.map(claim => (
@@ -472,11 +477,7 @@ const LeaveManagement: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border md:bg-card md:divide-y-0">
-                            {isLoading ? (
-                                isMobile
-                                    ? <tr><td colSpan={6}><TableSkeleton rows={3} cols={6} isMobile /></td></tr>
-                                    : <TableSkeleton rows={5} cols={6} />
-                            ) : requests.length === 0 ? (
+                            {requests.length === 0 ? (
                                 <tr><td colSpan={6} className="text-center py-10 text-muted">No requests found for this filter.</td></tr>
                             ) : (
                                 requests.map(req => (
