@@ -94,7 +94,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         });
 
         return groups.filter(g => g.items.length > 0);
-    }, [notifications, currentPage]);
+    }, [notifications, currentPage, pageSize]);
 
     const totalPages = Math.ceil(notifications.length / pageSize);
 

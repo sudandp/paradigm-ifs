@@ -4,10 +4,12 @@ import Header from './Header';
 import BottomNav from './BottomNav';
 import { NotificationPanel } from '../notifications/NotificationPanel';
 import { useNotificationStore } from '../../store/notificationStore';
+import { useAuthStore } from '../../store/authStore';
 
 const MobileLayout: React.FC = () => {
     const location = useLocation();
-    const { isPanelOpen, setIsPanelOpen } = useNotificationStore();
+    const { fetchNotifications, isPanelOpen, setIsPanelOpen } = useNotificationStore();
+    const { user } = useAuthStore();
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const lastScrollY = useRef(0);
     const ticking = useRef(false);
@@ -37,6 +39,12 @@ const MobileLayout: React.FC = () => {
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
+
+    useEffect(() => {
+        if (user) {
+            fetchNotifications();
+        }
+    }, [user, fetchNotifications]);
 
     return (
         <div className="flex flex-col min-h-screen bg-[#041b0f]">
