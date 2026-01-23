@@ -8,6 +8,9 @@ interface NotificationState {
   unreadCount: number;
   isLoading: boolean;
   error: string | null;
+  isPanelOpen: boolean;
+  setIsPanelOpen: (isOpen: boolean) => void;
+  togglePanel: () => void;
   fetchNotifications: () => Promise<void>;
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
@@ -19,6 +22,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   unreadCount: 0,
   isLoading: false,
   error: null,
+  isPanelOpen: false,
+
+  setIsPanelOpen: (isOpen: boolean) => set({ isPanelOpen: isOpen }),
+  togglePanel: () => set((state) => ({ isPanelOpen: !state.isPanelOpen })),
 
   fetchNotifications: async () => {
     const user = useAuthStore.getState().user;

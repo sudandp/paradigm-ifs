@@ -2,9 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Header from './Header';
 import BottomNav from './BottomNav';
+import { NotificationPanel } from '../notifications/NotificationPanel';
+import { useNotificationStore } from '../../store/notificationStore';
 
 const MobileLayout: React.FC = () => {
     const location = useLocation();
+    const { isPanelOpen, setIsPanelOpen } = useNotificationStore();
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const lastScrollY = useRef(0);
     const ticking = useRef(false);
@@ -59,6 +62,13 @@ const MobileLayout: React.FC = () => {
 
             {/* Bottom Navigation */}
             <BottomNav />
+
+            {/* Notification Panel Overlay */}
+            {isPanelOpen && (
+                <div className="fixed inset-0 z-[100] animate-in slide-in-from-right duration-300">
+                    <NotificationPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} isMobile={true} />
+                </div>
+            )}
         </div>
     );
 };

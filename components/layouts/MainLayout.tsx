@@ -13,6 +13,7 @@ import { useNotificationStore } from '../../store/notificationStore';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { isAdmin } from '../../utils/auth';
 import Header from './Header';
+import { NotificationPanel } from '../notifications/NotificationPanel';
 
 export interface NavLinkConfig {
     to: string;
@@ -150,7 +151,7 @@ const SidebarContent: React.FC<{ isCollapsed: boolean, onLinkClick?: () => void,
 
 const MainLayout: React.FC = () => {
     const { user } = useAuthStore();
-    const { fetchNotifications } = useNotificationStore();
+    const { fetchNotifications, isPanelOpen, setIsPanelOpen } = useNotificationStore();
     const { permissions } = usePermissionsStore();
     const { autoScrollOnHover } = useUiSettingsStore();
     const location = useLocation();
@@ -229,13 +230,20 @@ const MainLayout: React.FC = () => {
         // `p-8 gap-8`, which caused the sidebar and main content to squeeze on narrow viewports. Now we apply
         // progressively larger spacing on wider screens while keeping things compact on mobile. The `min-h-screen`
         // ensures the container grows as needed instead of forcing a fixed height.
-        <div className={`flex min-h-screen ${isMobile ? 'bg-[#041b0f]' : 'bg-page'} ${!isMobile ? 'p-4 md:p-6 lg:p-8 gap-4 md:gap-6 lg:gap-8' : ''}`}>
+        <div className={`flex min-h-screen overflow-hidden ${isMobile ? 'bg-[#041b0f]' : 'bg-page'} ${!isMobile ? 'p-4 md:p-6 lg:p-8 gap-4 md:gap-6 lg:gap-8' : ''}`}>
 
-            {/* Backdrop for mobile when sidebar is expanded */}
             {isMobile && !isSidebarCollapsed && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-20 transition-opacity duration-300"
+                    className="fixed inset-0 bg-black/50 z-[45] transition-opacity duration-300"
                     onClick={() => setIsSidebarCollapsed(true)}
+                />
+            )}
+
+            {/* Backdrop for notifications on mobile */}
+            {isMobile && isPanelOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-[95] transition-opacity duration-300"
+                    onClick={() => setIsPanelOpen(false)}
                 />
             )}
 
@@ -274,6 +282,20 @@ const MainLayout: React.FC = () => {
                 </main>
 
             </div>
+
+            {/* Notification Sidebar - Desktop */}
+            {!isMobile && isPanelOpen && (
+                <aside className="w-[400px] flex-shrink-0 bg-white border-l border-gray-200/60 rounded-3xl overflow-hidden shadow-sm animate-in slide-in-from-right duration-300">
+                    <NotificationPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} isMobile={false} />
+                </aside>
+            )}
+
+            {/* Notification Overlay - Mobile */}
+            {isMobile && isPanelOpen && (
+                <div className="fixed inset-y-0 right-0 w-full z-[100] animate-in slide-in-from-right duration-300">
+                    <NotificationPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} isMobile={true} />
+                </div>
+            )}
             {/* Scroll-to-top/bottom buttons */}
             {showScrollButtons && !isMobile && (
                 <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-2 no-print">

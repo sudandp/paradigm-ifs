@@ -1384,11 +1384,15 @@ export const api = {
     return toCamelCase(data);
   },
 
-  getFieldReports: async (filter?: { startDate?: string, endDate?: string, page?: number, pageSize?: number, userId?: string, siteName?: string }): Promise<any> => {
+  getFieldReports: async (filter?: { startDate?: string, endDate?: string, page?: number, pageSize?: number, userId?: string, siteName?: string, userIds?: string[] }): Promise<any> => {
     let query = supabase.from('field_reports').select('*', { count: 'exact' });
     if (filter?.startDate) query = query.gte('created_at', filter.startDate);
     if (filter?.endDate) query = query.lte('created_at', filter.endDate);
-    if (filter?.userId && filter.userId !== 'all') query = query.eq('user_id', filter.userId);
+    if (filter?.userId && filter.userId !== 'all') {
+      query = query.eq('user_id', filter.userId);
+    } else if (filter?.userIds && filter.userIds.length > 0) {
+      query = query.in('user_id', filter.userIds);
+    }
     if (filter?.siteName && filter.siteName !== 'all') query = query.eq('site_name', filter.siteName);
     
     const isPaginated = filter?.page !== undefined && filter?.pageSize !== undefined;
@@ -1409,10 +1413,12 @@ export const api = {
     return formattedData;
   },
 
-  getFieldReportFilterOptions: async (): Promise<{ users: { id: string, name: string }[], sites: string[] }> => {
-    const { data: reports, error: reportsError } = await supabase
-      .from('field_reports')
-      .select('user_id, site_name');
+  getFieldReportFilterOptions: async (userIds?: string[]): Promise<{ users: { id: string, name: string }[], sites: string[] }> => {
+    let query = supabase.from('field_reports').select('user_id, site_name');
+    if (userIds && userIds.length > 0) {
+      query = query.in('user_id', userIds);
+    }
+    const { data: reports, error: reportsError } = await query;
     
     if (reportsError) throw reportsError;
 

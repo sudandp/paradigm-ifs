@@ -259,11 +259,34 @@ const FieldReports: React.FC = () => {
     const [allSites, setAllSites] = useState<{ id: string, name: string }[]>([]);
     const [selectedUserId, setSelectedUserId] = useState('all');
     const [selectedSiteName, setSelectedSiteName] = useState('all');
+    const [teamMemberIds, setTeamMemberIds] = useState<string[] | undefined>(undefined);
+
+    // Visibility logic: admins and hr see everything. Others (managers) see only their team.
+    const isRestricted = user && !['admin', 'hr'].includes(user.role);
+
+    useEffect(() => {
+        const fetchTeam = async () => {
+            if (isRestricted && user) {
+                try {
+                    const users = await api.getUsers();
+                    const team = users.filter(u => u.reportingManagerId === user.id).map(u => u.id);
+                    // Include self in the team so they can see their own reports too
+                    setTeamMemberIds([...team, user.id]);
+                } catch (err) {
+                    console.error("Failed to fetch team members:", err);
+                }
+            }
+        };
+        fetchTeam();
+    }, [isRestricted, user]);
 
     useEffect(() => {
         const loadInitialData = async () => {
+            // Wait for teamMemberIds to be loaded if restricted
+            if (isRestricted && teamMemberIds === undefined) return;
+
             try {
-                const { users, sites } = await api.getFieldReportFilterOptions();
+                const { users, sites } = await api.getFieldReportFilterOptions(teamMemberIds);
                 setAllUsers(users);
                 setAllSites(sites.map(s => ({ id: s, name: s })));
             } catch (err) {
@@ -271,7 +294,7 @@ const FieldReports: React.FC = () => {
             }
         };
         loadInitialData();
-    }, []);
+    }, [teamMemberIds, isRestricted]);
 
     useEffect(() => {
         const fetchReports = async () => {
@@ -284,7 +307,8 @@ const FieldReports: React.FC = () => {
                         page: currentPage,
                         pageSize,
                         userId: selectedUserId,
-                        siteName: selectedSiteName
+                        siteName: selectedSiteName,
+                        userIds: teamMemberIds
                     }),
                     api.getUsers()
                 ]);
@@ -321,7 +345,7 @@ const FieldReports: React.FC = () => {
         };
 
         fetchReports();
-    }, [currentPage, pageSize, startDate, endDate, selectedUserId, selectedSiteName]);
+    }, [currentPage, pageSize, startDate, endDate, selectedUserId, selectedSiteName, teamMemberIds]);
 
     useEffect(() => {
         setCurrentPage(1);
