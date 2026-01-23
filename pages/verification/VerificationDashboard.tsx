@@ -178,7 +178,7 @@ const VerificationDashboard: React.FC = () => {
                         placeholder="Search by name, ID, site..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="form-input block w-full pl-10 pr-3 py-2 border-border rounded-lg leading-5 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-accent focus:border-accent sm:text-sm"
+                        className="form-input block w-full !pl-10 pr-3 py-2 border-border rounded-lg leading-5 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-accent focus:border-accent sm:text-sm"
                     />
                 </div>
             </div>

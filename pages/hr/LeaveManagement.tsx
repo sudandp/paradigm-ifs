@@ -359,7 +359,7 @@ const LeaveManagement: React.FC = () => {
                             <select 
                                 value={selectedUserId}
                                 onChange={(e) => setSelectedUserId(e.target.value)}
-                                className="w-full pl-10 pr-10 h-11 rounded-xl bg-page border border-border text-primary-text focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all appearance-none text-sm font-medium"
+                                className="w-full !pl-10 pr-10 h-11 rounded-xl bg-page border border-border text-primary-text focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all appearance-none text-sm font-medium"
                             >
                                 <option value="all">All Employees</option>
                                 {allUsers.map(u => (
@@ -380,7 +380,7 @@ const LeaveManagement: React.FC = () => {
                                 type="date"
                                 value={selectedDate}
                                 onChange={(e) => setSelectedDate(e.target.value)}
-                                className="w-full pl-10 pr-4 h-11 rounded-xl bg-page border border-border text-primary-text focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm font-medium"
+                                className="w-full !pl-10 pr-4 h-11 rounded-xl bg-page border border-border text-primary-text focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm font-medium"
                             />
                         </div>
                     </div>

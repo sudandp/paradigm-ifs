@@ -26,14 +26,18 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string> 
     const res = await fetch(url);
     if (!res.ok) return fallback;
     const data = await res.json();
-    if (data.display_name) {
-      return data.display_name as string;
-    }
     if (data.address) {
       const { road, suburb, city, village, town, state, country } = data.address;
-      return [road, suburb, city || village || town, state, country]
+      // Prioritize a concise address: Road, Suburb, and City/Village/Town
+      const shortAddress = [road, suburb, city || village || town]
         .filter(Boolean)
         .join(', ');
+      
+      if (shortAddress) return shortAddress;
+    }
+    
+    if (data.display_name) {
+      return data.display_name as string;
     }
     return fallback;
   } catch (err) {

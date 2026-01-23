@@ -462,82 +462,81 @@ export const useAuthStore = create<AuthState>()(
                 if (typeof accuracy === 'number' && accuracy > 1000) {
                     return await finalizeAttendance(latitude, longitude, null, null);
                 }
-                // --- Geofencing logic ---
+                // --- Location Context & Geofencing ---
                 let locationId: string | null = null;
                 let locationName: string | null = null;
                 let isViolation = false;
 
-                if (settings.enabled) {
-                    try {
-                        // Fetch locations specifically assigned to this user
-                        const userLocations = await api.getUserLocations(user.id);
-                        // Check if the user is within any of their assigned geofences
-                        for (const loc of userLocations) {
+                try {
+                    // Stage 1: Always attempt to match against known locations (sites) first
+                    // to get a friendly name (e.g., "PIFS Bangalore") regardless of geofencing status.
+                    const userLocations = await api.getUserLocations(user.id);
+                    for (const loc of userLocations) {
+                        const dist = calculateDistanceMeters(latitude, longitude, loc.latitude, loc.longitude);
+                        if (dist <= loc.radius) {
+                            locationId = loc.id;
+                            locationName = loc.name;
+                            break;
+                        }
+                    }
+
+                    if (!locationId) {
+                        const allLocations = await api.getLocations();
+                        for (const loc of allLocations) {
                             const dist = calculateDistanceMeters(latitude, longitude, loc.latitude, loc.longitude);
                             if (dist <= loc.radius) {
                                 locationId = loc.id;
-                                locationName = loc.name || loc.address || null;
+                                locationName = loc.name;
+                                // Auto-assign this location to the user
+                                api.assignLocationToUser(user.id, loc.id).catch(() => {});
                                 break;
                             }
                         }
-                        // If not inside any assigned geofence, check global locations
-                        if (!locationId) {
-                            const allLocations = await api.getLocations();
-                            for (const loc of allLocations) {
-                                const dist = calculateDistanceMeters(latitude, longitude, loc.latitude, loc.longitude);
-                                if (dist <= loc.radius) {
-                                    locationId = loc.id;
-                                    locationName = loc.name || loc.address || null;
-                                    // Auto-assign this location to the user
-                                    api.assignLocationToUser(user.id, loc.id).catch(() => {});
-                                    break;
-                                }
-                            }
+                    }
+
+                    // Stage 2: Handle Geofencing enforcement (Violations)
+                    if (settings.enabled && !locationId) {
+                        isViolation = true;
+                        try {
+                            locationName = await reverseGeocode(latitude, longitude);
+                        } catch (err) {
+                            locationName = 'Outside Geofence';
                         }
 
-                        // If still no geofence matched, it's a violation
-                        if (!locationId) {
-                            isViolation = true;
-                            try {
-                                locationName = await reverseGeocode(latitude, longitude);
-                            } catch (err) {
-                                locationName = 'Outside Geofence';
+                        // Log the violation
+                        const now = new Date();
+                        await api.addViolation({
+                            userId: user.id,
+                            violationDate: now.toISOString(),
+                            violationMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+                            attemptedLatitude: latitude,
+                            attemptedLongitude: longitude,
+                            locationName: locationName,
+                        }).catch(err => console.error('Failed to log geofencing violation:', err));
+
+                        // Send violation notification via Dynamic Rules
+                        dispatchNotificationFromRules(
+                            'violation',
+                            {
+                                actorName: user.name || 'An employee',
+                                actionText: newType === 'check-in' ? 'checked in' : 'checked out',
+                                locString: ` outside their assigned geofence at ${locationName}`,
+                                title: '📍 Geofencing Violation',
+                                link: '/hr/field-staff-tracking',
+                                actor: user
                             }
-
-                            // Log the violation
-                            const now = new Date();
-                            await api.addViolation({
-                                userId: user.id,
-                                violationDate: now.toISOString(),
-                                violationMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
-                                attemptedLatitude: latitude,
-                                attemptedLongitude: longitude,
-                                locationName: locationName,
-                            }).catch(err => console.error('Failed to log geofencing violation:', err));
-
-                            // Send violation notification via Dynamic Rules
-                            dispatchNotificationFromRules(
-                                'violation',
-                                {
-                                    actorName: user.name || 'An employee',
-                                    actionText: newType === 'check-in' ? 'checked in' : 'checked out',
-                                    locString: ` outside their assigned geofence at ${locationName}`,
-                                    title: '📍 Geofencing Violation',
-                                    link: '/hr/field-staff-tracking',
-                                    actor: user
-                                }
-                            );
+                        );
+                    } else if (!locationId) {
+                        // Geofencing disabled or no enforcement, and no site match:
+                        // Use reverse geocode but try to keep it concise if possible.
+                        try {
+                            locationName = await reverseGeocode(latitude, longitude);
+                        } catch (err) {
+                            locationName = 'Mobile Check-in';
                         }
-                    } catch (geoErr) {
-                        console.warn('Geofencing check failed:', geoErr);
                     }
-                } else {
-                    // Geofencing disabled: Just reverse geocode for context
-                    try {
-                        locationName = await reverseGeocode(latitude, longitude);
-                    } catch (err) {
-                        locationName = 'Mobile Check-in';
-                    }
+                } catch (geoErr) {
+                    console.warn('Location name resolution failed:', geoErr);
                 }
 
                 const result = await finalizeAttendance(latitude, longitude, locationId, locationName);

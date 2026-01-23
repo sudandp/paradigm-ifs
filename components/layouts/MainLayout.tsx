@@ -29,7 +29,7 @@ export const allNavLinks: NavLinkConfig[] = [
     { to: '/hr/attendance-settings', label: 'Attendance Rules', icon: CalendarCheck2, permission: 'manage_attendance_rules' },
     { to: '/hr/notification-management', label: 'Notifications Control', icon: Bell, permission: 'manage_attendance_rules' },
     { to: '/support', label: 'Backend Support', icon: LifeBuoy, permission: 'access_support_desk' },
-    { to: '/hr/entities', label: 'Client Management', icon: Briefcase, permission: 'view_entity_management' },
+    { to: '/hr/entity-management', label: 'Client Management', icon: Briefcase, permission: 'view_entity_management' },
     { to: '/hr/enrollment-rules', label: 'Enrollment Rules', icon: ClipboardCheck, permission: 'manage_enrollment_rules' },
     { to: '/hr/policies-and-insurance', label: 'Policies & Insurance', icon: ShieldHalf, permission: 'manage_policies' },
     { to: '/billing/summary', label: 'Invoice Summary', icon: FileDigit, permission: 'view_invoice_summary' },

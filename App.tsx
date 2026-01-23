@@ -650,7 +650,7 @@ const App: React.FC = () => {
             <Route path="hr/leave-management/grant-comp-off" element={<GrantCompOffPage />} />
           </Route>
           <Route element={<ProtectedRoute requiredPermission="view_entity_management" />}>
-            <Route path="hr/entities" element={<EntityManagement />} />
+            <Route path="hr/entity-management" element={<EntityManagement />} />
             <Route path="hr/entity-management/add-group" element={<AddGroupPage />} />
           </Route>
           <Route element={<ProtectedRoute requiredPermission="manage_policies" />}>

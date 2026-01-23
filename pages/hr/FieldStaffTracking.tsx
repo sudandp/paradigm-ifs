@@ -10,6 +10,7 @@ import Button from '../../components/ui/Button';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useThemeStore } from '../../store/themeStore';
 import { reverseGeocode } from '../../utils/locationUtils';
+import Pagination from '../../components/ui/Pagination';
 
 // Helper component to resolve GPS coordinates into a text address
 const ResolveAddress: React.FC<{ lat: number, lng: number, fallback?: string | null, knownLocations: Location[] }> = ({ lat, lng, fallback, knownLocations }) => {
@@ -324,6 +325,9 @@ const FieldStaffTracking: React.FC = () => {
     const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [selectedUser, setSelectedUser] = useState<string>('all');
+    
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
 
     const isMobile = useMediaQuery('(max-width: 767px)');
     const fieldStaff = useMemo(() => users.filter(u => u.role === 'field_staff'), [users]);
@@ -371,6 +375,15 @@ const FieldStaffTracking: React.FC = () => {
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     }, [events, users, selectedUser]);
 
+    const paginatedEvents = useMemo(() => {
+        const startIndex = (currentPage - 1) * pageSize;
+        return filteredEvents.slice(startIndex, startIndex + pageSize);
+    }, [filteredEvents, currentPage, pageSize]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedUser, startDate, endDate, pageSize]);
+
     const usersWithActivity = useMemo(() => {
         const activeUserIds = new Set(filteredEvents.map(e => e.userId));
         return users.filter(u => activeUserIds.has(u.id));
@@ -395,10 +408,10 @@ const FieldStaffTracking: React.FC = () => {
         if (isMobile) {
             return (
                 <div className="space-y-3">
-                    {filteredEvents.length === 0 ? (
+                    {paginatedEvents.length === 0 ? (
                         <div className="text-center py-10 text-muted">No events found.</div>
                     ) : (
-                        filteredEvents.map((event) => <MobileActivityCard key={event.id} event={event} knownLocations={knownLocations} />)
+                        paginatedEvents.map((event) => <MobileActivityCard key={event.id} event={event} knownLocations={knownLocations} />)
                     )}
                 </div>
             );
@@ -416,10 +429,10 @@ const FieldStaffTracking: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredEvents.length === 0 ? (
+                        {paginatedEvents.length === 0 ? (
                             <tr><td colSpan={4} className="text-center py-10 text-muted">No events found.</td></tr>
                         ) : (
-                            filteredEvents.map((event) => (
+                            paginatedEvents.map((event) => (
                                 <tr key={event.id}>
                                     <td data-label="User" className="px-6 py-4 font-medium" style={{width: '15%'}}>{event.userName}</td>
                                     <td data-label="Event" className="px-6 py-4 capitalize" style={{width: '12%'}}>{event.type.replace('-', ' ')}</td>
@@ -511,6 +524,17 @@ const FieldStaffTracking: React.FC = () => {
             <div className="mt-6">
                 {renderContent()}
             </div>
+
+            {viewMode === 'list' && !isLoading && filteredEvents.length > 0 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredEvents.length}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                    className="mt-6"
+                />
+            )}
         </div>
     );
 };

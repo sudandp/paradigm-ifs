@@ -303,7 +303,7 @@ const SupportDashboard: React.FC = () => {
                                 <Input
                                     id="search"
                                     placeholder="Search tickets..."
-                                    className="pl-10 bg-gray-50 border-gray-200"
+                                    className="!pl-10 bg-gray-50 border-gray-200"
                                     value={filters.searchTerm}
                                     onChange={e => setFilters(f => ({ ...f, searchTerm: e.target.value }))}
                                 />
