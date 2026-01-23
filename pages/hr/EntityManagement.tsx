@@ -720,7 +720,7 @@ const EntityManagement: React.FC = () => {
                     placeholder="Search across all clients and sites..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="form-input pl-10 w-full"
+                    className="form-input !pl-10 w-full"
                 />
             </div>
 

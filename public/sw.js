@@ -101,5 +101,8 @@ self.addEventListener('fetch', (event) => {
   }
 
   // For all other requests, just fetch from network
+  if (url.origin !== self.location.origin) {
+    return; // Bypass service worker for cross-origin requests (Supabase, etc.)
+  }
   event.respondWith(fetch(request));
 });

@@ -1,15 +1,16 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+declare const Deno: any;
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-serve(async (req) => {
+Deno.serve(async (req: any) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
@@ -17,9 +18,6 @@ serve(async (req) => {
     
     if (!RESEND_API_KEY) {
        console.error("Missing RESEND_API_KEY");
-       // For dev/test without key, we can simulate success to avoid breaking frontend
-       // return new Response(JSON.stringify({ id: 'mock-id', message: 'Simulated success (missing key)' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-       
        return new Response(JSON.stringify({ error: 'Server configuration error: Missing RESEND_API_KEY' }), {
          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
        });
@@ -32,11 +30,11 @@ serve(async (req) => {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'Paradigm FMS <onboarding@resend.dev>', // Use resend.dev for testing, or configured domain
+        from: 'Paradigm FMS <onboarding@resend.dev>',
         to,
         subject,
         html,
-        attachments // Pass existing attachments if any
+        attachments 
       }),
     });
 
@@ -51,8 +49,8 @@ serve(async (req) => {
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error?.message || 'Unknown error' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

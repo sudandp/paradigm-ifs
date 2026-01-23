@@ -14,7 +14,7 @@ const Input: React.FC<InputProps> = ({ label, id, error, registration, icon, ...
   
   const baseClass = 'form-input';
   const errorClass = 'form-input--error';
-  const finalClassName = `${baseClass} ${error ? errorClass : ''} ${icon ? 'pl-16' : ''} ${className || ''}`;
+  const finalClassName = `${baseClass} ${error ? errorClass : ''} ${icon ? '!pl-16' : ''} ${className || ''}`;
   
   const inputElement = (
     <div className="relative">

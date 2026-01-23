@@ -5,6 +5,7 @@ import { createClient, SupabaseClient } from 'supabase';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 /**
@@ -32,6 +33,12 @@ interface BiometricDeviceWithOrg {
 // @ts-ignore: Deno is a global in Supabase Edge Functions
 Deno.serve(async (req: Request) => {
   const { method, url } = req;
+
+  // Handle CORS preflight requests
+  if (method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   const urlObj = new URL(url);
   const path = urlObj.pathname;
   const query = urlObj.searchParams;
