@@ -193,11 +193,11 @@ const NotificationBell: React.FC<{ className?: string }> = ({ className = '' }) 
                                                         <NotificationIcon type={notif.type} />
                                                         
                                                         <div className="flex-1 min-w-0">
-                                                            <p className={`text-[14px] leading-relaxed mb-1.5 md:${
+                                                            <p className={`text-[14px] leading-relaxed mb-1.5 ${
                                                                 !notif.isRead 
-                                                                ? 'text-gray-900 font-semibold' 
-                                                                : 'text-gray-600'
-                                                            } text-white font-medium`}>
+                                                                ? 'text-white md:text-gray-900 font-semibold md:font-semibold' 
+                                                                : 'text-white/80 md:text-gray-600 font-medium md:font-normal'
+                                                            }`}>
                                                                 {notif.message}
                                                             </p>
                                                             <div className="flex items-center gap-3">

@@ -225,8 +225,9 @@ export const api = {
       .from('settings')
       .select('*')
       .eq('id', 'singleton')
-      .single();
+      .maybeSingle();
     if (settingsError) throw new Error('Failed to fetch core application settings.');
+    if (!settingsData) throw new Error('Core application settings are missing from the database.');
 
     const { data: rolesData, error: rolesError } = await supabase.from('roles').select('*');
     if (rolesError) throw new Error('Failed to fetch user roles.');
@@ -766,9 +767,9 @@ export const api = {
       .from('locations')
       .insert(payload)
       .select('*')
-      .single();
+      .maybeSingle();
     if (error) throw error;
-    return toCamelCase(data) as Location;
+    return data ? toCamelCase(data) as Location : null as any;
   },
 
   /**
@@ -800,9 +801,9 @@ export const api = {
       .update(payload)
       .eq('id', id)
       .select('*')
-      .single();
+      .maybeSingle();
     if (error) throw error;
-    return toCamelCase(data) as Location;
+    return data ? toCamelCase(data) as Location : null as any;
   },
 
   /**
@@ -2327,9 +2328,9 @@ export const api = {
       .from('attendance_violations')
       .insert(toSnakeCase(violationData))
       .select()
-      .single();
+      .maybeSingle();
     if (error) throw error;
-    return toCamelCase(data);
+    return data ? toCamelCase(data) : null;
   },
 
   getViolationCount: async (userId: string, month: string): Promise<number> => {
@@ -2418,7 +2419,7 @@ export const api = {
       .from('settings')
       .select('geofencing_verification_enabled, max_violations_per_month')
       .eq('id', 'singleton')
-      .single();
+      .maybeSingle();
     
     if (error) throw error;
     
@@ -2555,9 +2556,9 @@ export const api = {
       .from('field_attendance_violations')
       .insert(toSnakeCase(violationData))
       .select()
-      .single();
+      .maybeSingle();
     if (error) throw error;
-    return toCamelCase(data);
+    return data ? toCamelCase(data) : null;
   },
 
   async acknowledgeFieldViolation(violationId: string, notes: string): Promise<void> {
