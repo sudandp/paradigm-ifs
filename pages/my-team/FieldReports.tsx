@@ -255,7 +255,7 @@ const FieldReports: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
     const [previewReport, setPreviewReport] = useState<(FieldReport & { userName: string }) | null>(null);
-    const [allUsers, setAllUsers] = useState<User[]>([]);
+    const [allUsers, setAllUsers] = useState<{ id: string, name: string }[]>([]);
     const [allSites, setAllSites] = useState<{ id: string, name: string }[]>([]);
     const [selectedUserId, setSelectedUserId] = useState('all');
     const [selectedSiteName, setSelectedSiteName] = useState('all');
