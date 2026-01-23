@@ -210,60 +210,75 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
             
             {/* Footer */}
             {notifications.length > 0 && (
-                <div className={`p-4 border-t space-y-4 ${isMobile ? 'bg-[#0A3D2E] border-white/10' : 'bg-gray-50 border-gray-100'}`}>
-                    <div className="flex flex-col gap-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <span className={`text-[11px] font-medium ${isMobile ? 'text-white/40' : 'text-muted'}`}>Show:</span>
-                                <select
-                                    value={pageSize}
-                                    onChange={(e) => {
-                                        setPageSize(Number(e.target.value));
-                                        setCurrentPage(1);
-                                    }}
-                                    className={`text-xs font-bold rounded-lg px-1 py-0.5 outline-none transition-all ${
-                                        isMobile 
-                                        ? 'bg-white/5 text-white border border-white/10 focus:bg-white/10' 
-                                        : 'bg-white text-gray-700 border border-gray-200 focus:border-accent'
-                                    }`}
-                                >
+                <div className={`p-5 border-t ${isMobile ? 'bg-[#0A3D2E] border-white/10' : 'bg-gray-50 border-gray-100'}`}>
+                    <div className="flex flex-col gap-5">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex flex-col gap-2">
+                                <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-white/30' : 'text-muted/60'}`}>
+                                    Items per page
+                                </span>
+                                <div className="flex items-center gap-1.5">
                                     {[5, 10, 15, 20, 50].map(size => (
-                                        <option key={size} value={size} className="bg-white text-gray-900">{size}</option>
+                                        <button
+                                            key={size}
+                                            onClick={() => {
+                                                setPageSize(size);
+                                                setCurrentPage(1);
+                                            }}
+                                            className={`min-w-[32px] h-8 px-2 rounded-lg text-xs font-bold transition-all duration-300 border ${
+                                                pageSize === size
+                                                ? isMobile 
+                                                    ? 'bg-accent text-[#041b0f] border-accent cursor-default' 
+                                                    : 'bg-accent text-white border-accent cursor-default'
+                                                : isMobile
+                                                    ? 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10 hover:text-white'
+                                                    : 'bg-white text-gray-600 border-gray-200 hover:border-accent hover:text-accent'
+                                            }`}
+                                        >
+                                            {size}
+                                        </button>
                                     ))}
-                                </select>
+                                </div>
                             </div>
 
                             {totalPages > 1 && (
-                                <div className="flex items-center gap-3">
-                                    <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                        disabled={currentPage === 1}
-                                        className={`!p-1.5 ${isMobile ? 'bg-white/10 text-white border-0 hover:bg-white/20' : ''}`}
-                                    >
-                                        <ChevronLeft className="h-3.5 w-3.5" />
-                                    </Button>
-                                    
-                                    <div className={`text-[11px] font-bold ${isMobile ? 'text-white/60' : 'text-gray-600'}`}>
-                                        {currentPage} / {totalPages}
+                                <div className="flex flex-col items-end gap-2 text-right">
+                                    <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-white/30' : 'text-muted/60'}`}>
+                                        Navigation
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                            disabled={currentPage === 1}
+                                            className={`!p-1.5 h-8 w-8 !rounded-lg ${isMobile ? 'bg-white/5 text-white border-white/10 hover:bg-white/10 disabled:opacity-30' : 'bg-white disabled:opacity-50'}`}
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+                                        
+                                        <div className={`text-xs font-bold min-w-[40px] text-center ${isMobile ? 'text-white/80' : 'text-gray-700'}`}>
+                                            {currentPage} <span className="text-muted/50 font-normal mx-0.5">/</span> {totalPages}
+                                        </div>
+                                        
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                            disabled={currentPage === totalPages}
+                                            className={`!p-1.5 h-8 w-8 !rounded-lg ${isMobile ? 'bg-white/5 text-white border-white/10 hover:bg-white/10 disabled:opacity-30' : 'bg-white disabled:opacity-50'}`}
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
                                     </div>
-                                    
-                                    <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                        disabled={currentPage === totalPages}
-                                        className={`!p-1.5 ${isMobile ? 'bg-white/10 text-white border-0 hover:bg-white/20' : ''}`}
-                                    >
-                                        <ChevronRight className="h-3.5 w-3.5" />
-                                    </Button>
                                 </div>
                             )}
                         </div>
                         
-                        <div className="text-center pt-1">
-                            <button className={`text-xs font-bold transition-colors ${isMobile ? 'text-white/60 hover:text-white' : 'text-muted hover:text-primary-text'}`}>
+                        <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-200/50 to-transparent my-1 hidden md:block" />
+                        
+                        <div className="text-center">
+                            <button className={`text-xs font-bold transition-all duration-300 hover:tracking-wide ${isMobile ? 'text-white/40 hover:text-white' : 'text-muted hover:text-primary-text'}`}>
                                 All Notifications
                             </button>
                         </div>
