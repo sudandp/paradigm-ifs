@@ -7,7 +7,7 @@ import Input from '../ui/Input';
 import Toast from '../ui/Toast';
 import { Loader2, Plus, Trash2, Save, Upload, Download, FileText } from 'lucide-react';
 
-const CSV_HEADERS = ['Department', 'Designation', 'PermanentId', 'TemporaryId'];
+const CSV_HEADERS = ['Department', 'Designation', 'Permanent ID', 'Temporary ID'];
 
 const toCSV = (data: BackOfficeIdSeries[]): string => {
     const header = CSV_HEADERS.join(',');
@@ -26,22 +26,38 @@ const fromCSV = (csvText: string): Partial<BackOfficeIdSeries>[] => {
     const lines = csvText.trim().replace(/\r/g, '').split('\n');
     if (lines.length < 2) return [];
     
-    const headers = lines[0].split(',').map(h => h.trim());
-    const requiredHeaders = ['Department', 'Designation', 'PermanentId', 'TemporaryId'];
-    if (!requiredHeaders.every(h => headers.includes(h))) {
-        throw new Error('CSV is missing required headers.');
-    }
+    const rawHeaders = lines[0].split(',').map(h => h.trim());
+    
+    // Normalize headers for flexible mapping
+    const headerMap: Record<string, number> = {};
+    rawHeaders.forEach((h, i) => {
+        const normalized = h.toLowerCase().replace(/\s/g, '');
+        headerMap[normalized] = i;
+    });
 
     return lines.slice(1).map(line => {
         const values = line.split(',');
-        const row: Partial<BackOfficeIdSeries> = {};
-        headers.forEach((header, index) => {
-            if (header === 'Department') row.department = values[index];
-            if (header === 'Designation') row.designation = values[index];
-            if (header === 'PermanentId') row.permanentId = values[index];
-            if (header === 'TemporaryId') row.temporaryId = values[index];
-        });
-        return row;
+        
+        const getVal = (keys: string[]) => {
+            for (const key of keys) {
+                const index = headerMap[key.toLowerCase().replace(/\s/g, '')];
+                if (index !== undefined) {
+                    let val = (values[index] || '').trim();
+                    if (val.startsWith('"') && val.endsWith('"')) {
+                        val = val.substring(1, val.length - 1).replace(/""/g, '"');
+                    }
+                    return val;
+                }
+            }
+            return '';
+        };
+
+        return {
+            department: getVal(['Department']),
+            designation: getVal(['Designation']),
+            permanentId: getVal(['Permanent ID', 'PermanentId']),
+            temporaryId: getVal(['Temporary ID', 'TemporaryId']),
+        };
     });
 };
 

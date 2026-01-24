@@ -2183,46 +2183,69 @@ export const api = {
     if (error) throw error;
   },
   getAllSiteAssets: async (): Promise<Record<string, Asset[]>> => {
-    const { data, error } = await supabase.from('site_assets').select('organization_id, assets');
+    const { data, error } = await supabase.from('site_configurations').select('organization_id, config_data');
     if (error) throw error;
     const result: Record<string, Asset[]> = {};
     data.forEach(item => {
-      result[item.organization_id] = toCamelCase(item.assets);
+      const config = item.config_data as any;
+      result[item.organization_id] = toCamelCase(config?.assets || []);
     });
     return result;
   },
   updateSiteAssets: async (siteId: string, assets: Asset[]): Promise<void> => {
-    const { error } = await supabase.from('site_assets').upsert({
+    // Fetch existing config to avoid overwriting other fields
+    const { data: existing, error: fetchError } = await supabase
+      .from('site_configurations')
+      .select('config_data')
+      .eq('organization_id', siteId)
+      .maybeSingle();
+      
+    if (fetchError) throw fetchError;
+
+    const config = (existing?.config_data as any) || {};
+    const updatedConfig = {
+      ...config,
+      assets: toSnakeCase(assets)
+    };
+
+    const { error: upsertError } = await supabase.from('site_configurations').upsert({
       organization_id: siteId,
-      assets: toSnakeCase(assets),
-      updated_at: new Date().toISOString()
+      config_data: updatedConfig
     }, { onConflict: 'organization_id' });
-    if (error) throw error;
+    
+    if (upsertError) throw upsertError;
   },
   getBackOfficeIdSeries: async (): Promise<BackOfficeIdSeries[]> => {
-    const { data, error } = await supabase.from('back_office_id_series').select('*');
+    const { data, error } = await supabase.from('settings').select('back_office_id_series').eq('id', 'singleton').single();
     if (error) throw error;
-    return (data || []).map(toCamelCase);
+    return (data?.back_office_id_series || []).map(toCamelCase);
   },
   updateBackOfficeIdSeries: async (series: BackOfficeIdSeries[]): Promise<void> => {
-    const { error } = await supabase.from('back_office_id_series').upsert(toSnakeCase(series), { onConflict: 'id' });
+    const { error } = await supabase.from('settings').upsert({
+      id: 'singleton',
+      back_office_id_series: toSnakeCase(series)
+    }, { onConflict: 'id' });
     if (error) throw error;
   },
   getSiteStaffDesignations: async (): Promise<SiteStaffDesignation[]> => {
-    const { data, error } = await supabase.from('site_staff_designations').select('*');
+    const { data, error } = await supabase.from('settings').select('site_staff_designations').eq('id', 'singleton').single();
     if (error) throw error;
-    return (data || []).map(toCamelCase);
+    return (data?.site_staff_designations || []).map(toCamelCase);
   },
   updateSiteStaffDesignations: async (designations: SiteStaffDesignation[]): Promise<void> => {
-    const { error } = await supabase.from('site_staff_designations').upsert(toSnakeCase(designations), { onConflict: 'id' });
+    const { error } = await supabase.from('settings').upsert({
+      id: 'singleton',
+      site_staff_designations: toSnakeCase(designations)
+    }, { onConflict: 'id' });
     if (error) throw error;
   },
   getAllSiteIssuedTools: async (): Promise<Record<string, IssuedTool[]>> => {
-    const { data, error } = await supabase.from('site_issued_tools').select('organization_id, tools');
+    const { data, error } = await supabase.from('site_configurations').select('organization_id, config_data');
     if (error) throw error;
     const result: Record<string, IssuedTool[]> = {};
     data.forEach(item => {
-      result[item.organization_id] = toCamelCase(item.tools);
+      const config = item.config_data as any;
+      result[item.organization_id] = toCamelCase(config?.issuedTools || []);
     });
     return result;
   },
@@ -2232,12 +2255,27 @@ export const api = {
     return toCamelCase(data.master_tools);
   },
   updateSiteIssuedTools: async (siteId: string, tools: IssuedTool[]): Promise<void> => {
-    const { error } = await supabase.from('site_issued_tools').upsert({
+    // Fetch existing config to avoid overwriting other fields
+    const { data: existing, error: fetchError } = await supabase
+      .from('site_configurations')
+      .select('config_data')
+      .eq('organization_id', siteId)
+      .maybeSingle();
+      
+    if (fetchError) throw fetchError;
+
+    const config = (existing?.config_data as any) || {};
+    const updatedConfig = {
+      ...config,
+      issuedTools: toSnakeCase(tools)
+    };
+
+    const { error: upsertError } = await supabase.from('site_configurations').upsert({
       organization_id: siteId,
-      tools: toSnakeCase(tools),
-      updated_at: new Date().toISOString()
+      config_data: updatedConfig
     }, { onConflict: 'organization_id' });
-    if (error) throw error;
+    
+    if (upsertError) throw upsertError;
   },
   getAllSiteGentsUniforms: async (): Promise<Record<string, SiteGentsUniformConfig>> => {
     const { data, error } = await supabase.from('site_gents_uniform_configs').select('organization_id, config_data');

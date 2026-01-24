@@ -7,7 +7,7 @@ import Input from '../ui/Input';
 import Toast from '../ui/Toast';
 import { Loader2, Plus, Trash2, Save, Upload, Download, FileText } from 'lucide-react';
 
-const CSV_HEADERS = ['Department', 'Designation', 'PermanentId', 'TemporaryId', 'MonthlySalary'];
+const CSV_HEADERS = ['Department', 'Designation', 'Permanent ID', 'Temporary ID', 'Monthly Salary'];
 
 const toCSV = (data: SiteStaffDesignation[]): string => {
     const header = CSV_HEADERS.join(',');
@@ -28,30 +28,41 @@ const fromCSV = (csvText: string): Partial<SiteStaffDesignation>[] => {
     const lines = csvText.trim().replace(/\r/g, '').split('\n');
     if (lines.length < 2) return [];
     
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-    if (!CSV_HEADERS.every(h => headers.includes(h))) {
-        throw new Error(`CSV is missing required headers: ${CSV_HEADERS.join(', ')}`);
-    }
+    const rawHeaders = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    
+    // Normalize headers for flexible mapping
+    const headerMap: Record<string, number> = {};
+    rawHeaders.forEach((h, i) => {
+        const normalized = h.toLowerCase().replace(/\s/g, '');
+        headerMap[normalized] = i;
+    });
 
     const rows: Partial<SiteStaffDesignation>[] = [];
     for (let i = 1; i < lines.length; i++) {
-        const row: Record<string, string> = {};
         const values = lines[i].match(/(?<=,|^)(?:"(?:[^"]|"")*"|[^,]*)/g) || [];
         
-        headers.forEach((header, index) => {
-            let value = (values[index] || '').trim();
-            if (value.startsWith('"') && value.endsWith('"')) {
-                value = value.substring(1, value.length - 1).replace(/""/g, '""');
+        const getVal = (keys: string[]) => {
+            for (const key of keys) {
+                const index = headerMap[key.toLowerCase().replace(/\s/g, '')];
+                if (index !== undefined) {
+                    let val = (values[index] || '').trim();
+                    if (val.startsWith('"') && val.endsWith('"')) {
+                        val = val.substring(1, val.length - 1).replace(/""/g, '"');
+                    }
+                    return val;
+                }
             }
-            row[header] = value;
-        });
-        
-        const salary = parseFloat(row.MonthlySalary);
+            return '';
+        };
+
+        const salaryStr = getVal(['Monthly Salary', 'MonthlySalary']);
+        const salary = parseFloat(salaryStr);
+
         rows.push({
-            department: row.Department,
-            designation: row.Designation,
-            permanentId: row.PermanentId,
-            temporaryId: row.TemporaryId,
+            department: getVal(['Department']),
+            designation: getVal(['Designation']),
+            permanentId: getVal(['Permanent ID', 'PermanentId']),
+            temporaryId: getVal(['Temporary ID', 'TemporaryId']),
             monthlySalary: isNaN(salary) ? null : salary,
         });
     }

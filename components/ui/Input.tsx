@@ -10,7 +10,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   autoCapitalizeCustom?: boolean;
 }
 
-const Input: React.FC<InputProps> = ({ label, id, error, registration, icon, autoCapitalizeCustom = true, ...props }) => {
+const Input = React.forwardRef<HTMLInputElement, InputProps>(({ label, id, error, registration, icon, autoCapitalizeCustom = true, ...props }, ref) => {
   const generatedId = useId();
   const inputId = id || generatedId;
   const { className, ...otherProps } = props;
@@ -27,6 +27,7 @@ const Input: React.FC<InputProps> = ({ label, id, error, registration, icon, aut
         </div>
       )}
       <input
+        ref={ref}
         id={inputId}
         name={props.name || registration?.name || inputId}
         className={finalClassName}
@@ -71,6 +72,8 @@ const Input: React.FC<InputProps> = ({ label, id, error, registration, icon, aut
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
   );
-};
+});
+
+Input.displayName = 'Input';
 
 export default Input;
