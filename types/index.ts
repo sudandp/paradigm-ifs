@@ -1251,6 +1251,10 @@ export interface GeminiApiSettings {
   enabled: boolean;
 }
 
+export interface OfflineOcrSettings {
+  enabled: boolean;
+}
+
 export interface VerificationResult {
   success: boolean;
   message: string;

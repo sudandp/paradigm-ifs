@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { AddressSettings, AttendanceSettings, Holiday, GmcPolicySettings, PerfiosApiSettings, GeminiApiSettings, OtpSettings, ApiSettings, NotificationSettings, VerificationCosts, VerificationCostSetting, SiteManagementSettings, StaffAttendanceRules, RecurringHolidayRule } from '../types';
+import type { AddressSettings, AttendanceSettings, Holiday, GmcPolicySettings, PerfiosApiSettings, GeminiApiSettings, OfflineOcrSettings, OtpSettings, ApiSettings, NotificationSettings, VerificationCosts, VerificationCostSetting, SiteManagementSettings, StaffAttendanceRules, RecurringHolidayRule } from '../types';
 import { api } from '../services/api';
 
 interface SettingsState {
@@ -22,6 +22,7 @@ interface SettingsState {
   verificationCosts: VerificationCosts;
   siteManagement: SiteManagementSettings;
   apiSettings: ApiSettings;
+  offlineOcr: OfflineOcrSettings;
   recurringHolidays: RecurringHolidayRule[];
   initSettings: (data: { 
     holidays: Holiday[], 
@@ -30,6 +31,7 @@ interface SettingsState {
     apiSettings?: ApiSettings,
     addressSettings?: AddressSettings,
     geminiApiSettings?: GeminiApiSettings,
+    offlineOcrSettings?: OfflineOcrSettings,
     perfiosApiSettings?: PerfiosApiSettings,
     otpSettings?: OtpSettings,
     siteManagementSettings?: SiteManagementSettings,
@@ -45,6 +47,7 @@ interface SettingsState {
   updateVerificationCosts: (costs: VerificationCosts) => void;
   updateSiteManagementSettings: (settings: Partial<SiteManagementSettings>) => void;
   updateApiSettings: (settings: Partial<ApiSettings>) => void;
+  updateOfflineOcrSettings: (settings: Partial<OfflineOcrSettings>) => void;
   addHoliday: (type: 'office' | 'field' | 'site', holiday: Omit<Holiday, 'id' | 'type'>) => Promise<void>;
   removeHoliday: (type: 'office' | 'field' | 'site', id: string) => Promise<void>;
   addRecurringHoliday: (rule: RecurringHolidayRule) => Promise<void>;
@@ -156,6 +159,10 @@ const initialOtp: OtpSettings = {
   enabled: true,
 };
 
+const initialOfflineOcr: OfflineOcrSettings = {
+  enabled: false,
+};
+
 const initialApiSettings: ApiSettings = {
   autoBackupEnabled: false,
   backupSchedule: {
@@ -213,11 +220,12 @@ export const useSettingsStore = create<SettingsState>()(
       verificationCosts: initialVerificationCosts,
       siteManagement: initialSiteManagement,
       apiSettings: initialApiSettings,
+      offlineOcr: initialOfflineOcr,
       initSettings: (data) => {
         if (data) {
           const { 
             holidays, attendanceSettings, recurringHolidays, apiSettings,
-            addressSettings, geminiApiSettings, perfiosApiSettings,
+            addressSettings, geminiApiSettings, offlineOcrSettings, perfiosApiSettings,
             otpSettings, siteManagementSettings, notificationSettings
           } = data;
           const office = holidays.filter(h => h.type === 'office');
@@ -232,6 +240,7 @@ export const useSettingsStore = create<SettingsState>()(
             apiSettings: apiSettings || initialApiSettings,
             address: addressSettings || initialAddress,
             geminiApi: geminiApiSettings || initialGeminiApi,
+            offlineOcr: offlineOcrSettings || initialOfflineOcr,
             perfiosApi: perfiosApiSettings || initialPerfiosApi,
             otp: otpSettings || initialOtp,
             siteManagement: siteManagementSettings || initialSiteManagement,
@@ -268,6 +277,9 @@ export const useSettingsStore = create<SettingsState>()(
       })),
       updateApiSettings: (settings) => set((state) => ({
         apiSettings: { ...state.apiSettings, ...settings }
+      })),
+      updateOfflineOcrSettings: (settings) => set((state) => ({
+        offlineOcr: { ...state.offlineOcr, ...settings }
       })),
       addHoliday: async (type, holiday) => {
         const newHoliday = await api.addHoliday({ ...holiday, type });

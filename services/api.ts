@@ -16,6 +16,7 @@ import { differenceInCalendarDays, format, startOfMonth, endOfMonth, startOfDay,
 import { dispatchNotificationFromRules } from './notificationService';
 import { calculateSiteTravelTime, validateFieldStaffAttendance } from '../utils/fieldStaffTracking';
 import { GoogleGenAI, Type, Modality } from '@google/genai';
+import { createWorker } from 'tesseract.js';
 
 const ONBOARDING_DOCS_BUCKET = 'onboarding-documents';
 const AVATAR_BUCKET = 'avatars';
@@ -1091,6 +1092,12 @@ export const api = {
       .upsert({ id: 'singleton', gemini_api_settings: toSnakeCase(settings) }, { onConflict: 'id' });
     if (error) throw error;
   },
+  saveOfflineOcrSettings: async (settings: any): Promise<void> => {
+    const { error } = await supabase
+      .from('settings')
+      .upsert({ id: 'singleton', offline_ocr_settings: toSnakeCase(settings) }, { onConflict: 'id' });
+    if (error) throw error;
+  },
   savePerfiosApiSettings: async (settings: any): Promise<void> => {
     const { error } = await supabase
       .from('settings')
@@ -2101,6 +2108,34 @@ export const api = {
     });
     const jsonStr = response.text.trim();
     return JSON.parse(jsonStr);
+  },
+  extractDataFromImageLocal: async (base64: string, docType?: string): Promise<any> => {
+    const worker = await createWorker('eng');
+    try {
+        const { data: { text } } = await worker.recognize(`data:image/png;base64,${base64}`);
+        const result: any = {};
+        const normalizedText = text.replace(/\n/g, ' ');
+
+        if (docType === 'PAN') {
+            const panMatch = normalizedText.match(/[A-Z]{5}[0-9]{4}[A-Z]{1}/);
+            if (panMatch) result.panNumber = panMatch[0];
+            // Name extraction is very hard with raw OCR without keys
+        } else if (docType === 'Aadhaar') {
+            const aadhaarMatch = normalizedText.match(/\d{4}\s\d{4}\s\d{4}/);
+            if (aadhaarMatch) result.aadhaarNumber = aadhaarMatch[0].replace(/\s/g, '');
+        } else if (docType === 'Bank' || docType === 'Cheque') {
+            const ifscMatch = normalizedText.match(/[A-Z]{4}0[A-Z0-9]{6}/);
+            if (ifscMatch) result.ifscCode = ifscMatch[0];
+            const acMatch = normalizedText.match(/\d{9,18}/);
+            if (acMatch) result.accountNumber = acMatch[0];
+        } else if (docType === 'Salary' || docType === 'UAN') {
+            const uanMatch = normalizedText.match(/\d{12}/);
+            if (uanMatch) result.uanNumber = uanMatch[0];
+        }
+        return result;
+    } finally {
+        await worker.terminate();
+    }
   },
   crossVerifyNames: async (name1: string, name2: string): Promise<{ isMatch: boolean; reason: string }> => {
     // Without the AI client fall back to a simple case-insensitive

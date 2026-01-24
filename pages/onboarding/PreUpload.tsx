@@ -109,6 +109,7 @@ const formatNameToTitleCase = (value: string | undefined) => {
 const PreUpload = () => {
     const navigate = useNavigate();
     const store = useOnboardingStore();
+    const settingsStore = useSettingsStore();
     const { user } = useAuthStore();
     const { rulesByDesignation } = useEnrollmentRulesStore();
 
@@ -148,7 +149,10 @@ const PreUpload = () => {
         store.setRequiresManualVerification(isOverridden);
 
         try {
-            // Schemas
+            const useGemini = settingsStore.geminiApi.enabled;
+            const useOffline = settingsStore.offlineOcr.enabled;
+
+            // Schemas for Gemini
             const idFrontSchema = { type: Type.OBJECT, properties: { name: { type: Type.STRING, description: "The person's full name as written on the card." }, dob: { type: Type.STRING, description: "The person's date of birth in YYYY-MM-DD format. If only year available, return YYYY-01-01." }, gender: { type: Type.STRING, description: "Gender: 'Male', 'Female', or 'Other'." }, aadhaarNumber: { type: Type.STRING, description: "The 12-digit Aadhaar number, if present." }, panNumber: { type: Type.STRING, description: "The 10-character PAN number, if present." }, voterIdNumber: { type: Type.STRING, description: "The Voter ID number, also known as EPIC number." } } };
             const addressSchema = { type: Type.OBJECT, properties: { address: { type: Type.OBJECT, description: "The full address on the back of an Aadhaar card, parsed into components.", properties: { line1: { type: Type.STRING, description: "Full address line(s) excluding city, state, pincode. e.g., 'S/O: John Doe, 123 Maple Street, Anytown'" }, city: { type: Type.STRING }, state: { type: Type.STRING }, pincode: { type: Type.STRING } } } } };
             const bankProofSchema = { type: Type.OBJECT, properties: { accountHolderName: { type: Type.STRING, description: "The account holder's full name." }, accountNumber: { type: Type.STRING, description: "The full bank account number." }, ifscCode: { type: Type.STRING, description: "The bank's IFSC code." }, bankName: { type: Type.STRING, description: "The name of the bank (e.g., 'State Bank of India')." }, branchName: { type: Type.STRING, description: "The name of the bank branch (e.g., 'Koramangala Branch')." } } };
@@ -171,16 +175,27 @@ const PreUpload = () => {
             const familyFilesData = otherFilesData.slice(0, formData.family.length);
             const educationFilesData = otherFilesData.slice(formData.family.length);
 
-            // OCR Calls
-            const idFrontOcrPromise = idFrontFileData ? api.extractDataFromImage(idFrontFileData.base64, idFrontFileData.type, idFrontSchema, formData.idProofType as 'Aadhaar' | 'PAN' | 'Voter ID') : Promise.resolve({});
-            const idBackOcrPromise = (idBackFileData && formData.idProofType === 'Aadhaar') ? api.extractDataFromImage(idBackFileData.base64, idBackFileData.type, addressSchema, 'Aadhaar') : Promise.resolve({});
-            const bankOcrPromise = bankFileData ? api.extractDataFromImage(bankFileData.base64, bankFileData.type, bankProofSchema, 'Bank') : Promise.resolve({});
-            const salaryOcrPromise = salaryFileData ? api.extractDataFromImage(salaryFileData.base64, salaryFileData.type, salarySlipSchema, 'Salary') : Promise.resolve(null);
-            const uanOcrPromise = uanFileData ? api.extractDataFromImage(uanFileData.base64, uanFileData.type, uanProofSchema, 'UAN') : Promise.resolve(null);
-            const familyOcrPromises = familyFilesData.map(fData => fData ? api.extractDataFromImage(fData.base64, fData.type, familyAadhaarSchema, 'Aadhaar') : Promise.resolve({}));
-            const educationOcrPromises = educationFilesData.map(eData => eData ? api.extractDataFromImage(eData.base64, eData.type, educationSchema) : Promise.resolve({}));
+            // OCR Extraction Logic
+            const extract = async (fileData: { base64: string, type: string } | null, schema: any, docType: string) => {
+                if (!fileData) return {};
+                if (useGemini) {
+                    return api.extractDataFromImage(fileData.base64, fileData.type, schema, docType);
+                } else if (useOffline) {
+                    return api.extractDataFromImageLocal(fileData.base64, docType);
+                }
+                return {};
+            };
 
-            const [idFrontData, idBackData, bankData, salaryData, uanData, ...ocrResults] = await Promise.all([idFrontOcrPromise, idBackOcrPromise, bankOcrPromise, salaryOcrPromise, uanOcrPromise, ...familyOcrPromises, ...educationOcrPromises]);
+            const [idFrontData, idBackData, bankData, salaryData, uanData, ...ocrResults] = await Promise.all([
+                extract(idFrontFileData, idFrontSchema, formData.idProofType as string),
+                (formData.idProofType === 'Aadhaar') ? extract(idBackFileData, addressSchema, 'Aadhaar') : Promise.resolve({}),
+                extract(bankFileData, bankProofSchema, 'Bank'),
+                extract(salaryFileData, salarySlipSchema, 'Salary'),
+                extract(uanFileData, uanProofSchema, 'UAN'),
+                ...familyFilesData.map(fData => extract(fData, familyAadhaarSchema, 'Aadhaar')),
+                ...educationFilesData.map(eData => extract(eData, educationSchema, 'Education'))
+            ]);
+
             const familyOcrData = ocrResults.slice(0, familyFilesData.length);
             const educationOcrData = ocrResults.slice(familyFilesData.length);
             const idData = { ...idFrontData, ...idBackData };

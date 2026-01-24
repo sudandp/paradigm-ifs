@@ -457,7 +457,14 @@ CREATE TABLE IF NOT EXISTS public.settings (  attendance_settings JSONB,
   verification_costs JSONB,
   enrollment_rules JSONB,
   api_settings JSONB,
-  gmc_policy JSONB
+  gmc_policy JSONB,
+  address_settings JSONB,
+  gemini_api_settings JSONB,
+  offline_ocr_settings JSONB,
+  perfios_api_settings JSONB,
+  otp_settings JSONB,
+  site_management_settings JSONB,
+  notification_settings JSONB
 );
 
 CREATE TABLE IF NOT EXISTS public.site_configurations (  config_data JSONB,

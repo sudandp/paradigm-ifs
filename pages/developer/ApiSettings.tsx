@@ -80,6 +80,7 @@ export const ApiSettings: React.FC = () => {
                                 setIsExporting(true);
                                 await api.saveApiSettings(store.apiSettings);
                                 await api.saveGeminiApiSettings(store.geminiApi);
+                                await api.saveOfflineOcrSettings(store.offlineOcr);
                                 await api.savePerfiosApiSettings(store.perfiosApi);
                                 await api.saveOtpSettings(store.otp);
                                 await api.saveSiteManagementSettings(store.siteManagement);
@@ -122,6 +123,16 @@ export const ApiSettings: React.FC = () => {
                                     description="Use Google's Gemini API for document data extraction. This is a powerful fallback or primary OCR. API key must be configured on the backend."
                                     checked={store.geminiApi.enabled}
                                     onChange={e => store.updateGeminiApiSettings({ enabled: e.target.checked })}
+                                />
+                            </div>
+                            {/* Offline OCR (Tesseract.js) */}
+                            <div className="p-4 border border-border rounded-lg api-setting-item-bg">
+                                <Checkbox
+                                    id="offline-ocr-enabled"
+                                    label="Enable Offline OCR (Tesseract.js)"
+                                    description="Use browser-side Tesseract.js for document data extraction. Works offline and requires no API key, but may be less accurate for complex layouts."
+                                    checked={store.offlineOcr.enabled}
+                                    onChange={e => store.updateOfflineOcrSettings({ enabled: e.target.checked })}
                                 />
                             </div>
                             {/* Perfios API */}
