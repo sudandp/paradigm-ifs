@@ -122,9 +122,19 @@ const SelectOrganization = () => {
 
     const handleContinue = () => {
         const selectedEntity = entities.find(e => e.id === selectedEntityId);
-        if (selectedEntity?.organizationId) {
-            const organization = organizations.find(o => o.id === selectedEntity.organizationId);
+        if (selectedEntity) {
+            let organization = organizations.find(o => o.id === (selectedEntity.organizationId || selectedEntity.id));
             const designationDetails = siteStaffDesignations.find(d => d.designation === selectedDesignation);
+
+            // Fallback: If organization record is not yet in the master list, create a virtual one
+            if (!organization && (selectedEntity.organizationId || selectedEntity.id)) {
+                organization = {
+                    id: selectedEntity.organizationId || selectedEntity.id,
+                    shortName: selectedEntity.name,
+                    fullName: selectedEntity.name,
+                    address: selectedEntity.registeredAddress || ''
+                } as Organization;
+            }
 
             if (organization && designationDetails) {
                 updateOrganization({
@@ -141,7 +151,13 @@ const SelectOrganization = () => {
                 });
                 navigate('/onboarding/pre-upload');
             } else {
-                console.error("Organization or Designation details not found.");
+                console.error("Critical onboarding data missing:", { 
+                    siteFound: !!selectedEntity, 
+                    orgFound: !!organization, 
+                    designationFound: !!designationDetails,
+                    selectedSite: selectedEntity?.name,
+                    selectedDesignation: selectedDesignation
+                });
             }
         }
     };

@@ -654,6 +654,21 @@ export const api = {
     const entityData = entities.map(e => toSnakeCase(e));
     const { error: entityError } = await supabase.from('entities').upsert(entityData);
     if (entityError) throw entityError;
+
+    // 4. Ensure matching entries in 'organizations' table for onboarding metadata
+    // We only need to create them if they don't exist yet. This prevents errors in SelectOrganization.tsx.
+    const orgData = entities.map(e => ({
+        id: e.organizationId || e.id,
+        short_name: e.name,
+        full_name: e.name,
+        address: e.registeredAddress || '',
+        updated_at: new Date().toISOString()
+    }));
+
+    // Perform a bulk upsert on organizations. 
+    // This will create new records or update existing basic info without overwriting manually managed manpower limits.
+    const { error: orgError } = await supabase.from('organizations').upsert(orgData, { onConflict: 'id' });
+    if (orgError) throw orgError;
   },
   createOrganizationGroup: async (group: Partial<OrganizationGroup>): Promise<OrganizationGroup> => {
     const { data, error } = await supabase.from('organization_groups').insert(toSnakeCase(group)).select().single();
