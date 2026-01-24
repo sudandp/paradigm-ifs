@@ -442,6 +442,7 @@ export interface Company {
   id: string;
   name: string;
   entities: Entity[];
+  groupId?: string;
 }
 
 export interface OrganizationGroup {

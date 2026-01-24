@@ -12,49 +12,12 @@ import type { RealtimeChannel, Subscription } from '@supabase/supabase-js';
 import { api } from '../services/api';
 import { withTimeout } from '../utils/async';
 import { format } from 'date-fns';
-// Utilities for geofencing
 import { calculateDistanceMeters, reverseGeocode, getPrecisePosition } from '../utils/locationUtils';
+import { dispatchNotificationFromRules } from '../services/notificationService';
 
 // Centralized friendly error message handler for Supabase
 // Centralized friendly error message handler for Supabase
-// Helper to dispatch notifications based on dynamic rules
-const dispatchNotificationFromRules = async (eventType: string, data: { actorName: string; actionText: string; locString: string; title?: string; link?: string; actor: any }) => {
-    try {
-        const rules = await api.getNotificationRules();
-        const activeRules = rules.filter(r => r.eventType === eventType && r.isEnabled);
-        
-        const recipients: Set<string> = new Set();
-        
-        for (const rule of activeRules) {
-            if (rule.recipientUserId) {
-                recipients.add(rule.recipientUserId);
-            } else if (rule.recipientRole) {
-                if (rule.recipientRole === 'direct_manager') {
-                    if (data.actor.reportingManagerId) recipients.add(data.actor.reportingManagerId);
-                } else {
-                    // Fetch users with this role
-                    const { data: users, error } = await supabase.from('users').select('id').eq('role', rule.recipientRole);
-                    if (!error && users) {
-                        users.forEach(u => recipients.add(u.id));
-                    }
-                }
-            }
-        }
-
-        if (recipients.size > 0) {
-            const message = `${data.actorName} ${data.actionText}${data.locString}`;
-            await Promise.all(Array.from(recipients).map(userId => api.createNotification({
-                userId,
-                message,
-                title: data.title || 'Attendance Update',
-                type: eventType === 'violation' ? 'security' : 'greeting',
-                link: data.link
-            })));
-        }
-    } catch (err) {
-        console.warn(`Failed to dispatch notifications for ${eventType}:`, err);
-    }
-};
+// Centralized friendly error message handler for Supabase
 
 const getFriendlyAuthError = (errorMessage: string): string => {
     const msg = errorMessage.toLowerCase();
@@ -89,6 +52,16 @@ const getFriendlyAuthError = (errorMessage: string): string => {
     return 'Something went wrong. Please try again or contact support.';
 };
 
+const getActionTextForType = (type: string): string => {
+    switch (type) {
+        case 'check-in': return 'checked in';
+        case 'check-out': return 'checked out';
+        case 'break-in': return 'started a break';
+        case 'break-out': return 'ended their break';
+        default: return 'updated attendance';
+    }
+};
+
 interface AuthState {
     user: User | null;
     isCheckedIn: boolean;
@@ -106,7 +79,7 @@ interface AuthState {
     resetAttendance: () => void;
     updateUserProfile: (updates: Partial<User>) => void;
     checkAttendanceStatus: () => Promise<void>;
-    toggleCheckInStatus: (note?: string, attachmentUrl?: string | null, workType?: 'office' | 'field', fieldReportId?: string) => Promise<{ success: boolean; message: string }>;
+    toggleCheckInStatus: (note?: string, attachmentUrl?: string | null, workType?: 'office' | 'field', fieldReportId?: string, forcedType?: string) => Promise<{ success: boolean; message: string }>;
     subscribeToAttendance: () => (() => void) | void;
     error: string | null;
     setError: (error: string | null) => void;
@@ -361,10 +334,10 @@ export const useAuthStore = create<AuthState>()(
             }
         },
 
-        toggleCheckInStatus: async (note?: string, attachmentUrl?: string | null, workType?: 'office' | 'field', fieldReportId?: string) => {
+        toggleCheckInStatus: async (note?: string, attachmentUrl?: string | null, workType?: 'office' | 'field', fieldReportId?: string, forcedType?: string) => {
             const { user, isCheckedIn, geofencingSettings } = get();
             if (!user) return { success: false, message: 'User not found' };
-            const newType = isCheckedIn ? 'check-out' : 'check-in';
+            const newType = (forcedType || (isCheckedIn ? 'check-out' : 'check-in')) as 'check-in' | 'check-out' | 'break-in' | 'break-out';
 
             // Ensure we have settings
             let settings = geofencingSettings;
@@ -402,7 +375,6 @@ export const useAuthStore = create<AuthState>()(
                     locationStatus = 'GPS Unavailable';
                 }
 
-                // Helper to finalize attendance
                 const finalizeAttendance = async (lat?: number, lng?: number, locId?: string | null, locName?: string | null) => {
                     await api.addAttendanceEvent({
                         userId: user.id,
@@ -435,12 +407,17 @@ export const useAuthStore = create<AuthState>()(
 
                     // Send notifications via Dynamic Rules
                     dispatchNotificationFromRules(
-                        newType === 'check-in' ? 'check_in' : 'check_out',
+                        newType.replace('-', '_'),
                         {
                             actorName: user.name || 'An employee',
-                            actionText: newType === 'check-in' ? 'checked in' : 'checked out',
+                            actionText: getActionTextForType(newType),
                             locString: locName ? ` at ${locName}` : '',
-                            actor: user
+                            actor: {
+                                id: user.id,
+                                name: user.name,
+                                role: user.role,
+                                reportingManagerId: user.reportingManagerId
+                            }
                         }
                     );
 
@@ -523,7 +500,12 @@ export const useAuthStore = create<AuthState>()(
                                 locString: ` outside their assigned geofence at ${locationName}`,
                                 title: '📍 Geofencing Violation',
                                 link: '/hr/field-staff-tracking',
-                                actor: user
+                                actor: {
+                                    id: user.id,
+                                    name: user.name,
+                                    role: user.role,
+                                    reportingManagerId: user.reportingManagerId
+                                }
                             }
                         );
                     } else if (!locationId) {

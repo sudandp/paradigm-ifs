@@ -107,7 +107,11 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                 <div className="flex items-center gap-3">
                     <h4 className={`font-bold text-xl ${isMobile ? 'text-white' : 'text-gray-900'}`}>Notifications</h4>
                     {unreadCount > 0 && (
-                        <span className="px-2 py-0.5 bg-accent/10 text-accent text-xs rounded-full">
+                        <span className={`px-2 py-0.5 text-xs rounded-full font-bold ${
+                            isMobile 
+                            ? 'bg-accent text-[#041b0f] shadow-[0_0_10px_rgba(34,197,94,0.2)]' 
+                            : 'bg-accent/10 text-accent border border-accent/20'
+                        }`}>
                             {unreadCount} New
                         </span>
                     )}
@@ -210,14 +214,17 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
             
             {/* Footer */}
             {notifications.length > 0 && (
-                <div className={`p-5 border-t ${isMobile ? 'bg-[#0A3D2E] border-white/10' : 'bg-gray-50 border-gray-100'}`}>
-                    <div className="flex flex-col gap-5">
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="flex flex-col gap-2">
-                                <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-white/30' : 'text-muted/60'}`}>
+                <div className={`px-6 py-6 border-t ${isMobile ? 'bg-[#0A3D2E] border-white/10' : 'bg-gray-50 border-gray-100'}`}>
+                    <div className="flex flex-col gap-6">
+                        {/* Mobile Optimized Layout: Stacks on mobile, Side-by-side on desktop */}
+                        <div className={`flex ${isMobile ? 'flex-col gap-6' : 'items-center justify-between gap-4'}`}>
+                            
+                            {/* Page Size Selector */}
+                            <div className={`flex flex-col ${isMobile ? 'items-center w-full' : 'gap-2'}`}>
+                                <span className={`text-[10px] font-black uppercase tracking-[0.2em] mb-3 ${isMobile ? 'text-white/40' : 'text-muted/60'}`}>
                                     Items per page
                                 </span>
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-2">
                                     {[5, 10, 15, 20, 50].map(size => (
                                         <button
                                             key={size}
@@ -225,13 +232,13 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                                 setPageSize(size);
                                                 setCurrentPage(1);
                                             }}
-                                            className={`min-w-[32px] h-8 px-2 rounded-lg text-xs font-bold transition-all duration-300 border ${
+                                            className={`min-w-[40px] h-9 px-2 rounded-xl text-xs font-bold transition-all duration-300 border ${
                                                 pageSize === size
                                                 ? isMobile 
-                                                    ? 'bg-accent text-[#041b0f] border-accent cursor-default' 
-                                                    : 'bg-accent text-white border-accent cursor-default'
+                                                    ? 'bg-accent text-[#041b0f] border-accent shadow-[0_0_15px_rgba(34,197,94,0.3)]' 
+                                                    : 'bg-accent text-white border-accent shadow-sm'
                                                 : isMobile
-                                                    ? 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10 hover:text-white'
+                                                    ? 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10 hover:text-white'
                                                     : 'bg-white text-gray-600 border-gray-200 hover:border-accent hover:text-accent'
                                             }`}
                                         >
@@ -241,24 +248,27 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                 </div>
                             </div>
 
+                            {/* Navigation Controls */}
                             {totalPages > 1 && (
-                                <div className="flex flex-col items-end gap-2 text-right">
-                                    <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-white/30' : 'text-muted/60'}`}>
+                                <div className={`flex flex-col ${isMobile ? 'items-center w-full' : 'items-end text-right gap-2'}`}>
+                                    <span className={`text-[10px] font-black uppercase tracking-[0.2em] mb-3 ${isMobile ? 'text-white/40' : 'text-muted/60'}`}>
                                         Navigation
                                     </span>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-4">
                                         <Button
                                             variant="secondary"
                                             size="sm"
                                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                             disabled={currentPage === 1}
-                                            className={`!p-1.5 h-8 w-8 !rounded-lg ${isMobile ? 'bg-white/5 text-white border-white/10 hover:bg-white/10 disabled:opacity-30' : 'bg-white disabled:opacity-50'}`}
+                                            className={`!p-2 h-10 w-10 !rounded-xl ${isMobile ? 'bg-white/5 text-white border-white/10 hover:bg-white/10 disabled:opacity-20' : 'bg-white disabled:opacity-40'}`}
                                         >
-                                            <ChevronLeft className="h-4 w-4" />
+                                            <ChevronLeft className="h-5 w-5" />
                                         </Button>
                                         
-                                        <div className={`text-xs font-bold min-w-[40px] text-center ${isMobile ? 'text-white/80' : 'text-gray-700'}`}>
-                                            {currentPage} <span className="text-muted/50 font-normal mx-0.5">/</span> {totalPages}
+                                        <div className={`flex items-baseline gap-1.5 ${isMobile ? 'text-white' : 'text-gray-900'}`}>
+                                            <span className="text-sm font-black tracking-wider">{currentPage}</span>
+                                            <span className="text-[10px] font-bold text-muted/40 uppercase tracking-tighter">of</span>
+                                            <span className="text-sm font-black tracking-wider">{totalPages}</span>
                                         </div>
                                         
                                         <Button
@@ -266,20 +276,27 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                             size="sm"
                                             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                             disabled={currentPage === totalPages}
-                                            className={`!p-1.5 h-8 w-8 !rounded-lg ${isMobile ? 'bg-white/5 text-white border-white/10 hover:bg-white/10 disabled:opacity-30' : 'bg-white disabled:opacity-50'}`}
+                                            className={`!p-2 h-10 w-10 !rounded-xl ${isMobile ? 'bg-white/5 text-white border-white/10 hover:bg-white/10 disabled:opacity-20' : 'bg-white disabled:opacity-40'}`}
                                         >
-                                            <ChevronRight className="h-4 w-4" />
+                                            <ChevronRight className="h-5 w-5" />
                                         </Button>
                                     </div>
                                 </div>
                             )}
                         </div>
                         
-                        <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-200/50 to-transparent my-1 hidden md:block" />
+                        {/* Divider for Desktop */}
+                        {!isMobile && <div className="w-full h-px bg-gray-100" />}
                         
-                        <div className="text-center">
-                            <button className={`text-xs font-bold transition-all duration-300 hover:tracking-wide ${isMobile ? 'text-white/40 hover:text-white' : 'text-muted hover:text-primary-text'}`}>
-                                All Notifications
+                        {/* Action Link */}
+                        <div className="text-center pt-2">
+                            <button 
+                                className={`group flex items-center justify-center gap-2 mx-auto text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300 ${
+                                    isMobile ? 'text-accent/80 hover:text-white' : 'text-muted hover:text-accent'
+                                }`}
+                            >
+                                <span>All Notifications</span>
+                                <div className={`w-4 h-px transition-all duration-300 group-hover:w-8 ${isMobile ? 'bg-accent/30 group-hover:bg-accent' : 'bg-muted/30 group-hover:bg-accent'}`} />
                             </button>
                         </div>
                     </div>

@@ -78,15 +78,15 @@ const fromCSV = (csvText: string): Record<string, string>[] => {
 
 
 const entityCsvColumns = [
-    'GroupId', 'GroupName', 'CompanyId', 'CompanyName', 'EntityId', 'EntityName', 'organizationId', 'Location', 'RegisteredAddress',
-    'RegistrationType', 'RegistrationNumber', 'GSTNumber', 'PANNumber', 'Email', 'EShramNumber',
-    'ShopAndEstablishmentCode', 'EPFOCode', 'ESICCode', 'PSARALicenseNumber', 'PSARAValidTill'
+    'Group Id', 'Group Name', 'Company Id', 'Company Name', 'Entity Id', 'Entity Name', 'Organization Id', 'Location', 'Registered Address',
+    'Registration Type', 'Registration Number', 'GST Number', 'PAN Number', 'Email', 'E Shram Number',
+    'Shop and Establishment Code', 'EPFO Code', 'ESIC Code', 'PSARA License Number', 'PSARA Valid Till'
 ];
 
 const siteConfigCsvColumns = [
-    'organizationId', 'organizationName', 'location', 'entityId', 'billingName', 'registeredAddress',
-    'gstNumber', 'panNumber', 'email1', 'email2', 'email3', 'eShramNumber', 'shopAndEstablishmentCode',
-    'keyAccountManager', 'siteAreaSqFt', 'projectType', 'apartmentCount', 'agreementDetails', 'siteOperations'
+    'Organization Id', 'Organization Name', 'Location', 'Entity Id', 'Billing Name', 'Registered Address',
+    'GST Number', 'PAN Number', 'Email 1', 'Email 2', 'Email 3', 'E Shram Number', 'Shop and Establishment Code',
+    'Key Account Manager', 'Site Area (Sq Ft)', 'Project Type', 'Apartment Count', 'Agreement Details', 'Site Operations'
 ];
 
 const triggerDownload = (data: BlobPart, fileName: string) => {
@@ -257,8 +257,17 @@ const EntityManagement: React.FC = () => {
 
     const toggleExpand = (id: string) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
-    const handleSaveAll = () => {
-        setToast({ message: 'All changes are already synchronized with the database.', type: 'success' });
+    const handleSaveAll = async () => {
+        setIsLoading(true);
+        try {
+            await api.bulkSaveOrganizationStructure(groups);
+            setToast({ message: 'All changes saved to database successfully.', type: 'success' });
+        } catch (error) {
+            console.error('Failed to save changes:', error);
+            setToast({ message: 'Failed to save changes to database.', type: 'error' });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     // Client/Entity handlers
@@ -370,26 +379,26 @@ const EntityManagement: React.FC = () => {
             const flatData = groups.flatMap(group =>
                 group.companies.flatMap(company =>
                     company.entities.map(entity => ({
-                        GroupId: group.id,
-                        GroupName: group.name,
-                        CompanyId: company.id,
-                        CompanyName: company.name,
-                        EntityId: entity.id,
-                        EntityName: entity.name,
-                        organizationId: entity.organizationId || '',
-                        Location: entity.location || '',
-                        RegisteredAddress: entity.registeredAddress || '',
-                        RegistrationType: entity.registrationType || '',
-                        RegistrationNumber: entity.registrationNumber || '',
-                        GSTNumber: entity.gstNumber || '',
-                        PANNumber: entity.panNumber || '',
-                        Email: entity.email || '',
-                        EShramNumber: entity.eShramNumber || '',
-                        ShopAndEstablishmentCode: entity.shopAndEstablishmentCode || '',
-                        EPFOCode: entity.epfoCode || '',
-                        ESICCode: entity.esicCode || '',
-                        PSARALicenseNumber: entity.psaraLicenseNumber || '',
-                        PSARAValidTill: entity.psaraValidTill || '',
+                        'Group Id': group.id,
+                        'Group Name': group.name,
+                        'Company Id': company.id,
+                        'Company Name': company.name,
+                        'Entity Id': entity.id,
+                        'Entity Name': entity.name,
+                        'Organization Id': entity.organizationId || '',
+                        'Location': entity.location || '',
+                        'Registered Address': entity.registeredAddress || '',
+                        'Registration Type': entity.registrationType || '',
+                        'Registration Number': entity.registrationNumber || '',
+                        'GST Number': entity.gstNumber || '',
+                        'PAN Number': entity.panNumber || '',
+                        'Email': entity.email || '',
+                        'E Shram Number': entity.eShramNumber || '',
+                        'Shop and Establishment Code': entity.shopAndEstablishmentCode || '',
+                        'EPFO Code': entity.epfoCode || '',
+                        'ESIC Code': entity.esicCode || '',
+                        'PSARA License Number': entity.psaraLicenseNumber || '',
+                        'PSARA Valid Till': entity.psaraValidTill || '',
                     }))
                 )
             );
@@ -400,11 +409,25 @@ const EntityManagement: React.FC = () => {
             const dataToExport = organizations.map(org => {
                 const config = siteConfigs.find(c => c.organizationId === org.id);
                 return {
-                    organizationId: org.id,
-                    organizationName: org.shortName,
-                    ...(config || {}),
-                    agreementDetails: JSON.stringify(config?.agreementDetails || {}),
-                    siteOperations: JSON.stringify(config?.siteOperations || {}),
+                    'Organization Id': org.id,
+                    'Organization Name': org.shortName,
+                    'Location': config?.location || '',
+                    'Entity Id': config?.entityId || '',
+                    'Billing Name': config?.billingName || '',
+                    'Registered Address': config?.registeredAddress || '',
+                    'GST Number': config?.gstNumber || '',
+                    'PAN Number': config?.panNumber || '',
+                    'Email 1': config?.email1 || '',
+                    'Email 2': config?.email2 || '',
+                    'Email 3': config?.email3 || '',
+                    'E Shram Number': config?.eShramNumber || '',
+                    'Shop and Establishment Code': config?.shopAndEstablishmentCode || '',
+                    'Key Account Manager': config?.keyAccountManager || '',
+                    'Site Area (Sq Ft)': config?.siteAreaSqFt || '',
+                    'Project Type': config?.projectType || '',
+                    'Apartment Count': config?.apartmentCount || '',
+                    'Agreement Details': JSON.stringify(config?.agreementDetails || {}),
+                    'Site Operations': JSON.stringify(config?.siteOperations || {}),
                 };
             });
             csvData = toCSV(dataToExport, columns);
@@ -460,38 +483,43 @@ const EntityManagement: React.FC = () => {
                     const newGroupsMap = new Map<string, { group: OrganizationGroup, companiesMap: Map<string, Company> }>();
 
                     for (const row of parsedData) {
-                        if (!newGroupsMap.has(row.GroupId)) {
-                            newGroupsMap.set(row.GroupId, {
-                                group: { id: row.GroupId, name: row.GroupName, locations: [], companies: [] },
+                        const groupId = row['Group Id'] || row.GroupId;
+                        const groupName = row['Group Name'] || row.GroupName;
+                        const companyId = row['Company Id'] || row.CompanyId;
+                        const companyName = row['Company Name'] || row.CompanyName;
+
+                        if (!newGroupsMap.has(groupId)) {
+                            newGroupsMap.set(groupId, {
+                                group: { id: groupId, name: groupName, locations: [], companies: [] },
                                 companiesMap: new Map<string, Company>()
                             });
                         }
 
-                        const groupData = newGroupsMap.get(row.GroupId)!;
+                        const groupData = newGroupsMap.get(groupId)!;
 
-                        if (!groupData.companiesMap.has(row.CompanyId)) {
-                            groupData.companiesMap.set(row.CompanyId, { id: row.CompanyId, name: row.CompanyName, entities: [] });
+                        if (!groupData.companiesMap.has(companyId)) {
+                            groupData.companiesMap.set(companyId, { id: companyId, name: companyName, entities: [] });
                         }
 
-                        const companyData = groupData.companiesMap.get(row.CompanyId)!;
+                        const companyData = groupData.companiesMap.get(companyId)!;
 
                         const entity: Entity = {
-                            id: row.EntityId,
-                            name: row.EntityName,
-                            organizationId: row.organizationId,
-                            location: row.Location,
-                            registeredAddress: row.RegisteredAddress,
-                            registrationType: row.RegistrationType as RegistrationType || '',
-                            registrationNumber: row.RegistrationNumber,
-                            gstNumber: row.GSTNumber,
-                            panNumber: row.PANNumber,
-                            email: row.Email,
-                            eShramNumber: row.EShramNumber,
-                            shopAndEstablishmentCode: row.ShopAndEstablishmentCode,
-                            epfoCode: row.EPFOCode,
-                            esicCode: row.ESICCode,
-                            psaraLicenseNumber: row.PSARALicenseNumber,
-                            psaraValidTill: row.PSARAValidTill,
+                            id: row['Entity Id'] || row.EntityId,
+                            name: row['Entity Name'] || row.EntityName,
+                            organizationId: row['Organization Id'] || row.organizationId,
+                            location: row['Location'] || row.Location,
+                            registeredAddress: row['Registered Address'] || row.RegisteredAddress,
+                            registrationType: (row['Registration Type'] || row.RegistrationType) as RegistrationType || '',
+                            registrationNumber: row['Registration Number'] || row.RegistrationNumber,
+                            gstNumber: row['GST Number'] || row.GSTNumber,
+                            panNumber: row['PAN Number'] || row.PANNumber,
+                            email: row['Email'] || row.Email,
+                            eShramNumber: row['E Shram Number'] || row.EShramNumber,
+                            shopAndEstablishmentCode: row['Shop and Establishment Code'] || row.ShopAndEstablishmentCode,
+                            epfoCode: row['EPFO Code'] || row.EPFOCode,
+                            esicCode: row['ESIC Code'] || row.ESICCode,
+                            psaraLicenseNumber: row['PSARA License Number'] || row.PSARALicenseNumber,
+                            psaraValidTill: row['PSARA Valid Till'] || row.PSARAValidTill,
                         };
 
                         companyData.entities.push(entity);
@@ -514,20 +542,26 @@ const EntityManagement: React.FC = () => {
                     if (parsedData.length === 0) throw new Error("No data rows found.");
 
                     const newSiteConfigs = parsedData.map(row => {
-                        const config: Partial<SiteConfiguration> = {};
-                        for (const key of Object.keys(row)) {
-                            if (key === 'agreementDetails' || key === 'siteOperations') {
-                                try {
-                                    (config as any)[key] = JSON.parse(row[key]);
-                                } catch (e) {
-                                    console.warn(`Could not parse JSON for ${key} in row for site ${row.organizationId}`);
-                                    (config as any)[key] = {};
-                                }
-                            } else {
-                                (config as any)[key] = row[key];
-                            }
-                        }
-                        return config as SiteConfiguration;
+                        return {
+                            organizationId: row['Organization Id'] || row.organizationId,
+                            location: row['Location'] || row.location,
+                            entityId: row['Entity Id'] || row.entityId,
+                            billingName: row['Billing Name'] || row.billingName,
+                            registeredAddress: row['Registered Address'] || row.registeredAddress,
+                            gstNumber: row['GST Number'] || row.gstNumber,
+                            panNumber: row['PAN Number'] || row.panNumber,
+                            email1: row['Email 1'] || row.email1,
+                            email2: row['Email 2'] || row.email2,
+                            email3: row['Email 3'] || row.email3,
+                            eShramNumber: row['E Shram Number'] || row.eShramNumber,
+                            shopAndEstablishmentCode: row['Shop and Establishment Code'] || row.shopAndEstablishmentCode,
+                            keyAccountManager: row['Key Account Manager'] || row.keyAccountManager,
+                            siteAreaSqFt: Number(row['Site Area (Sq Ft)'] || row.siteAreaSqFt) || null,
+                            projectType: row['Project Type'] || row.projectType,
+                            apartmentCount: Number(row['Apartment Count'] || row.apartmentCount) || null,
+                            agreementDetails: JSON.parse(row['Agreement Details'] || row.agreementDetails || '{}'),
+                            siteOperations: JSON.parse(row['Site Operations'] || row.siteOperations || '{}'),
+                        } as SiteConfiguration;
                     });
 
                     setSiteConfigs(prev => {

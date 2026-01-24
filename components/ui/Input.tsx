@@ -7,9 +7,10 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   registration?: UseFormRegisterReturn;
   icon?: React.ReactNode;
+  autoCapitalizeCustom?: boolean;
 }
 
-const Input: React.FC<InputProps> = ({ label, id, error, registration, icon, ...props }) => {
+const Input: React.FC<InputProps> = ({ label, id, error, registration, icon, autoCapitalizeCustom = true, ...props }) => {
   const generatedId = useId();
   const inputId = id || generatedId;
   const { className, ...otherProps } = props;
@@ -31,8 +32,28 @@ const Input: React.FC<InputProps> = ({ label, id, error, registration, icon, ...
         className={finalClassName}
         style={icon ? { paddingLeft: '3.5rem' } : undefined}
         aria-invalid={!!error}
+        autoCapitalize={autoCapitalizeCustom ? "words" : undefined}
         {...registration}
         {...otherProps}
+        onChange={(e) => {
+          const isTextField = !props.type || props.type === 'text';
+          if (autoCapitalizeCustom && isTextField) {
+            const originalValue = e.target.value;
+            // Capitalize first letter of each word for Names/Cities/Addresses
+            const capitalizedValue = originalValue.replace(/\b\w/g, char => char.toUpperCase());
+            if (originalValue !== capitalizedValue) {
+                e.target.value = capitalizedValue;
+            }
+          }
+          // Call registration.onChange if it exists
+          if (registration?.onChange) {
+            registration.onChange(e);
+          }
+          // Call props.onChange if it exists
+          if (props.onChange) {
+            props.onChange(e);
+          }
+        }}
       />
     </div>
   );

@@ -28,10 +28,16 @@ const AttendanceActionPage: React.FC = () => {
 
     // Determine action from URL
     const isCheckIn = location.pathname.includes('check-in');
-    const action = isCheckIn ? 'Check In' : 'Check Out';
-    const Icon = isCheckIn ? LogIn : LogOut;
-    const iconBgColor = isCheckIn ? 'bg-emerald-100' : 'bg-red-100';
-    const iconColor = isCheckIn ? 'text-emerald-600' : 'text-red-600';
+    const isBreakIn = location.pathname.includes('break-in');
+    const isBreakOut = location.pathname.includes('break-out');
+    
+    let action = isCheckIn ? 'Check In' : 'Check Out';
+    if (isBreakIn) action = 'Break In';
+    if (isBreakOut) action = 'Break Out';
+
+    const Icon = (isCheckIn || isBreakIn) ? LogIn : LogOut;
+    const iconBgColor = (isCheckIn || isBreakIn) ? 'bg-emerald-100' : 'bg-red-100';
+    const iconColor = (isCheckIn || isBreakIn) ? 'text-emerald-600' : 'text-red-600';
 
     const handleConfirm = async () => {
         setIsSubmitting(true);
@@ -46,8 +52,13 @@ const AttendanceActionPage: React.FC = () => {
                 return;
             }
 
+            // Determine forced type
+            let forcedType: string | undefined = undefined;
+            if (isBreakIn) forcedType = 'break-in';
+            if (isBreakOut) forcedType = 'break-out';
+
             // Direct check-in OR direct check-out (if geofencing is disabled)
-            const { success, message } = await toggleCheckInStatus();
+            const { success, message } = await toggleCheckInStatus(undefined, null, 'office', undefined, forcedType);
             setToast({ message, type: success ? 'success' : 'error' });
             
             if (success) {

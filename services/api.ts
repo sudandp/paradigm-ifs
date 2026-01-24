@@ -13,6 +13,7 @@ import type {
 } from '../types';
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { differenceInCalendarDays, format, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
+import { dispatchNotificationFromRules } from './notificationService';
 import { calculateSiteTravelTime, validateFieldStaffAttendance } from '../utils/fieldStaffTracking';
 import { GoogleGenAI, Type, Modality } from '@google/genai';
 
@@ -286,6 +287,18 @@ export const api = {
     const { draftId } = await api._saveSubmission(data, false);
     const submittedData = await api.getOnboardingDataById(draftId);
     if (!submittedData) throw new Error("Failed to retrieve submitted data.");
+    
+    // Trigger rule-based notification
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        dispatchNotificationFromRules('onboarding_submitted', {
+            actorName: data.personal.firstName + ' ' + data.personal.lastName,
+            actionText: 'has submitted a new enrollment',
+            locString: '',
+            actor: { id: user.id, name: user.email || 'Admin', role: 'admin' }
+        });
+    }
+    
     return submittedData;
   },
 
@@ -299,11 +312,35 @@ export const api = {
   verifySubmission: async (id: string): Promise<void> => {
     const { error } = await supabase.from('onboarding_submissions').update({ status: 'verified', portal_sync_status: 'pending_sync' }).eq('id', id);
     if (error) throw error;
+    
+    // Trigger notification
+    const submission = await api.getOnboardingDataById(id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (submission && user) {
+        dispatchNotificationFromRules('onboarding_verified', {
+            actorName: 'Enrollment for ' + (submission.personal as any).firstName,
+            actionText: 'has been verified',
+            locString: '',
+            actor: { id: user.id, name: user.email || 'Admin', role: 'admin' }
+        });
+    }
   },
 
   requestChanges: async (id: string, reason: string): Promise<void> => {
     const { error } = await supabase.from('onboarding_submissions').update({ status: 'rejected' }).eq('id', id);
     if (error) throw error;
+    
+    // Trigger notification
+    const submission = await api.getOnboardingDataById(id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (submission && user) {
+        dispatchNotificationFromRules('onboarding_rejected', {
+            actorName: 'Enrollment for ' + (submission.personal as any).firstName,
+            actionText: 'has been rejected (changes requested)',
+            locString: '',
+            actor: { id: user.id, name: user.email || 'Admin', role: 'admin' }
+        });
+    }
   },
 
   syncPortals: async (id: string): Promise<OnboardingData> => {
@@ -599,6 +636,24 @@ export const api = {
     });
 
     return camelGroups.map(group => ({ ...group, companies: companyMap.get(group.id) || [], locations: [] }));
+  },
+  bulkSaveOrganizationStructure: async (groups: OrganizationGroup[]): Promise<void> => {
+    // 1. Upsert Groups (exclude companies and locations)
+    const groupData = groups.map(({ companies, locations, ...rest }) => toSnakeCase(rest));
+    const { error: groupError } = await supabase.from('organization_groups').upsert(groupData);
+    if (groupError) throw groupError;
+
+    // 2. Upsert Companies (exclude entities)
+    const companies = groups.flatMap(g => g.companies.map(c => ({ ...c, groupId: g.id })));
+    const companyData = companies.map(({ entities, ...rest }) => toSnakeCase(rest));
+    const { error: companyError } = await supabase.from('companies').upsert(companyData);
+    if (companyError) throw companyError;
+
+    // 3. Upsert Entities (Clients)
+    const entities = companies.flatMap(c => c.entities.map(e => ({ ...e, companyId: c.id })));
+    const entityData = entities.map(e => toSnakeCase(e));
+    const { error: entityError } = await supabase.from('entities').upsert(entityData);
+    if (entityError) throw entityError;
   },
   createOrganizationGroup: async (group: Partial<OrganizationGroup>): Promise<OrganizationGroup> => {
     const { data, error } = await supabase.from('organization_groups').insert(toSnakeCase(group)).select().single();
@@ -1170,6 +1225,19 @@ export const api = {
     // Trigger notification to manager
     if (userProfile.reporting_manager_id) {
       try {
+        // Dynamic Rule Dispatch
+        dispatchNotificationFromRules('leave_request', {
+          actorName: data.userName || 'An employee',
+          actionText: `has submitted a new ${data.leaveType} leave request`,
+          locString: '',
+          actor: { 
+            id: data.userId, 
+            name: data.userName || 'Employee', 
+            role: 'staff',
+            reportingManagerId: userProfile.reporting_manager_id 
+          }
+        });
+
         await api.createNotification({
           userId: userProfile.reporting_manager_id,
           message: `${data.userName || 'An employee'} has submitted a new ${data.leaveType} leave request.`,
@@ -1258,6 +1326,17 @@ export const api = {
   createTask: async (taskData: Partial<Task>): Promise<Task> => {
     const { data, error } = await supabase.from('tasks').insert(toSnakeCase({ ...taskData, status: 'To Do', escalationStatus: 'None' })).select().single();
     if (error) throw error;
+
+    // Trigger rule-based notification
+    if (data.assigned_to_id) {
+        dispatchNotificationFromRules('task_assigned', {
+            actorName: data.name,
+            actionText: 'has been assigned',
+            locString: '',
+            actor: { id: data.created_by_id || '', name: 'System', role: 'admin' }
+        });
+    }
+
     return toCamelCase(data);
   },
   updateTask: async (id: string, updates: Partial<Task>): Promise<Task> => {
@@ -1282,6 +1361,17 @@ export const api = {
     }
     const { data, error } = await supabase.from('tasks').update(toSnakeCase(updates)).eq('id', id).select().single();
     if (error) throw error;
+
+    // Trigger notification if task is completed
+    if (updates.status === 'Done') {
+        dispatchNotificationFromRules('task_completed', {
+            actorName: data.name,
+            actionText: 'has been completed',
+            locString: '',
+            actor: { id: data.assigned_to_id || '', name: 'Staff', role: 'staff' }
+        });
+    }
+
     return toCamelCase(data);
   },
   deleteTask: async (id: string): Promise<void> => {
@@ -1381,6 +1471,20 @@ export const api = {
       .select()
       .single();
     if (error) throw error;
+
+    // Trigger notification
+    const { data: { user } } = await supabase.auth.getUser();
+    dispatchNotificationFromRules('field_report', {
+        actorName: reportData.siteName || 'Field staff',
+        actionText: `has submitted a ${reportData.jobType} report`,
+        locString: '',
+        actor: { 
+            id: user?.id || reportData.userId || '', 
+            name: user?.user_metadata?.name || 'Staff', 
+            role: 'staff' 
+        }
+    });
+
     return toCamelCase(data);
   },
 
@@ -1615,6 +1719,14 @@ export const api = {
         approval_history: updatedHistory 
       }).eq('id', id);
       if (error) throw error;
+
+      // Dynamic Rule Dispatch
+      dispatchNotificationFromRules('leave_approved', {
+        actorName: 'Leave request',
+        actionText: 'has been approved',
+        locString: '',
+        actor: { id: approverId, name: approverData.name, role: 'admin' }
+      });
       
       // If it's a Comp Off leave, mark a log as used
       if (request.leave_type === 'Comp Off') {
@@ -1643,6 +1755,14 @@ export const api = {
     const updatedHistory = [...((request.approval_history as any[]) || []), newHistoryRecord];
     const { error } = await supabase.from('leave_requests').update({ status: 'rejected', current_approver_id: null, approval_history: updatedHistory }).eq('id', id);
     if (error) throw error;
+
+    // Dynamic Rule Dispatch
+    dispatchNotificationFromRules('leave_rejected', {
+      actorName: 'Leave request',
+      actionText: 'has been rejected',
+      locString: '',
+      actor: { id: approverId, name: approverData.name, role: 'admin' }
+    });
   },
   cancelApprovedLeave: async (id: string, cancellerId: string, reason: string): Promise<void> => {
     const { data: request, error: fetchError } = await supabase.from('leave_requests').select('approval_history, user_id, leave_type').eq('id', id).single();
@@ -2234,6 +2354,15 @@ export const api = {
     }
     const { data, error } = await supabase.from('support_tickets').insert(toSnakeCase(ticketData)).select('*, posts:ticket_posts(*, comments:ticket_comments(*))').single();
     if (error) throw error;
+
+    // Trigger notification
+    dispatchNotificationFromRules('support_ticket', {
+        actorName: ticketData.raisedByName || 'A user',
+        actionText: 'has raised a new support ticket',
+        locString: `: ${ticketData.title}`,
+        actor: { id: ticketData.raisedById || '', name: ticketData.raisedByName || 'User', role: 'staff' }
+    });
+
     return toCamelCase(data);
   },
   updateSupportTicket: async (id: string, updates: Partial<SupportTicket>): Promise<SupportTicket> => {
@@ -2260,6 +2389,15 @@ export const api = {
   addTicketPost: async (ticketId: string, postData: Partial<TicketPost>): Promise<TicketPost> => {
     const { data, error } = await supabase.from('ticket_posts').insert(toSnakeCase(postData)).select('*, comments:ticket_comments(*)').single();
     if (error) throw error;
+
+    // Trigger notification
+    dispatchNotificationFromRules('support_response', {
+        actorName: postData.authorName || 'Staff',
+        actionText: 'has responded to a support ticket',
+        locString: '',
+        actor: { id: postData.authorId || '', name: postData.authorName || 'Staff', role: postData.authorRole || 'hr' }
+    });
+
     return toCamelCase(data);
   },
   togglePostLike: async (postId: string, userId: string): Promise<void> => {

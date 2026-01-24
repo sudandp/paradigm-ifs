@@ -15,7 +15,17 @@ import {
     Clock,
     Target,
     Filter,
-    Mail
+    Mail,
+    Pencil,
+    X as CloseIcon,
+    Coffee,
+    LogOut as LogOutIcon,
+    ClipboardCheck,
+    XCircle,
+    UserCheck,
+    MessageSquare,
+    DollarSign,
+    FileText
 } from 'lucide-react';
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import Button from '../../components/ui/Button';
@@ -27,13 +37,27 @@ import { api } from '../../services/api';
 import type { NotificationRule, NotificationType, User as AppUser, Role } from '../../types';
 
 const EVENT_TYPES = [
-    { value: 'check_in', label: 'Check-in Event', icon: CheckCircle2 },
-    { value: 'check_out', label: 'Check-out Event', icon: Clock },
+    { value: 'check_in', label: 'Check-in (Punch In)', icon: CheckCircle2 },
+    { value: 'check_out', label: 'Check-out (Punch Out)', icon: LogOutIcon },
+    { value: 'break_in', label: 'Break Start', icon: Coffee },
+    { value: 'break_out', label: 'Break End', icon: Clock },
     { value: 'violation', label: 'Geofencing Violation', icon: AlertTriangle },
     { value: 'field_report', label: 'Field Report Submission', icon: Target },
-    { value: 'task_assigned', label: 'Task Assignment', icon: Users },
-    { value: 'leave_request', label: 'Leave Request', icon: Mail },
-    { value: 'security_alert', label: 'Security Alert', icon: Shield }
+    { value: 'onboarding_submitted', label: 'New Enrollment Submission', icon: UserIcon },
+    { value: 'onboarding_verified', label: 'Enrollment Verified', icon: UserCheck },
+    { value: 'onboarding_rejected', label: 'Enrollment Rejected / Change Request', icon: XCircle },
+    { value: 'task_assigned', label: 'Task Assigned', icon: Users },
+    { value: 'task_completed', label: 'Task Completed', icon: ClipboardCheck },
+    { value: 'leave_request', label: 'Leave Request Applied', icon: Mail },
+    { value: 'leave_approved', label: 'Leave Approved', icon: CheckCircle2 },
+    { value: 'leave_rejected', label: 'Leave Rejected', icon: XCircle },
+    { value: 'salary_request', label: 'Salary Change Request', icon: DollarSign },
+    { value: 'salary_approved', label: 'Salary Change Approved', icon: CheckCircle2 },
+    { value: 'salary_rejected', label: 'Salary Change Rejected', icon: XCircle },
+    { value: 'support_ticket', label: 'New Support Ticket', icon: MessageSquare },
+    { value: 'support_response', label: 'Support Response Received', icon: Bell },
+    { value: 'billing_invoice', label: 'Invoice Generated', icon: FileText },
+    { value: 'security_alert', label: 'Emergency / Security Alert', icon: Shield }
 ];
 
 const RECIPIENT_ROLES = [
@@ -58,6 +82,7 @@ const NotificationsControl: React.FC = () => {
     const [users, setUsers] = useState<AppUser[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
     // New Rule Form State
@@ -100,14 +125,39 @@ const NotificationsControl: React.FC = () => {
         setIsSaving(true);
         try {
             const rule = await api.saveNotificationRule(newRule);
-            setRules([rule, ...rules]);
-            setToast({ message: 'Rule added successfully.', type: 'success' });
-            setNewRule({ eventType: 'check_in', recipientRole: 'direct_manager', isEnabled: true });
+            if (isEditing) {
+                setRules(rules.map(r => r.id === rule.id ? rule : r));
+                setToast({ message: 'Rule updated successfully.', type: 'success' });
+            } else {
+                setRules([rule, ...rules]);
+                setToast({ message: 'Rule added successfully.', type: 'success' });
+            }
+            cancelEdit();
         } catch (err) {
-            setToast({ message: 'Failed to add rule.', type: 'error' });
+            setToast({ message: isEditing ? 'Failed to update rule.' : 'Failed to add rule.', type: 'error' });
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handleEditRule = (rule: NotificationRule) => {
+        setNewRule({
+            id: rule.id,
+            eventType: rule.eventType,
+            recipientRole: rule.recipientRole,
+            recipientUserId: rule.recipientUserId,
+            isEnabled: rule.isEnabled
+        });
+        setIsEditing(true);
+        // Scroll to form on mobile
+        if (window.innerWidth < 1024) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
+    const cancelEdit = () => {
+        setNewRule({ eventType: 'check_in', recipientRole: 'direct_manager', isEnabled: true });
+        setIsEditing(false);
     };
 
     const handleToggleRule = async (rule: NotificationRule) => {
@@ -174,9 +224,17 @@ const NotificationsControl: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Add Rule Sidebar */}
                     <div className="lg:col-span-1 space-y-6">
-                        <section className="bg-card p-6 rounded-xl border border-border shadow-sm">
-                            <h3 className="text-lg font-semibold mb-4 flex items-center">
-                                <Plus className="mr-2 h-5 w-5 text-accent" /> New Dispatch Rule
+                        <section className={`bg-card p-6 rounded-xl border shadow-sm transition-all duration-300 ${isEditing ? 'border-accent ring-1 ring-accent/20' : 'border-border'}`}>
+                            <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
+                                <span className="flex items-center">
+                                    {isEditing ? <Pencil className="mr-2 h-5 w-5 text-accent" /> : <Plus className="mr-2 h-5 w-5 text-accent" />}
+                                    {isEditing ? 'Edit Dispatch Rule' : 'New Dispatch Rule'}
+                                </span>
+                                {isEditing && (
+                                    <button onClick={cancelEdit} className="text-muted hover:text-primary-text p-1">
+                                        <CloseIcon className="h-4 w-4" />
+                                    </button>
+                                )}
                             </h3>
                             <div className="space-y-4">
                                 <Select 
@@ -210,15 +268,23 @@ const NotificationsControl: React.FC = () => {
                                         onChange={(e) => setNewRule({ ...newRule, recipientUserId: e.target.value, recipientRole: undefined })}
                                     >
                                         <option value="">Select User</option>
+                                        <option value="all">All Users</option>
                                         {users.map(user => (
                                             <option key={user.id} value={user.id}>{user.name}</option>
                                         ))}
                                     </Select>
                                 </div>
 
-                                <Button className="w-full" onClick={handleAddRule} isLoading={isSaving}>
-                                    Create Rule
-                                </Button>
+                                <div className="space-y-2 pt-2">
+                                    <Button className="w-full" onClick={handleAddRule} isLoading={isSaving}>
+                                        {isEditing ? 'Update Rule' : 'Create Rule'}
+                                    </Button>
+                                    {isEditing && (
+                                        <Button variant="secondary" className="w-full" onClick={cancelEdit}>
+                                            Cancel Edit
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </section>
 
@@ -258,23 +324,38 @@ const NotificationsControl: React.FC = () => {
                                                 <p className="font-semibold text-primary-text">{eventType?.label || rule.eventType}</p>
                                                 <p className="text-sm text-muted">
                                                     Notifies: <span className="font-medium text-emerald-600">
-                                                        {recipientUser ? `User: ${recipientUser.name}` : (recipientRole?.label || rule.recipientRole)}
+                                                        {rule.recipientUserId === 'all' ? 'All Users' : (recipientUser ? `User: ${recipientUser.name}` : (recipientRole?.label || rule.recipientRole))}
                                                     </span>
                                                 </p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <div className="flex items-center gap-2 pr-4 border-r border-border">
-                                                <span className="text-xs text-muted uppercase font-bold tracking-wider">Active</span>
-                                                <Checkbox 
-                                                    id={`rule-${rule.id}`} 
-                                                    label=""
-                                                    checked={rule.isEnabled} 
-                                                    onChange={() => handleToggleRule(rule)} 
-                                                />
+                                            <div className="flex items-center gap-4 pr-4 border-r border-border">
+                                                <Button 
+                                                    variant="icon" 
+                                                    onClick={() => handleEditRule(rule)} 
+                                                    className="text-accent hover:bg-accent/5 h-8 w-8" 
+                                                    title="Edit Rule"
+                                                >
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] text-muted uppercase font-bold tracking-wider">Active</span>
+                                                    <Checkbox 
+                                                        id={`rule-${rule.id}`} 
+                                                        label=""
+                                                        checked={rule.isEnabled} 
+                                                        onChange={() => handleToggleRule(rule)} 
+                                                    />
+                                                </div>
                                             </div>
-                                            <Button variant="icon" onClick={() => handleDeleteRule(rule.id)} className="text-red-500 hover:bg-red-50">
-                                                <Trash2 className="h-5 w-5" />
+                                            <Button 
+                                                variant="icon" 
+                                                onClick={() => handleDeleteRule(rule.id)} 
+                                                className="text-red-500 hover:bg-red-50 h-8 w-8" 
+                                                title="Delete Rule"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
                                             </Button>
                                         </div>
                                     </div>

@@ -630,6 +630,8 @@ const App: React.FC = () => {
             <Route path="attendance/dashboard" element={<AttendanceDashboard />} />
             <Route path="attendance/check-in" element={<AttendanceActionPage />} />
             <Route path="attendance/check-out" element={<AttendanceActionPage />} />
+            <Route path="attendance/break-in" element={<AttendanceActionPage />} />
+            <Route path="attendance/break-out" element={<AttendanceActionPage />} />
           </Route>
           <Route element={<ProtectedRoute requiredPermission="view_my_locations" />}>
             {/* New page for users to manage their own geofenced locations */}
