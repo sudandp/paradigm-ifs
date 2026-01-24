@@ -32,27 +32,32 @@ const AadhaarScannerPage: React.FC = () => {
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const qrCodeRegionId = "qr-reader-full-page";
 
-    useEffect(() => {
-        // Start scanner with a small delay to ensure DOM is ready
-        const timer = setTimeout(() => {
-            startScanner();
-        }, 500);
-        
-        return () => {
-            clearTimeout(timer);
-            stopScanner();
-        };
-    }, []);
-
+    // --- Helper Functions ---
     const formatNameToTitleCase = (value: string | undefined) => {
         if (!value) return '';
         return value.toLowerCase().replace(/\b(\w)/g, s => s.toUpperCase());
     };
 
+    const formatDobToISO = (dob: string): string => {
+        if (!dob) return '';
+        const parts = dob.split(/[-/]/);
+        if (parts.length === 3) {
+            const [day, month, year] = parts;
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        return dob;
+    };
+
+    const formatGender = (gender: string): string => {
+        const g = (gender || '').toUpperCase();
+        if (g === 'M' || g === 'MALE') return 'Male';
+        if (g === 'F' || g === 'FEMALE') return 'Female';
+        return 'Other';
+    };
+
     const parseAadhaarQR = (qrText: string): AadhaarData | null => {
         try {
             if (qrText.includes('<?xml')) {
-                // ... legacy XML format
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(qrText, 'text/xml');
                 
@@ -83,49 +88,6 @@ const AadhaarScannerPage: React.FC = () => {
                     },
                     aadhaarNumber: uid
                 };
-            } else if (qrText.includes('|')) {
-                // ... Pipe-separated format
-                const parts = qrText.split('|');
-                if (parts.length < 4) throw new Error('Invalid format');
-
-                const [uid, name, dob, gender, ...addressParts] = parts;
-                
-                return {
-                    name,
-                    dob: formatDobToISO(dob),
-                    gender: formatGender(gender),
-                    address: {
-                        line1: addressParts.slice(0, -3).join(', '),
-                        city: addressParts[addressParts.length - 3] || '',
-                        state: addressParts[addressParts.length - 2] || '',
-                        pincode: addressParts[addressParts.length - 1] || ''
-                    },
-                    aadhaarNumber: uid
-                };
-            } else if (/^\d+$/.test(qrText)) {
-                 // MODIFIED: Support for Secure QR (Numeric format)
-                 // This format is a very large integer. We extract demographic data if possible.
-                 // While full decompression is complex, we can often see the UID or segments.
-                 // For now, let's treat it as a trigger to try and parse a data blob.
-                 
-                 // If it's mAadhaar format, it's often signed data. 
-                 // We will at least try to extract the UID if it's visible or the reference ID.
-                 
-                 // Since mAadhaar Secure QR parsing requires ZLIB decompression, 
-                 // we'll implement a fallback that alerts the user but handles common cases.
-                 
-                 // However, many "Secure QR" readers actually just look for the 12 digits or a known pattern.
-                 const uidMatch = qrText.match(/\d{12}/);
-                 if (uidMatch) {
-                    return {
-                        name: "Extracted from Secure QR",
-                        dob: "",
-                        gender: "",
-                        address: { line1: "", city: "", state: "", pincode: "" },
-                        aadhaarNumber: uidMatch[0]
-                    };
-                 }
-                 return null;
             }
             return null;
         } catch (err) {
@@ -133,38 +95,13 @@ const AadhaarScannerPage: React.FC = () => {
         }
     };
 
-    const formatDobToISO = (dob: string): string => {
-        if (!dob) return '';
-        const parts = dob.split(/[-/]/);
-        if (parts.length === 3) {
-            const [day, month, year] = parts;
-            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-        }
-        return dob;
-    };
-
-    const formatGender = (gender: string): string => {
-        const g = (gender || '').toUpperCase();
-        if (g === 'M' || g === 'MALE') return 'Male';
-        if (g === 'F' || g === 'FEMALE') return 'Female';
-        return 'Other';
-    };
-
-    /**
-     * DECORDER FOR SECURE QR CODE (mAadhaar/New Format)
-     * Logic: BigInt -> Byte Array -> GZIP Decompress -> Parse Binary
-     */
     const decodeSecureQR = async (numericText: string): Promise<AadhaarData | null> => {
         try {
-            // 1. BigInt to Byte Array
             let bigInt = BigInt(numericText);
             let hex = bigInt.toString(16);
             if (hex.length % 2 !== 0) hex = '0' + hex;
             const bytes = new Uint8Array(hex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
 
-            // 2. GZIP Decompress (Modern Browser API)
-            // Note: Secure QR uses a compressed byte stream.
-            // We use DecompressionStream which works in Chrome/Safari/Android WebView
             const stream = new ReadableStream({
                 start(controller) {
                     controller.enqueue(bytes);
@@ -190,76 +127,45 @@ const AadhaarScannerPage: React.FC = () => {
                 offset += chunk.length;
             }
 
-            // 3. Parse UIDAI format (V2/V3)
-            // UIDAI Secure QR Structure: 
-            // Header, 255 bytes Signature, then Version, then Data separated by 255 (delimiter)
-            
-            // Skip signature (usually first 256 bytes)
-            // The data is actually encoded using ISO-8859-1 after decompression
-            const decoder = new TextDecoder('iso-8859-1');
-            
-            // Secure QR data mapping: 
-            // V2 format has data fields separated by byte value 255
+            const textDecoder = new TextDecoder('iso-8859-1');
             const fields: string[] = [];
-            let currentField: number[] = [];
+            let currentFieldBytes: number[] = [];
             
-            // Start from where demographic data begins (after header/signature)
-            // Community research shows data starts after the 256-byte signature
             for (let i = 256; i < data.length; i++) {
                 if (data[i] === 255) {
-                    fields.push(decoder.decode(new Uint8Array(currentField)));
-                    currentField = [];
-                    // Stop if we hit photo (large field) or end
-                    if (fields.length > 15) break; 
+                    fields.push(textDecoder.decode(new Uint8Array(currentFieldBytes)));
+                    currentFieldBytes = [];
+                    if (fields.length > 20) break; 
                 } else {
-                    currentField.push(data[i]);
+                    currentFieldBytes.push(data[i]);
                 }
             }
 
             if (fields.length < 5) return null;
 
-            // Mapping based on Verified mAadhaar V5 Binary Dump:
-            // 3: Name
-            // 4: DOB
-            // 5: Gender
-            // 6: Care Of (S/O, D/O)
-            // 7: City / District 
-            // 8: Landmark
-            // 9: House
-            // 10: Local Area / Layout
-            // 11: Pincode
-            // 12: Post Office (Doorvaninagar)
-            // 13: State (Karnataka)
-            // 14: Locality (Ramamurthi Nagar / Sub District)
-            // 16: Local Area Detail (Ramamurthynagar)
-            // 17: Masked Mobile
-            // 18: Masked Email
-            
             const name = fields[3] || '';
             const dobRaw = fields[4] || '';
             const genderRaw = fields[5] || '';
             const maskedMobile = fields[17] || '';
             const maskedEmail = fields[18] || '';
 
-            // Map full address hierarchy as requested by the user
             const house = fields[9] || '';
-            const layout = fields[10] || '';
-            const neighborhood = fields[14] || '';
+            const layout = fields[14] || '';
+            const locality = fields[10] || '';
             const landmark = fields[8] || '';
             const subLocality = fields[16] || '';
-            const postOffice = fields[12] || '';
+            const town = fields[12] || '';
             const city = fields[7] || '';
             const state = fields[13] || '';
             const pincode = fields[11] || '';
             
-            // Build the specific address format requested:
             const addrParts = [
                 house, 
                 layout, 
-                neighborhood, 
+                locality, 
                 landmark, 
                 subLocality, 
-                postOffice, 
+                town, 
                 city, 
                 `${state} - ${pincode}`
             ].filter(Boolean);
@@ -276,7 +182,7 @@ const AadhaarScannerPage: React.FC = () => {
                     state: state,
                     pincode: pincode
                 },
-                aadhaarNumber: maskedMobile, // Using 17 as identity for now
+                aadhaarNumber: '', 
                 mobile: maskedMobile,
                 email: maskedEmail
             };
@@ -284,77 +190,6 @@ const AadhaarScannerPage: React.FC = () => {
         } catch (err) {
             console.error('Secure QR Decoding Error:', err);
             return null;
-        }
-    };
-
-    const startScanner = async () => {
-        try {
-            setError(null);
-            setIsInitializing(true);
-
-            const html5QrCode = new Html5Qrcode(qrCodeRegionId);
-            scannerRef.current = html5QrCode;
-
-            const config = {
-                fps: 30, // Higher FPS for better tracking
-                qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                    // Secure QR codes are dense, a larger box helps with resolution
-                    const boxSize = Math.floor(minEdge * 0.85);
-                    return { width: boxSize, height: boxSize };
-                },
-                aspectRatio: 1.0,
-                // CRITICAL: Request high resolution for dense Secure QR codes
-                videoConstraints: {
-                    facingMode: "environment",
-                    width: { min: 1280, ideal: 1920, max: 2560 },
-                    height: { min: 720, ideal: 1080, max: 1440 },
-                }
-            };
-
-            await html5QrCode.start(
-                { facingMode: "environment" },
-                config,
-                async (decodedText) => {
-                    let parsedData: AadhaarData | null = null;
-                    
-                    if (/^\d+$/.test(decodedText) && decodedText.length > 500) {
-                        // High-density numeric string = Secure QR
-                        setIsInitializing(true); // Show loader while decoding
-                        parsedData = await decodeSecureQR(decodedText);
-                        setIsInitializing(false);
-                    } else {
-                        // Standard XML or Pipe format
-                        parsedData = parseAadhaarQR(decodedText);
-                    }
-
-                    if (parsedData) {
-                        try {
-                            if (window.navigator && window.navigator.vibrate) {
-                                window.navigator.vibrate(100);
-                            }
-                        } catch (e) {}
-                        handleScanSuccess(parsedData);
-                    }
-                },
-                () => {}
-            );
-            
-            // Check if flash (torch) is supported
-            try {
-                const capabilities = await html5QrCode.getRunningTrackCapabilities();
-                if (capabilities && (capabilities as any).torch) {
-                    setHasFlash(true);
-                }
-            } catch (e) {
-                console.log("Torch capability check failed", e);
-            }
-            
-            setIsInitializing(false);
-        } catch (err: any) {
-            console.error('Scanner error:', err);
-            setError(`Camera error: ${err.message || 'Access denied'}`);
-            setIsInitializing(false);
         }
     };
 
@@ -387,8 +222,9 @@ const AadhaarScannerPage: React.FC = () => {
             dob: aadhaarData.dob,
             gender: aadhaarData.gender as any,
             idProofType: 'Aadhaar',
-            idProofNumber: aadhaarData.aadhaarNumber,
-            email: aadhaarData.email // Pass the detected email field
+            idProofNumber: '', 
+            mobile: aadhaarData.mobile,
+            email: aadhaarData.email
         });
 
         store.updateAddress({
@@ -419,14 +255,79 @@ const AadhaarScannerPage: React.FC = () => {
         store.setPersonalVerifiedStatus({
             name: true,
             dob: true,
-            idProofNumber: true,
+            idProofNumber: false,
             email: !!aadhaarData.email
         });
 
-        // Set a global flag that this user is QR-Verified
-        (store as any).setIsQrVerified?.(true);
+        store.setIsQrVerified(true);
 
         navigate('/onboarding/add/personal');
+    };
+
+    const startScanner = async () => {
+        try {
+            setError(null);
+            setIsInitializing(true);
+
+            const html5QrCode = new Html5Qrcode(qrCodeRegionId);
+            scannerRef.current = html5QrCode;
+
+            const config = {
+                fps: 30,
+                qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                    const boxSize = Math.floor(minEdge * 0.85);
+                    return { width: boxSize, height: boxSize };
+                },
+                aspectRatio: 1.0,
+                videoConstraints: {
+                    facingMode: "environment",
+                    width: { min: 1280, ideal: 1920, max: 2560 },
+                    height: { min: 720, ideal: 1080, max: 1440 },
+                }
+            };
+
+            await html5QrCode.start(
+                { facingMode: "environment" },
+                config,
+                async (decodedText) => {
+                    let parsedData: AadhaarData | null = null;
+                    
+                    if (/^\d+$/.test(decodedText) && decodedText.length > 500) {
+                        setIsInitializing(true);
+                        parsedData = await decodeSecureQR(decodedText);
+                        setIsInitializing(false);
+                    } else {
+                        parsedData = parseAadhaarQR(decodedText);
+                    }
+
+                    if (parsedData) {
+                        try {
+                            if (window.navigator && window.navigator.vibrate) {
+                                window.navigator.vibrate(100);
+                            }
+                        } catch (e) {}
+                        handleScanSuccess(parsedData);
+                    }
+                },
+                () => {}
+            );
+            
+            try {
+                const capabilities = await html5QrCode.getRunningTrackCapabilities();
+                if (capabilities && (capabilities as any).torch) {
+                    setHasFlash(true);
+                }
+            } catch (e) {
+                console.log("Torch capability check failed", e);
+            }
+            
+            setIsInitializing(false);
+        } catch (err: any) {
+            console.error('Scanner error:', err);
+            setError(`Camera error: ${err.message || 'Access denied'}`);
+            setIsInitializing(false);
+        }
     };
 
     const handleRetry = () => {
@@ -447,6 +348,17 @@ const AadhaarScannerPage: React.FC = () => {
             console.error('Flash toggle failed:', err);
         }
     };
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            startScanner();
+        }, 500);
+        
+        return () => {
+            clearTimeout(timer);
+            stopScanner();
+        };
+    }, []);
 
     return (
         <div className="fixed inset-0 z-[250] flex flex-col bg-black text-white">
