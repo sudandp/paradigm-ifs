@@ -19,7 +19,7 @@ import { Plus, Trash2, AlertTriangle, Loader2, ArrowLeft } from 'lucide-react';
 import MismatchModal from '../../components/modals/MismatchModal';
 import { useAuthStore } from '../../store/authStore';
 import Input from '../../components/ui/Input';
-import AadhaarQrScanner from '../../components/onboarding/AadhaarQrScanner';
+// Removed AadhaarQrScanner import as it's now a separate route
 
 const defaultDesignationRules = {
     documents: {
@@ -119,7 +119,6 @@ const PreUpload = () => {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [mismatchModalState, setMismatchModalState] = useState({ isOpen: false, employeeName: '', bankName: '', reason: '' });
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-    const [showQrScanner, setShowQrScanner] = useState(false);
 
     const designation = store.data.organization.designation;
     const currentRules = useMemo(() =>
@@ -311,58 +310,6 @@ const PreUpload = () => {
         processAndNavigate(getValues(), true);
     };
 
-    const handleQrScanSuccess = (aadhaarData: any) => {
-        // Auto-fill the form with scanned Aadhaar data
-        const nameParts = aadhaarData.name.split(' ');
-        const firstName = formatNameToTitleCase(nameParts.shift() || '');
-        const lastName = formatNameToTitleCase(nameParts.pop() || '');
-        const middleName = formatNameToTitleCase(nameParts.join(' '));
-
-        store.updatePersonal({
-            firstName,
-            lastName,
-            middleName,
-            preferredName: firstName,
-            dob: aadhaarData.dob,
-            gender: aadhaarData.gender,
-            idProofType: 'Aadhaar',
-            idProofNumber: aadhaarData.aadhaarNumber
-        });
-
-        store.updateAddress({
-            present: {
-                ...aadhaarData.address,
-                country: 'India',
-                verifiedStatus: {
-                    line1: true,
-                    city: true,
-                    state: true,
-                    pincode: true,
-                    country: true
-                }
-            },
-            permanent: {
-                ...aadhaarData.address,
-                country: 'India'
-            },
-            sameAsPresent: true
-        });
-
-        store.setPersonalVerifiedStatus({
-            name: true,
-            dob: true,
-            idProofNumber: true
-        });
-
-        setShowQrScanner(false);
-        setToast({ message: 'Aadhaar details extracted successfully! Please continue to fill remaining details.', type: 'success' });
-        
-        // Navigate to personal details page
-        setTimeout(() => {
-            navigate('/onboarding/add/personal');
-        }, 1500);
-    };
-
 
     return (
         <div className="relative">
@@ -375,7 +322,7 @@ const PreUpload = () => {
             )}
             <div className={`bg-card p-8 rounded-xl shadow-card w-full transition-all ${isProcessing ? 'blur-sm pointer-events-none' : ''}`}>
                 <MismatchModal {...mismatchModalState} onClose={() => setMismatchModalState({ isOpen: false, employeeName: '', bankName: '', reason: '' })} onOverride={handleOverride} />
-                {showQrScanner && <AadhaarQrScanner onScanSuccess={handleQrScanSuccess} onClose={() => setShowQrScanner(false)} />}
+                <MismatchModal {...mismatchModalState} onClose={() => setMismatchModalState({ isOpen: false, employeeName: '', bankName: '', reason: '' })} onOverride={handleOverride} />
                 <form onSubmit={handleSubmit(handleFormSubmit)}>
                     <FormHeader title="Document Collection" subtitle="Upload documents to auto-fill the application." />
 
@@ -395,13 +342,7 @@ const PreUpload = () => {
                                     type="button" 
                                     variant="outline" 
                                     size="sm"
-                                    onClick={() => {
-                                        if (isMobile) {
-                                            navigate('/onboarding/scan-aadhaar');
-                                        } else {
-                                            setShowQrScanner(true);
-                                        }
-                                    }}
+                                    onClick={() => navigate('/onboarding/scan-aadhaar')}
                                 >
                                     <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />

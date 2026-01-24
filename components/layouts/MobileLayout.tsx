@@ -69,7 +69,7 @@ const MobileLayout: React.FC = () => {
             </main>
 
             {/* Bottom Navigation */}
-            {!location.pathname.startsWith('/onboarding/scan-aadhaar') && <BottomNav />}
+            <BottomNav />
 
             {/* Notification Panel Overlay */}
             {isPanelOpen && (

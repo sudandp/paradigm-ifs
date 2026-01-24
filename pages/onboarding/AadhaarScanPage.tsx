@@ -52,7 +52,7 @@ const AadhaarScanPage: React.FC = () => {
     };
 
     return (
-        <div className="fixed inset-0 bg-page z-[100] flex flex-col overflow-hidden">
+        <div className="w-full h-screen bg-black">
             <AadhaarQrScanner 
                 onScanSuccess={handleScanSuccess} 
                 onClose={handleClose} 
