@@ -113,6 +113,7 @@ const UniformDetails = lazyWithRetry(() => import('./pages/onboarding/UniformDet
 const Documents = lazyWithRetry(() => import('./pages/onboarding/Documents'));
 const Biometrics = lazyWithRetry(() => import('./pages/onboarding/Biometrics'));
 const Review = lazyWithRetry(() => import('./pages/onboarding/Review'));
+const AadhaarScannerPage = lazyWithRetry(() => import('./pages/onboarding/AadhaarScannerPage'));
 
 // Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -551,6 +552,7 @@ const App: React.FC = () => {
             <Route path="onboarding/select-organization" element={<SelectOrganization />} />
             <Route path="onboarding/pre-upload" element={<PreUpload />} />
             <Route path="onboarding/submissions" element={<MySubmissions />} />
+            <Route path="onboarding/aadhaar-scan" element={<AadhaarScannerPage />} />
             <Route path="onboarding/tasks" element={<MyTasks />} />
             <Route path="onboarding/uniforms" element={<UniformRequests />} />
             <Route path="onboarding/add" element={<AddEmployee />}>
