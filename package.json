@@ -39,6 +39,7 @@
     "file-saver": "^2.0.5",
     "html2pdf.js": "^0.14.0",
     "html5-qrcode": "^2.3.8",
+    "jsqr": "^1.4.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.378.0",
     "puppeteer": "^24.30.0",

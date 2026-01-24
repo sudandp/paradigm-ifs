@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
+import jsQR from 'jsqr';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, RefreshCw, Zap, ZapOff } from 'lucide-react';
+import { ArrowLeft, Loader2, RefreshCw, Zap, ZapOff, Upload, CheckCircle2, XCircle } from 'lucide-react';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import Button from '../../components/ui/Button';
+import Modal from '../../components/ui/Modal';
 
 interface AadhaarData {
     name: string;
@@ -29,6 +31,10 @@ const AadhaarScannerPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [isFlashOn, setIsFlashOn] = useState(false);
     const [hasFlash, setHasFlash] = useState(false);
+    const [isScanningFile, setIsScanningFile] = useState(false);
+    const [scannedData, setScannedData] = useState<AadhaarData | null>(null);
+    const [isReviewOpen, setIsReviewOpen] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const qrCodeRegionId = "qr-reader-full-page";
 
@@ -40,12 +46,24 @@ const AadhaarScannerPage: React.FC = () => {
 
     const formatDobToISO = (dob: string): string => {
         if (!dob) return '';
-        const parts = dob.split(/[-/]/);
+        // Aggressively remove non-date characters (hidden binary bits)
+        const cleaned = dob.replace(/[^-/0-9]/g, '').trim();
+        
+        // If already YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned;
+        
+        const parts = cleaned.split(/[-/]/);
         if (parts.length === 3) {
-            const [day, month, year] = parts;
-            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            const [p1, p2, p3] = parts;
+            // Determine if p1 or p3 is the year
+            const year = p3.length === 4 ? p3 : (p1.length === 4 ? p1 : '');
+            const day = p3.length === 4 ? p1 : (p1.length === 4 ? p3 : '');
+            const month = p2.padStart(2, '0');
+            const d = day.padStart(2, '0');
+            
+            if (year) return `${year}-${month}-${d}`;
         }
-        return dob;
+        return cleaned;
     };
 
     const formatGender = (gender: string): string => {
@@ -131,11 +149,13 @@ const AadhaarScannerPage: React.FC = () => {
             const fields: string[] = [];
             let currentFieldBytes: number[] = [];
             
-            for (let i = 256; i < data.length; i++) {
+            // Start from 0 to match our successful diagnostic dump
+            for (let i = 0; i < data.length; i++) {
                 if (data[i] === 255) {
                     fields.push(textDecoder.decode(new Uint8Array(currentFieldBytes)));
                     currentFieldBytes = [];
-                    if (fields.length > 20) break; 
+                    // Keep scanning fields until we hit the photo/end
+                    if (fields.length > 30) break; 
                 } else {
                     currentFieldBytes.push(data[i]);
                 }
@@ -150,14 +170,14 @@ const AadhaarScannerPage: React.FC = () => {
             const maskedEmail = fields[18] || '';
 
             const house = fields[9] || '';
-            const layout = fields[14] || '';
-            const locality = fields[10] || '';
-            const landmark = fields[8] || '';
-            const subLocality = fields[16] || '';
-            const town = fields[12] || '';
-            const city = fields[7] || '';
-            const state = fields[13] || '';
-            const pincode = fields[11] || '';
+            const layout = fields[14] || ''; // Raja Reddy Layout in your V5 card
+            const locality = fields[10] || ''; // Ramamurthi Nagar
+            const landmark = fields[8] || ''; // 39 m from Rakesh Kumar Fuel
+            const subLocality = fields[16] || ''; // Ramammurthynagar
+            const town = fields[12] || ''; // Doorvaninagar
+            const city = fields[7] || ''; // Bengaluru
+            const state = fields[13] || ''; // Karnataka
+            const pincode = fields[11] || ''; // 560016
             
             const addrParts = [
                 house, 
@@ -182,7 +202,7 @@ const AadhaarScannerPage: React.FC = () => {
                     state: state,
                     pincode: pincode
                 },
-                aadhaarNumber: '', 
+                aadhaarNumber: maskedMobile || 'QR-VERIFIED', 
                 mobile: maskedMobile,
                 email: maskedEmail
             };
@@ -199,7 +219,8 @@ const AadhaarScannerPage: React.FC = () => {
                 if (scannerRef.current.isScanning) {
                     await scannerRef.current.stop();
                 }
-                scannerRef.current.clear();
+                // Don't call clear() immediately if we might need the object for file scanning
+                // but for this implementation we recreate it if needed.
             } catch (err) {
                 console.error('Error stopping scanner:', err);
             }
@@ -208,7 +229,14 @@ const AadhaarScannerPage: React.FC = () => {
 
     const handleScanSuccess = async (aadhaarData: AadhaarData) => {
         await stopScanner();
+        setScannedData(aadhaarData);
+        setIsReviewOpen(true);
+    };
+
+    const confirmAndFill = () => {
+        if (!scannedData) return;
         
+        const aadhaarData = scannedData;
         const nameParts = aadhaarData.name.split(' ');
         const firstName = formatNameToTitleCase(nameParts.shift() || '');
         const lastName = formatNameToTitleCase(nameParts.pop() || '');
@@ -222,9 +250,10 @@ const AadhaarScannerPage: React.FC = () => {
             dob: aadhaarData.dob,
             gender: aadhaarData.gender as any,
             idProofType: 'Aadhaar',
-            idProofNumber: '', 
+            idProofNumber: aadhaarData.mobile || 'QR-VERIFIED', 
             mobile: aadhaarData.mobile,
-            email: aadhaarData.email
+            email: aadhaarData.email,
+            isQrVerified: true
         });
 
         store.updateAddress({
@@ -259,8 +288,6 @@ const AadhaarScannerPage: React.FC = () => {
             email: !!aadhaarData.email
         });
 
-        store.setIsQrVerified(true);
-
         navigate('/onboarding/add/personal');
     };
 
@@ -273,17 +300,18 @@ const AadhaarScannerPage: React.FC = () => {
             scannerRef.current = html5QrCode;
 
             const config = {
-                fps: 30,
+                fps: 60, // Increased FPS for better tracking
                 qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
                     const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                    const boxSize = Math.floor(minEdge * 0.85);
+                    const boxSize = Math.floor(minEdge * 0.95); // Even larger box for dense codes
                     return { width: boxSize, height: boxSize };
                 },
                 aspectRatio: 1.0,
                 videoConstraints: {
                     facingMode: "environment",
-                    width: { min: 1280, ideal: 1920, max: 2560 },
+                    width: { min: 1280, ideal: 1920, max: 2560 }, // Request high res
                     height: { min: 720, ideal: 1080, max: 1440 },
+                    frameRate: { ideal: 60 }
                 }
             };
 
@@ -332,8 +360,94 @@ const AadhaarScannerPage: React.FC = () => {
 
     const handleRetry = () => {
         setIsFlashOn(false);
-        stopScanner();
-        startScanner();
+        if (scannerRef.current?.isScanning) {
+            scannerRef.current.stop().then(() => startScanner());
+        } else {
+            startScanner();
+        }
+    };
+
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !scannerRef.current) return;
+
+        try {
+            setIsScanningFile(true);
+            setError(null);
+            
+            // CRITICAL: Stop ongoing camera scan before starting file scan
+            if (scannerRef.current.isScanning) {
+                await scannerRef.current.stop();
+            }
+            
+            // Using jsQR for robust decoding of high-density images
+            const reader = new FileReader();
+            const decodedText = await new Promise<string>((resolve, reject) => {
+                reader.onload = async (e) => {
+                    try {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            const ctx = canvas.getContext('2d');
+                            if (!ctx) {
+                                reject(new Error('Canvas context failed'));
+                                return;
+                            }
+
+                            // ZXing-like preprocessing: Boost contrast and convert to grayscale
+                            ctx.filter = 'contrast(120%) grayscale(100%)';
+                            ctx.drawImage(img, 0, 0);
+                            
+                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            
+                            // Advanced binarization fallback if first attempt fails
+                            let code = jsQR(imageData.data, imageData.width, imageData.height);
+                            
+                            if (!code) {
+                                // Sharpen and try again
+                                ctx.filter = 'contrast(150%) brightness(110%) grayscale(100%)';
+                                ctx.drawImage(img, 0, 0);
+                                const retryData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                code = jsQR(retryData.data, retryData.width, retryData.height);
+                            }
+
+                            if (code) {
+                                resolve(code.data);
+                            } else {
+                                reject(new Error('No QR code found'));
+                            }
+                        };
+                        img.onerror = () => reject(new Error('Image load failed'));
+                        img.src = e.target?.result as string;
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                reader.onerror = () => reject(new Error('File read failed'));
+                reader.readAsDataURL(file);
+            });
+            
+            let parsedData: AadhaarData | null = null;
+            if (/^\d+$/.test(decodedText) && decodedText.length > 500) {
+                parsedData = await decodeSecureQR(decodedText);
+            } else {
+                parsedData = parseAadhaarQR(decodedText);
+            }
+
+            if (parsedData) {
+                handleScanSuccess(parsedData);
+            } else {
+                setError("Could not find any Aadhaar data in this image. Please ensure the QR is clear.");
+            }
+        } catch (err: any) {
+            console.error('File scan error:', err);
+            setError("Failed to read image. Make sure it is a valid QR code.");
+        } finally {
+            setIsScanningFile(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
     };
 
     const toggleFlash = async () => {
@@ -350,15 +464,94 @@ const AadhaarScannerPage: React.FC = () => {
     };
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            startScanner();
-        }, 500);
-        
-        return () => {
-            clearTimeout(timer);
+        if (!isReviewOpen) {
+            const timer = setTimeout(() => {
+                startScanner();
+            }, 500);
+            
+            return () => {
+                clearTimeout(timer);
+                stopScanner();
+            };
+        } else {
             stopScanner();
-        };
-    }, []);
+        }
+    }, [isReviewOpen]);
+
+    if (isReviewOpen && scannedData) {
+        return (
+            <div className="fixed inset-0 z-[300] flex flex-col bg-[#01140a] text-white animate-fade-in">
+                <header className="p-6 border-b border-emerald-900/30 flex items-center gap-4">
+                    <Button 
+                        variant="icon" 
+                        className="!text-white bg-white/5 hover:!bg-white/10 !p-2 !rounded-full" 
+                        onClick={() => setIsReviewOpen(false)}
+                    >
+                        <ArrowLeft className="h-6 w-6" />
+                    </Button>
+                    <h2 className="text-xl font-bold tracking-tight">Verify Extracted Details</h2>
+                </header>
+
+                <main className="flex-1 overflow-y-auto p-6 space-y-8">
+                    <div className="flex items-center gap-4 p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
+                        <div className="h-12 w-12 bg-emerald-500 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+                            <CheckCircle2 className="h-7 w-7 text-white" />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-emerald-400">Scan Successful!</h4>
+                            <p className="text-sm text-white/50">Please verify the details below before proceeding.</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-6">
+                        <section className="space-y-1 border-l-2 border-emerald-500/30 pl-4">
+                            <label className="text-[10px] uppercase font-black text-emerald-500/60 tracking-widest block">Full Name</label>
+                            <p className="font-bold text-2xl text-white leading-tight">{scannedData.name}</p>
+                        </section>
+
+                        <div className="grid grid-cols-2 gap-8">
+                            <section className="space-y-1 border-l-2 border-emerald-500/30 pl-4">
+                                <label className="text-[10px] uppercase font-black text-emerald-500/60 tracking-widest block">Date of Birth</label>
+                                <p className="font-bold text-lg text-white">{scannedData.dob}</p>
+                            </section>
+                            <section className="space-y-1 border-l-2 border-emerald-500/30 pl-4">
+                                <label className="text-[10px] uppercase font-black text-emerald-500/60 tracking-widest block">Gender</label>
+                                <p className="font-bold text-lg text-white">{scannedData.gender}</p>
+                            </section>
+                        </div>
+
+                        <section className="space-y-2 border-l-2 border-emerald-500/30 pl-4">
+                            <label className="text-[10px] uppercase font-black text-emerald-500/60 tracking-widest block">Verified Address</label>
+                            <p className="text-sm leading-relaxed text-white/80">{scannedData.address.line1}</p>
+                            <div className="inline-flex mt-2 px-3 py-1 bg-emerald-950/50 border border-emerald-800/30 rounded-lg">
+                                <p className="text-sm font-bold text-emerald-400">
+                                    {scannedData.address.city}, {scannedData.address.state} - {scannedData.address.pincode}
+                                </p>
+                            </div>
+                        </section>
+                    </div>
+                </main>
+
+                <footer className="p-6 pt-0 bg-gradient-to-t from-[#01140a] via-[#01140a] to-transparent">
+                     <div className="flex flex-col gap-3">
+                        <Button 
+                            className="w-full !rounded-2xl !py-4 font-bold text-lg shadow-xl shadow-emerald-900/20"
+                            onClick={confirmAndFill}
+                        >
+                            Confirm & Auto-Fill
+                        </Button>
+                        <Button 
+                            variant="secondary"
+                            className="w-full !rounded-2xl !py-4 !bg-white/5 !border-white/10 !text-white/60 font-medium"
+                            onClick={() => setIsReviewOpen(false)}
+                        >
+                            Rescan QR Code
+                        </Button>
+                     </div>
+                </footer>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 z-[250] flex flex-col bg-black text-white">
@@ -383,10 +576,17 @@ const AadhaarScannerPage: React.FC = () => {
             </div>
 
             <div className="flex-grow relative flex items-center justify-center overflow-hidden bg-black">
-                {isInitializing && (
+                {isInitializing && !isScanningFile && (
                     <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black">
                         <Loader2 className="h-12 w-12 animate-spin text-accent" />
                         <p className="mt-4 text-white/70 font-medium">Initializing scanner...</p>
+                    </div>
+                )}
+
+                {isScanningFile && (
+                    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+                        <Loader2 className="h-12 w-12 animate-spin text-white" />
+                        <p className="mt-4 text-white font-medium text-lg">Processing Image...</p>
                     </div>
                 )}
 
@@ -407,12 +607,12 @@ const AadhaarScannerPage: React.FC = () => {
 
                 {!isInitializing && !error && (
                     <div className="absolute inset-0 z-30 pointer-events-none flex flex-col items-center justify-center">
-                        <div className="w-64 h-64 border-2 border-accent rounded-2xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                        <div className="w-80 h-80 border-2 border-accent rounded-3xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
                             <div className="absolute inset-x-0 h-0.5 bg-accent/50 shadow-[0_0_15px_#006b3f] animate-[scan_2s_linear_infinite]"></div>
-                            <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-accent rounded-tl-lg"></div>
-                            <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-accent rounded-tr-lg"></div>
-                            <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-accent rounded-bl-lg"></div>
-                            <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-accent rounded-br-lg"></div>
+                            <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-accent rounded-tl-xl"></div>
+                            <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-accent rounded-tr-xl"></div>
+                            <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-accent rounded-bl-xl"></div>
+                            <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-accent rounded-br-xl"></div>
                         </div>
                         <h3 className="mt-6 text-xl font-bold text-white drop-shadow-md">Scan Aadhaar QR</h3>
                         <p className="mt-3 text-white/80 text-sm font-medium px-6 text-center">
@@ -422,17 +622,36 @@ const AadhaarScannerPage: React.FC = () => {
                 )}
             </div>
 
-            <div className="absolute bottom-20 left-0 right-0 p-4 z-40 flex justify-end">
-                 {!isInitializing && (
-                    <Button 
-                        variant="secondary" 
-                        className="!rounded-full !bg-black/60 !border-white/20 !text-white hover:!bg-black/80 shadow-lg"
-                        onClick={handleRetry}
-                    >
-                        <RefreshCw className="h-5 w-5 mr-2" />
-                        Reload Camera
-                    </Button>
+            <div className="absolute bottom-20 left-0 right-0 p-6 z-40 flex flex-col gap-4 items-center">
+                 {!isInitializing && !isScanningFile && (
+                    <div className="flex flex-col gap-3 w-full max-w-sm">
+                        <div className="flex gap-4">
+                            <Button 
+                                variant="secondary" 
+                                className="flex-1 !rounded-2xl !py-5 !bg-white/10 !border-white/20 !text-white hover:!bg-white/20 backdrop-blur-md shadow-lg text-lg font-bold"
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                <Upload className="h-6 w-6 mr-3" />
+                                Upload Image
+                            </Button>
+                            <Button 
+                                variant="icon" 
+                                className="!rounded-2xl !bg-white/10 !border-white/20 !text-white hover:!bg-white/20 backdrop-blur-md shadow-lg !p-5"
+                                onClick={handleRetry}
+                            >
+                                <RefreshCw className="h-7 w-7" />
+                            </Button>
+                        </div>
+                    </div>
                  )}
+
+                 <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleFileUpload}
+                 />
             </div>
 
             <style>{`

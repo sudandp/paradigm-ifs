@@ -267,18 +267,26 @@ export const api = {
     const submissionId = (data.id && !data.id.startsWith('draft_')) ? data.id : crypto.randomUUID();
     const dataWithPaths = await processFilesForUpload(data, session.user.id, submissionId);
 
+    const snakedData = toSnakeCase(dataWithPaths);
+    
     const dbData = {
-      ...toSnakeCase(dataWithPaths),
+      ...snakedData,
       id: submissionId,
       user_id: session.user.id,
+      employee_id: data.personal?.employeeId || null,
       status: asDraft ? 'draft' : data.status,
     };
 
+    // Remove any client-side only properties that don't have columns
     delete dbData.file;
     delete dbData.confirm_account_number;
+    delete (dbData as any).is_qr_verified; // Guard against legacy state
 
     const { data: savedData, error } = await supabase.from('onboarding_submissions').upsert(dbData, { onConflict: 'id' }).select('id').single();
-    if (error) throw error;
+    if (error) {
+        console.error('Save submission error:', error);
+        throw error;
+    }
     return { draftId: savedData.id };
   },
 

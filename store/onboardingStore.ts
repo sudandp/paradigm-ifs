@@ -25,7 +25,6 @@ interface OnboardingState {
   setRequiresManualVerification: (requires: boolean) => void;
   setFormsGenerated: (generated: boolean) => void;
   logVerificationUsage: (serviceName: string) => void;
-  setIsQrVerified: (verified: boolean) => void;
   reset: () => void;
   addFamilyMember: () => void;
   updateFamilyMember: (id: string, updates: Partial<FamilyMember>) => void;
@@ -166,7 +165,6 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
           }
           return { data: { ...state.data, verificationUsage: newUsage } };
         }),
-      setIsQrVerified: (verified) => set((state) => ({ data: { ...state.data, isQrVerified: verified } })),
       reset: () => set({ data: getInitialState() }),
       addFamilyMember: () => set((state) => ({
         data: {

@@ -109,7 +109,9 @@ const DatePicker: React.FC<DatePickerProps> = ({ label, id, error, value, onChan
           aria-expanded={isOpen}
           aria-label={`Date picker for ${label}`}
         >
-          <span className={value ? '' : 'text-muted'}>{value ? format(selectedDate, 'dd MMM, yyyy') : 'Select date'}</span>
+          <span className={value ? '' : 'text-muted'}>
+            {value && !isNaN(selectedDate.getTime()) ? format(selectedDate, 'dd MMM, yyyy') : 'Select date'}
+          </span>
           <CalendarIcon className="h-4 w-4 text-muted" />
         </div>
         

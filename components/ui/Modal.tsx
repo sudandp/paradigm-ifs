@@ -13,10 +13,11 @@ interface ModalProps {
     isLoading?: boolean; // Alias for isConfirming
     maxWidth?: string; // Optional custom max-width
     extraActions?: React.ReactNode; // Optional extra buttons
+    footer?: React.ReactNode; // Optional full footer override
     hideFooter?: boolean;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, onConfirm, title, children, confirmButtonVariant = 'danger', confirmButtonText = 'Confirm', isConfirming = false, isLoading, maxWidth = 'md:max-w-md', extraActions, hideFooter = false }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, onConfirm, title, children, confirmButtonVariant = 'danger', confirmButtonText = 'Confirm', isConfirming = false, isLoading, maxWidth = 'md:max-w-md', extraActions, footer, hideFooter = false }) => {
     if (!isOpen) return null;
 
     // Use isLoading if provided, otherwise fall back to isConfirming
@@ -41,25 +42,27 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, onConfirm, title, childr
                 {/* Footer with Buttons */}
                 {!hideFooter && (
                 <div className="flex-shrink-0 p-6 border-t border-border bg-card">
-                    <div className="flex justify-end space-x-3">
-                        {extraActions}
-                        <Button
-                            onClick={onClose}
-                            variant="secondary"
-                            disabled={loading}
-                        >
-                            Cancel
-                        </Button>
-                        {onConfirm && (
+                    {footer ? footer : (
+                        <div className="flex justify-end space-x-3">
+                            {extraActions}
                             <Button
-                                onClick={onConfirm}
-                                variant={confirmButtonVariant}
-                                isLoading={loading}
+                                onClick={onClose}
+                                variant="secondary"
+                                disabled={loading}
                             >
-                                {confirmButtonText}
+                                Cancel
                             </Button>
-                        )}
-                    </div>
+                            {onConfirm && (
+                                <Button
+                                    onClick={onConfirm}
+                                    variant={confirmButtonVariant}
+                                    isLoading={loading}
+                                >
+                                    {confirmButtonText}
+                                </Button>
+                            )}
+                        </div>
+                    )}
                 </div>
                 )}
             </div>
