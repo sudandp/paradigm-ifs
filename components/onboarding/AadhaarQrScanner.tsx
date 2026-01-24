@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { ArrowLeft, Camera, AlertCircle, X, FileText, SwitchCamera } from 'lucide-react';
+import { ArrowLeft, Camera, AlertCircle, X } from 'lucide-react';
 import Button from '../ui/Button';
 
 interface AadhaarData {
@@ -25,7 +25,6 @@ interface AadhaarQrScannerProps {
 
 const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onClose, isFullScreenPage = false }) => {
     const [scanState, setScanState] = useState<'idle' | 'reading' | 'success' | 'error'>('idle');
-    const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
     const [error, setError] = useState<string | null>(null);
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const detectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -68,7 +67,7 @@ const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onCl
             if (detectionTimeoutRef.current) clearTimeout(detectionTimeoutRef.current);
             stopScanner();
         };
-    }, [facingMode]); // Re-init when camera switches
+    }, []);
 
     const resetDetectionTimeout = () => {
         if (detectionTimeoutRef.current) clearTimeout(detectionTimeoutRef.current);
@@ -156,14 +155,10 @@ const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onCl
             scannerRef.current = html5QrCode;
 
             await html5QrCode.start(
-                { facingMode: facingMode }, // Use state for camera switching
+                { facingMode: "environment" },
                 {
                     fps: 15,
-                    qrbox: (viewfinderWidth, viewfinderHeight) => {
-                        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                        const edgeSize = Math.floor(minEdge * 0.7);
-                        return { width: edgeSize, height: edgeSize };
-                    }
+                    qrbox: { width: 250, height: 250 },
                 },
                 (decodedText) => {
                     setScanState('reading');
@@ -209,25 +204,14 @@ const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onCl
     return (
         <div className="fixed inset-0 bg-black z-[100] flex flex-col animate-in fade-in duration-300">
             {/* Header */}
-            <div className="bg-black/90 backdrop-blur-md p-4 pt-12 flex items-center border-b border-white/10 shrink-0 z-20">
+            <div className="bg-black/80 backdrop-blur-md p-4 pt-12 flex items-center border-b border-white/10 shrink-0 z-20">
                 <button onClick={handleClose} className="p-2 text-white hover:bg-white/10 rounded-full transition-colors mr-3">
-                    <ArrowLeft className="h-7 w-7" />
+                    <ArrowLeft className="h-6 w-6" />
                 </button>
                 <div>
-                    <h3 className="text-xl font-black text-white tracking-tight uppercase">Scan Aadhaar QR</h3>
-                    <p className="text-sm text-white/50 font-medium">Align the Aadhaar QR inside the box</p>
+                    <h3 className="text-xl font-bold text-white tracking-tight">Scan Aadhaar QR</h3>
+                    <p className="text-sm text-white/70">Align the Aadhaar QR inside the box</p>
                 </div>
-                <div className="flex-1" />
-                <button 
-                    onClick={() => {
-                        setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
-                        initializationLock.current = false; // Allow re-init
-                    }}
-                    className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all active:scale-90"
-                    title="Switch Camera"
-                >
-                    <SwitchCamera className="h-6 w-6" />
-                </button>
             </div>
 
             {/* Viewfinder Area */}
@@ -243,28 +227,27 @@ const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onCl
 
                 {/* Dark Mask for Focus */}
                 <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center z-10">
-                    <div className="absolute inset-0 bg-black/40" />
+                    <div className="absolute inset-0 bg-black/60 shadow-[inset_0_0_150px_rgba(0,0,0,0.8)]" />
                     
-                    {/* Viewfinder Box (Square 70% width) */}
-                    <div className="w-72 h-72 relative bg-transparent rounded-2xl border-2 border-white/40 shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] animate-in zoom-in-95 duration-500">
-                        {/* Corner markers style ┐ ┌ └ ┘ - Brighter and Thicker */}
-                        <div className="absolute -top-1.5 -left-1.5 w-14 h-14 border-t-[6px] border-l-[6px] border-accent rounded-tl-2xl" />
-                        <div className="absolute -top-1.5 -right-1.5 w-14 h-14 border-t-[6px] border-r-[6px] border-accent rounded-tr-2xl" />
-                        <div className="absolute -bottom-1.5 -left-1.5 w-14 h-14 border-b-[6px] border-l-[6px] border-accent rounded-bl-2xl" />
-                        <div className="absolute -bottom-1.5 -right-1.5 w-14 h-14 border-b-[6px] border-r-[6px] border-accent rounded-br-2xl" />
+                    {/* Viewfinder Box (Square 65% width approx) */}
+                    <div className="w-72 h-72 relative bg-transparent rounded-2xl border-2 border-white/20 shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] animate-in zoom-in-95 duration-500">
+                        {/* Corner markers style ┐ ┌ └ ┘ */}
+                        <div className="absolute -top-1 -left-1 w-12 h-12 border-t-8 border-l-8 border-accent rounded-tl-2xl" />
+                        <div className="absolute -top-1 -right-1 w-12 h-12 border-t-8 border-r-8 border-accent rounded-tr-2xl" />
+                        <div className="absolute -bottom-1 -left-1 w-12 h-12 border-b-8 border-l-8 border-accent rounded-bl-2xl" />
+                        <div className="absolute -bottom-1 -right-1 w-12 h-12 border-b-8 border-r-8 border-accent rounded-br-2xl" />
                         
-                        {/* Intent Visual Overlay - Subtle Icon */}
-                        <div className="absolute inset-0 flex items-center justify-center opacity-10">
-                             <FileText className="h-32 w-32 text-white" />
-                        </div>
-
-                        {/* Status Label - Simplified */}
-                        <div className="absolute -bottom-20 left-0 right-0 text-center flex justify-center">
-                            <span className={`text-sm font-bold px-6 py-2.5 rounded-full shadow-2xl transition-all duration-300 border
-                                ${scanState === 'reading' ? 'bg-orange-500 border-orange-400 text-white animate-pulse' : 
+                        {/* Status Label */}
+                        <div className="absolute -bottom-16 left-0 right-0 text-center flex justify-center">
+                            <span className={`text-sm font-bold px-6 py-2 rounded-full shadow-2xl transition-all duration-300 border
+                                ${scanState === 'reading' ? 'bg-orange-500 border-orange-400 text-white animate-pulse scale-105' : 
                                   scanState === 'success' ? 'bg-green-500 border-green-400 text-white scale-110' : 
-                                  'bg-black/40 backdrop-blur-md border-white/20 text-white'}`}>
-                                {scanState === 'reading' ? 'Reading QR code...' : 'Align the Aadhaar QR inside the box'}
+                                  scanState === 'error' ? 'bg-red-500 border-red-400 text-white' : 
+                                  'bg-black/60 backdrop-blur-md border-white/20 text-white'}`}>
+                                {scanState === 'idle' ? 'Align Aadhaar QR inside the box' :
+                                 scanState === 'reading' ? 'Reading QR...' :
+                                 scanState === 'success' ? 'Scan Successful!' :
+                                 'QR not detected'}
                             </span>
                         </div>
                     </div>
@@ -282,23 +265,17 @@ const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onCl
             </div>
 
             {error && scanState === 'error' && (
-                <div className="absolute bottom-10 left-4 right-4 z-[110] animate-in slide-in-from-bottom-8 duration-300">
-                    <div className="bg-red-600 text-white p-5 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col gap-4 border border-white/20">
-                        <div className="flex items-center gap-3">
-                            <AlertCircle className="h-6 w-6 shrink-0" />
+                <div className="absolute top-1/2 left-4 right-4 -translate-y-1/2 mt-40 z-[100] animate-in slide-in-from-bottom-4 duration-300">
+                    <div className="bg-red-600 text-white p-5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex items-center gap-4 border border-white/10">
+                        <AlertCircle className="h-7 w-7 shrink-0" />
+                        <div className="flex-1">
                             <p className="font-bold text-base leading-tight">QR not detected. Please try again.</p>
                         </div>
                         <button 
-                            onClick={async () => { 
-                                setScanState('idle'); 
-                                setError(null); 
-                                await stopScanner();
-                                await startScanner();
-                                resetDetectionTimeout(); 
-                            }} 
-                            className="bg-white text-red-600 w-full py-3.5 rounded-xl text-sm font-black transition-transform active:scale-95 shadow-lg"
+                            onClick={() => { setScanState('idle'); setError(null); resetDetectionTimeout(); }} 
+                            className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-black transition-colors"
                         >
-                            RETRY SCANNING
+                            RETRY
                         </button>
                     </div>
                 </div>
