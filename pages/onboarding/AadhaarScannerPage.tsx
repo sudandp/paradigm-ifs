@@ -141,10 +141,111 @@ const AadhaarScannerPage: React.FC = () => {
     };
 
     const formatGender = (gender: string): string => {
-        const g = gender.toUpperCase();
+        const g = (gender || '').toUpperCase();
         if (g === 'M' || g === 'MALE') return 'Male';
         if (g === 'F' || g === 'FEMALE') return 'Female';
         return 'Other';
+    };
+
+    /**
+     * DECORDER FOR SECURE QR CODE (mAadhaar/New Format)
+     * Logic: BigInt -> Byte Array -> GZIP Decompress -> Parse Binary
+     */
+    const decodeSecureQR = async (numericText: string): Promise<AadhaarData | null> => {
+        try {
+            // 1. BigInt to Byte Array
+            let bigInt = BigInt(numericText);
+            let hex = bigInt.toString(16);
+            if (hex.length % 2 !== 0) hex = '0' + hex;
+            const bytes = new Uint8Array(hex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+
+            // 2. GZIP Decompress (Modern Browser API)
+            // Note: Secure QR uses a compressed byte stream.
+            // We use DecompressionStream which works in Chrome/Safari/Android WebView
+            const stream = new ReadableStream({
+                start(controller) {
+                    controller.enqueue(bytes);
+                    controller.close();
+                }
+            });
+
+            const decompressedStream = stream.pipeThrough(new (window as any).DecompressionStream('gzip'));
+            const reader = decompressedStream.getReader();
+            const chunks: Uint8Array[] = [];
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (value) chunks.push(value as Uint8Array);
+            }
+
+            const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+            const data = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const chunk of chunks) {
+                data.set(chunk, offset);
+                offset += chunk.length;
+            }
+
+            // 3. Parse UIDAI format (V2/V3)
+            // UIDAI Secure QR Structure: 
+            // Header, 255 bytes Signature, then Version, then Data separated by 255 (delimiter)
+            
+            // Skip signature (usually first 256 bytes)
+            // The data is actually encoded using ISO-8859-1 after decompression
+            const decoder = new TextDecoder('iso-8859-1');
+            
+            // Secure QR data mapping: 
+            // V2 format has data fields separated by byte value 255
+            const fields: string[] = [];
+            let currentField: number[] = [];
+            
+            // Start from where demographic data begins (after header/signature)
+            // Community research shows data starts after the 256-byte signature
+            for (let i = 256; i < data.length; i++) {
+                if (data[i] === 255) {
+                    fields.push(decoder.decode(new Uint8Array(currentField)));
+                    currentField = [];
+                    // Stop if we hit photo (large field) or end
+                    if (fields.length > 15) break; 
+                } else {
+                    currentField.push(data[i]);
+                }
+            }
+
+            if (fields.length < 5) return null;
+
+            // Mapping based on UIDAI V2 Spec:
+            // 0: Version, 1: Email Hash, 2: Mobile Hash, 3: Name, 4: DOB, 5: Gender
+            // 6: CareOf, 7: District, 8: Landmark, 9: House, 10: Location, 11: Pincode
+            // 12: State, 13: VTC, 14: Masked UID
+            
+            const name = fields[3] || '';
+            const dob = formatDobToISO(fields[4] || '');
+            const gender = formatGender(fields[5] || '');
+            const maskedUid = fields[14] || '';
+            
+            // Build address
+            const addrParts = [fields[9], fields[6], fields[8], fields[10]].filter(Boolean);
+            const line1 = addrParts.join(', ');
+
+            return {
+                name,
+                dob,
+                gender,
+                address: {
+                    line1,
+                    city: fields[13] || fields[7] || '',
+                    state: fields[12] || '',
+                    pincode: fields[11] || ''
+                },
+                aadhaarNumber: maskedUid.replace(/X/g, '0') // Store masked or dummy for now
+            };
+
+        } catch (err) {
+            console.error('Secure QR Decoding Error:', err);
+            return null;
+        }
     };
 
     const startScanner = async () => {
@@ -175,11 +276,21 @@ const AadhaarScannerPage: React.FC = () => {
             await html5QrCode.start(
                 { facingMode: "environment" },
                 config,
-                (decodedText) => {
-                    const parsedData = parseAadhaarQR(decodedText);
+                async (decodedText) => {
+                    let parsedData: AadhaarData | null = null;
+                    
+                    if (/^\d+$/.test(decodedText) && decodedText.length > 500) {
+                        // High-density numeric string = Secure QR
+                        setIsInitializing(true); // Show loader while decoding
+                        parsedData = await decodeSecureQR(decodedText);
+                        setIsInitializing(false);
+                    } else {
+                        // Standard XML or Pipe format
+                        parsedData = parseAadhaarQR(decodedText);
+                    }
+
                     if (parsedData) {
                         try {
-                            // Haptic feedback if available
                             if (window.navigator && window.navigator.vibrate) {
                                 window.navigator.vibrate(100);
                             }
