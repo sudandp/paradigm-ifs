@@ -6,6 +6,10 @@ import 'leaflet/dist/leaflet.css';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import App from './App';
+import { defineCustomElements } from '@ionic/pwa-elements/loader';
+
+// Initialize PWA Elements for Capacitor Camera
+defineCustomElements(window);
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

@@ -85,6 +85,7 @@ const FieldReports = lazyWithRetry(() => import('./pages/my-team/FieldReports'))
 const Tasks = lazyWithRetry(() => import('./pages/tasks/TaskManagement'));
 const TeamMemberProfile = lazyWithRetry(() => import('./pages/my-team/TeamMemberProfile'));
 const ReportingStructure = lazyWithRetry(() => import('./pages/my-team/ReportingStructure'));
+const AadhaarScanPage = lazyWithRetry(() => import('./pages/onboarding/AadhaarScanPage'));
 
 // Form Pages
 const AddUserPage = lazyWithRetry(() => import('./pages/forms/AddUserPage'));
@@ -436,6 +437,7 @@ const App: React.FC = () => {
             apiSettings: settings.apiSettings,
             addressSettings: settings.addressSettings,
             geminiApiSettings: settings.geminiApiSettings,
+            offlineOcrSettings: settings.offlineOcrSettings,
             perfiosApiSettings: settings.perfiosApiSettings,
             otpSettings: settings.otpSettings,
             siteManagementSettings: settings.siteManagementSettings,
@@ -549,6 +551,7 @@ const App: React.FC = () => {
             <Route path="onboarding" element={<OnboardingHome />} />
             <Route path="onboarding/select-organization" element={<SelectOrganization />} />
             <Route path="onboarding/pre-upload" element={<PreUpload />} />
+            <Route path="onboarding/scan-aadhaar" element={<AadhaarScanPage />} />
             <Route path="onboarding/submissions" element={<MySubmissions />} />
             <Route path="onboarding/tasks" element={<MyTasks />} />
             <Route path="onboarding/uniforms" element={<UniformRequests />} />

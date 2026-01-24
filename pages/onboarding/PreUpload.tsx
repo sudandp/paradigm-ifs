@@ -5,6 +5,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { useEnrollmentRulesStore } from '../../store/enrollmentRulesStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import type { UploadedFile, PersonalDetails, BankDetails, UanDetails, EsiDetails, FamilyMember, DocumentRules, EducationRecord } from '../../types';
 import FormHeader from '../../components/onboarding/FormHeader';
 import UploadDocument from '../../components/UploadDocument';
@@ -18,6 +19,7 @@ import { Plus, Trash2, AlertTriangle, Loader2, ArrowLeft } from 'lucide-react';
 import MismatchModal from '../../components/modals/MismatchModal';
 import { useAuthStore } from '../../store/authStore';
 import Input from '../../components/ui/Input';
+import AadhaarQrScanner from '../../components/onboarding/AadhaarQrScanner';
 
 const defaultDesignationRules = {
     documents: {
@@ -117,6 +119,7 @@ const PreUpload = () => {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [mismatchModalState, setMismatchModalState] = useState({ isOpen: false, employeeName: '', bankName: '', reason: '' });
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [showQrScanner, setShowQrScanner] = useState(false);
 
     const designation = store.data.organization.designation;
     const currentRules = useMemo(() =>
@@ -308,6 +311,59 @@ const PreUpload = () => {
         processAndNavigate(getValues(), true);
     };
 
+    const handleQrScanSuccess = (aadhaarData: any) => {
+        // Auto-fill the form with scanned Aadhaar data
+        const nameParts = aadhaarData.name.split(' ');
+        const firstName = formatNameToTitleCase(nameParts.shift() || '');
+        const lastName = formatNameToTitleCase(nameParts.pop() || '');
+        const middleName = formatNameToTitleCase(nameParts.join(' '));
+
+        store.updatePersonal({
+            firstName,
+            lastName,
+            middleName,
+            preferredName: firstName,
+            dob: aadhaarData.dob,
+            gender: aadhaarData.gender,
+            idProofType: 'Aadhaar',
+            idProofNumber: aadhaarData.aadhaarNumber
+        });
+
+        store.updateAddress({
+            present: {
+                ...aadhaarData.address,
+                country: 'India',
+                verifiedStatus: {
+                    line1: true,
+                    city: true,
+                    state: true,
+                    pincode: true,
+                    country: true
+                }
+            },
+            permanent: {
+                ...aadhaarData.address,
+                country: 'India'
+            },
+            sameAsPresent: true
+        });
+
+        store.setPersonalVerifiedStatus({
+            name: true,
+            dob: true,
+            idProofNumber: true
+        });
+
+        setShowQrScanner(false);
+        setToast({ message: 'Aadhaar details extracted successfully! Please continue to fill remaining details.', type: 'success' });
+        
+        // Navigate to personal details page
+        setTimeout(() => {
+            navigate('/onboarding/add/personal');
+        }, 1500);
+    };
+
+
     return (
         <div className="relative">
             {isProcessing && (
@@ -319,6 +375,7 @@ const PreUpload = () => {
             )}
             <div className={`bg-card p-8 rounded-xl shadow-card w-full transition-all ${isProcessing ? 'blur-sm pointer-events-none' : ''}`}>
                 <MismatchModal {...mismatchModalState} onClose={() => setMismatchModalState({ isOpen: false, employeeName: '', bankName: '', reason: '' })} onOverride={handleOverride} />
+                {showQrScanner && <AadhaarQrScanner onScanSuccess={handleQrScanSuccess} onClose={() => setShowQrScanner(false)} />}
                 <form onSubmit={handleSubmit(handleFormSubmit)}>
                     <FormHeader title="Document Collection" subtitle="Upload documents to auto-fill the application." />
 
@@ -331,9 +388,39 @@ const PreUpload = () => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                            <Controller name="idProofFront" control={control} render={({ field }) => <UploadDocument label="Aadhaar (Front Side)" file={field.value} onFileChange={field.onChange} error={errors.idProofFront?.message as string} allowCapture verificationStatus={store.data.personal.verifiedStatus?.idProofNumber} />} />
-                            <Controller name="idProofBack" control={control} render={({ field }) => <UploadDocument label="Aadhaar (Back Side)" file={field.value} onFileChange={field.onChange} error={errors.idProofBack?.message as string} allowCapture verificationStatus={store.data.personal.verifiedStatus?.idProofNumber} />} />
+                        <div className="border border-border rounded-lg p-6 bg-muted/10 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-base font-semibold text-primary-text">Aadhaar Verification</h4>
+                                <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => {
+                                        if (isMobile) {
+                                            navigate('/onboarding/scan-aadhaar');
+                                        } else {
+                                            setShowQrScanner(true);
+                                        }
+                                    }}
+                                >
+                                    <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                    </svg>
+                                    Scan QR Code
+                                </Button>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                                <Controller name="idProofFront" control={control} render={({ field }) => <UploadDocument label="Aadhaar (Front Side)" file={field.value} onFileChange={field.onChange} error={errors.idProofFront?.message as string} allowCapture verificationStatus={store.data.personal.verifiedStatus?.idProofNumber} />} />
+                                <Controller name="idProofBack" control={control} render={({ field }) => <UploadDocument label="Aadhaar (Back Side)" file={field.value} onFileChange={field.onChange} error={errors.idProofBack?.message as string} allowCapture verificationStatus={store.data.personal.verifiedStatus?.idProofNumber} />} />
+                            </div>
+                            
+                            <div className="flex items-center gap-2 text-xs text-muted bg-accent/5 p-3 rounded-lg border border-accent/20">
+                                <svg className="h-4 w-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span><strong>Tip:</strong> Use "Scan QR Code" for instant auto-fill, or upload images for OCR extraction.</span>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">

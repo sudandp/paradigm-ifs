@@ -49,8 +49,8 @@ const MobileLayout: React.FC = () => {
     return (
         <div className="flex flex-col min-h-screen bg-[#041b0f]">
             {/* Mobile Header - Auto-hide on scroll (FAST) */}
-            {/* Hide global header for specific standalone pages like Apply for Leave */}
-            {!location.pathname.startsWith('/leaves/apply') && (
+            {/* Hide global header for specific standalone pages like Apply for Leave and Scanner */}
+            {!location.pathname.startsWith('/onboarding/scan-aadhaar') && !location.pathname.startsWith('/leaves/apply') && (
                 <div
                     className={`sticky top-0 z-50 transition-transform duration-200 ${isHeaderVisible ? 'translate-y-0' : '-translate-y-full'
                         }`}
@@ -69,7 +69,7 @@ const MobileLayout: React.FC = () => {
             </main>
 
             {/* Bottom Navigation */}
-            <BottomNav />
+            {!location.pathname.startsWith('/onboarding/scan-aadhaar') && <BottomNav />}
 
             {/* Notification Panel Overlay */}
             {isPanelOpen && (
