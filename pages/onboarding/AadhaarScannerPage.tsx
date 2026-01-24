@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Loader2, RefreshCw, Zap, ZapOff } from 'lucide-react';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import Button from '../../components/ui/Button';
 
@@ -24,6 +24,8 @@ const AadhaarScannerPage: React.FC = () => {
     const store = useOnboardingStore();
     const [isInitializing, setIsInitializing] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isFlashOn, setIsFlashOn] = useState(false);
+    const [hasFlash, setHasFlash] = useState(false);
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const qrCodeRegionId = "qr-reader-full-page";
 
@@ -145,6 +147,17 @@ const AadhaarScannerPage: React.FC = () => {
                 },
                 () => {}
             );
+            
+            // Check if flash (torch) is supported
+            try {
+                const capabilities = await html5QrCode.getRunningTrackCapabilities();
+                if (capabilities && (capabilities as any).torch) {
+                    setHasFlash(true);
+                }
+            } catch (e) {
+                console.log("Torch capability check failed", e);
+            }
+            
             setIsInitializing(false);
         } catch (err: any) {
             console.error('Scanner error:', err);
@@ -214,18 +227,44 @@ const AadhaarScannerPage: React.FC = () => {
     };
 
     const handleRetry = () => {
+        setIsFlashOn(false);
         stopScanner();
         startScanner();
     };
 
+    const toggleFlash = async () => {
+        if (!scannerRef.current || !hasFlash) return;
+        try {
+            const newState = !isFlashOn;
+            await scannerRef.current.applyVideoConstraints({
+                advanced: [{ torch: newState }]
+            } as any);
+            setIsFlashOn(newState);
+        } catch (err) {
+            console.error('Flash toggle failed:', err);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[250] flex flex-col bg-black text-white">
-            <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent z-50 flex justify-between items-center">
-                <Button variant="icon" className="!text-white hover:!bg-white/20 !p-2" onClick={() => navigate(-1)}>
-                    <ArrowLeft className="h-6 w-6" />
+            <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/70 to-transparent z-50 flex items-center justify-between">
+                <Button 
+                    variant="icon" 
+                    className="!text-white bg-black/40 backdrop-blur-md hover:!bg-black/60 !p-3 !rounded-full shadow-2xl border border-white/20" 
+                    onClick={() => navigate(-1)}
+                >
+                    <ArrowLeft className="h-8 w-8" />
                 </Button>
-                <h3 className="text-lg font-bold flex-1 text-center">Scan Aadhaar QR</h3>
-                <div className="w-10"></div>
+                
+                {hasFlash && (
+                    <Button 
+                        variant="icon" 
+                        className={`!p-3 !rounded-full bg-black/40 backdrop-blur-md border border-white/20 ${isFlashOn ? '!text-yellow-400' : '!text-white'}`}
+                        onClick={toggleFlash}
+                    >
+                        {isFlashOn ? <Zap className="h-7 w-7" /> : <ZapOff className="h-7 w-7" />}
+                    </Button>
+                )}
             </div>
 
             <div className="flex-grow relative flex items-center justify-center overflow-hidden bg-black">
@@ -260,18 +299,19 @@ const AadhaarScannerPage: React.FC = () => {
                             <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-accent rounded-bl-lg"></div>
                             <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-accent rounded-br-lg"></div>
                         </div>
-                        <p className="mt-8 text-white/80 text-sm font-medium px-6 text-center">
+                        <h3 className="mt-6 text-xl font-bold text-white drop-shadow-md">Scan Aadhaar QR</h3>
+                        <p className="mt-3 text-white/80 text-sm font-medium px-6 text-center">
                             Hold the QR code within the square to scan
                         </p>
                     </div>
                 )}
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/80 to-transparent z-40 flex justify-center">
+            <div className="absolute bottom-20 left-0 right-0 p-4 z-40 flex justify-end">
                  {!isInitializing && (
                     <Button 
                         variant="secondary" 
-                        className="!rounded-full !bg-white/10 !border-white/20 !text-white hover:!bg-white/20"
+                        className="!rounded-full !bg-black/60 !border-white/20 !text-white hover:!bg-black/80 shadow-lg"
                         onClick={handleRetry}
                     >
                         <RefreshCw className="h-5 w-5 mr-2" />
