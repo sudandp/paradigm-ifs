@@ -369,66 +369,82 @@ const AadhaarScannerPage: React.FC = () => {
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (!file || !scannerRef.current) return;
+        if (!file) return;
 
         try {
             setIsScanningFile(true);
             setError(null);
             
-            // CRITICAL: Stop ongoing camera scan before starting file scan
-            if (scannerRef.current.isScanning) {
+            // 0. Preliminary: Stop camera if running
+            if (scannerRef.current?.isScanning) {
                 await scannerRef.current.stop();
             }
+
+            // Create a temporary scanner instance if needed
+            const html5QrCode = scannerRef.current || new Html5Qrcode(qrCodeRegionId);
             
-            // Using jsQR for robust decoding of high-density images
-            const reader = new FileReader();
-            const decodedText = await new Promise<string>((resolve, reject) => {
-                reader.onload = async (e) => {
-                    try {
+            let decodedText = '';
+
+            // 1. FIRST PASS: Native html5-qrcode file scanning (often better at thresholding)
+            try {
+                decodedText = await html5QrCode.scanFile(file, false);
+            } catch (scanErr) {
+                // Native engine failed, move to custom jsQR pipeline
+                console.log("Native file scan failed, trying custom pipeline...");
+            }
+
+            // 2. SECOND PASS: Custom jsQR Multi-filter Pipeline
+            if (!decodedText) {
+                decodedText = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
                         const img = new Image();
                         img.onload = () => {
                             const canvas = document.createElement('canvas');
-                            canvas.width = img.width;
-                            canvas.height = img.height;
-                            const ctx = canvas.getContext('2d');
-                            if (!ctx) {
-                                reject(new Error('Canvas context failed'));
-                                return;
-                            }
+                            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                            if (!ctx) return reject(new Error('Canvas setup failed'));
 
-                            // ZXing-like preprocessing: Boost contrast and convert to grayscale
-                            ctx.filter = 'contrast(120%) grayscale(100%)';
-                            ctx.drawImage(img, 0, 0);
-                            
-                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                            
-                            // Advanced binarization fallback if first attempt fails
-                            let code = jsQR(imageData.data, imageData.width, imageData.height);
-                            
-                            if (!code) {
-                                // Sharpen and try again
-                                ctx.filter = 'contrast(150%) brightness(110%) grayscale(100%)';
-                                ctx.drawImage(img, 0, 0);
-                                const retryData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                                code = jsQR(retryData.data, retryData.width, retryData.height);
+                            // Optimization: If image is huge, downscale it to help jsQR
+                            const MAX_DIM = 1200;
+                            let width = img.width;
+                            let height = img.height;
+                            if (width > MAX_DIM || height > MAX_DIM) {
+                                if (width > height) {
+                                    height = Math.floor((MAX_DIM / width) * height);
+                                    width = MAX_DIM;
+                                } else {
+                                    width = Math.floor((MAX_DIM / height) * width);
+                                    height = MAX_DIM;
+                                }
                             }
+                            canvas.width = width;
+                            canvas.height = height;
 
-                            if (code) {
-                                resolve(code.data);
-                            } else {
-                                reject(new Error('No QR code found'));
-                            }
+                            const tryPass = (filter: string) => {
+                                ctx.filter = filter;
+                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                return jsQR(imageData.data, canvas.width, canvas.height);
+                            };
+
+                            // Aggressive retry logic with different levels of processing
+                            let code = tryPass('none');
+                            if (!code) code = tryPass('contrast(130%) grayscale(100%)');
+                            if (!code) code = tryPass('contrast(160%) brightness(110%) grayscale(100%)');
+                            if (!code) code = tryPass('contrast(300%) grayscale(100%)'); // Thresholding-like
+                            if (!code) code = tryPass('contrast(100%) brightness(140%) grayscale(100%)'); // Very dark
+                            if (!code) code = tryPass('invert(100%) contrast(120%) grayscale(100%)'); // Inverted version
+
+                            if (code) resolve(code.data);
+                            else reject(new Error('No QR code found after multiple checks'));
                         };
-                        img.onerror = () => reject(new Error('Image load failed'));
                         img.src = e.target?.result as string;
-                    } catch (err) {
-                        reject(err);
-                    }
-                };
-                reader.onerror = () => reject(new Error('File read failed'));
-                reader.readAsDataURL(file);
-            });
-            
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            // 3. Decoding logic
             let parsedData: AadhaarData | null = null;
             if (/^\d+$/.test(decodedText) && decodedText.length > 500) {
                 parsedData = await decodeSecureQR(decodedText);
@@ -439,11 +455,11 @@ const AadhaarScannerPage: React.FC = () => {
             if (parsedData) {
                 handleScanSuccess(parsedData);
             } else {
-                setError("Could not find any Aadhaar data in this image. Please ensure the QR is clear.");
+                setError("Decoded text did not contain valid Aadhaar data. Please ensure it's a Secure Aadhaar QR.");
             }
         } catch (err: any) {
             console.error('File scan error:', err);
-            setError("Failed to read image. Make sure it is a valid QR code.");
+            setError("Could not find a clear Aadhaar QR in this image. Please ensure the QR is flat, well-lit, and not blurry.");
         } finally {
             setIsScanningFile(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
