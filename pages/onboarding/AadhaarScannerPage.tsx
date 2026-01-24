@@ -17,6 +17,9 @@ interface AadhaarData {
     };
     aadhaarNumber: string;
     photo?: string;
+    dataAsOn?: string;
+    mobile?: string;
+    email?: string;
 }
 
 const AadhaarScannerPage: React.FC = () => {
@@ -215,31 +218,67 @@ const AadhaarScannerPage: React.FC = () => {
 
             if (fields.length < 5) return null;
 
-            // Mapping based on UIDAI V2 Spec:
-            // 0: Version, 1: Email Hash, 2: Mobile Hash, 3: Name, 4: DOB, 5: Gender
-            // 6: CareOf, 7: District, 8: Landmark, 9: House, 10: Location, 11: Pincode
-            // 12: State, 13: VTC, 14: Masked UID
+            // Mapping based on Verified mAadhaar V5 Binary Dump:
+            // 3: Name
+            // 4: DOB
+            // 5: Gender
+            // 6: Care Of (S/O, D/O)
+            // 7: City / District 
+            // 8: Landmark
+            // 9: House
+            // 10: Local Area / Layout
+            // 11: Pincode
+            // 12: Post Office (Doorvaninagar)
+            // 13: State (Karnataka)
+            // 14: Locality (Ramamurthi Nagar / Sub District)
+            // 16: Local Area Detail (Ramamurthynagar)
+            // 17: Masked Mobile
+            // 18: Masked Email
             
             const name = fields[3] || '';
-            const dob = formatDobToISO(fields[4] || '');
-            const gender = formatGender(fields[5] || '');
-            const maskedUid = fields[14] || '';
+            const dobRaw = fields[4] || '';
+            const genderRaw = fields[5] || '';
+            const maskedMobile = fields[17] || '';
+            const maskedEmail = fields[18] || '';
+
+            // Map full address hierarchy as requested by the user
+            const house = fields[9] || '';
+            const layout = fields[10] || '';
+            const neighborhood = fields[14] || '';
+            const landmark = fields[8] || '';
+            const subLocality = fields[16] || '';
+            const postOffice = fields[12] || '';
+            const city = fields[7] || '';
+            const state = fields[13] || '';
+            const pincode = fields[11] || '';
             
-            // Build address
-            const addrParts = [fields[9], fields[6], fields[8], fields[10]].filter(Boolean);
-            const line1 = addrParts.join(', ');
+            // Build the specific address format requested:
+            const addrParts = [
+                house, 
+                layout, 
+                neighborhood, 
+                landmark, 
+                subLocality, 
+                postOffice, 
+                city, 
+                `${state} - ${pincode}`
+            ].filter(Boolean);
+
+            const fullAddress = addrParts.join(', ');
 
             return {
                 name,
-                dob,
-                gender,
+                dob: formatDobToISO(dobRaw),
+                gender: formatGender(genderRaw),
                 address: {
-                    line1,
-                    city: fields[13] || fields[7] || '',
-                    state: fields[12] || '',
-                    pincode: fields[11] || ''
+                    line1: fullAddress,
+                    city: city,
+                    state: state,
+                    pincode: pincode
                 },
-                aadhaarNumber: maskedUid.replace(/X/g, '0') // Store masked or dummy for now
+                aadhaarNumber: maskedMobile, // Using 17 as identity for now
+                mobile: maskedMobile,
+                email: maskedEmail
             };
 
         } catch (err) {
@@ -348,12 +387,16 @@ const AadhaarScannerPage: React.FC = () => {
             dob: aadhaarData.dob,
             gender: aadhaarData.gender as any,
             idProofType: 'Aadhaar',
-            idProofNumber: aadhaarData.aadhaarNumber
+            idProofNumber: aadhaarData.aadhaarNumber,
+            email: aadhaarData.email // Pass the detected email field
         });
 
         store.updateAddress({
             present: {
-                ...aadhaarData.address,
+                line1: aadhaarData.address.line1,
+                city: aadhaarData.address.city,
+                state: aadhaarData.address.state,
+                pincode: aadhaarData.address.pincode,
                 country: 'India',
                 verifiedStatus: {
                     line1: true,
@@ -364,7 +407,10 @@ const AadhaarScannerPage: React.FC = () => {
                 }
             },
             permanent: {
-                ...aadhaarData.address,
+                line1: aadhaarData.address.line1,
+                city: aadhaarData.address.city,
+                state: aadhaarData.address.state,
+                pincode: aadhaarData.address.pincode,
                 country: 'India'
             },
             sameAsPresent: true
@@ -373,8 +419,12 @@ const AadhaarScannerPage: React.FC = () => {
         store.setPersonalVerifiedStatus({
             name: true,
             dob: true,
-            idProofNumber: true
+            idProofNumber: true,
+            email: !!aadhaarData.email
         });
+
+        // Set a global flag that this user is QR-Verified
+        (store as any).setIsQrVerified?.(true);
 
         navigate('/onboarding/add/personal');
     };

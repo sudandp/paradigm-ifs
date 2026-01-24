@@ -146,6 +146,7 @@ export interface PersonalDetails {
     name?: boolean | null;
     dob?: boolean | null;
     idProofNumber?: boolean | null;
+    email?: boolean | null;
   };
 }
 
@@ -325,6 +326,7 @@ export interface OnboardingData {
   requiresManualVerification?: boolean;
   formsGenerated?: boolean;
   verificationUsage?: VerificationUsageItem[];
+  isQrVerified?: boolean;
 }
 
 export type OnboardingStep = 'personal' | 'address' | 'organization' | 'family' | 'education' | 'bank' | 'uan' | 'esi' | 'gmc' | 'uniform' | 'biometrics' | 'documents' | 'review';
