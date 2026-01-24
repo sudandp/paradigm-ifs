@@ -242,12 +242,15 @@ const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onCl
 
                 {/* Scanner Area */}
                 <div className="flex-1 relative flex flex-col items-center justify-center bg-black overflow-hidden">
-                    <div id={qrCodeRegionId} className="absolute inset-0 w-full h-full">
+                    <div id={qrCodeRegionId} className="w-full h-full">
                         <style>{`
                             #${qrCodeRegionId} {
                                 width: 100% !important;
                                 height: 100% !important;
                                 overflow: hidden !important;
+                                display: flex !important;
+                                align-items: center !important;
+                                justify-content: center !important;
                             }
                             #${qrCodeRegionId} video {
                                 width: 100% !important;
@@ -255,11 +258,13 @@ const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onCl
                                 object-fit: cover !important;
                                 display: block !important;
                             }
-                            #${qrCodeRegionId} > div {
+                            /* Hide html5-qrcode's built-in UI elements that clutter the screen */
+                            #${qrCodeRegionId}__header_message,
+                            #${qrCodeRegionId}__dashboard_section_csr {
                                 display: none !important;
                             }
-                            #${qrCodeRegionId} > video {
-                                display: block !important;
+                            #${qrCodeRegionId} img[alt="Camera menu"] {
+                                display: none !important;
                             }
                         `}</style>
                     </div>
