@@ -20,56 +20,17 @@ interface AadhaarData {
 interface AadhaarQrScannerProps {
     onScanSuccess: (data: AadhaarData) => void;
     onClose: () => void;
-    isFullScreenPage?: boolean;
 }
 
-const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onClose, isFullScreenPage = false }) => {
+const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onClose }) => {
     const [isScanning, setIsScanning] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const qrCodeRegionId = "qr-reader";
 
-    const isMountedRef = useRef(true);
-    const initializationLock = useRef(false);
-
     useEffect(() => {
-        isMountedRef.current = true;
-        
-        const initScanner = async () => {
-            // Prevent double-execution in Strict Mode
-            if (initializationLock.current) return;
-            initializationLock.current = true;
-
-            try {
-                // Wait a brief moment to allow any previous cleanup to finish
-                await new Promise(r => setTimeout(r, 100));
-                
-                if (!isMountedRef.current) return;
-                
-                // Safety: Stop existing
-                if (scannerRef.current) {
-                    try {
-                        if (scannerRef.current.isScanning) {
-                            await scannerRef.current.stop();
-                        }
-                        scannerRef.current.clear();
-                    } catch (e) { /* ignore */ }
-                }
-                
-                // Hard cleanup of DOM
-                const region = document.getElementById(qrCodeRegionId);
-                if (region) region.innerHTML = "";
-                
-                await startScanner();
-            } finally {
-                // initializationLock.current = false; // Keep locked to prevent re-runs
-            }
-        };
-
-        initScanner();
-
+        startScanner();
         return () => {
-            isMountedRef.current = false;
             stopScanner();
         };
     }, []);
@@ -180,7 +141,8 @@ const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onCl
                 (decodedText) => {
                     const parsedData = parseAadhaarQR(decodedText);
                     if (parsedData) {
-                        handleScanSuccess(parsedData);
+                        stopScanner();
+                        onScanSuccess(parsedData);
                     } else {
                         setError('Invalid Aadhaar QR code. Please try again.');
                     }
@@ -199,108 +161,49 @@ const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onCl
     const stopScanner = async () => {
         if (scannerRef.current) {
             try {
-                // Check if scanner is running before stopping
-                if (scannerRef.current.isScanning) {
-                    await scannerRef.current.stop();
-                }
+                await scannerRef.current.stop();
                 scannerRef.current.clear();
-            } catch (err: any) {
-                // Ignore "not running" errors as they are harmless cleanup races
-                if (!err.message?.includes('not running')) {
-                    console.error('Error stopping scanner:', err);
-                }
+            } catch (err) {
+                console.error('Error stopping scanner:', err);
             }
         }
         setIsScanning(false);
     };
 
-    const handleScanSuccess = async (data: AadhaarData) => {
-        await stopScanner();
-        onScanSuccess(data);
-    };
-
-    const handleClose = async () => {
-        await stopScanner();
+    const handleClose = () => {
+        stopScanner();
         onClose();
     };
 
     return (
-        <div className={`${isFullScreenPage ? 'h-full w-full' : 'fixed inset-0 bg-black/95 z-[100] p-0 md:p-4'} flex flex-col items-center justify-center animate-in fade-in duration-200`}>
-            <div className={`${isFullScreenPage ? 'h-full w-full' : 'w-full h-full md:h-auto md:max-w-md md:bg-card md:rounded-xl md:shadow-2xl'} flex flex-col overflow-hidden bg-black text-white md:text-primary-text`}>
-                {/* Header */}
-                <div className="p-4 border-b border-white/10 md:border-border flex items-center justify-between shrink-0 bg-black md:bg-transparent z-10">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-accent/10 rounded-full">
-                            <Camera className="h-5 w-5 text-accent" />
-                        </div>
-                        <h3 className="text-lg font-bold">Scan Aadhaar QR</h3>
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+                <div className="p-4 border-b border-border flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Camera className="h-5 w-5 text-accent" />
+                        <h3 className="text-lg font-bold text-primary-text">Scan Aadhaar QR Code</h3>
                     </div>
-                    <button onClick={handleClose} className="p-2 hover:bg-white/10 md:hover:bg-muted rounded-full transition-colors">
-                        <X className="h-6 w-6" />
+                    <button onClick={handleClose} className="p-1 hover:bg-muted rounded-lg transition-colors">
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                {/* Scanner Area */}
-                <div className="flex-1 relative flex flex-col items-center justify-center bg-black overflow-hidden">
-                    <div id={qrCodeRegionId} className="w-full h-full">
-                        <style>{`
-                            #${qrCodeRegionId} {
-                                width: 100% !important;
-                                height: 100% !important;
-                                overflow: hidden !important;
-                                display: flex !important;
-                                align-items: center !important;
-                                justify-content: center !important;
-                            }
-                            #${qrCodeRegionId} video {
-                                width: 100% !important;
-                                height: 100% !important;
-                                object-fit: cover !important;
-                                display: block !important;
-                            }
-                            /* Hide html5-qrcode's built-in UI elements that clutter the screen */
-                            #${qrCodeRegionId}__header_message,
-                            #${qrCodeRegionId}__dashboard_section_csr {
-                                display: none !important;
-                            }
-                            #${qrCodeRegionId} img[alt="Camera menu"] {
-                                display: none !important;
-                            }
-                        `}</style>
-                    </div>
+                <div className="p-6">
+                    <div id={qrCodeRegionId} className="rounded-lg overflow-hidden border-2 border-accent/30"></div>
                     
-                    {/* Overlay Guide */}
-                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
-                        <div className="w-64 h-64 border-2 border-accent/50 rounded-lg relative">
-                            <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-accent -mt-[2px] -ml-[2px]" />
-                            <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-accent -mt-[2px] -mr-[2px]" />
-                            <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-accent -mb-[2px] -ml-[2px]" />
-                            <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-accent -mb-[2px] -mr-[2px]" />
-                            
-                            {/* Scanning Animation */}
-                            <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent/80 shadow-[0_0_8px_rgba(var(--accent),0.8)] animate-[scan_2s_ease-in-out_infinite]" />
-                        </div>
-                    </div>
-
                     {error && (
-                        <div className="absolute bottom-24 left-4 right-4 p-3 bg-red-900/80 border border-red-500/50 rounded-lg text-sm text-white text-center backdrop-blur-sm z-30">
+                        <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">
                             {error}
                         </div>
                     )}
-                </div>
 
-                {/* Footer Instructions */}
-                <div className="p-6 bg-black/80 md:bg-transparent text-center shrink-0 w-full backdrop-blur-sm md:backdrop-filter-none z-10 border-t border-white/10 md:border-none">
-                    <p className="text-sm text-white/80 md:text-muted mb-4">
-                        Align the Aadhaar QR code within the frame to scan automatically.
-                    </p>
-                    <div className="md:hidden">
-                        <Button variant="secondary" onClick={handleClose} className="w-full !bg-white/10 !text-white !border-white/20">
-                            Cancel
-                        </Button>
+                    <div className="mt-4 text-center text-sm text-muted">
+                        <p>Position the QR code from the back of the Aadhaar card within the frame.</p>
+                        <p className="mt-1">The scanner will automatically detect and extract details.</p>
                     </div>
-                    <div className="hidden md:block">
-                         <Button variant="secondary" onClick={handleClose} className="w-full">
+
+                    <div className="mt-6">
+                        <Button variant="secondary" onClick={handleClose} className="w-full">
                             Cancel
                         </Button>
                     </div>

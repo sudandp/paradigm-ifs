@@ -76,16 +76,12 @@ const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({ isOpen, onClose
         setCapturedImage(dataUrl);
       }
     } catch (err: any) {
-      if (err.message && err.message.includes('cancelled')) {
-        // User cancelled, just close
-        onClose();
-        return;
-      }
-      
       console.error('Camera capture failed:', err);
-      
       if (err.message && err.message.includes('permission')) {
         setError('Camera permission denied. Please grant camera access in Settings.');
+      } else if (err.message && err.message.includes('cancelled')) {
+        // User cancelled, just close
+        onClose();
       } else {
         setError('Failed to capture photo. Please try again.');
       }
