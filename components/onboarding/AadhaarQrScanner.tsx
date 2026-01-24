@@ -20,10 +20,9 @@ interface AadhaarData {
 interface AadhaarQrScannerProps {
     onScanSuccess: (data: AadhaarData) => void;
     onClose: () => void;
-    isFullScreenPage?: boolean;
 }
 
-const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onClose, isFullScreenPage = false }) => {
+const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onClose }) => {
     const [isScanning, setIsScanning] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -225,30 +224,29 @@ const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onCl
     };
 
     return (
-        <div className={`
-            ${isFullScreenPage ? 'relative w-full h-full' : 'fixed inset-0 z-[9999] p-0 flex items-center justify-center bg-black/90 backdrop-blur-md'}
-            flex flex-col animate-in fade-in duration-200
-        `}>
-            <div className={`
-                ${isFullScreenPage ? 'w-full h-full justify-center px-2' : 'w-[92%] max-w-sm rounded-3xl border border-white/20 shadow-2xl'}
-                bg-page flex flex-col overflow-hidden relative
-            `}>
+        <div className="fixed inset-0 bg-black/95 z-[100] flex flex-col items-center justify-center p-0 md:p-4 animate-in fade-in duration-200">
+            <div className="w-full h-full md:h-auto md:max-w-md md:bg-card md:rounded-xl md:shadow-2xl flex flex-col overflow-hidden bg-black text-white md:text-primary-text">
                 {/* Header */}
-                <div className={`p-4 flex items-center justify-between shrink-0 bg-page z-10 ${isFullScreenPage ? '' : 'border-b border-white/10'} relative`}>
-                    <div className="w-8"></div> {/* Spacer for centering */}
-                    <h3 className="text-base font-bold text-white text-center flex-1">Scan Aadhaar QR</h3>
-                    <button onClick={handleClose} className="p-2 -mr-2 hover:bg-white/10 rounded-full transition-colors text-white/80">
-                        <X className="h-5 w-5" />
+                <div className="p-4 border-b border-white/10 md:border-border flex items-center justify-between shrink-0 bg-black md:bg-transparent z-10">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-accent/10 rounded-full">
+                            <Camera className="h-5 w-5 text-accent" />
+                        </div>
+                        <h3 className="text-lg font-bold">Scan Aadhaar QR</h3>
+                    </div>
+                    <button onClick={handleClose} className="p-2 hover:bg-white/10 md:hover:bg-muted rounded-full transition-colors">
+                        <X className="h-6 w-6" />
                     </button>
                 </div>
 
-                {/* Scanner Area - Compact size */}
-                <div className={`${isFullScreenPage ? 'aspect-square max-h-[40vh] w-[95%] mx-auto rounded-2xl' : 'flex-1'} relative bg-black overflow-hidden group`}>
+                {/* Scanner Area */}
+                <div className="flex-1 relative flex flex-col items-center justify-center bg-black overflow-hidden">
                     <div id={qrCodeRegionId} className="absolute inset-0 w-full h-full">
                         <style>{`
                             #${qrCodeRegionId} {
                                 width: 100% !important;
                                 height: 100% !important;
+                                overflow: hidden !important;
                             }
                             #${qrCodeRegionId} video {
                                 width: 100% !important;
@@ -265,34 +263,38 @@ const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onCl
                         `}</style>
                     </div>
                     
-                    {/* Overlay Guide - Green Corners */}
+                    {/* Overlay Guide */}
                      <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
-                        <div className="w-56 h-56 relative">
-                            {/* Corners */}
-                            <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-accent rounded-tl-lg" />
-                            <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-accent rounded-tr-lg" />
-                            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-accent rounded-bl-lg" />
-                            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-accent rounded-br-lg" />
+                        <div className="w-64 h-64 border-2 border-accent/50 rounded-lg relative">
+                            <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-accent -mt-[2px] -ml-[2px]" />
+                            <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-accent -mt-[2px] -mr-[2px]" />
+                            <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-accent -mb-[2px] -ml-[2px]" />
+                            <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-accent -mb-[2px] -mr-[2px]" />
                             
                             {/* Scanning Animation */}
-                            <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent shadow-[0_0_8px_rgba(var(--accent),0.8)] animate-[scan_2s_ease-in-out_infinite] top-[10%]" />
+                            <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent/80 shadow-[0_0_8px_rgba(var(--accent),0.8)] animate-[scan_2s_ease-in-out_infinite]" />
                         </div>
                     </div>
 
                     {error && (
-                        <div className="absolute bottom-4 left-4 right-4 p-3 bg-red-900/90 border border-red-500/50 rounded-lg text-xs text-white text-center z-30 shadow-lg">
+                        <div className="absolute bottom-24 left-4 right-4 p-3 bg-red-900/80 border border-red-500/50 rounded-lg text-sm text-white text-center backdrop-blur-sm z-30">
                             {error}
                         </div>
                     )}
                 </div>
 
                 {/* Footer Instructions */}
-                <div className={`p-6 bg-page shrink-0 w-full z-10 flex flex-col items-center gap-4 ${isFullScreenPage ? '' : 'border-t border-white/10'}`}>
-                    <p className="text-sm text-center text-white/40 max-w-xs leading-relaxed">
-                        Align the QR code within the frame to scan automatically
+                <div className="p-6 bg-black/80 md:bg-transparent text-center shrink-0 w-full backdrop-blur-sm md:backdrop-filter-none z-10 border-t border-white/10 md:border-none">
+                    <p className="text-sm text-white/80 md:text-muted mb-4">
+                        Align the Aadhaar QR code within the frame to scan automatically.
                     </p>
-                    <div className="w-full">
-                        <Button variant="secondary" onClick={handleClose} className="w-full !bg-white/5 hover:!bg-white/10 !text-white border-none h-12 text-base font-medium rounded-xl">
+                    <div className="md:hidden">
+                        <Button variant="secondary" onClick={handleClose} className="w-full !bg-white/10 !text-white !border-white/20">
+                            Cancel
+                        </Button>
+                    </div>
+                    <div className="hidden md:block">
+                         <Button variant="secondary" onClick={handleClose} className="w-full">
                             Cancel
                         </Button>
                     </div>
