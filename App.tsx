@@ -110,6 +110,7 @@ const UanDetails = lazyWithRetry(() => import('./pages/onboarding/UanDetails'));
 const EsiDetails = lazyWithRetry(() => import('./pages/onboarding/EsiDetails'));
 const GmcDetails = lazyWithRetry(() => import('./pages/onboarding/GmcDetails'));
 const UniformDetails = lazyWithRetry(() => import('./pages/onboarding/UniformDetails'));
+const AadhaarScanPage = lazyWithRetry(() => import('./pages/onboarding/AadhaarScanPage'));
 const Documents = lazyWithRetry(() => import('./pages/onboarding/Documents'));
 const Biometrics = lazyWithRetry(() => import('./pages/onboarding/Biometrics'));
 const Review = lazyWithRetry(() => import('./pages/onboarding/Review'));
@@ -550,6 +551,7 @@ const App: React.FC = () => {
             <Route path="onboarding" element={<OnboardingHome />} />
             <Route path="onboarding/select-organization" element={<SelectOrganization />} />
             <Route path="onboarding/pre-upload" element={<PreUpload />} />
+            <Route path="onboarding/scan-aadhaar" element={<AadhaarScanPage />} />
             <Route path="onboarding/submissions" element={<MySubmissions />} />
             <Route path="onboarding/tasks" element={<MyTasks />} />
             <Route path="onboarding/uniforms" element={<UniformRequests />} />

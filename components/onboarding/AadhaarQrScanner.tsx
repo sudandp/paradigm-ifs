@@ -20,9 +20,10 @@ interface AadhaarData {
 interface AadhaarQrScannerProps {
     onScanSuccess: (data: AadhaarData) => void;
     onClose: () => void;
+    isFullScreenPage?: boolean;
 }
 
-const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onClose }) => {
+const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onClose, isFullScreenPage = false }) => {
     const [isScanning, setIsScanning] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -224,8 +225,8 @@ const AadhaarQrScanner: React.FC<AadhaarQrScannerProps> = ({ onScanSuccess, onCl
     };
 
     return (
-        <div className="fixed inset-0 bg-black/95 z-[100] flex flex-col items-center justify-center p-0 md:p-4 animate-in fade-in duration-200">
-            <div className="w-full h-full md:h-auto md:max-w-md md:bg-card md:rounded-xl md:shadow-2xl flex flex-col overflow-hidden bg-black text-white md:text-primary-text">
+        <div className={`${isFullScreenPage ? 'h-full w-full' : 'fixed inset-0 bg-black/95 z-[100] p-0 md:p-4'} flex flex-col items-center justify-center animate-in fade-in duration-200`}>
+            <div className={`${isFullScreenPage ? 'h-full w-full' : 'w-full h-full md:h-auto md:max-w-md md:bg-card md:rounded-xl md:shadow-2xl'} flex flex-col overflow-hidden bg-black text-white md:text-primary-text`}>
                 {/* Header */}
                 <div className="p-4 border-b border-white/10 md:border-border flex items-center justify-between shrink-0 bg-black md:bg-transparent z-10">
                     <div className="flex items-center gap-3">
