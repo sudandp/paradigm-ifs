@@ -15,10 +15,14 @@ import Select from '../../components/ui/Select';
 import { api } from '../../services/api';
 import { Type } from "@google/genai";
 import { format } from 'date-fns';
-import { Plus, Trash2, AlertTriangle, Loader2, ArrowLeft } from 'lucide-react';
+import { FileStack, User, CreditCard, UserCheck, Calendar, Users, ArrowRight, Plus, Trash2, AlertTriangle, Loader2, ArrowLeft, Phone, Mail, MapPin } from 'lucide-react';
+import { AadhaarData, parseAadhaarZip, isAgeAbove18, formatNameToTitleCase } from '../../utils/aadhaarUtils';
+import Modal from '../../components/ui/Modal';
 import MismatchModal from '../../components/modals/MismatchModal';
 import { useAuthStore } from '../../store/authStore';
 import Input from '../../components/ui/Input';
+import Logo from '../../components/ui/Logo';
+import NotificationBell from '../../components/notifications/NotificationBell';
 
 const defaultDesignationRules = {
     documents: {
@@ -102,10 +106,6 @@ const fileToBase64 = (file: File): Promise<{ base64: string; type: string }> => 
     });
 };
 
-const formatNameToTitleCase = (value: string | undefined) => {
-    if (!value) return '';
-    return value.toLowerCase().replace(/\b(\w)/g, s => s.toUpperCase());
-};
 
 const PreUpload = () => {
     const navigate = useNavigate();
@@ -118,6 +118,9 @@ const PreUpload = () => {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [mismatchModalState, setMismatchModalState] = useState({ isOpen: false, employeeName: '', bankName: '', reason: '' });
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [zipReviewData, setZipReviewData] = useState<AadhaarData | null>(null);
+    const [isZipReviewOpen, setIsZipReviewOpen] = useState(false);
+    const zipInputRef = React.useRef<HTMLInputElement>(null);
 
     const designation = store.data.organization.designation;
     const currentRules = useMemo(() =>
@@ -309,6 +312,89 @@ const PreUpload = () => {
         processAndNavigate(getValues(), true);
     };
 
+    const handleZipUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+            setIsProcessing(true);
+            const data = await parseAadhaarZip(file);
+            if (data) {
+                setZipReviewData(data);
+                setIsZipReviewOpen(true);
+            } else {
+                setToast({ message: 'Could not parse Aadhaar data from zip file.', type: 'error' });
+            }
+        } catch (error) {
+            setToast({ message: 'Failed to process zip file.', type: 'error' });
+        } finally {
+            setIsProcessing(false);
+            if (zipInputRef.current) zipInputRef.current.value = '';
+        }
+    };
+
+    const confirmZipDataAndFill = () => {
+        if (!zipReviewData) return;
+        
+        const aadhaarData = zipReviewData;
+        const nameParts = aadhaarData.name.split(' ');
+        const firstName = formatNameToTitleCase(nameParts.shift() || '');
+        const lastName = formatNameToTitleCase(nameParts.pop() || '');
+        const middleName = formatNameToTitleCase(nameParts.join(' '));
+
+        store.updatePersonal({
+            firstName,
+            lastName,
+            middleName,
+            preferredName: firstName,
+            dob: aadhaarData.dob,
+            gender: aadhaarData.gender as any,
+            idProofType: 'Aadhaar',
+            idProofNumber: aadhaarData.aadhaarNumber, 
+            mobile: aadhaarData.mobile,
+            email: aadhaarData.email,
+            isQrVerified: true
+        });
+
+        if (aadhaarData.address) {
+            store.updateAddress({
+                present: {
+                    line1: aadhaarData.address.line1,
+                    city: aadhaarData.address.city,
+                    state: aadhaarData.address.state,
+                    pincode: aadhaarData.address.pincode,
+                    country: 'India',
+                    verifiedStatus: {
+                        line1: true,
+                        city: true,
+                        state: true,
+                        pincode: true,
+                        country: true
+                    }
+                },
+                permanent: {
+                    line1: aadhaarData.address.line1,
+                    city: aadhaarData.address.city,
+                    state: aadhaarData.address.state,
+                    pincode: aadhaarData.address.pincode,
+                    country: 'India'
+                },
+                sameAsPresent: true
+            });
+        }
+
+        store.setPersonalVerifiedStatus({
+            name: true,
+            dob: true,
+            idProofNumber: true,
+            email: !!aadhaarData.email
+        });
+
+        setIsZipReviewOpen(false);
+        setToast({ message: 'Application auto-filled from Zip! Please review.', type: 'success' });
+        navigate('/onboarding/add/personal');
+    };
+
     return (
         <div className="relative">
             {isProcessing && (
@@ -335,24 +421,31 @@ const PreUpload = () => {
                         <div className="border border-border rounded-lg p-4 bg-muted/10">
                             <div className="flex items-center justify-between mb-4">
                                 <h4 className="text-sm font-semibold text-primary-text">Aadhaar Verification</h4>
-                                <Button 
-                                    type="button" 
-                                    variant="outline" 
-                                    size="sm"
-                                    onClick={() => navigate('/onboarding/aadhaar-scan')}
-                                    className="text-xs"
-                                >
-                                    <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                                    </svg>
-                                    Scan QR Code
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="file"
+                                        accept=".zip"
+                                        className="hidden"
+                                        ref={zipInputRef}
+                                        onChange={handleZipUpload}
+                                    />
+                                    <Button 
+                                        type="button" 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => zipInputRef.current?.click()}
+                                        className="text-xs"
+                                    >
+                                        <FileStack className="h-4 w-4 mr-1 text-accent" />
+                                        Upload Zip
+                                    </Button>
+                                </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                                 <Controller name="idProofFront" control={control} render={({ field }) => <UploadDocument label="Aadhaar (Front Side)" file={field.value} onFileChange={field.onChange} error={errors.idProofFront?.message as string} allowCapture verificationStatus={store.data.personal.verifiedStatus?.idProofNumber} />} />
                                 <Controller name="idProofBack" control={control} render={({ field }) => <UploadDocument label="Aadhaar (Back Side)" file={field.value} onFileChange={field.onChange} error={errors.idProofBack?.message as string} allowCapture verificationStatus={store.data.personal.verifiedStatus?.idProofNumber} />} />
                             </div>
-                            <p className="text-xs text-muted mt-2">Tip: Use "Scan QR Code" for instant auto-fill, or upload images for OCR extraction.</p>
+                            <p className="text-xs text-muted mt-2">Tip: Use "Upload Zip" or "Scan QR" for instant auto-fill, or upload images for OCR extraction.</p>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
@@ -409,6 +502,107 @@ const PreUpload = () => {
                     </div>
                 </form>
             </div>
+            {isZipReviewOpen && zipReviewData && (
+                <div className="fixed inset-0 z-[500] flex flex-col bg-[#041b0f] text-white animate-fade-in overflow-hidden">
+                    {/* Brand Header */}
+                    <header 
+                        className="px-4 py-2 flex items-center justify-between border-b border-[#1f3d2b]"
+                        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+                    >
+                        <div className="flex items-center justify-center p-2">
+                            <Logo className="h-[52px]" />
+                        </div>
+                        <div className="flex items-center">
+                            <NotificationBell />
+                        </div>
+                    </header>
+
+                    <main className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+                        {/* Page Header Context */}
+                        <div className="space-y-1">
+                            <h1 className="text-xl font-bold text-white">Document Collection</h1>
+                            <p className="text-sm text-white/50">Upload documents to auto-fill the application.</p>
+                        </div>
+
+                        {/* Verification Title */}
+                        <div className="flex items-center gap-3 py-2">
+                            <button 
+                                type="button"
+                                onClick={() => setIsZipReviewOpen(false)}
+                                className="p-1 hover:bg-white/10 rounded-full transition-colors"
+                            >
+                                <ArrowLeft className="h-6 w-6 text-accent" />
+                            </button>
+                            <h2 className="text-lg font-bold">Verify Extracted Details</h2>
+                        </div>
+                        {/* Photo Section */}
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                {zipReviewData.photo ? (
+                                    <img 
+                                        src={zipReviewData.photo} 
+                                        alt="Resident" 
+                                        className="w-20 h-20 rounded-full object-cover border-2 border-accent/20"
+                                    />
+                                ) : (
+                                    <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center border-2 border-accent/10">
+                                        <User className="h-10 w-10 text-accent/50" />
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-lg">Your photo</h3>
+                                <p className="text-white/40 text-sm">Your digital photo saved on Aadhaar</p>
+                            </div>
+                        </div>
+
+                        {/* Details List */}
+                        <div className="space-y-6">
+                            {[
+                                { icon: User, label: "Full name", value: zipReviewData.name },
+                                { icon: CreditCard, label: "Aadhaar Number", value: zipReviewData.aadhaarNumber, mono: true },
+                                { icon: UserCheck, label: "Age Above 18", value: isAgeAbove18(zipReviewData.dob) },
+                                { icon: Calendar, label: "Date of Birth", value: zipReviewData.dob },
+                                { icon: User, label: "Gender", value: zipReviewData.gender },
+                                { icon: Users, label: "Care of / Guardian", value: zipReviewData.careOf || 'N/A' },
+                                { icon: MapPin, label: "Address", value: `${zipReviewData.address.line1}, ${zipReviewData.address.city}, ${zipReviewData.address.state} - ${zipReviewData.address.pincode}` },
+                                { icon: Phone, label: "Mobile Number", value: zipReviewData.mobile || 'N/A' },
+                                { icon: Mail, label: "Email", value: zipReviewData.email || 'N/A' }
+                            ].map((item, idx) => (
+                                <div key={idx} className="flex gap-4">
+                                    <item.icon className="h-5 w-5 text-accent mt-1 flex-shrink-0" />
+                                    <div className="space-y-1">
+                                        <label className="block text-sm font-medium text-white/60">{item.label}</label>
+                                        <p className={`text-accent font-semibold ${item.mono ? 'tracking-wider font-mono' : ''}`}>
+                                            {item.value}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </main>
+
+                    <footer className="p-6 space-y-3 bg-[#041b0f] border-t border-[#1f3d2b]">
+                        <Button 
+                            type="button"
+                            className="w-full !bg-accent !text-[#02140a] !h-14 !rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(34,197,94,0.3)]"
+                            onClick={confirmZipDataAndFill}
+                        >
+                            Confirm & Auto-fill
+                        </Button>
+                        <button 
+                            type="button"
+                            className="w-full h-14 rounded-2xl font-bold text-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+                            onClick={() => {
+                                setIsZipReviewOpen(false);
+                                zipInputRef.current?.click();
+                            }}
+                        >
+                            Re-upload Zip File
+                        </button>
+                    </footer>
+                </div>
+            )}
         </div>
     );
 };
