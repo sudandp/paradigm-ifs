@@ -50,7 +50,7 @@ const MobileLayout: React.FC = () => {
         <div className="flex flex-col min-h-screen bg-[#041b0f]">
             {/* Mobile Header - Auto-hide on scroll (FAST) */}
             {/* Hide global header for specific standalone pages like Apply for Leave */}
-            {!location.pathname.startsWith('/leaves/apply') && (
+            {!location.pathname.startsWith('/leaves/apply') && !location.pathname.startsWith('/onboarding/aadhaar-scan') && (
                 <div
                     className={`sticky top-0 z-50 transition-transform duration-200 ${isHeaderVisible ? 'translate-y-0' : '-translate-y-full'
                         }`}

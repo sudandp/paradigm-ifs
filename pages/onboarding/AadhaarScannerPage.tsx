@@ -571,25 +571,26 @@ const AadhaarScannerPage: React.FC = () => {
 
     return (
         <div className="fixed inset-0 z-[250] flex flex-col bg-black text-white">
-            <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/70 to-transparent z-50 flex items-center justify-between">
+            <header className="p-6 border-b border-emerald-900/30 flex items-center gap-4 bg-gradient-to-b from-[#01140a] to-transparent">
                 <Button 
                     variant="icon" 
-                    className="!text-white bg-black/40 backdrop-blur-md hover:!bg-black/60 !p-3 !rounded-full shadow-2xl border border-white/20" 
+                    className="!text-white bg-white/5 hover:!bg-white/10 !p-2 !rounded-full" 
                     onClick={() => navigate(-1)}
                 >
-                    <ArrowLeft className="h-8 w-8" />
+                    <ArrowLeft className="h-6 w-6" />
                 </Button>
+                <h2 className="text-xl font-bold tracking-tight flex-1">Scan Aadhaar QR</h2>
                 
                 {hasFlash && (
                     <Button 
                         variant="icon" 
-                        className={`!p-3 !rounded-full bg-black/40 backdrop-blur-md border border-white/20 ${isFlashOn ? '!text-yellow-400' : '!text-white'}`}
+                        className={`!p-2 !rounded-full ${isFlashOn ? 'bg-yellow-500/20 !text-yellow-400' : 'bg-white/5 !text-white'} hover:!bg-white/10`}
                         onClick={toggleFlash}
                     >
-                        {isFlashOn ? <Zap className="h-7 w-7" /> : <ZapOff className="h-7 w-7" />}
+                        {isFlashOn ? <Zap className="h-6 w-6" /> : <ZapOff className="h-6 w-6" />}
                     </Button>
                 )}
-            </div>
+            </header>
 
             <div className="flex-grow relative flex items-center justify-center overflow-hidden bg-black">
                 {isInitializing && !isScanningFile && (
@@ -638,7 +639,7 @@ const AadhaarScannerPage: React.FC = () => {
                 )}
             </div>
 
-            <div className="absolute bottom-20 left-0 right-0 p-6 z-40 flex flex-col gap-4 items-center">
+            <div className="absolute bottom-[61px] left-0 right-0 px-6 pb-4 z-40 flex flex-col gap-4 items-center">
                  {!isInitializing && !isScanningFile && (
                     <div className="flex flex-col gap-3 w-full max-w-sm">
                         <div className="flex gap-4">
