@@ -504,20 +504,8 @@ const PreUpload = () => {
             </div>
             {isZipReviewOpen && zipReviewData && (
                 <div className="fixed inset-0 z-[500] flex flex-col bg-[#041b0f] text-white animate-fade-in overflow-hidden">
-                    {/* Brand Header */}
-                    <header 
-                        className="px-4 py-2 flex items-center justify-between border-b border-[#1f3d2b]"
-                        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-                    >
-                        <div className="flex items-center justify-center p-2">
-                            <Logo className="h-[52px]" />
-                        </div>
-                        <div className="flex items-center">
-                            <NotificationBell />
-                        </div>
-                    </header>
-
-                    <main className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+                    {/* Main content starts below the global header */}
+                    <main className="flex-1 overflow-y-auto px-6 py-4 space-y-6" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 64px)' }}>
                         {/* Page Header Context */}
                         <div className="space-y-1">
                             <h1 className="text-xl font-bold text-white">Document Collection</h1>
