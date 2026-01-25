@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import jsQR from 'jsqr';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, RefreshCw, Zap, ZapOff, Upload, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, RefreshCw, Zap, ZapOff, Upload, CheckCircle2, XCircle, Calendar, MapPin, Phone, Mail, User, CreditCard, UserCheck, Users } from 'lucide-react';
+import JSZip from 'jszip';
+import { differenceInYears } from 'date-fns';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
@@ -22,6 +24,8 @@ interface AadhaarData {
     dataAsOn?: string;
     mobile?: string;
     email?: string;
+    careOf?: string;
+    enrollmentDate?: string;
 }
 
 const AadhaarScannerPage: React.FC = () => {
@@ -78,18 +82,38 @@ const AadhaarScannerPage: React.FC = () => {
             if (qrText.includes('<?xml')) {
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(qrText, 'text/xml');
+                const root = xmlDoc.documentElement;
+
+                // Helper to get value from attribute or element
+                const getVal = (tags: string[]) => {
+                    for (const tag of tags) {
+                        // Check attributes on root first (common in Offline XML)
+                        const attr = root.getAttribute(tag);
+                        if (attr) return attr.trim();
+                        
+                        // Check nested elements
+                        const el = xmlDoc.getElementsByTagName(tag)[0] || xmlDoc.querySelector(tag);
+                        if (el && el.textContent) return el.textContent.trim();
+                    }
+                    return '';
+                };
                 
-                const uid = xmlDoc.querySelector('uid')?.textContent || '';
-                const name = xmlDoc.querySelector('name')?.textContent || '';
-                const dob = xmlDoc.querySelector('dob')?.textContent || '';
-                const gender = xmlDoc.querySelector('gender')?.textContent || '';
-                const house = xmlDoc.querySelector('house')?.textContent || '';
-                const street = xmlDoc.querySelector('street')?.textContent || '';
-                const loc = xmlDoc.querySelector('loc')?.textContent || '';
-                const vtc = xmlDoc.querySelector('vtc')?.textContent || '';
-                const dist = xmlDoc.querySelector('dist')?.textContent || '';
-                const state = xmlDoc.querySelector('state')?.textContent || '';
-                const pc = xmlDoc.querySelector('pc')?.textContent || '';
+                // Prioritize UID extraction from any possible variant
+                const uid = getVal(['uid', 'u', 'uidUID', 'UID', 'AadhaarNumber']);
+                const name = getVal(['name', 'n', 'Name']);
+                const dob = getVal(['dob', 'd', 'dOB', 'DOB']);
+                const gender = getVal(['gender', 'g']);
+                const house = getVal(['house', 'h', 'building']);
+                const street = getVal(['street', 's', 'loc']);
+                const loc = getVal(['loc', 'lm', 'locality']);
+                const vtc = getVal(['vtc', 'v', 'vtc']);
+                const dist = getVal(['dist', 'd', 'district']);
+                const state = getVal(['state', 's', 'st', 'state']);
+                const pc = getVal(['pc', 'p', 'pincode']);
+                const co = getVal(['co', 'careOf', 'careof']);
+                const email = getVal(['email', 'e']);
+                const mobile = getVal(['mobile', 'm']);
+                const enrollmentDate = getVal(['enrollmentDate']); 
 
                 const addressParts = [house, street, loc].filter(Boolean);
                 const line1 = addressParts.join(', ');
@@ -104,7 +128,11 @@ const AadhaarScannerPage: React.FC = () => {
                         state,
                         pincode: pc
                     },
-                    aadhaarNumber: uid
+                    aadhaarNumber: uid,
+                    careOf: co,
+                    email,
+                    mobile,
+                    enrollmentDate
                 };
             }
             return null;
@@ -213,6 +241,126 @@ const AadhaarScannerPage: React.FC = () => {
         }
     };
 
+    const parseAadhaarSecureText = (secureText: string): AadhaarData | null => {
+        try {
+            // The format is: HEADER.PAYLOAD.SIGNATURE (JWT-like)
+            // But the user provided internal payload has ~ separated base64 chunks
+            // We need to look for that structure.
+            
+            // Heuristic: If it contains many tildes and long base64 strings
+            const parts = secureText.split('~');
+            if (parts.length < 5) return null;
+
+            const extractValue = (key: string): string => {
+                const searchKey = key.toLowerCase();
+                // Segment 0 is the JWT header/payload, disclosures start from 1
+                for (let i = 1; i < parts.length; i++) {
+                    const part = parts[i].trim();
+                    if (!part) continue;
+                    
+                    try {
+                        let base64 = part.replace(/-/g, '+').replace(/_/g, '/');
+                        while (base64.length % 4) base64 += '=';
+                        
+                        const binary = atob(base64);
+                        const bytes = new Uint8Array(binary.length);
+                        for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+                        const decoded = new TextDecoder().decode(bytes);
+                        
+                        if (decoded.startsWith('[') && decoded.endsWith(']')) {
+                            const json = JSON.parse(decoded);
+                            // Disclosure format: [salt, name, value]
+                            if (json.length >= 3 && String(json[1]).toLowerCase() === searchKey) {
+                                return String(json[2]);
+                            }
+                            // Fallback for UID specifically: any 12 digit number in a disclosure containing 'uid'
+                            if (searchKey === 'uid' && json.length >= 3 && String(json[1]).toLowerCase().includes('uid')) {
+                                if (/^\d{12}$/.test(String(json[2]))) return String(json[2]);
+                            }
+                        }
+                    } catch (e) {}
+                }
+                return '';
+            };
+
+            const uid = extractValue('Uid') || extractValue('aadhaarNumber');
+            const name = extractValue('ResidentName') || extractValue('Name');
+            const dob = extractValue('Dob');
+            const gender = extractValue('Gender');
+            const mobile = extractValue('Mobile');
+            const email = extractValue('Email');
+            const photoBase64 = extractValue('ResidentImage');
+            const careOf = extractValue('CareOf');
+            const enrollmentDate = extractValue('EnrollmentDate');
+            
+            const fullAddress = extractValue('Address');
+            const pincode = extractValue('Pincode');
+            const state = extractValue('State');
+            const district = extractValue('District');
+            const vtc = extractValue('Vtc');
+            
+            const building = extractValue('Building');
+            const street = extractValue('Street');
+            const locality = extractValue('Locality');
+            
+            let finalAddressLine = fullAddress;
+            if (!fullAddress) {
+                 finalAddressLine = [building, street, locality].filter(Boolean).join(', ');
+            }
+
+            // Fallback for UID: some systems use the ID segment or a combined segment
+            let finalUid = uid;
+            if (!finalUid || finalUid === 'QR-VERIFIED') {
+                // Secondary pass: look for any 12-digit number in any disclosure
+                for (let i = 1; i < parts.length; i++) {
+                    try {
+                        const binary = atob(parts[i].trim().replace(/-/g, '+').replace(/_/g, '/'));
+                        if (binary.includes('4852') || /\d{12}/.test(binary)) {
+                            const match = binary.match(/\d{12}/);
+                            if (match) {
+                                finalUid = match[0];
+                                break;
+                            }
+                        }
+                    } catch(e) {}
+                }
+            }
+
+            if (!name && !finalUid) return null;
+
+            return {
+                name,
+                dob: formatDobToISO(dob),
+                gender: formatGender(gender),
+                address: {
+                    line1: finalAddressLine,
+                    city: vtc || district,
+                    state: state,
+                    pincode: pincode
+                },
+                aadhaarNumber: finalUid || 'QR-VERIFIED',
+                mobile: mobile,
+                email: email,
+                photo: photoBase64 ? `data:image/jpeg;base64,${photoBase64}` : undefined,
+                careOf: careOf,
+                enrollmentDate: enrollmentDate
+            };
+
+        } catch (e) {
+            console.error('Secure Text Parse Error:', e);
+            return null;
+        }
+    };
+
+    const isAgeAbove18 = (dobString: string) => {
+        if (!dobString) return 'No';
+        const date = new Date(dobString);
+        if (isNaN(date.getTime())) return 'No';
+        // Simple age calc
+        const age = differenceInYears(new Date(), date);
+        return age >= 18 ? 'Yes' : 'No';
+    };
+
     const stopScanner = async () => {
         if (scannerRef.current) {
             try {
@@ -250,7 +398,7 @@ const AadhaarScannerPage: React.FC = () => {
             dob: aadhaarData.dob,
             gender: aadhaarData.gender as any,
             idProofType: 'Aadhaar',
-            idProofNumber: aadhaarData.mobile || 'QR-VERIFIED', 
+            idProofNumber: aadhaarData.aadhaarNumber, 
             mobile: aadhaarData.mobile,
             email: aadhaarData.email,
             isQrVerified: true
@@ -321,7 +469,9 @@ const AadhaarScannerPage: React.FC = () => {
                 async (decodedText) => {
                     let parsedData: AadhaarData | null = null;
                     
-                    if (/^\d+$/.test(decodedText) && decodedText.length > 500) {
+                    if (decodedText.includes('~')) {
+                        parsedData = parseAadhaarSecureText(decodedText);
+                    } else if (/^\d+$/.test(decodedText) && decodedText.length > 500) {
                         setIsInitializing(true);
                         parsedData = await decodeSecureQR(decodedText);
                         setIsInitializing(false);
@@ -380,6 +530,52 @@ const AadhaarScannerPage: React.FC = () => {
                 await scannerRef.current.stop();
             }
 
+            // --- ZIP FILE HANDLING ---
+            if (file.name.endsWith('.zip') || file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
+                const zip = new JSZip();
+                try {
+                    const contents = await zip.loadAsync(file);
+                    let foundText = '';
+                    
+                    // Look for the offline XML/Data file. usually 'offlineaadhaar202...'
+                    // We iterate and try to find a file that contains XML or the new text format
+                    for (const filename of Object.keys(contents.files)) {
+                        if (!contents.files[filename].dir) {
+                            const textProps = await contents.files[filename].async('string');
+                            if (textProps.includes('<?xml') || textProps.includes('~') || textProps.includes('ResidentName')) {
+                                foundText = textProps;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!foundText) {
+                        throw new Error("No valid Aadhaar data file found inside the zip.");
+                    }
+
+                    let parsedData: AadhaarData | null = null;
+                    if (foundText.includes('~')) {
+                         parsedData = parseAadhaarSecureText(foundText);
+                    } else if (foundText.includes('<?xml')) {
+                         parsedData = parseAadhaarQR(foundText);
+                    }
+
+                    if (parsedData) {
+                        handleScanSuccess(parsedData);
+                    } else {
+                        setError("Could not parse Aadhaar data from the zip file.");
+                    }
+                } catch (zipErr: any) {
+                    console.error('Zip Error:', zipErr);
+                    setError(zipErr.message || "Failed to read zip file.");
+                } finally {
+                    setIsScanningFile(false);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                }
+                return; // Stop here for zip files
+            }
+
+            // --- IMAGE FILE HANDLING ---
             // Create a temporary scanner instance if needed
             const html5QrCode = scannerRef.current || new Html5Qrcode(qrCodeRegionId);
             
@@ -446,7 +642,9 @@ const AadhaarScannerPage: React.FC = () => {
 
             // 3. Decoding logic
             let parsedData: AadhaarData | null = null;
-            if (/^\d+$/.test(decodedText) && decodedText.length > 500) {
+            if (decodedText.includes('~')) {
+                parsedData = parseAadhaarSecureText(decodedText);
+            } else if (/^\d+$/.test(decodedText) && decodedText.length > 500) {
                 parsedData = await decodeSecureQR(decodedText);
             } else {
                 parsedData = parseAadhaarQR(decodedText);
@@ -496,11 +694,11 @@ const AadhaarScannerPage: React.FC = () => {
 
     if (isReviewOpen && scannedData) {
         return (
-            <div className="fixed inset-0 z-[300] flex flex-col bg-[#01140a] text-white animate-fade-in">
-                <header className="p-6 border-b border-emerald-900/30 flex items-center gap-4">
+            <div className="fixed inset-0 z-[300] flex flex-col bg-gray-100 text-gray-900 animate-fade-in">
+                <header className="p-6 bg-white border-b border-gray-200 flex items-center gap-4">
                     <Button 
                         variant="icon" 
-                        className="!text-white bg-white/5 hover:!bg-white/10 !p-2 !rounded-full" 
+                        className="!text-gray-600 bg-gray-100 hover:bg-gray-200 !p-2 !rounded-full" 
                         onClick={() => setIsReviewOpen(false)}
                     >
                         <ArrowLeft className="h-6 w-6" />
@@ -508,57 +706,150 @@ const AadhaarScannerPage: React.FC = () => {
                     <h2 className="text-xl font-bold tracking-tight">Verify Extracted Details</h2>
                 </header>
 
-                <main className="flex-1 overflow-y-auto p-6 space-y-8">
-                    <div className="flex items-center gap-4 p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
-                        <div className="h-12 w-12 bg-emerald-500 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.3)]">
-                            <CheckCircle2 className="h-7 w-7 text-white" />
-                        </div>
-                        <div>
-                            <h4 className="font-bold text-emerald-400">Scan Successful!</h4>
-                            <p className="text-sm text-white/50">Please verify the details below before proceeding.</p>
-                        </div>
-                    </div>
-
-                    <div className="space-y-6">
-                        <section className="space-y-1 border-l-2 border-emerald-500/30 pl-4">
-                            <label className="text-[10px] uppercase font-black text-emerald-500/60 tracking-widest block">Full Name</label>
-                            <p className="font-bold text-2xl text-white leading-tight">{scannedData.name}</p>
-                        </section>
-
-                        <div className="grid grid-cols-2 gap-8">
-                            <section className="space-y-1 border-l-2 border-emerald-500/30 pl-4">
-                                <label className="text-[10px] uppercase font-black text-emerald-500/60 tracking-widest block">Date of Birth</label>
-                                <p className="font-bold text-lg text-white">{scannedData.dob}</p>
-                            </section>
-                            <section className="space-y-1 border-l-2 border-emerald-500/30 pl-4">
-                                <label className="text-[10px] uppercase font-black text-emerald-500/60 tracking-widest block">Gender</label>
-                                <p className="font-bold text-lg text-white">{scannedData.gender}</p>
-                            </section>
-                        </div>
-
-                        <section className="space-y-2 border-l-2 border-emerald-500/30 pl-4">
-                            <label className="text-[10px] uppercase font-black text-emerald-500/60 tracking-widest block">Verified Address</label>
-                            <p className="text-sm leading-relaxed text-white/80">{scannedData.address.line1}</p>
-                            <div className="inline-flex mt-2 px-3 py-1 bg-emerald-950/50 border border-emerald-800/30 rounded-lg">
-                                <p className="text-sm font-bold text-emerald-400">
-                                    {scannedData.address.city}, {scannedData.address.state} - {scannedData.address.pincode}
-                                </p>
+                <main className="flex-1 overflow-y-auto p-4 space-y-4">
+                    <div className="bg-white rounded-3xl p-5 shadow-lg space-y-6 text-gray-900">
+                        
+                        {/* Photo Section */}
+                        <div className="flex items-center gap-4 border-b border-gray-100 pb-4">
+                            <div className="relative">
+                                {scannedData.photo ? (
+                                    <img 
+                                        src={scannedData.photo} 
+                                        alt="Resident" 
+                                        className="w-16 h-16 rounded-full object-cover border border-gray-200"
+                                    />
+                                ) : (
+                                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                                        <User className="h-8 w-8 text-green-500" />
+                                    </div>
+                                )}
                             </div>
-                        </section>
+                            <div>
+                                <h3 className="font-bold text-lg">Your photo</h3>
+                                <p className="text-gray-500 text-sm">Your digital photo saved on Aadhaar</p>
+                            </div>
+                        </div>
+
+                        {/* Details List */}
+                        <div className="space-y-5">
+                            {/* Name */}
+                            <div className="flex gap-4 border-b border-gray-100 pb-4">
+                                <User className="h-6 w-6 text-green-500 mt-0.5" />
+                                <div>
+                                    <label className="block font-bold text-gray-900">Full name</label>
+                                    <p className="text-green-500">{scannedData.name}</p>
+                                </div>
+                            </div>
+
+                            {/* Aadhaar Number */}
+                            <div className="flex gap-4 border-b border-gray-100 pb-4">
+                                <CreditCard className="h-6 w-6 text-green-500 mt-0.5" />
+                                <div>
+                                    <label className="block font-bold text-gray-900">Aadhaar Number</label>
+                                    <p className="text-green-500 tracking-wider font-mono">
+                                        {scannedData.aadhaarNumber.length === 12 
+                                            ? scannedData.aadhaarNumber.replace(/(.{4})/g, '$1 ').trim() 
+                                            : scannedData.aadhaarNumber}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Age */}
+                            <div className="flex gap-4 border-b border-gray-100 pb-4">
+                                <UserCheck className="h-6 w-6 text-green-500 mt-0.5" />
+                                <div>
+                                    <label className="block font-bold text-gray-900">Age Above 18</label>
+                                    <p className="text-green-500">{isAgeAbove18(scannedData.dob)}</p>
+                                </div>
+                            </div>
+
+                            {/* DOB */}
+                            <div className="flex gap-4 border-b border-gray-100 pb-4">
+                                <Calendar className="h-6 w-6 text-green-500 mt-0.5" />
+                                <div>
+                                    <label className="block font-bold text-gray-900">Date of Birth</label>
+                                    <p className="text-green-500">{scannedData.dob}</p>
+                                </div>
+                            </div>
+
+                            {/* Enrollment Date */}
+                            {scannedData.enrollmentDate && (
+                                <div className="flex gap-4 border-b border-gray-100 pb-4">
+                                    <Calendar className="h-6 w-6 text-green-500 mt-0.5" />
+                                    <div>
+                                        <label className="block font-bold text-gray-900">Enrollment Date</label>
+                                        <p className="text-green-500">{scannedData.enrollmentDate.split('T')[0]}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Gender */}
+                            <div className="flex gap-4 border-b border-gray-100 pb-4">
+                                <User className="h-6 w-6 text-green-500 mt-0.5" />
+                                <div>
+                                    <label className="block font-bold text-gray-900">Gender</label>
+                                    <p className="text-green-500 uppercase">{scannedData.gender}</p>
+                                </div>
+                            </div>
+
+                            {/* Care Of */}
+                            <div className="flex gap-4 border-b border-gray-100 pb-4">
+                                <Users className="h-6 w-6 text-green-500 mt-0.5" />
+                                <div>
+                                    <label className="block font-bold text-gray-900">Care of / Guardian</label>
+                                    <p className="text-green-500 capitalize">{scannedData.careOf || 'N/A'}</p>
+                                </div>
+                            </div>
+
+                            {/* Address */}
+                            <div className="flex gap-4 border-b border-gray-100 pb-4">
+                                <MapPin className="h-6 w-6 text-green-500 mt-0.5" />
+                                <div>
+                                    <label className="block font-bold text-gray-900">Address</label>
+                                    <p className="text-green-500 text-sm leading-relaxed">
+                                        {scannedData.address.line1}
+                                        {scannedData.address.line1 ? ', ' : ''}
+                                        {scannedData.address.city}, {scannedData.address.state} {scannedData.address.pincode}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Mobile */}
+                            <div className="flex gap-4 border-b border-gray-100 pb-4">
+                                <Phone className="h-6 w-6 text-green-500 mt-0.5" />
+                                <div>
+                                    <label className="block font-bold text-gray-900">Mobile Number</label>
+                                    <p className="text-green-500 text-sm font-medium">
+                                        {scannedData.mobile || 'N/A'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Email */}
+                            <div className="flex gap-4 pb-2">
+                                <Mail className="h-6 w-6 text-green-500 mt-0.5" />
+                                <div>
+                                    <label className="block font-bold text-gray-900">Email</label>
+                                    <p className="text-green-500 text-sm break-all">
+                                        {scannedData.email || 'N/A'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </main>
 
-                <footer className="p-6 pt-0 bg-gradient-to-t from-[#01140a] via-[#01140a] to-transparent">
+                <footer className="p-6 bg-white border-t border-gray-100">
                      <div className="flex flex-col gap-3">
                         <Button 
-                            className="w-full !rounded-2xl !py-4 font-bold text-lg shadow-xl shadow-emerald-900/20"
+                            className="w-full !rounded-2xl !py-4 font-bold text-lg shadow-lg"
                             onClick={confirmAndFill}
                         >
                             Confirm & Auto-Fill
                         </Button>
                         <Button 
                             variant="secondary"
-                            className="w-full !rounded-2xl !py-4 !bg-white/5 !border-white/10 !text-white/60 font-medium"
+                            className="w-full !rounded-2xl !py-4 !bg-gray-100 !border-gray-200 !text-gray-600 font-medium"
                             onClick={() => setIsReviewOpen(false)}
                         >
                             Rescan QR Code
@@ -649,7 +940,7 @@ const AadhaarScannerPage: React.FC = () => {
                                 onClick={() => fileInputRef.current?.click()}
                             >
                                 <Upload className="h-6 w-6 mr-3" />
-                                Upload Image
+                                Upload Image / Zip
                             </Button>
                             <Button 
                                 variant="icon" 
@@ -666,7 +957,7 @@ const AadhaarScannerPage: React.FC = () => {
                     type="file" 
                     ref={fileInputRef} 
                     className="hidden" 
-                    accept="image/*" 
+                    accept="image/*,application/zip,.zip,.xml" 
                     onChange={handleFileUpload}
                  />
             </div>
