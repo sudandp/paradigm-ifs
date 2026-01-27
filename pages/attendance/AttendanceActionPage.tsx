@@ -35,9 +35,17 @@ const AttendanceActionPage: React.FC = () => {
     if (isBreakIn) action = 'Break In';
     if (isBreakOut) action = 'Break Out';
 
-    const Icon = (isCheckIn || isBreakIn) ? LogIn : LogOut;
-    const iconBgColor = (isCheckIn || isBreakIn) ? 'bg-emerald-100' : 'bg-red-100';
-    const iconColor = (isCheckIn || isBreakIn) ? 'text-emerald-600' : 'text-red-600';
+    const Icon = (isCheckIn || isBreakIn || isBreakOut) ? LogIn : LogOut;
+    let iconBgColor = isCheckIn ? 'bg-emerald-100' : 'bg-red-100';
+    let iconColor = isCheckIn ? 'text-emerald-600' : 'text-red-600';
+    
+    if (isBreakIn) {
+        iconBgColor = 'bg-blue-100';
+        iconColor = 'text-blue-600';
+    } else if (isBreakOut) {
+        iconBgColor = 'bg-amber-100';
+        iconColor = 'text-amber-600';
+    }
 
     const handleConfirm = async () => {
         setIsSubmitting(true);
@@ -111,7 +119,7 @@ const AttendanceActionPage: React.FC = () => {
                 <div className="flex flex-col gap-3">
                     <Button
                         onClick={handleConfirm}
-                        variant={isCheckIn ? "primary" : "danger"}
+                        variant={isCheckIn ? "primary" : ((isBreakIn || isBreakOut) ? "primary" : "danger")}
                         className="w-full !py-3 !text-lg shadow-lg"
                         isLoading={isSubmitting}
                     >

@@ -12,47 +12,72 @@ export function calculateDailyHours(checkIn: string, checkOut: string): number {
 }
 
 /**
- * Calculate working hours with automatic lunch break deduction
- * 
- * IMPORTANT RULES:
- * - Maximum total time (check-in to check-out): 9 hours
- * - Lunch break: 60 minutes (1 hour) - ALWAYS AUTO-DEDUCTED
- * - Minimum working hours (after lunch deduction): 8 hours
- * - Working Hours = Total Hours - 1 hour (lunch)
- * 
- * The 60-minute lunch is deducted automatically regardless of whether
- * break-in/break-out events are recorded. This ensures consistent calculation
- * and affects loss of pay even if employee doesn't explicitly take lunch.
- * 
- * @param checkIn Check-in timestamp
- * @param checkOut Check-out timestamp
- * @param breakIn Break-in timestamp (optional, for tracking purposes)
- * @param breakOut Break-out timestamp (optional, for tracking purposes)
- * @returns Object with totalHours, breakHours, and workingHours
+ * Calculate working hours with multiple segments and break tracking
  */
 export function calculateWorkingHours(
-  checkIn: string,
-  checkOut: string,
-  breakIn?: string,
-  breakOut?: string
-): { totalHours: number; breakHours: number; workingHours: number } {
-  const totalHours = calculateDailyHours(checkIn, checkOut);
+  events: AttendanceEvent[]
+): { totalHours: number; breakHours: number; workingHours: number; lastBreakIn: string | null; lastBreakOut: string | null } {
+  // Sort events chronologically to process segments
+  const sortedEvents = [...events].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   
-  let breakHours = 0;
+  let totalGrossWorkMinutes = 0;
+  let totalBreakMinutes = 0;
+  let lastBreakIn: string | null = null;
+  let lastBreakOut: string | null = null;
   
-  // If actual break-in/out is recorded, use the actual duration
-  if (breakIn && breakOut) {
-    breakHours = calculateDailyHours(breakIn, breakOut);
+  let workStartTime: Date | null = null;
+  let breakStartTime: Date | null = null;
+  
+  sortedEvents.forEach(event => {
+    const eventTime = new Date(event.timestamp);
+    
+    switch (event.type) {
+      case 'check-in':
+        if (!workStartTime) workStartTime = eventTime;
+        break;
+      case 'check-out':
+        if (workStartTime) {
+          totalGrossWorkMinutes += differenceInMinutes(eventTime, workStartTime);
+          workStartTime = null;
+        }
+        break;
+      case 'break-in':
+        breakStartTime = eventTime;
+        lastBreakIn = event.timestamp;
+        lastBreakOut = null; // Reset last break out when a new break starts
+        break;
+      case 'break-out':
+        if (breakStartTime) {
+          totalBreakMinutes += differenceInMinutes(eventTime, breakStartTime);
+          breakStartTime = null;
+          lastBreakOut = event.timestamp;
+        }
+        break;
+    }
+  });
+
+  // Handle ongoing sessions (if any) - though usually we only calculate for finished ones or up to "now"
+  // For the purpose of "current status", we might not need to add the ongoing minutes here
+  // but for "total duration today", we should.
+  const now = new Date();
+  if (workStartTime) {
+    totalGrossWorkMinutes += differenceInMinutes(now, workStartTime);
   }
+  if (breakStartTime) {
+    totalBreakMinutes += differenceInMinutes(now, breakStartTime);
+  }
+
+  // Working hours = Total gross hours - Break hours
+  // We don't cap at 9 hours here as multiple sessions might exceed it naturally
+  const workingHours = Math.max(0, (totalGrossWorkMinutes - totalBreakMinutes) / 60);
   
-  // Cap totalHours at 9 hours maximum
-  const MAX_TOTAL_HOURS = 9;
-  const cappedTotalHours = Math.min(totalHours, MAX_TOTAL_HOURS);
-  
-  // Working hours = Total hours - Break hours
-  const workingHours = Math.max(0, cappedTotalHours - breakHours);
-  
-  return { totalHours: cappedTotalHours, breakHours, workingHours };
+  return { 
+    totalHours: totalGrossWorkMinutes / 60, 
+    breakHours: totalBreakMinutes / 60, 
+    workingHours,
+    lastBreakIn,
+    lastBreakOut
+  };
 }
 
 /**
@@ -180,34 +205,33 @@ export function processDailyEvents(events: AttendanceEvent[]): {
   breakHours: number;
   workingHours: number;
 } {
-  const checkInEvent = events.find(e => e.type === 'check-in');
-  const checkOutEvent = events.find(e => e.type === 'check-out');
-  const breakInEvent = events.find(e => e.type === 'break-in');
-  const breakOutEvent = events.find(e => e.type === 'break-out');
-  
-  const checkIn = checkInEvent?.timestamp || null;
-  const checkOut = checkOutEvent?.timestamp || null;
-  const breakIn = breakInEvent?.timestamp || null;
-  const breakOut = breakOutEvent?.timestamp || null;
-  
-  let totalHours = 0;
-  let breakHours = 0;
-  let workingHours = 0;
-  
-  if (checkIn && checkOut) {
-    const result = calculateWorkingHours(checkIn, checkOut, breakIn || undefined, breakOut || undefined);
-    totalHours = result.totalHours;
-    breakHours = result.breakHours;
-    workingHours = result.workingHours;
+  if (events.length === 0) {
+    return {
+      checkIn: null,
+      checkOut: null,
+      breakIn: null,
+      breakOut: null,
+      totalHours: 0,
+      breakHours: 0,
+      workingHours: 0,
+    };
   }
+
+  // Sort events chronologically
+  const sortedEvents = [...events].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  
+  const firstCheckIn = sortedEvents.find(e => e.type === 'check-in');
+  const lastCheckOut = [...sortedEvents].reverse().find(e => e.type === 'check-out');
+  
+  const result = calculateWorkingHours(events);
   
   return {
-    checkIn,
-    checkOut,
-    breakIn,
-    breakOut,
-    totalHours,
-    breakHours,
-    workingHours,
+    checkIn: firstCheckIn?.timestamp || null,
+    checkOut: lastCheckOut?.timestamp || null,
+    breakIn: result.lastBreakIn,
+    breakOut: result.lastBreakOut,
+    totalHours: result.totalHours,
+    breakHours: result.breakHours,
+    workingHours: result.workingHours,
   };
 }

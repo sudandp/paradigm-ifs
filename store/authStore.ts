@@ -13,6 +13,7 @@ import { api } from '../services/api';
 import { withTimeout } from '../utils/async';
 import { format } from 'date-fns';
 import { calculateDistanceMeters, reverseGeocode, getPrecisePosition } from '../utils/locationUtils';
+import { processDailyEvents } from '../utils/attendanceCalculations';
 import { dispatchNotificationFromRules } from '../services/notificationService';
 
 // Centralized friendly error message handler for Supabase
@@ -68,6 +69,10 @@ interface AuthState {
     isAttendanceLoading: boolean;
     lastCheckInTime: string | null;
     lastCheckOutTime: string | null;
+    lastBreakInTime: string | null;
+    lastBreakOutTime: string | null;
+    totalBreakDurationToday: number;
+    isOnBreak: boolean;
     loginWithEmail: (email: string, password: string, rememberMe: boolean) => Promise<{ error: { message: string } | null }>;
     signUp: (name: string, email: string, password: string) => Promise<{ error: { message: string } | null }>;
     loginWithGoogle: () => Promise<{ error: { message: string } | null; }>;
@@ -107,6 +112,10 @@ export const useAuthStore = create<AuthState>()(
         isAttendanceLoading: true,
         lastCheckInTime: null,
         lastCheckOutTime: null,
+        lastBreakInTime: null,
+        lastBreakOutTime: null,
+        totalBreakDurationToday: 0,
+        isOnBreak: false,
         error: null,
         loading: false,
         geofencingSettings: null,
@@ -122,6 +131,10 @@ export const useAuthStore = create<AuthState>()(
             isAttendanceLoading: false,
             lastCheckInTime: null,
             lastCheckOutTime: null,
+            lastBreakInTime: null,
+            lastBreakOutTime: null,
+            totalBreakDurationToday: 0,
+            isOnBreak: false,
             isLoginAnimationPending: false,
         }),
         setError: (error) => set({ error }),
@@ -312,17 +325,17 @@ export const useAuthStore = create<AuthState>()(
                     return;
                 }
 
-                // Sort events chronologically (oldest first) to easily find first/last
-                events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-                const firstCheckIn = events.find(e => e.type === 'check-in');
-                const lastCheckOut = [...events].reverse().find(e => e.type === 'check-out');
+                const { checkIn, checkOut, breakIn, breakOut, breakHours } = processDailyEvents(events);
                 const lastEvent = events[events.length - 1];
 
                 set({
-                    isCheckedIn: lastEvent?.type === 'check-in',
-                    lastCheckInTime: firstCheckIn ? firstCheckIn.timestamp : null,
-                    lastCheckOutTime: lastCheckOut ? lastCheckOut.timestamp : null,
+                    isCheckedIn: lastEvent?.type !== 'check-out',
+                    isOnBreak: lastEvent?.type === 'break-in',
+                    lastCheckInTime: checkIn,
+                    lastCheckOutTime: lastEvent?.type === 'check-out' ? checkOut : null,
+                    lastBreakInTime: breakIn,
+                    lastBreakOutTime: breakOut,
+                    totalBreakDurationToday: breakHours,
                     isAttendanceLoading: false
                 });
             } catch (error) {
