@@ -9,10 +9,13 @@ import type {
   SubmissionCostBreakdown, AppModule, Role, SupportTicket, TicketPost, TicketComment, VerificationResult, CompOffLog,
   ExtraWorkLog, PerfiosVerificationData, HolidayListItem, UniformRequestItem, IssuedTool, RecurringHolidayRule,
   BiometricDevice, ChecklistTemplate, FieldReport, FieldAttendanceViolation,
-  NotificationRule, NotificationType, Company, GmcPolicySettings
+  NotificationRule, NotificationType, Company, GmcPolicySettings, StaffAttendanceRules
 } from '../types';
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
-import { differenceInCalendarDays, format, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
+import { 
+  differenceInCalendarDays, format, startOfMonth, endOfMonth, 
+  startOfDay, endOfDay, eachDayOfInterval, isSameDay, getDay
+} from 'date-fns';
 import { dispatchNotificationFromRules } from './notificationService';
 import { calculateSiteTravelTime, validateFieldStaffAttendance } from '../utils/fieldStaffTracking';
 import { GoogleGenAI, Type, Modality } from '@google/genai';
@@ -1183,9 +1186,15 @@ export const api = {
   },
   getLeaveBalancesForUser: async (userId: string): Promise<LeaveBalance> => {
     const getStaffType = (role: UserRole): 'office' | 'field' => (['hr', 'admin', 'finance'].includes(role) ? 'office' : 'field');
-    const { data: settingsData, error: settingsError } = await supabase.from('settings').select('attendance_settings').eq('id', 'singleton').single();
+    const [
+      { data: settingsData, error: settingsError },
+      { data: userData, error: userError }
+    ] = await Promise.all([
+      supabase.from('settings').select('attendance_settings').eq('id', 'singleton').single(),
+      supabase.from('users').select('role_id, earned_leave_opening_balance, earned_leave_opening_date').eq('id', userId).single()
+    ]);
+
     if (settingsError || !settingsData?.attendance_settings) throw new Error('Could not load attendance rules.');
-    const { data: userData, error: userError } = await supabase.from('users').select('role_id').eq('id', userId).single();
     if (userError) throw userError;
 
     const staffType = getStaffType(userData.role_id);
@@ -1193,29 +1202,45 @@ export const api = {
 
     const currentYear = new Date().getFullYear();
     const yearStart = `${currentYear}-01-01`;
-    const yearEnd = `${currentYear}-12-31`;
 
     const [
       { data: approvedLeaves, error: leavesError },
       { data: compOffData, error: compOffError },
-      { data: otData, error: otError }
+      { data: otData, error: otError },
+      { data: holidays, error: holidaysError },
+      recurringHolidays
     ] = await Promise.all([
       supabase.from('leave_requests')
         .select('leave_type, start_date, end_date, day_option')
         .eq('user_id', userId)
         .eq('status', 'approved')
-        .gte('start_date', yearStart), // Only current year leaves
+        .gte('start_date', yearStart),
       supabase.from('comp_off_logs').select('*').eq('user_id', userId),
-      supabase.from('extra_work_logs').select('hours_worked').eq('user_id', userId).eq('claim_type', 'OT').eq('status', 'Approved').gte('work_date', format(startOfMonth(new Date()), 'yyyy-MM-dd')).lte('work_date', format(endOfMonth(new Date()), 'yyyy-MM-dd'))
+      supabase.from('extra_work_logs').select('hours_worked').eq('user_id', userId).eq('claim_type', 'OT').eq('status', 'Approved').gte('work_date', format(startOfMonth(new Date()), 'yyyy-MM-dd')).lte('work_date', format(endOfMonth(new Date()), 'yyyy-MM-dd')),
+      supabase.from('holidays').select('*'),
+      api.getRecurringHolidays()
     ]);
 
-    if (leavesError || compOffError || otError) throw new Error("Failed to fetch all leave balance data.");
+    if (leavesError || compOffError || otError || holidaysError) throw new Error("Failed to fetch all leave balance data.");
+
+    // Calculate Earned Leave dynamically if rule exists
+    let earnedTotal = rules.annualEarnedLeaves || 0;
+    if (rules.earnedLeaveAccrual) {
+      const openingBalance = userData.earned_leave_opening_balance || 0;
+      const openingDate = userData.earned_leave_opening_date || format(new Date(), 'yyyy-MM-dd');
+      
+      const countableDays = await api.getCountableDays(userId, openingDate, format(new Date(), 'yyyy-MM-dd'), holidays || [], recurringHolidays || [], rules);
+      earnedTotal = openingBalance + Math.floor(countableDays / rules.earnedLeaveAccrual.daysRequired) * rules.earnedLeaveAccrual.amountEarned;
+    }
 
     const balance: LeaveBalance = {
       userId,
-      earnedTotal: rules.annualEarnedLeaves || 0, earnedUsed: 0,
-      sickTotal: rules.annualSickLeaves || 0, sickUsed: 0,
-      floatingTotal: (rules.monthlyFloatingLeaves || 0) * 12, floatingUsed: 0,
+      earnedTotal,
+      earnedUsed: 0,
+      sickTotal: rules.annualSickLeaves || 0,
+      sickUsed: 0,
+      floatingTotal: (rules.monthlyFloatingLeaves || 0) * 12,
+      floatingUsed: 0,
       compOffTotal: (compOffData || []).filter(log => log.status === 'earned').length, 
       compOffUsed: (compOffData || []).filter(log => log.status === 'used').length,
       otHoursThisMonth: (otData || []).reduce((sum, log) => sum + (log.hours_worked || 0), 0),
@@ -1223,14 +1248,73 @@ export const api = {
 
     (approvedLeaves || []).forEach(leave => {
       const leaveAmount = leave.day_option === 'half' ? 0.5 : differenceInCalendarDays(new Date(leave.end_date), new Date(leave.start_date)) + 1;
-      // Reset only Sick and Floating annually. Earned might carry over depending on policy, 
-      // but for now we follow the user's specific request for Sick leave reset.
       if (leave.leave_type === 'Earned') balance.earnedUsed += leaveAmount;
       if (leave.leave_type === 'Sick') balance.sickUsed += leaveAmount;
       if (leave.leave_type === 'Floating') balance.floatingUsed += leaveAmount;
     });
 
     return balance;
+  },
+
+  getCountableDays: async (userId: string, fromDate: string, toDate: string, holidays: any[], recurringHolidays: any[], rules: StaffAttendanceRules): Promise<number> => {
+    // 1. Fetch attendance events for the period
+    const { data: events, error } = await supabase
+      .from('attendance_events')
+      .select('timestamp')
+      .eq('user_id', userId)
+      .gte('timestamp', startOfDay(new Date(fromDate)).toISOString())
+      .lte('timestamp', endOfDay(new Date(toDate)).toISOString());
+    
+    if (error) throw error;
+
+    const attendedDates = new Set((events || []).map(e => format(new Date(e.timestamp), 'yyyy-MM-dd')));
+    const holidayDates = new Set(holidays.map(h => format(new Date(h.date), 'yyyy-MM-dd')));
+
+    let countableCount = 0;
+    const interval = { start: new Date(fromDate), end: new Date(toDate) };
+    const days = eachDayOfInterval(interval);
+
+    days.forEach(day => {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      
+      // Case 1: Employee worked (at least one attendance event)
+      if (attendedDates.has(dateStr)) {
+        countableCount++;
+        return;
+      }
+
+      // Case 2: It's a public holiday
+      if (holidayDates.has(dateStr)) {
+        countableCount++;
+        return;
+      }
+
+      // Case 3: It's a week-off day
+      // a) Check weeklyOffDays rule (index-based)
+      const dayOfWeek = getDay(day); // 0 = Sunday, 1 = Monday, ...
+      if (rules.weeklyOffDays?.includes(dayOfWeek)) {
+        countableCount++;
+        return;
+      }
+
+      // b) Check recurring holidays (specifically role-based week-offs like "Every Sunday")
+      const isRecurring = recurringHolidays.some(rh => {
+        if (rh.day !== format(day, 'EEEE')) return false;
+        if (rh.n === 0) return true; // 0 usually means every
+        
+        // Calculate which occurrence of that day it is in the month
+        const dayOfMonth = day.getDate();
+        const nth = Math.ceil(dayOfMonth / 7);
+        return rh.n === nth;
+      });
+
+      if (isRecurring) {
+        countableCount++;
+        return;
+      }
+    });
+
+    return countableCount;
   },
   submitLeaveRequest: async (data: Omit<LeaveRequest, 'id' | 'status' | 'currentApproverId' | 'approvalHistory'>): Promise<LeaveRequest> => {
     const { data: userProfile, error: userError } = await supabase.from('users').select('reporting_manager_id').eq('id', data.userId).single();

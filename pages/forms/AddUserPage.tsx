@@ -9,7 +9,7 @@ import Select from '../../components/ui/Select';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { api } from '../../services/api';
-import { UserPlus, ArrowLeft } from 'lucide-react';
+import { UserPlus, ArrowLeft, Calendar } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 const createUserSchema = yup.object({
@@ -32,6 +32,8 @@ const createUserSchema = yup.object({
   reportingManagerId: yup.string().optional().nullable(),
   photoUrl: yup.string().optional().nullable(),
   biometricId: yup.string().optional().nullable(),
+  earnedLeaveOpeningBalance: yup.number().optional().nullable().transform((value) => (isNaN(value) ? 0 : value)).default(0),
+  earnedLeaveOpeningDate: yup.string().optional().nullable(),
 }).defined();
 
 const editUserSchema = yup.object({
@@ -50,6 +52,8 @@ const editUserSchema = yup.object({
   reportingManagerId: yup.string().optional().nullable(),
   photoUrl: yup.string().optional().nullable(),
   biometricId: yup.string().optional().nullable(),
+  earnedLeaveOpeningBalance: yup.number().optional().nullable().transform((value) => (isNaN(value) ? 0 : value)).default(0),
+  earnedLeaveOpeningDate: yup.string().optional().nullable(),
 }).defined();
 
 const AddUserPage: React.FC = () => {
@@ -254,6 +258,27 @@ const AddUserPage: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              <div className="pt-4 border-t border-gray-100">
+                <h3 className="text-sm font-semibold text-primary-text mb-4">Earned Leave Initial Balance</h3>
+                <div className="space-y-4">
+                  <Input 
+                    label="Opening Balance (Days)" 
+                    type="number" 
+                    step="0.5" 
+                    registration={register('earnedLeaveOpeningBalance')} 
+                    error={errors.earnedLeaveOpeningBalance?.message}
+                    description="The number of earned leaves the employee has as of the opening date."
+                  />
+                  <Input 
+                    label="Opening Date" 
+                    type="date" 
+                    registration={register('earnedLeaveOpeningDate')} 
+                    error={errors.earnedLeaveOpeningDate?.message}
+                    description="The date from which dynamic accrual will start calculating (or when the opening balance was valid)."
+                  />
+                </div>
+              </div>
             </form>
           </div>
         </main>
@@ -359,6 +384,30 @@ const AddUserPage: React.FC = () => {
               </div>
             </div>
           )}
+
+          <div className="pt-6 border-t border-gray-100">
+            <h3 className="text-lg font-semibold text-primary-text mb-4 flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-accent" />
+              Earned Leave Initial Balance
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <Input 
+                label="Opening Balance (Days)" 
+                type="number" 
+                step="0.5" 
+                registration={register('earnedLeaveOpeningBalance')} 
+                error={errors.earnedLeaveOpeningBalance?.message}
+                description="Initial earned leave balance."
+              />
+              <Input 
+                label="Opening Date" 
+                type="date" 
+                registration={register('earnedLeaveOpeningDate')} 
+                error={errors.earnedLeaveOpeningDate?.message}
+                description="Accrual start date."
+              />
+            </div>
+          </div>
 
           <div className="mt-8 pt-6 border-t flex justify-end gap-3">
             <Button

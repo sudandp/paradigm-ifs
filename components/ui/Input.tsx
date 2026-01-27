@@ -5,12 +5,13 @@ import { type UseFormRegisterReturn } from 'react-hook-form';
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  description?: string;
   registration?: UseFormRegisterReturn;
   icon?: React.ReactNode;
   autoCapitalizeCustom?: boolean;
 }
 
-const Input = React.forwardRef<HTMLInputElement, InputProps>(({ label, id, error, registration, icon, autoCapitalizeCustom = true, ...props }, ref) => {
+const Input = React.forwardRef<HTMLInputElement, InputProps>(({ label, id, error, description, registration, icon, autoCapitalizeCustom = true, ...props }, ref) => {
   const generatedId = useId();
   const inputId = id || generatedId;
   const { className, ...otherProps } = props;
@@ -66,6 +67,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({ label, id, error
           {label}
         </label>
       )}
+      {description && <p className="text-xs text-muted mb-1">{description}</p>}
       <div className={label ? "mt-1" : ""}>
         {inputElement}
       </div>

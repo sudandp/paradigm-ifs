@@ -279,6 +279,7 @@ const AttendanceSettings: React.FC = () => {
                             type="number"
                             value={currentRules.annualEarnedLeaves}
                             onChange={(e) => handleSettingChange('annualEarnedLeaves', parseInt(e.target.value, 10) || 0)}
+                            description="Base annual quota if dynamic accrual is disabled."
                         />
                         <Input
                             label="Annual Sick Leaves"
@@ -294,6 +295,56 @@ const AttendanceSettings: React.FC = () => {
                             value={currentRules.monthlyFloatingLeaves}
                             onChange={(e) => handleSettingChange('monthlyFloatingLeaves', parseInt(e.target.value, 10) || 0)}
                         />
+                    </div>
+
+                    <div className="mt-8 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+                        <h4 className="text-sm font-semibold text-emerald-600 mb-4 flex items-center">
+                            <Settings className="mr-2 h-4 w-4" /> Earned Leave Accrual Rule
+                        </h4>
+                        <div className="flex flex-col gap-4">
+                            <Checkbox
+                                id="enableAccrual"
+                                label="Enable Dynamic Accrual"
+                                description="Automatically calculate earned leave based on attendance history."
+                                checked={!!currentRules.earnedLeaveAccrual}
+                                onChange={(e) => {
+                                    if (e.target.checked) {
+                                        handleSettingChange('earnedLeaveAccrual', { daysRequired: 10, amountEarned: 0.5 });
+                                    } else {
+                                        handleSettingChange('earnedLeaveAccrual', undefined);
+                                    }
+                                }}
+                            />
+                            
+                            {currentRules.earnedLeaveAccrual && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pl-8">
+                                    <Input
+                                        label="Days Required"
+                                        type="number"
+                                        value={currentRules.earnedLeaveAccrual.daysRequired}
+                                        onChange={(e) => handleSettingChange('earnedLeaveAccrual', {
+                                            ...currentRules.earnedLeaveAccrual,
+                                            daysRequired: parseFloat(e.target.value) || 10
+                                        })}
+                                        description="Countable days (Worked + Holiday + Weekoff)"
+                                    />
+                                    <Input
+                                        label="Leave Earned (Days)"
+                                        type="number"
+                                        step="0.1"
+                                        value={currentRules.earnedLeaveAccrual.amountEarned}
+                                        onChange={(e) => handleSettingChange('earnedLeaveAccrual', {
+                                            ...currentRules.earnedLeaveAccrual,
+                                            amountEarned: parseFloat(e.target.value) || 0.5
+                                        })}
+                                        description="Amount of leave granted per period"
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
                         <Input
                             label="Annual Compensatory Off"
                             id="annualCompOffLeaves"

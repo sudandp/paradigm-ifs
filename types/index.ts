@@ -90,6 +90,8 @@ export interface User {
   salaryHold?: boolean;
   salaryHoldReason?: string | null;
   salaryHoldDate?: string | null; // ISO String
+  earnedLeaveOpeningBalance?: number;
+  earnedLeaveOpeningDate?: string; // YYYY-MM-DD
 }
 
 export interface BiometricDevice {
@@ -734,6 +736,10 @@ export interface StaffAttendanceRules {
   minimumSitePercentage?: number; // e.g., 75 - minimum % of time that must be on-site
   maximumTravelPercentage?: number; // e.g., 25 - maximum % of time for travel
   enableSiteTimeTracking?: boolean; // Enable site vs travel validation for field staff
+  earnedLeaveAccrual?: {
+    daysRequired: number; // e.g., 10
+    amountEarned: number; // e.g., 0.5
+  };
 }
 
 export interface AttendanceSettings {
