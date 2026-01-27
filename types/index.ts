@@ -935,6 +935,7 @@ export interface DeviceInfo {
   // Device specific (for mobile apps)
   deviceModel?: string;
   manufacturer?: string;
+  hardwareModel?: string; // Specific model number (e.g. SM-G991B)
   uuid?: string; // Capacitor Device ID
   
   // Screen info

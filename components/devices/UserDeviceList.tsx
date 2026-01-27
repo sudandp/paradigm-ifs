@@ -176,9 +176,10 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
                             
                             // 2. Identify Android
                             if (device.deviceType.toLowerCase() === 'android' || os.includes('android')) {
-                              const makeModel = info.manufacturer && info.deviceModel 
-                                ? `${info.manufacturer} ${info.deviceModel}`
-                                : info.deviceModel || info.manufacturer || 'Android Device';
+                              const hwModel = info.hardwareModel || info.deviceModel;
+                              const makeModel = info.manufacturer && hwModel 
+                                ? `${info.manufacturer} ${hwModel}`
+                                : hwModel || info.manufacturer || 'Android Device';
                               return `${makeModel} (${browser})`;
                             }
                             
@@ -368,6 +369,16 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
                     <p className="text-sm font-mono text-gray-700">{viewedDevice.deviceInfo?.ipAddress || 'Not recorded'}</p>
                   </div>
                 </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Screen</label>
+                    <p className="text-sm font-medium text-gray-700">{viewedDevice.deviceInfo?.screenResolution || 'Unknown'}</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -377,8 +388,14 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
                 <span className="font-medium text-gray-700">v{viewedDevice.deviceInfo?.appVersion || 'Unknown'}</span>
               </div>
               <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-500">Hardware Signature</span>
+                <span className="font-mono text-gray-700 text-[10px]">
+                  {viewedDevice.deviceInfo?.canvas ? `HW-${viewedDevice.deviceInfo.canvas.slice(-8).toUpperCase()}` : 'GENERIC-ID'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
                 <span className="text-gray-500">System ID</span>
-                <span className="font-mono text-gray-700">{viewedDevice.id}</span>
+                <span className="font-mono text-gray-700">{viewedDevice.id.slice(0, 18)}...</span>
               </div>
               {viewedDevice.deviceInfo?.androidId && (
                 <div className="flex justify-between items-center text-xs">

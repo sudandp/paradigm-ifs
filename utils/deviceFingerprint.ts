@@ -82,7 +82,22 @@ async function getMobileDeviceInfo(): Promise<DeviceInfo> {
       isCharging: battery.isCharging,
       connectionType: network.connectionType,
       appVersion: appInfo.version || 'unknown',
+      hardwareModel: info.model, // Native model number
+      // Added high-entropy markers for mobile to prevent incorrect merging
+      screenResolution: `${window.screen.width}x${window.screen.height}`,
+      colorDepth: window.screen.colorDepth,
+      canvas: getCanvasFingerprint(),
+      webgl: getWebGLFingerprint(),
     };
+    
+    // Fallback model from UA if native model is generic/empty
+    if (!deviceInfo.hardwareModel || deviceInfo.hardwareModel === 'unknown') {
+      const uaModel = parseAndroidModel(navigator.userAgent);
+      if (uaModel) {
+        deviceInfo.hardwareModel = uaModel;
+        deviceInfo.deviceModel = uaModel;
+      }
+    }
 
     // Try to get public IP for mobile too
     try {
@@ -140,6 +155,12 @@ async function getWebDeviceInfo(): Promise<DeviceInfo> {
   // Extract OS - PRIORITIZE MOBILE (Android/iOS) over Generic (Linux/Mac)
   if (ua.includes('Android')) {
     info.os = 'Android';
+    // Extract specific hardware model from UA string
+    const model = parseAndroidModel(ua);
+    if (model) {
+      info.hardwareModel = model;
+      info.deviceModel = model;
+    }
   } else if (ua.includes('iOS') || ua.includes('iPhone') || ua.includes('iPad')) {
     info.os = 'iOS';
   } else if (ua.includes('Windows') || navigator.platform.includes('Win')) {
@@ -224,14 +245,23 @@ export async function generateDeviceIdentifier(): Promise<string> {
       const id = await Device.getId();
       if (id.identifier) {
         const nativeId = id.identifier.toLowerCase();
+        // IMPORTANT: On mobile, we MUST use the native hardware ID. 
+        // Do NOT fall back to a web fingerprint if this is available.
         await Preferences.set({ key: PERSISTENT_ID_KEY, value: nativeId });
         return nativeId;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error('Error getting native ID:', e);
+    }
+    // If native ID fails for some reason, don't just generate a generic web fingerprint
+    // that might collide with another similar phone. Use a timestamp-based unique one.
+    const urgentId = `mob-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    return urgentId;
   }
 
   // 4. Generate new fingerprint as last resort
-  const newId = generateWebFingerprint().toLowerCase();
+  const generatedId = await generateWebFingerprint();
+  const newId = generatedId.toLowerCase();
   try {
     await Preferences.set({ key: PERSISTENT_ID_KEY, value: newId });
   } catch (e) {}
@@ -240,9 +270,10 @@ export async function generateDeviceIdentifier(): Promise<string> {
 }
 
 /**
- * Generate web browser fingerprint
+ * Generate web browser fingerprint with high entropy
  */
-function generateWebFingerprint(): string {
+async function generateWebFingerprint(): Promise<string> {
+  const info = await getWebDeviceInfo();
   const components = [
     navigator.userAgent,
     navigator.language,
@@ -251,10 +282,12 @@ function generateWebFingerprint(): string {
     String(window.screen.height),
     String(window.screen.colorDepth),
     new Date().getTimezoneOffset(),
-    getCanvasFingerprint(),
-    getWebGLFingerprint(),
-    getAvailableFonts().join(','),
-    Array.from(navigator.plugins || []).map(p => p.name).join(','),
+    info.canvas || '',
+    info.webgl || '',
+    info.hardwareModel || '',
+    info.deviceModel || '',
+    (navigator as any).hardwareConcurrency || 'unknown',
+    (navigator as any).deviceMemory || 'unknown',
   ];
   
   return hashString(components.join('|'));
@@ -375,6 +408,30 @@ function hashString(str: string): string {
 }
 
 /**
+ * Parse Android model from User Agent string
+ */
+function parseAndroidModel(ua: string): string | null {
+  // Common pattern: (Linux; Android 10; SM-G981B) or (Linux; U; Android 9; CPH1907)
+  const androidMatch = ua.match(/\(([^)]+)\)/);
+  if (androidMatch && androidMatch[1]) {
+    const parts = androidMatch[1].split(';');
+    // Look for the part that's likely the model (usually at the end, and not 'Linux' or 'Android')
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const part = parts[i].trim();
+      if (!part.includes('Linux') && 
+          !part.includes('Android') && 
+          !part.includes('Version') && 
+          !part.includes('build') &&
+          part.length > 3 &&
+          part.length < 30) {
+        return part;
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Generate a user-friendly device name
  */
 export async function generateDeviceName(): Promise<string> {
@@ -384,6 +441,16 @@ export async function generateDeviceName(): Promise<string> {
   if (deviceType === 'web') {
     const browser = info.browser || 'Browser';
     const os = info.os || info.platform || 'Unknown OS';
+    const hwModel = info.hardwareModel || info.deviceModel;
+    
+    if (os === 'Android' && hwModel) {
+      return `${hwModel} (${browser})`;
+    }
+    
+    if (os === 'iOS' && hwModel) {
+      return `${hwModel} (${browser})`;
+    }
+
     return `${browser} on ${os}`;
   } else {
     // Clean up mobile names (avoid messy UserAgent strings in titles)
@@ -401,10 +468,21 @@ export async function generateDeviceName(): Promise<string> {
     }
 
     // Build friendly name
-    if (model && manufacturer) return `${manufacturer} ${model}`;
-    if (model) return model;
-    if (manufacturer) return `${manufacturer} ${deviceType === 'android' ? 'Android' : 'iOS'}`;
-    
-    return deviceType === 'android' ? 'Android Device' : 'iOS Device';
+    // Prioritize hardwareModel if available, especially for Android
+    const hwModel = info.hardwareModel;
+    if (deviceType === 'android') {
+      if (hwModel && manufacturer) return `${manufacturer} ${hwModel}`;
+      if (hwModel) return hwModel;
+      if (model && manufacturer) return `${manufacturer} ${model}`; // Fallback to deviceModel
+      if (model) return model;
+      if (manufacturer) return `${manufacturer} Android`;
+      return 'Android Device';
+    } else { // iOS or other mobile
+      if (model && manufacturer) return `${manufacturer} ${model}`;
+      if (model) return model;
+      if (manufacturer) return `${manufacturer} iOS`;
+      if (hwModel) return `${hwModel} iOS`; // For iOS, hardwareModel is often the same as deviceModel
+      return 'iOS Device';
+    }
   }
 }
