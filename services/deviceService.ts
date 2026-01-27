@@ -208,12 +208,18 @@ export async function registerDevice(
   message: string;
 }> {
   try {
-    // Check if device already exists
-    const existingCheck = await isDeviceAuthorized(userId, deviceIdentifier);
+    // Check if device already exists (case-insensitive for extra safety)
+    const existingCheck = await isDeviceAuthorized(userId, deviceIdentifier.toLowerCase());
     if (existingCheck.device) {
       if (existingCheck.status === 'active') {
-        // Update last used time
-        await updateDeviceLastUsed(existingCheck.device.id);
+        // Update last used time and sync newest info (battery, ip, etc.)
+        await supabase
+          .from('user_devices')
+          .update({ 
+            last_used_at: new Date().toISOString(),
+            device_info: deviceInfo // Update with latest stats (battery, etc.)
+          })
+          .eq('id', existingCheck.device.id);
         return {
           success: true,
           device: existingCheck.device,

@@ -7,10 +7,15 @@ import {
   AlertTriangle, 
   CheckCircle, 
   Clock, 
-  Shield 
+  Shield,
+  Info,
+  Cpu,
+  Zap,
+  Wifi
 } from 'lucide-react';
 import Toast from '../ui/Toast';
 import Button from '../ui/Button';
+import Modal from '../ui/Modal';
 import { 
   getUserDevices, 
   revokeDevice, 
@@ -36,6 +41,7 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
   const [loading, setLoading] = useState(true);
   const [currentDeviceIdentifier, setCurrentDeviceIdentifier] = useState<string>('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [viewedDevice, setViewedDevice] = useState<UserDevice | null>(null);
 
   useEffect(() => {
     loadDevices();
@@ -239,15 +245,25 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
                   <div className="flex flex-col items-end gap-3">
                     {getStatusBadge(device.status)}
                     
-                    {canManage && device.status !== 'revoked' && (
-                      <button 
-                        onClick={() => handleRevokeDevice(device.id)}
-                        className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-colors"
-                        title="Remove Device"
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setViewedDevice(device)}
+                        className="p-1.5 text-gray-400 hover:text-accent hover:bg-accent-soft rounded-lg transition-colors"
+                        title="View device details"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Info className="w-4 h-4" />
                       </button>
-                    )}
+                      
+                      {canManage && device.status !== 'revoked' && (
+                        <button 
+                          onClick={() => handleRevokeDevice(device.id)}
+                          className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-colors"
+                          title="Remove Device"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -260,6 +276,126 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
           <p>No devices registered yet.</p>
         </div>
       )}
+
+      {/* Device Information Modal */}
+      <Modal
+        isOpen={!!viewedDevice}
+        onClose={() => setViewedDevice(null)}
+        title="Device Information"
+        hideFooter
+        maxWidth="md:max-w-lg"
+      >
+        {viewedDevice && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="p-3 bg-white text-primary rounded-lg shadow-sm">
+                {getDeviceIcon(viewedDevice)}
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-900">{viewedDevice.deviceName}</h4>
+                <p className="text-xs text-gray-500">Registered: {formatDate(viewedDevice.registeredAt)}</p>
+              </div>
+              <div className="ml-auto">
+                {getStatusBadge(viewedDevice.status)}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                    <Monitor className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Manufacturer</label>
+                    <p className="text-sm font-medium text-gray-700">{viewedDevice.deviceInfo?.manufacturer || 'Unknown'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
+                    <Cpu className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Hardware Model</label>
+                    <p className="text-sm font-medium text-gray-700">{viewedDevice.deviceInfo?.deviceModel || 'Unknown'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-orange-50 text-orange-600 rounded-lg">
+                    <Shield className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Operating System</label>
+                    <p className="text-sm font-medium text-gray-700">{viewedDevice.deviceInfo?.os} {viewedDevice.deviceInfo?.osVersion || ''}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-green-50 text-green-600 rounded-lg">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Battery Status</label>
+                    <p className="text-sm font-medium text-gray-700">
+                      {viewedDevice.deviceInfo?.batteryLevel !== undefined 
+                        ? `${Math.round(viewedDevice.deviceInfo.batteryLevel * 100)}% ${viewedDevice.deviceInfo.isCharging ? '(Charging)' : ''}`
+                        : 'Unknown'
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <Wifi className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Network Info</label>
+                    <p className="text-sm font-medium text-gray-700 uppercase">{viewedDevice.deviceInfo?.connectionType || 'Unknown'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-pink-50 text-pink-600 rounded-lg">
+                    <Globe className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Public IP API</label>
+                    <p className="text-sm font-mono text-gray-700">{viewedDevice.deviceInfo?.ipAddress || 'Not recorded'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-50 rounded-xl space-y-3">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-500">App Version</span>
+                <span className="font-medium text-gray-700">v{viewedDevice.deviceInfo?.appVersion || 'Unknown'}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-500">System ID</span>
+                <span className="font-mono text-gray-700">{viewedDevice.id}</span>
+              </div>
+              {viewedDevice.deviceInfo?.androidId && (
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-500">Android ID</span>
+                  <span className="font-mono text-gray-700">{viewedDevice.deviceInfo.androidId}</span>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => setViewedDevice(null)} variant="secondary" className="w-full">
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

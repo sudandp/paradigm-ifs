@@ -192,9 +192,20 @@ export async function generateDeviceIdentifier(): Promise<string> {
   const deviceType = await detectDeviceType();
   
   if (deviceType === 'web') {
-    return generateWebFingerprint();
+    // For web, use localStorage to persist the ID across refreshes/browser updates
+    const PERSISTENT_ID_KEY = 'paradigm_device_id';
+    const existingId = localStorage.getItem(PERSISTENT_ID_KEY);
+    
+    if (existingId) {
+      return existingId;
+    }
+    
+    // Generate new fingerprint if none exists
+    const newId = generateWebFingerprint();
+    localStorage.setItem(PERSISTENT_ID_KEY, newId);
+    return newId;
   } else {
-    // For mobile, use the UUID from Capacitor
+    // For mobile (native), use the hardware UUID from Capacitor
     try {
       const id = await Device.getId();
       return id.identifier || generateFallbackFingerprint();
