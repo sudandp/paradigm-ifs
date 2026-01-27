@@ -445,7 +445,12 @@ const TeamMemberProfile: React.FC = () => {
                 </>
               ) : activeTab === 'devices' ? (
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  <UserDeviceList userId={member.id} canManage={isManager} showTitle={true} />
+                  <UserDeviceList 
+                    userId={member.id} 
+                    userRole={member.role}
+                    canManage={isManager} 
+                    showTitle={true} 
+                  />
                 </div>
               ) : activeTab === 'violations' ? (
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">

@@ -44,8 +44,9 @@ export async function getDeviceLimits(roleId: string): Promise<DeviceLimitsConfi
     const deviceLimits = attendanceSettings.deviceLimits || {};
     
     // Map role to staff category
-    let staffCategory = 'staff'; // Default category
-    if (roleId === 'admin') {
+    const normalizedRole = (roleId || '').toLowerCase();
+    let staffCategory = 'staff'; 
+    if (normalizedRole === 'admin' || normalizedRole === 'developer') {
       staffCategory = 'admin';
     }
     

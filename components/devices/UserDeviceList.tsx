@@ -129,6 +129,16 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
     }
   };
 
+  const getUsageColor = (used: number, limit: number) => {
+    if (used > limit) return 'bg-red-50 border-red-100 text-red-700';
+    if (used === limit) return 'bg-amber-50 border-amber-100 text-amber-700';
+    return 'bg-blue-50 border-blue-100 text-blue-700';
+  };
+
+  const activeWeb = devices.filter(d => d.deviceType.toLowerCase() === 'web' && d.status.toLowerCase() === 'active').length;
+  const activeAndroid = devices.filter(d => d.deviceType.toLowerCase() === 'android' && d.status.toLowerCase() === 'active').length;
+  const activeIos = devices.filter(d => d.deviceType.toLowerCase() === 'ios' && d.status.toLowerCase() === 'active').length;
+
   return (
     <div className={`space-y-6 ${className}`}>
       {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
@@ -140,14 +150,14 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
           </h2>
           
           <div className="flex gap-2">
-            <div className="px-3 py-1 bg-blue-50 border border-blue-100 rounded-lg text-xs font-semibold text-blue-700 flex items-center gap-1.5">
-              <Monitor className="w-3.5 h-3.5" /> Laptop / PC: {devices.filter(d => d.deviceType.toLowerCase() === 'web' && d.status.toLowerCase() === 'active').length} / {limits.web}
+            <div className={`px-3 py-1 border rounded-lg text-xs font-semibold flex items-center gap-1.5 ${getUsageColor(activeWeb, limits.web)}`}>
+              <Monitor className="w-3.5 h-3.5" /> Laptop / PC: {activeWeb} / {limits.web}
             </div>
-            <div className="px-3 py-1 bg-green-50 border border-green-100 rounded-lg text-xs font-semibold text-green-700 flex items-center gap-1.5">
-              <Smartphone className="w-3.5 h-3.5" /> Android: {devices.filter(d => d.deviceType.toLowerCase() === 'android' && d.status.toLowerCase() === 'active').length} / {limits.android}
+            <div className={`px-3 py-1 border rounded-lg text-xs font-semibold flex items-center gap-1.5 ${getUsageColor(activeAndroid, limits.android)}`}>
+              <Smartphone className="w-3.5 h-3.5" /> Android: {activeAndroid} / {limits.android}
             </div>
-            <div className="px-3 py-1 bg-gray-50 border border-gray-100 rounded-lg text-xs font-semibold text-gray-700 flex items-center gap-1.5">
-              <Smartphone className="w-3.5 h-3.5" /> iOS: {devices.filter(d => d.deviceType.toLowerCase() === 'ios' && d.status.toLowerCase() === 'active').length} / {limits.ios}
+            <div className={`px-3 py-1 border rounded-lg text-xs font-semibold flex items-center gap-1.5 ${getUsageColor(activeIos, limits.ios)}`}>
+              <Smartphone className="w-3.5 h-3.5" /> iOS: {activeIos} / {limits.ios}
             </div>
           </div>
         </div>
