@@ -69,6 +69,7 @@ interface AuthState {
     isAttendanceLoading: boolean;
     lastCheckInTime: string | null;
     lastCheckOutTime: string | null;
+    firstBreakInTime: string | null;
     lastBreakInTime: string | null;
     lastBreakOutTime: string | null;
     totalBreakDurationToday: number;
@@ -112,6 +113,7 @@ export const useAuthStore = create<AuthState>()(
         isAttendanceLoading: true,
         lastCheckInTime: null,
         lastCheckOutTime: null,
+        firstBreakInTime: null,
         lastBreakInTime: null,
         lastBreakOutTime: null,
         totalBreakDurationToday: 0,
@@ -131,6 +133,7 @@ export const useAuthStore = create<AuthState>()(
             isAttendanceLoading: false,
             lastCheckInTime: null,
             lastCheckOutTime: null,
+            firstBreakInTime: null,
             lastBreakInTime: null,
             lastBreakOutTime: null,
             totalBreakDurationToday: 0,
@@ -325,15 +328,16 @@ export const useAuthStore = create<AuthState>()(
                     return;
                 }
 
-                const { checkIn, checkOut, breakIn, breakOut, breakHours } = processDailyEvents(events);
+                const { checkIn, checkOut, firstBreakIn, lastBreakIn, breakOut, breakHours } = processDailyEvents(events);
                 const lastEvent = events[events.length - 1];
-
+                
                 set({
                     isCheckedIn: lastEvent?.type !== 'check-out',
                     isOnBreak: lastEvent?.type === 'break-in',
                     lastCheckInTime: checkIn,
                     lastCheckOutTime: lastEvent?.type === 'check-out' ? checkOut : null,
-                    lastBreakInTime: breakIn,
+                    firstBreakInTime: firstBreakIn,
+                    lastBreakInTime: lastBreakIn,
                     lastBreakOutTime: breakOut,
                     totalBreakDurationToday: breakHours,
                     isAttendanceLoading: false

@@ -40,6 +40,7 @@ const ProfilePage: React.FC = () => {
         logout, 
         lastCheckInTime, 
         lastCheckOutTime,
+        firstBreakInTime,
         lastBreakInTime,
         lastBreakOutTime,
         totalBreakDurationToday,
@@ -273,9 +274,9 @@ const ProfilePage: React.FC = () => {
                                     </div>
                                     <div className="text-center p-3 bg-black/30 rounded-xl border border-white/10">
                                         <p className="text-[9px] text-blue-400 mb-1 uppercase tracking-widest font-bold flex items-center justify-center gap-1">
-                                            <CheckCircle className="h-3 w-3" /> Last B-In
+                                            <CheckCircle className="h-3 w-3" /> First B-In
                                         </p>
-                                        <p className="text-base font-bold text-white font-mono">{formatTime(lastBreakInTime)}</p>
+                                        <p className="text-base font-bold text-white font-mono">{formatTime(firstBreakInTime)}</p>
                                     </div>
                                     <div className="text-center p-3 bg-black/30 rounded-xl border border-white/10">
                                         <p className="text-[9px] text-amber-400 mb-1 uppercase tracking-widest font-bold flex items-center justify-center gap-1">
@@ -530,13 +531,13 @@ const ProfilePage: React.FC = () => {
                                     </div>
                                     <div className="text-center bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
                                         <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <CheckCircle className="h-3 w-3 text-blue-600" /> Last Break In
+                                            <CheckCircle className="h-3 w-3 text-blue-600" /> First B-In
                                         </p>
-                                        <p className="text-2xl font-bold text-gray-900 font-mono">{formatTime(lastBreakInTime)}</p>
+                                        <p className="text-2xl font-bold text-gray-900 font-mono">{formatTime(firstBreakInTime)}</p>
                                     </div>
                                     <div className="text-center bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
                                         <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <CheckCircle className="h-3 w-3 text-amber-600" /> Last Break Out
+                                            <CheckCircle className="h-3 w-3 text-amber-600" /> Last B-Out
                                         </p>
                                         <p className="text-2xl font-bold text-gray-900 font-mono">{formatTime(lastBreakOutTime)}</p>
                                     </div>

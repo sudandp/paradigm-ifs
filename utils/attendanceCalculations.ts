@@ -16,12 +16,20 @@ export function calculateDailyHours(checkIn: string, checkOut: string): number {
  */
 export function calculateWorkingHours(
   events: AttendanceEvent[]
-): { totalHours: number; breakHours: number; workingHours: number; lastBreakIn: string | null; lastBreakOut: string | null } {
+): { 
+  totalHours: number; 
+  breakHours: number; 
+  workingHours: number; 
+  firstBreakIn: string | null;
+  lastBreakIn: string | null; 
+  lastBreakOut: string | null 
+} {
   // Sort events chronologically to process segments
   const sortedEvents = [...events].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   
   let totalGrossWorkMinutes = 0;
   let totalBreakMinutes = 0;
+  let firstBreakIn: string | null = null;
   let lastBreakIn: string | null = null;
   let lastBreakOut: string | null = null;
   
@@ -43,6 +51,7 @@ export function calculateWorkingHours(
         break;
       case 'break-in':
         breakStartTime = eventTime;
+        if (!firstBreakIn) firstBreakIn = event.timestamp;
         lastBreakIn = event.timestamp;
         lastBreakOut = null; // Reset last break out when a new break starts
         break;
@@ -75,6 +84,7 @@ export function calculateWorkingHours(
     totalHours: totalGrossWorkMinutes / 60, 
     breakHours: totalBreakMinutes / 60, 
     workingHours,
+    firstBreakIn,
     lastBreakIn,
     lastBreakOut
   };
@@ -199,7 +209,8 @@ export function calculateHoursBasedStatus(
 export function processDailyEvents(events: AttendanceEvent[]): {
   checkIn: string | null;
   checkOut: string | null;
-  breakIn: string | null;
+  firstBreakIn: string | null;
+  lastBreakIn: string | null;
   breakOut: string | null;
   totalHours: number;
   breakHours: number;
@@ -209,7 +220,8 @@ export function processDailyEvents(events: AttendanceEvent[]): {
     return {
       checkIn: null,
       checkOut: null,
-      breakIn: null,
+      firstBreakIn: null,
+      lastBreakIn: null,
       breakOut: null,
       totalHours: 0,
       breakHours: 0,
@@ -228,7 +240,8 @@ export function processDailyEvents(events: AttendanceEvent[]): {
   return {
     checkIn: firstCheckIn?.timestamp || null,
     checkOut: lastCheckOut?.timestamp || null,
-    breakIn: result.lastBreakIn,
+    firstBreakIn: result.firstBreakIn,
+    lastBreakIn: result.lastBreakIn,
     breakOut: result.lastBreakOut,
     totalHours: result.totalHours,
     breakHours: result.breakHours,
