@@ -740,6 +740,12 @@ export interface StaffAttendanceRules {
     daysRequired: number; // e.g., 10
     amountEarned: number; // e.g., 0.5
   };
+  // Device limits configuration
+  deviceLimits?: {
+    web: number; // Number of allowed web devices
+    android: number; // Number of allowed Android devices
+    ios: number; // Number of allowed iOS devices
+  };
 }
 
 export interface AttendanceSettings {
@@ -903,6 +909,130 @@ export interface ExtraWorkLog {
   approvedAt?: string | null;
   rejectionReason?: string | null;
   createdAt: string;
+}
+
+// =============================================
+// Device Management Types
+// =============================================
+
+export type DeviceType = 'web' | 'android' | 'ios';
+export type DeviceStatus = 'active' | 'pending' | 'revoked';
+export type DeviceRequestStatus = 'pending' | 'approved' | 'rejected';
+export type DeviceActivityType = 'login' | 'logout' | 'blocked_attempt' | 'registration';
+
+/**
+ * Device information captured from the user agent or device API
+ */
+export interface DeviceInfo {
+  // Browser/Platform info
+  userAgent?: string;
+  platform?: string;
+  browser?: string;
+  browserVersion?: string;
+  os?: string;
+  osVersion?: string;
+  
+  // Device specific (for mobile apps)
+  deviceModel?: string;
+  manufacturer?: string;
+  uuid?: string; // Capacitor Device ID
+  
+  // Screen info
+  screenResolution?: string;
+  colorDepth?: number;
+  
+  // Network info
+  ipAddress?: string;
+  connectionType?: string; // wifi, cellular, etc.
+  
+  // Fingerprint components (for web)
+  canvas?: string;
+  webgl?: string;
+  fonts?: string[];
+  plugins?: string[];
+  timezone?: string;
+  language?: string;
+
+  // Status info
+  batteryLevel?: number;
+  isCharging?: boolean;
+  appVersion?: string;
+  androidId?: string; // Specifically for Android
+}
+
+/**
+ * Registered device for a user
+ */
+export interface UserDevice {
+  id: string;
+  userId: string;
+  deviceType: DeviceType;
+  deviceIdentifier: string; // Unique fingerprint or device ID
+  deviceName: string; // User-friendly name like "Chrome on Windows" or "iPhone 14"
+  deviceInfo: DeviceInfo;
+  status: DeviceStatus;
+  registeredAt: string; // ISO timestamp
+  lastUsedAt: string; // ISO timestamp
+  approvedById?: string | null;
+  approvedByName?: string; // Derived on client
+  approvedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Device approval request when exceeding limits
+ */
+export interface DeviceChangeRequest {
+  id: string;
+  userId: string;
+  userName?: string; // Derived on client
+  userPhotoUrl?: string; // Derived on client
+  reportingManagerName?: string; // Derived on client
+  deviceType: DeviceType;
+  deviceIdentifier: string;
+  deviceName: string;
+  deviceInfo: DeviceInfo;
+  status: DeviceRequestStatus;
+  requestedAt: string; // ISO timestamp
+  reviewedById?: string | null;
+  reviewedByName?: string; // Derived on client
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  reportingManagerNotified: boolean;
+  createdAt: string;
+  updatedAt: string;
+  // Derived fields
+  currentDeviceCount?: number; // Number of active devices of this type
+}
+
+/**
+ * Activity log for device usage
+ */
+export interface DeviceActivityLog {
+  id: string;
+  userId: string;
+  deviceId?: string | null;
+  deviceName?: string; // Derived from device_id
+  activityType: DeviceActivityType;
+  timestamp: string; // ISO timestamp
+  ipAddress?: string | null;
+  location?: {
+    latitude?: number;
+    longitude?: number;
+    address?: string;
+  } | null;
+  deviceInfo?: DeviceInfo;
+  createdAt: string;
+}
+
+/**
+ * Device limits configuration (extends StaffAttendanceRules)
+ */
+export interface DeviceLimitsConfig {
+  web: number;
+  android: number;
+  ios: number;
 }
 
 // Types for Task Management

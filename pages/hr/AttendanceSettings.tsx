@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useSettingsStore } from '../../store/settingsStore';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
-import { Trash2, Plus, Settings, Calendar, Clock, LifeBuoy, Bell, Save } from 'lucide-react';
+import { Trash2, Plus, Settings, Calendar, Clock, LifeBuoy, Bell, Save, Monitor } from 'lucide-react';
 import DatePicker from '../../components/ui/DatePicker';
 import Toast from '../../components/ui/Toast';
 import Checkbox from '../../components/ui/Checkbox';
@@ -135,6 +135,53 @@ const AttendanceSettings: React.FC = () => {
                             type="number"
                             value={currentRules.minimumHoursHalfDay}
                             onChange={(e) => handleSettingChange('minimumHoursHalfDay', parseFloat(e.target.value) || 0)}
+                        />
+                    </div>
+                </section>
+
+                {/* Device Limits Section */}
+                <section className="pt-6 border-t border-border">
+                    <h3 className="text-lg font-semibold text-primary-text mb-4 flex items-center">
+                        <Monitor className="mr-2 h-5 w-5 text-muted" />Device Limits
+                    </h3>
+                    <p className="text-sm text-muted mb-4">
+                        Set the maximum number of devices an employee can use to access the application. 
+                        Exceeding these limits will require admin/HR approval.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        <Input
+                            label="Web Sessions"
+                            id="limitWeb"
+                            type="number"
+                            min="0"
+                            value={currentRules.deviceLimits?.web ?? 1}
+                            onChange={(e) => handleSettingChange('deviceLimits', { 
+                                ...currentRules.deviceLimits, 
+                                web: parseInt(e.target.value) || 0 
+                            })}
+                            description="Max allowed browsers"
+                        />
+                        <Input
+                            label="Android Devices"
+                            id="limitAndroid"
+                            type="number"
+                            min="0"
+                            value={currentRules.deviceLimits?.android ?? 1}
+                            onChange={(e) => handleSettingChange('deviceLimits', { 
+                                ...currentRules.deviceLimits, 
+                                android: parseInt(e.target.value) || 0 
+                            })}
+                        />
+                        <Input
+                            label="iOS Devices"
+                            id="limitIos"
+                            type="number"
+                            min="0"
+                            value={currentRules.deviceLimits?.ios ?? 1}
+                            onChange={(e) => handleSettingChange('deviceLimits', { 
+                                ...currentRules.deviceLimits, 
+                                ios: parseInt(e.target.value) || 0 
+                            })}
                         />
                     </div>
                 </section>

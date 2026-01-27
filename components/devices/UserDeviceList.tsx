@@ -1,0 +1,267 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Monitor, 
+  Smartphone, 
+  Globe, 
+  Trash2, 
+  AlertTriangle, 
+  CheckCircle, 
+  Clock, 
+  Shield 
+} from 'lucide-react';
+import Toast from '../ui/Toast';
+import Button from '../ui/Button';
+import { 
+  getUserDevices, 
+  revokeDevice, 
+  getCurrentDevice
+} from '../../services/deviceService';
+import { UserDevice, DeviceType } from '../../types';
+import { formatDate } from '../../utils/date';
+
+interface UserDeviceListProps {
+  userId: string;
+  canManage?: boolean;
+  className?: string;
+  showTitle?: boolean;
+}
+
+const UserDeviceList: React.FC<UserDeviceListProps> = ({ 
+  userId, 
+  canManage = false,
+  className = '',
+  showTitle = true
+}) => {
+  const [devices, setDevices] = useState<UserDevice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentDeviceIdentifier, setCurrentDeviceIdentifier] = useState<string>('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  useEffect(() => {
+    loadDevices();
+    identifyCurrentDevice();
+  }, [userId]);
+
+  const loadDevices = async () => {
+    try {
+      setLoading(true);
+      const userDevices = await getUserDevices(userId);
+      setDevices(userDevices);
+    } catch (error) {
+      console.error('Error loading devices:', error);
+      setToast({ message: 'Failed to load devices', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const identifyCurrentDevice = async () => {
+    try {
+      const { deviceIdentifier } = await getCurrentDevice();
+      setCurrentDeviceIdentifier(deviceIdentifier);
+    } catch (error) {
+      console.error('Error identifying device:', error);
+    }
+  };
+
+  const handleRevokeDevice = async (deviceId: string) => {
+    if (!canManage) return;
+    
+    if (!window.confirm('Are you sure you want to remove this device? The user will need to register it again to use it.')) {
+      return;
+    }
+    
+    try {
+      await revokeDevice(deviceId);
+      setToast({ message: 'Device removed successfully', type: 'success' });
+      await loadDevices();
+    } catch (error) {
+      console.error('Error revoking device:', error);
+      setToast({ message: 'Failed to remove device', type: 'error' });
+    }
+  };
+
+  const getDeviceIcon = (device: UserDevice) => {
+    const type = device.deviceType.toLowerCase();
+    const os = device.deviceInfo?.os?.toLowerCase() || '';
+    const model = device.deviceInfo?.deviceModel?.toLowerCase() || '';
+    const name = device.deviceName.toLowerCase();
+
+    if (os.includes('ios') || os.includes('iphone')) return <Smartphone className="w-5 h-5 text-gray-800" />;
+    if (os.includes('ipad')) return <Smartphone className="w-5 h-5 text-gray-800" />; // Or Tablet icon if available
+    if (os.includes('mac')) return <Monitor className="w-5 h-5 text-gray-800" />;
+    if (type === 'android') return <Smartphone className="w-5 h-5 text-green-500" />;
+    
+    return <Monitor className="w-5 h-5" />;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const s = status.toLowerCase();
+    switch (s) {
+      case 'active':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" /> Active</span>;
+      case 'pending':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800"><Clock className="w-3 h-3 mr-1" /> Pending Approval</span>;
+      case 'revoked':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"><AlertTriangle className="w-3 h-3 mr-1" /> Revoked</span>;
+      default:
+        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">{status}</span>;
+    }
+  };
+
+  return (
+    <div className={`space-y-6 ${className}`}>
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
+      
+      {showTitle && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <h2 className="text-lg font-bold text-gray-900 flex items-center">
+            <Shield className="w-5 h-5 mr-2 text-primary" /> Registered Devices
+          </h2>
+          
+          <div className="flex gap-2">
+            <div className="px-3 py-1 bg-blue-50 border border-blue-100 rounded-lg text-xs font-semibold text-blue-700 flex items-center gap-1.5">
+              <Monitor className="w-3.5 h-3.5" /> Laptop / PC: {devices.filter(d => d.deviceType.toLowerCase() === 'web' && d.status.toLowerCase() === 'active').length}
+            </div>
+            <div className="px-3 py-1 bg-green-50 border border-green-100 rounded-lg text-xs font-semibold text-green-700 flex items-center gap-1.5">
+              <Smartphone className="w-3.5 h-3.5" /> Android: {devices.filter(d => d.deviceType.toLowerCase() === 'android' && d.status.toLowerCase() === 'active').length}
+            </div>
+            <div className="px-3 py-1 bg-gray-50 border border-gray-100 rounded-lg text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+              <Smartphone className="w-3.5 h-3.5" /> iOS: {devices.filter(d => d.deviceType.toLowerCase() === 'ios' && d.status.toLowerCase() === 'active').length}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="animate-pulse bg-gray-50 h-20 rounded-lg"></div>
+          ))}
+        </div>
+      ) : devices.length > 0 ? (
+        <div className="space-y-4">
+          {devices.map(device => {
+            const isCurrent = device.deviceIdentifier === currentDeviceIdentifier;
+            return (
+              <div key={device.id} className={`border rounded-xl p-4 transition-all ${isCurrent ? 'border-primary ring-1 ring-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`}>
+                <div className="flex justify-between items-start">
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg ${isCurrent ? 'bg-white text-primary' : 'bg-gray-100 text-gray-500'}`}>
+                      {getDeviceIcon(device)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-gray-900">
+                          {(() => {
+                            const info = device.deviceInfo || {};
+                            const os = (info.os || '').toLowerCase();
+                            const manufacturer = (info.manufacturer || '').toLowerCase();
+                            const model = (info.deviceModel || '').toLowerCase();
+                            const browser = info.browser || '';
+                            
+                            // 1. Identify Apple Devices Specifically
+                            if (manufacturer.includes('apple') || os.includes('mac') || os.includes('ios') || os.includes('iphone') || os.includes('ipad')) {
+                              if (os.includes('iphone') || model.includes('iphone')) return `iPhone (${browser})`;
+                              if (os.includes('ipad') || model.includes('ipad')) return `iPad (${browser})`;
+                              if (os.includes('mac') || model.includes('mac')) return `MacBook / iMac (${browser})`;
+                              return `Apple Device (${browser})`;
+                            }
+                            
+                            // 2. Identify Android
+                            if (device.deviceType.toLowerCase() === 'android' || os.includes('android')) {
+                              const makeModel = info.manufacturer && info.deviceModel 
+                                ? `${info.manufacturer} ${info.deviceModel}`
+                                : info.deviceModel || info.manufacturer || 'Android Device';
+                              return `${makeModel} (${browser})`;
+                            }
+                            
+                            // 3. Identify PC Make (HP, Dell, etc.)
+                            if (info.deviceModel || info.manufacturer) {
+                              const makeModel = info.manufacturer && info.deviceModel 
+                                ? `${info.manufacturer} ${info.deviceModel}`
+                                : info.deviceModel || info.manufacturer;
+                              return `${makeModel} Laptop/PC (${browser})`;
+                            }
+
+                            // Fallback to the original logic or registered device name
+                            return device.deviceName || `${os || 'Unknown'} System (${browser})`;
+                          })()}
+                        </h3>
+                        {isCurrent && <span className="text-xs bg-primary text-white px-2 py-0.5 rounded-full">Current</span>}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                        <span>
+                          {device.deviceType.toLowerCase() === 'web' 
+                            ? `${device.deviceInfo?.browser} on ${device.deviceInfo?.os || device.deviceInfo?.platform}`
+                            : `${device.deviceInfo?.manufacturer || ''} ${device.deviceInfo?.deviceModel || device.deviceInfo?.platform || ''}`
+                          }
+                        </span>
+                        {device.deviceInfo?.ipAddress && (
+                          <>
+                            <span className="text-gray-300">•</span>
+                            <span className="flex items-center gap-1 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 text-[11px] font-mono">
+                              <Globe className="w-3 h-3 text-accent/70" /> {device.deviceInfo.ipAddress}
+                            </span>
+                          </>
+                        )}
+                        <span className="text-gray-300">•</span>
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {formatDate(device.lastUsedAt)}</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {device.deviceInfo?.batteryLevel !== undefined && (
+                          <span className="flex items-center gap-1 bg-gray-50 px-2 py-0.5 rounded border border-gray-100 text-[10px] font-medium text-gray-600">
+                            <span className={`w-1.5 h-1.5 rounded-full ${device.deviceInfo.batteryLevel > 0.2 ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                            Battery: {Math.round(device.deviceInfo.batteryLevel * 100)}% {device.deviceInfo.isCharging ? '(Charging)' : ''}
+                          </span>
+                        )}
+                        {device.deviceInfo?.connectionType && (
+                          <span className="flex items-center gap-1 bg-gray-50 px-2 py-0.5 rounded border border-gray-100 text-[10px] font-medium text-gray-600 uppercase">
+                            Network: {device.deviceInfo.connectionType}
+                          </span>
+                        )}
+                        {device.deviceInfo?.appVersion && (
+                          <span className="flex items-center gap-1 bg-gray-50 px-2 py-0.5 rounded border border-gray-100 text-[10px] font-medium text-gray-600">
+                            App v{device.deviceInfo.appVersion}
+                          </span>
+                        )}
+                        {device.deviceInfo?.androidId && (
+                          <span className="flex items-center gap-1 bg-gray-50 px-2 py-0.5 rounded border border-gray-100 text-[10px] font-medium text-gray-600 font-mono">
+                            Android ID: {device.deviceInfo.androidId}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 text-xs text-gray-400 font-mono">
+                        System ID: {device.id.slice(0, 8)}...
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-3">
+                    {getStatusBadge(device.status)}
+                    
+                    {canManage && device.status !== 'revoked' && (
+                      <button 
+                        onClick={() => handleRevokeDevice(device.id)}
+                        className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-colors"
+                        title="Remove Device"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+          <Monitor className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+          <p>No devices registered yet.</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default UserDeviceList;

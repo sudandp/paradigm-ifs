@@ -49,12 +49,14 @@ const SiteManagement = lazyWithRetry(() => import('./pages/admin/OrganizationMan
 const RoleManagement = lazyWithRetry(() => import('./pages/admin/RoleManagement'));
 const ModuleManagement = lazyWithRetry(() => import('./pages/admin/ModuleManagement'));
 const ManageDevices = lazyWithRetry(() => import('./pages/admin/ManageDevices'));
+const DeviceApprovals = lazyWithRetry(() => import('./pages/admin/DeviceApprovals'));
 const ApiSettings = lazyWithRetry(() => import('./pages/developer/ApiSettings').then(m => ({ default: m.ApiSettings })));
 const OperationsDashboard = lazyWithRetry(() => import('./pages/operations/OperationsDashboard'));
 const TeamActivity = lazyWithRetry(() => import('./pages/operations/TeamActivity'));
 const SiteDashboard = lazyWithRetry(() => import('./pages/site/OrganizationDashboard'));
 const ProfilePage = lazyWithRetry(() => import('./pages/profile/ProfilePage'));
 const AttendanceDashboard = lazyWithRetry(() => import('./pages/attendance/AttendanceDashboard'));
+const DeviceManagement = lazyWithRetry(() => import('./pages/settings/DeviceManagement'));
 const MyLocations = lazyWithRetry(() => import('./pages/attendance/MyLocations'));
 const AttendanceActionPage = lazyWithRetry(() => import('./pages/attendance/AttendanceActionPage'));
 const AttendanceSettings = lazyWithRetry(() => import('./pages/hr/AttendanceSettings'));
@@ -586,6 +588,7 @@ const App: React.FC = () => {
           </Route>
           <Route element={<ProtectedRoute requiredPermission="manage_biometric_devices" />}>
             <Route path="admin/devices" element={<ManageDevices />} />
+            <Route path="admin/device-approvals" element={<DeviceApprovals />} />
           </Route>
           <Route element={<ProtectedRoute requiredPermission="manage_sites" />}>
             <Route path="admin/sites" element={<SiteManagement />} />
@@ -640,6 +643,10 @@ const App: React.FC = () => {
             {/* New page for users to manage their own geofenced locations */}
             <Route path="attendance/locations" element={<MyLocations />} />
           </Route>
+
+          {/* User Settings */}
+          <Route path="settings/devices" element={<DeviceManagement />} />
+
           <Route element={<ProtectedRoute requiredPermission="apply_for_leave" />}>
             <Route path="leaves/dashboard" element={<LeaveDashboard />} />
             <Route path="leaves/apply" element={<ApplyLeave />} />

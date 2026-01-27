@@ -1,10 +1,10 @@
 
 import React, { useEffect } from 'react';
-import { CheckCircle, XCircle, X } from 'lucide-react';
+import { CheckCircle, XCircle, X, Info } from 'lucide-react';
 
 interface ToastProps {
   message: string;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'info';
   onDismiss: () => void;
 }
 
@@ -19,8 +19,20 @@ const Toast: React.FC<ToastProps> = ({ message, type, onDismiss }) => {
     };
   }, [onDismiss]);
 
-  const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
-  const Icon = type === 'success' ? CheckCircle : XCircle;
+  const getToastStyles = () => {
+    switch (type) {
+      case 'success':
+        return { bgColor: 'bg-green-500', Icon: CheckCircle };
+      case 'error':
+        return { bgColor: 'bg-red-500', Icon: XCircle };
+      case 'info':
+        return { bgColor: 'bg-blue-500', Icon: Info };
+      default:
+        return { bgColor: 'bg-gray-800', Icon: Info };
+    }
+  };
+
+  const { bgColor, Icon } = getToastStyles();
 
   return (
     <div className={`fixed top-5 right-5 z-50 flex items-center p-4 rounded-lg text-white shadow-lg ${bgColor}`}>

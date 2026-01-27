@@ -1,0 +1,258 @@
+/* Device Warning Dialog Styles */
+
+.device-warning-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 20px;
+}
+
+.device-warning-dialog {
+    background: white;
+    border-radius: 20px;
+    max-width: 600px;
+    width: 100%;
+    padding: 40px;
+    text-align: center;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.device-warning-icon {
+    margin-bottom: 24px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.device-warning-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 16px;
+}
+
+.device-warning-device-info {
+    background: #f3f4f6;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+}
+
+.device-warning-device-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 4px;
+}
+
+.device-warning-device-type {
+    font-size: 14px;
+    color: #6b7280;
+    text-transform: capitalize;
+}
+
+.device-warning-description {
+    font-size: 16px;
+    color: #4b5563;
+    line-height: 1.6;
+    margin-bottom: 32px;
+}
+
+.device-warning-info-box {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 2px solid #f59e0b;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 32px;
+    text-align: left;
+}
+
+.device-warning-info-box h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #92400e;
+    margin-bottom: 12px;
+}
+
+.device-warning-info-box ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px 0;
+}
+
+.device-warning-info-box li {
+    font-size: 14px;
+    color: #78350f;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.device-warning-info-box li:last-child {
+    border-bottom: none;
+}
+
+.device-warning-info-note {
+    font-size: 13px;
+    color: #92400e;
+    font-style: italic;
+    margin: 0;
+}
+
+.device-warning-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.device-warning-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 24px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.device-warning-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.device-warning-button-primary {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.4);
+}
+
+.device-warning-button-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px 0 rgba(37, 99, 235, 0.5);
+}
+
+.device-warning-button-secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border: 2px solid #d1d5db;
+}
+
+.device-warning-button-secondary:hover:not(:disabled) {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+}
+
+.spinner-small {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+    .device-warning-dialog {
+        background: #1f2937;
+    }
+
+    .device-warning-title {
+        color: #f9fafb;
+    }
+
+    .device-warning-device-info {
+        background: #374151;
+    }
+
+    .device-warning-device-name {
+        color: #f3f4f6;
+    }
+
+    .device-warning-device-type {
+        color: #9ca3af;
+    }
+
+    .device-warning-description {
+        color: #d1d5db;
+    }
+
+    .device-warning-info-box {
+        background: linear-gradient(135deg, #451a03 0%, #78350f 100%);
+        border-color: #ea580c;
+    }
+
+    .device-warning-info-box h3 {
+        color: #fed7aa;
+    }
+
+    .device-warning-info-box li {
+        color: #fdba74;
+    }
+
+    .device-warning-info-note {
+        color: #fed7aa;
+    }
+
+    .device-warning-button-secondary {
+        background: #374151;
+        color: #f9fafb;
+        border-color: #4b5563;
+    }
+
+    .device-warning-button-secondary:hover:not(:disabled) {
+        background: #4b5563;
+        border-color: #6b7280;
+    }
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+    .device-warning-dialog {
+        padding: 24px;
+    }
+
+    .device-warning-title {
+        font-size: 24px;
+    }
+
+    .device-warning-icon svg {
+        width: 48px;
+        height: 48px;
+    }
+}

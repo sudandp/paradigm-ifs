@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Download, Calendar, MapPin, Clock, 
-  Navigation, Briefcase, ChevronRight, Info, FileText, AlertTriangle
+  Navigation, Briefcase, ChevronRight, Info, FileText, AlertTriangle, Monitor, Shield, Globe, Smartphone
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import ViolationsView from '../../components/violations/ViolationsView';
@@ -13,6 +13,7 @@ import {
 import { api } from '../../services/api';
 import { User, AttendanceEvent, LeaveRequest } from '../../types';
 import { calculateDistanceMeters, reverseGeocode } from '../../utils/locationUtils';
+import UserDeviceList from '../../components/devices/UserDeviceList';
 
 // Helper to safely format ISO strings and prevent RangeErrors
 const safeFormatISO = (dateStr: string | undefined | null, formatStr: string, fallback = 'N/A') => {
@@ -78,7 +79,7 @@ const TeamMemberProfile: React.FC = () => {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'activity' | 'leaves' | 'violations'>('activity');
+  const [activeTab, setActiveTab] = useState<'activity' | 'leaves' | 'devices' | 'violations'>('activity');
   const { user: currentUser } = useAuthStore();
 
   const isManager = useMemo(() => {
@@ -86,6 +87,10 @@ const TeamMemberProfile: React.FC = () => {
     if (['admin', 'hr', 'operation_manager', 'developer'].includes(currentUser.role)) return true;
     return member.reportingManagerId === currentUser.id;
   }, [currentUser, member]);
+
+  const isFieldStaff = useMemo(() => {
+    return member?.role?.toLowerCase() === 'field_staff';
+  }, [member]);
 
   useEffect(() => {
     if (id) {
@@ -111,6 +116,7 @@ const TeamMemberProfile: React.FC = () => {
       console.error('Error fetching user details:', err);
     }
   };
+
   const fetchActivityLog = async () => {
     if (!id) return;
     try {
@@ -129,7 +135,6 @@ const TeamMemberProfile: React.FC = () => {
   const timeline = useMemo(() => {
     if (events.length === 0) return [];
 
-    // 1. Deduplicate and sort events
     const sorted = [...events]
       .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
       .filter((e, i, arr) => {
@@ -141,26 +146,20 @@ const TeamMemberProfile: React.FC = () => {
     const workSegments: ActivitySegment[] = [];
     const travelSegments: ActivitySegment[] = [];
 
-    // 2. Identify Work segments (Pairs of check-in -> check-out)
     let activeIn: AttendanceEvent | null = null;
     for (let i = 0; i < sorted.length; i++) {
       const evt = sorted[i];
       if (evt.type === 'check-in') {
-        if (!activeIn) {
-          activeIn = evt;
-        }
+        if (!activeIn) activeIn = evt;
       } else if (evt.type === 'check-out') {
         if (activeIn) {
           const start = parseISO(activeIn.timestamp);
           const end = parseISO(evt.timestamp);
           const durationMin = Math.max(0, differenceInMinutes(end, start));
-
-          // Improved location name fallback: use coordinates if site name is unknown
           let locName = activeIn.locationName || 'Unknown Site';
           if (locName === 'Unknown Site' && activeIn.latitude && activeIn.longitude) {
             locName = `GPS: ${activeIn.latitude.toFixed(4)}, ${activeIn.longitude.toFixed(4)}`;
           }
-
           workSegments.push({
             id: `work-${activeIn.id}`,
             type: 'Work',
@@ -177,14 +176,12 @@ const TeamMemberProfile: React.FC = () => {
       }
     }
 
-    // Handle open check-in (ongoing work)
     if (activeIn) {
       const isToday = isSameDay(selectedDate, new Date());
       const endTs = isToday ? new Date().toISOString() : endOfDay(parseISO(activeIn.timestamp)).toISOString();
       const start = parseISO(activeIn.timestamp);
       const end = parseISO(endTs);
       const durationMin = Math.max(0, differenceInMinutes(end, start));
-
       workSegments.push({
         id: `work-${activeIn.id}`,
         type: 'Work',
@@ -198,28 +195,18 @@ const TeamMemberProfile: React.FC = () => {
       });
     }
 
-    // 3. Identify Travel segments (Gaps between Work segments)
     for (let j = 0; j < workSegments.length - 1; j++) {
       const current = workSegments[j];
       const next = workSegments[j + 1];
-
       const start = parseISO(current.endTime);
       const end = parseISO(next.startTime);
       const durationMin = Math.max(0, differenceInMinutes(end, start));
-
-      // Coordinate matching for distance
       const outEvt = sorted.find(e => e.timestamp === current.endTime && e.type === 'check-out');
       const inEvt = sorted.find(e => e.timestamp === next.startTime && e.type === 'check-in');
-
       let dist = 0;
       if (outEvt?.latitude && outEvt?.longitude && inEvt?.latitude && inEvt?.longitude) {
-        dist = calculateDistanceMeters(
-          outEvt.latitude, outEvt.longitude,
-          inEvt.latitude, inEvt.longitude
-        ) / 1000;
+        dist = calculateDistanceMeters(outEvt.latitude, outEvt.longitude, inEvt.latitude, inEvt.longitude) / 1000;
       }
-
-      // Only show travel if there's significant distance OR duration
       if (durationMin > 0 || dist > 0.05) {
         travelSegments.push({
           id: `travel-${j}`,
@@ -233,22 +220,17 @@ const TeamMemberProfile: React.FC = () => {
       }
     }
 
-    return [...workSegments, ...travelSegments].sort((a, b) => 
-      a.startTime.localeCompare(b.startTime)
-    );
+    return [...workSegments, ...travelSegments].sort((a, b) => a.startTime.localeCompare(b.startTime));
   }, [events, selectedDate]);
 
   const groupedLeaves = useMemo(() => {
     const groups: Record<string, LeaveRequest[]> = {};
     if (!leaveRequests) return groups;
-    
     leaveRequests.forEach(req => {
       const dateStr = (req as any).createdAt || req.startDate;
       if (!dateStr) return;
-      
       const month = safeFormatISO(dateStr, 'MMMM yyyy');
       if (month === 'N/A') return;
-      
       if (!groups[month]) groups[month] = [];
       groups[month].push(req);
     });
@@ -259,7 +241,6 @@ const TeamMemberProfile: React.FC = () => {
     let totalDist = 0;
     let workMin = 0;
     let travelMin = 0;
-
     timeline.forEach(s => {
       if (s.type === 'Work') workMin += s.durationMin;
       if (s.type === 'Travel') {
@@ -267,7 +248,6 @@ const TeamMemberProfile: React.FC = () => {
         totalDist += s.distance || 0;
       }
     });
-
     return {
       totalDistance: totalDist.toFixed(2),
       workDuration: `${Math.floor(workMin / 60)}h ${workMin % 60}m`,
@@ -286,7 +266,6 @@ const TeamMemberProfile: React.FC = () => {
         s.type === 'Work' ? `"${s.locationName}"` : `${s.distance} km`
       ].join(','))
     ].join('\n');
-
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -300,32 +279,23 @@ const TeamMemberProfile: React.FC = () => {
   if (!member) return null;
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen bg-background text-primary-text">
       {/* Premium Header */}
       <div className="bg-card border-b border-border shadow-soft sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-6">
-            {/* Top Row: Back button, Name, and Actions */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3">
                   {member.photoUrl ? (
-                    <img 
-                      src={member.photoUrl} 
-                      alt={member.name} 
-                      className="w-12 h-12 rounded-full object-cover border-2 border-accent/20"
-                    />
+                    <img src={member.photoUrl} alt={member.name} className="w-12 h-12 rounded-full object-cover border-2 border-accent/20" />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center text-accent font-bold text-lg">
-                      {member.name.charAt(0)}
-                    </div>
+                    <div className="w-12 h-12 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center text-accent font-bold text-lg">{member.name.charAt(0)}</div>
                   )}
                   <div className="flex flex-col">
-                    <h1 className="text-xl sm:text-2xl font-bold text-primary-text leading-tight">{member.name}</h1>
+                    <h1 className="text-xl sm:text-2xl font-bold leading-tight">{member.name}</h1>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className="text-[10px] sm:text-xs px-2 py-0.5 bg-accent/10 text-accent rounded-full font-bold uppercase tracking-wider">
-                        {member.role.replace(/_/g, ' ')}
-                      </span>
+                      <span className="text-[10px] sm:text-xs px-2 py-0.5 bg-accent/10 text-accent rounded-full font-bold uppercase tracking-wider">{member.role.replace(/_/g, ' ')}</span>
                       <span className="text-muted text-xs">•</span>
                       <span className="text-muted text-xs font-medium">{member.email}</span>
                     </div>
@@ -334,307 +304,169 @@ const TeamMemberProfile: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-hide">
-                {/* Date Selector */}
                 <div className="flex items-center bg-white border border-border p-1 rounded-xl shadow-inner-soft min-w-fit">
-                  <button
-                    onClick={() => setSelectedDate(subDays(selectedDate, 1))}
-                    className="p-1 px-2.5 bg-transparent hover:bg-accent/5 rounded-lg text-primary-text transition-colors font-bold"
-                  >
-                    &larr;
-                  </button>
-                  <div className="flex items-center gap-2 px-3 py-1 text-xs sm:text-sm font-semibold text-primary-text">
+                  <button onClick={() => setSelectedDate(subDays(selectedDate, 1))} className="p-1 px-2.5 bg-transparent hover:bg-accent/5 rounded-lg transition-colors font-bold">&larr;</button>
+                  <div className="flex items-center gap-2 px-3 py-1 text-xs sm:text-sm font-semibold">
                     <Calendar className="w-4 h-4 text-accent" />
                     {format(selectedDate, 'dd MMM, yyyy')}
                   </div>
-                  <button
-                    onClick={() => setSelectedDate(addDays(selectedDate, 1))}
-                    disabled={isSameDay(selectedDate, new Date())}
-                    className="p-1 px-2.5 bg-transparent hover:bg-accent/5 rounded-lg text-primary-text transition-colors font-bold disabled:opacity-20"
-                  >
-                    &rarr;
-                  </button>
+                  <button onClick={() => setSelectedDate(addDays(selectedDate, 1))} disabled={isSameDay(selectedDate, new Date())} className="p-1 px-2.5 bg-transparent hover:bg-accent/5 rounded-lg transition-colors font-bold disabled:opacity-20">&rarr;</button>
                 </div>
-
-                {/* Export Button */}
-                <button
-                  onClick={exportReport}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-accent text-white rounded-xl hover:bg-accent/90 transition-all font-bold text-xs sm:text-sm shadow-accent-soft whitespace-nowrap"
-                >
+                <button onClick={exportReport} className="flex items-center gap-2 px-4 py-2.5 bg-accent text-white rounded-xl hover:bg-accent/90 transition-all font-bold text-xs sm:text-sm shadow-accent-soft whitespace-nowrap">
                   <Download className="w-4 h-4" />
                   <span>Report</span>
                 </button>
               </div>
             </div>
 
-            {/* Bottom Row: Navigation Tabs */}
             <div className="flex items-center gap-1 sm:gap-2 -mb-[1px]">
-              <button
-                onClick={() => setActiveTab('activity')}
-                className={`relative px-4 py-2 text-sm font-bold transition-all rounded-t-lg ${activeTab === 'activity'
-                    ? 'text-accent'
-                    : 'text-primary-text hover:text-accent'
-                  }`}
+              <button 
+                onClick={() => setActiveTab('violations')} 
+                className={`relative px-4 py-2 text-sm font-bold transition-all rounded-t-lg ${activeTab === 'violations' ? 'text-accent' : 'text-primary-text hover:text-accent'}`}
+              >
+                Attendance Violations
+                {activeTab === 'violations' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full shadow-accent-soft" />}
+              </button>
+              <button 
+                onClick={() => setActiveTab('activity')} 
+                className={`relative px-4 py-2 text-sm font-bold transition-all rounded-t-lg ${activeTab === 'activity' ? 'text-accent' : 'text-primary-text hover:text-accent'}`}
               >
                 Daily Activity
-                {activeTab === 'activity' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full shadow-accent-soft" />
-                )}
+                {activeTab === 'activity' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full shadow-accent-soft" />}
               </button>
-              <button
-                onClick={() => setActiveTab('leaves')}
-                className={`relative px-4 py-2 text-sm font-bold transition-all rounded-t-lg ${activeTab === 'leaves'
-                    ? 'text-accent'
-                    : 'text-primary-text hover:text-accent'
-                  }`}
+              <button 
+                onClick={() => setActiveTab('devices')} 
+                className={`relative px-4 py-2 text-sm font-bold transition-all rounded-t-lg ${activeTab === 'devices' ? 'text-accent' : 'text-primary-text hover:text-accent'}`}
+              >
+                Device History
+                {activeTab === 'devices' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full shadow-accent-soft" />}
+              </button>
+              <button 
+                onClick={() => setActiveTab('leaves')} 
+                className={`relative px-4 py-2 text-sm font-bold transition-all rounded-t-lg ${activeTab === 'leaves' ? 'text-accent' : 'text-primary-text hover:text-accent'}`}
               >
                 Leave History
-                {activeTab === 'leaves' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full shadow-accent-soft" />
-                )}
+                {activeTab === 'leaves' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full shadow-accent-soft" />}
               </button>
-              {member.role === 'field_staff' && (
-                <button
-                  onClick={() => setActiveTab('violations')}
-                  className={`relative px-4 py-2 text-sm font-bold transition-all rounded-t-lg ${activeTab === 'violations'
-                      ? 'text-accent'
-                      : 'text-primary-text hover:text-accent'
-                    }`}
-                >
-                  Violations
-                  {activeTab === 'violations' && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full shadow-accent-soft" />
-                  )}
-                </button>
-              )}
             </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto w-full p-4 md:p-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-4 space-y-4">
+            <MetricCard title="Total Distance" value={`${metrics.totalDistance} km`} subtext="Traveled across segments" icon={<Navigation className="w-5 h-5" />} color="bg-blue-500" />
+            <MetricCard title="Work Duration" value={metrics.workDuration} subtext="Total time at site locations" icon={<Briefcase className="w-5 h-5" />} color="bg-green-500" />
+            <MetricCard title="Travel Time" value={metrics.travelTime} subtext="Total time spent commuting" icon={<MapPin className="w-5 h-5" />} color="bg-orange-500" />
+            
+            <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+              <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
+                <Info className="w-4 h-4 text-accent" />
+                Day Insights
+              </h3>
+              <div className="space-y-3">
+                <InsightItem label="First Check-in" value={safeFormatISO(events.find(e => e.type === 'check-in')?.timestamp, 'hh:mm a')} />
+                <InsightItem label="Last Event" value={safeFormatISO(events[events.length - 1]?.timestamp, 'hh:mm a')} />
+                <InsightItem label="Sites Visited" value={new Set(timeline.filter(s => s.type === 'Work').map(s => s.locationName)).size.toString()} />
+              </div>
+            </div>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Metrics */}
-        <div className="lg:col-span-4 space-y-4">
-          <MetricCard 
-            title="Total Distance"
-            value={`${metrics.totalDistance} km`}
-            subtext="Traveled across segments"
-            icon={<Navigation className="w-5 h-5" />}
-            color="bg-blue-500"
-          />
-          <MetricCard 
-            title="Work Duration"
-            value={metrics.workDuration}
-            subtext="Total time at site locations"
-            icon={<Briefcase className="w-5 h-5" />}
-            color="bg-green-500"
-          />
-          <MetricCard 
-            title="Travel Time"
-            value={metrics.travelTime}
-            subtext="Total time spent commuting"
-            icon={<MapPin className="w-5 h-5" />}
-            color="bg-orange-500"
-          />
-          
-          {/* Quick Info */}
-          <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
-            <h3 className="text-sm font-bold text-primary-text mb-3 flex items-center gap-2">
-              <Info className="w-4 h-4 text-accent" />
-              Day Insights
-            </h3>
-            <div className="space-y-3">
-              <InsightItem label="First Check-in" value={safeFormatISO(events.find(e => e.type === 'check-in')?.timestamp, 'hh:mm a')} />
-              <InsightItem label="Last Event" value={safeFormatISO(events[events.length - 1]?.timestamp, 'hh:mm a')} />
-              <InsightItem label="Sites Visited" value={new Set(timeline.filter(s => s.type === 'Work').map(s => s.locationName)).size.toString()} />
+          <div className="lg:col-span-8">
+            <div className="bg-card border border-border rounded-2xl p-6 shadow-sm overflow-visible min-h-[500px]">
+              {activeTab === 'activity' ? (
+                <>
+                  <h3 className="text-lg font-bold mb-6">Activity Timeline</h3>
+                  {loading ? (
+                    <div className="space-y-8 animate-pulse">
+                      {[1,2,3].map(i => (
+                        <div key={i} className="flex gap-4">
+                          <div className="w-8 h-8 rounded-full bg-slate-200" />
+                          <div className="flex-1 h-20 bg-slate-100 rounded-xl" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : timeline.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-muted opacity-50 text-lg">
+                      <Clock className="w-12 h-12 mb-3" />
+                      <p>No activity recorded for this day.</p>
+                    </div>
+                  ) : (
+                    <div className="relative space-y-2">
+                      <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-border via-border to-transparent" />
+                      {timeline.map((s) => (
+                        <div key={s.id} className="relative pl-10 pb-8 last:pb-0 text-base">
+                          <div className={`absolute left-0 top-1.5 w-8 h-8 rounded-full border-4 border-card flex items-center justify-center z-10 ${s.type === 'Work' ? 'bg-green-500' : 'bg-orange-500'}`}>
+                            {s.type === 'Work' ? <Briefcase className="w-3 h-3 text-white" /> : <Navigation className="w-3 h-3 text-white" />}
+                          </div>
+                          <div className={`p-4 rounded-2xl border transition-all duration-300 ${s.type === 'Work' ? 'bg-green-500/5 border-green-500/10 hover:border-green-500/30' : 'bg-orange-500/5 border-orange-500/10 hover:border-orange-500/30'}`}>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${s.type === 'Work' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'}`}>{s.type === 'Work' ? 'At Location' : 'Travel'}</span>
+                                <h4 className="font-bold">{s.type === 'Work' ? (s.latitude && s.longitude ? <ResolveAddress lat={s.latitude} lng={s.longitude} fallback={s.locationName} /> : s.locationName) : 'Travel to next stop'}</h4>
+                              </div>
+                              <div className="flex items-center gap-3 text-xs font-medium text-muted">
+                                <div className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{safeFormatISO(s.startTime, 'hh:mm a')} - {safeFormatISO(s.endTime, 'hh:mm a')}</div>
+                                <span className="bg-background px-2 py-0.5 rounded-lg border border-border">{s.duration}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : activeTab === 'leaves' ? (
+                <>
+                  <h3 className="text-lg font-bold mb-6">Leave Request History</h3>
+                  {Object.keys(groupedLeaves).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-muted opacity-50 text-lg"><FileText className="w-12 h-12 mb-3" /><p>No leave requests found.</p></div>
+                  ) : (
+                    <div className="space-y-8">
+                      {Object.entries(groupedLeaves).map(([month, requests]) => (
+                        <div key={month} className="space-y-4">
+                          <h4 className="text-sm font-bold text-accent px-2 py-1 bg-accent/5 rounded-lg inline-block">{month}</h4>
+                          <div className="space-y-3">
+                            {requests.map(req => (
+                              <div key={req.id} className="p-4 rounded-xl border border-border bg-page/50 hover:bg-page transition-colors text-base">
+                                <div className="flex justify-between items-start mb-2">
+                                  <div><p className="font-bold">{req.leaveType} Leave</p><p className="text-xs text-muted">{safeFormatISO(req.startDate, 'dd MMM')} - {safeFormatISO(req.endDate, 'dd MMM, yyyy')}</p></div>
+                                  <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${req.status === 'approved' ? 'bg-green-500 text-white' : req.status === 'rejected' ? 'bg-red-500 text-white' : 'bg-yellow-500 text-white'}`}>{req.status.replace(/_/g, ' ')}</span>
+                                </div>
+                                <p className="text-sm text-muted line-clamp-2 italic">"{req.reason}"</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : activeTab === 'devices' ? (
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <UserDeviceList userId={member.id} canManage={isManager} showTitle={true} />
+                </div>
+              ) : activeTab === 'violations' ? (
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <ViolationsView userId={member.id} userName={member.name} isManager={isManager} />
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
-
-        {/* Right: Timeline or Leaves */}
-        <div className="lg:col-span-8">
-          {activeTab === 'violations' ? (
-            <div className="bg-card border border-border rounded-2xl p-6 shadow-sm overflow-hidden min-h-[500px]">
-              <ViolationsView 
-                userId={member.id} 
-                userName={member.name} 
-                isManager={isManager} 
-              />
-            </div>
-          ) : (
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm overflow-hidden min-h-[500px]">
-            {activeTab === 'activity' ? (
-              <>
-                <h3 className="text-lg font-bold text-primary-text mb-6">Activity Timeline</h3>
-                
-                {loading ? (
-                  <div className="space-y-8 animate-pulse">
-                    {[1,2,3].map(i => (
-                      <div key={i} className="flex gap-4">
-                        <div className="w-8 h-8 rounded-full bg-slate-200" />
-                        <div className="flex-1 h-20 bg-slate-100 rounded-xl" />
-                      </div>
-                    ))}
-                  </div>
-                ) : timeline.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-muted opacity-50 text-lg">
-                    <Clock className="w-12 h-12 mb-3" />
-                    <p>No activity recorded for this day.</p>
-                  </div>
-                ) : (
-                  <div className="relative space-y-2">
-                    {/* Vertical Line */}
-                    <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-border via-border to-transparent" />
-                    
-                    {timeline.map((s, idx) => (
-                      <div key={s.id} className="relative pl-10 pb-8 last:pb-0 text-base">
-                        {/* Indicator Dot */}
-                        <div className={`absolute left-0 top-1.5 w-8 h-8 rounded-full border-4 border-card flex items-center justify-center z-10 ${
-                          s.type === 'Work' ? 'bg-green-500' : 'bg-orange-500'
-                        }`}>
-                          {s.type === 'Work' ? <Briefcase className="w-3 h-3 text-white" /> : <Navigation className="w-3 h-3 text-white" />}
-                        </div>
-
-                        <div className={`p-4 rounded-2xl border transition-all duration-300 ${
-                          s.type === 'Work' 
-                            ? 'bg-green-500/5 border-green-500/10 hover:border-green-500/30' 
-                            : 'bg-orange-500/5 border-orange-500/10 hover:border-orange-500/30'
-                        }`}>
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${
-                                s.type === 'Work' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'
-                              }`}>
-                                {s.type === 'Work' ? 'At Location' : 'Travel'}
-                              </span>
-                            <h4 className="font-bold text-primary-text">
-                              {s.type === 'Work' ? (
-                                s.latitude && s.longitude ? (
-                                  <ResolveAddress 
-                                    lat={s.latitude} 
-                                    lng={s.longitude} 
-                                    fallback={s.locationName} 
-                                  />
-                                ) : s.locationName
-                              ) : 'Travel to next stop'}
-                            </h4>
-                              {s.type === 'Work' && s.latitude && s.longitude && (
-                                <a 
-                                  href={`https://www.google.com/maps/search/?api=1&query=${s.latitude},${s.longitude}`} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
-                                  className="text-[10px] text-accent flex items-center hover:underline bg-accent/5 px-2 py-0.5 rounded-lg border border-accent/20"
-                                >
-                                  <MapPin className="h-2.5 w-2.5 mr-1" /> View Map
-                                </a>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 text-xs font-medium text-muted">
-                              <div className="flex items-center gap-1">
-                                <Clock className="w-3.5 h-3.5" />
-                                {safeFormatISO(s.startTime, 'hh:mm a')} - {safeFormatISO(s.endTime, 'hh:mm a')}
-                              </div>
-                              <span className="bg-background px-2 py-0.5 rounded-lg border border-border">
-                                {s.duration}
-                              </span>
-                            </div>
-                          </div>
-
-                          {s.type === 'Work' && s.latitude && (
-                            <div className="flex items-center gap-4 text-xs text-muted">
-                              <div className="flex items-center gap-1 capitalize">
-                                <MapPin className="w-3.5 h-3.5 text-green-500" />
-                                Lat: {s.latitude.toFixed(4)}, Lng: {s.longitude?.toFixed(4)}
-                              </div>
-                            </div>
-                          )}
-
-                          {s.type === 'Travel' && (
-                            <div className="flex items-center gap-1 text-xs font-semibold text-orange-600">
-                               <Navigation className="w-3.5 h-3.5" />
-                               {s.distance} km
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <h3 className="text-lg font-bold text-primary-text mb-6">Leave Request History</h3>
-                {Object.keys(groupedLeaves).length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-muted opacity-50 text-lg">
-                    <FileText className="w-12 h-12 mb-3" />
-                    <p>No leave requests found for this member.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-8">
-                    {Object.entries(groupedLeaves).map(([month, requests]) => (
-                      <div key={month} className="space-y-4">
-                        <h4 className="text-sm font-bold text-accent px-2 py-1 bg-accent/5 rounded-lg inline-block">{month}</h4>
-                        <div className="space-y-3">
-                          {requests.map(req => (
-                            <div key={req.id} className="p-4 rounded-xl border border-border bg-page/50 hover:bg-page transition-colors text-base">
-                              <div className="flex justify-between items-start mb-2">
-                                <div>
-                                  <p className="font-bold text-primary-text">{req.leaveType} Leave</p>
-                                  <p className="text-xs text-muted">
-                                    {safeFormatISO(req.startDate, 'dd MMM')} - {safeFormatISO(req.endDate, 'dd MMM, yyyy')}
-                                  </p>
-                                </div>
-                                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
-                                  req.status === 'approved' ? 'bg-green-500 text-white' :
-                                  req.status === 'rejected' ? 'bg-red-500 text-white' :
-                                  'bg-yellow-500 text-white'
-                                }`}>
-                                  {req.status.replace(/_/g, ' ')}
-                                </span>
-                              </div>
-                              <p className="text-sm text-muted line-clamp-2 italic mb-3">"{req.reason}"</p>
-                              
-                              {req.approvalHistory && req.approvalHistory.length > 0 && (
-                                <div className="mt-2 pt-2 border-t border-border space-y-2">
-                                  <p className="text-[10px] font-bold text-muted uppercase">Approval Logs</p>
-                                  {req.approvalHistory.map((log: any, idx) => (
-                                    <div key={idx} className="flex items-center gap-2 text-xs text-muted">
-                                      <div className={`w-1.5 h-1.5 rounded-full ${log.status === 'approved' ? 'bg-green-500' : 'bg-red-500'}`} />
-                                      <span>
-                                        {log.status === 'approved' ? 'Approved' : 'Rejected'} by <strong>{log.approver_name}</strong> on {safeFormatISO(log.timestamp, 'dd MMM, hh:mm a')}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
       </div>
     </div>
-  </div>
-</div>
-);
+  );
 };
 
 const MetricCard: React.FC<{ title: string; value: string; subtext: string; icon: React.ReactNode; color: string }> = ({ title, value, subtext, icon, color }) => (
   <div className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow group">
     <div className="flex items-center gap-4">
-      <div className={`p-3 rounded-xl text-white shadow-sm ${color} group-hover:scale-110 transition-transform`}>
-        {icon}
-      </div>
+      <div className={`p-3 rounded-xl text-white shadow-sm ${color} group-hover:scale-110 transition-transform`}>{icon}</div>
       <div>
         <p className="text-xs font-medium text-muted uppercase tracking-wider">{title}</p>
-        <h4 className="text-xl font-extrabold text-primary-text">{value}</h4>
+        <h4 className="text-xl font-extrabold">{value}</h4>
         <p className="text-[10px] text-muted mt-0.5">{subtext}</p>
       </div>
     </div>
@@ -644,7 +476,7 @@ const MetricCard: React.FC<{ title: string; value: string; subtext: string; icon
 const InsightItem: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className="flex items-center justify-between text-xs">
     <span className="text-muted">{label}</span>
-    <span className="font-bold text-primary-text">{value}</span>
+    <span className="font-bold">{value}</span>
   </div>
 );
 

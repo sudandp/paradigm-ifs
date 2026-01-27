@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, Navigate, useLocation } from 'react-router-dom';
-import { Bell, ChevronsLeft, ChevronsRight, ChevronDown, ChevronUp, ShieldCheck, LayoutDashboard, ClipboardCheck, Map as MapIcon, ClipboardList, User, Briefcase, ListTodo, Building, Users, Shirt, Settings, GitBranch, Calendar, CalendarCheck2, ShieldHalf, FileDigit, GitPullRequest, Home, BriefcaseBusiness, UserPlus, IndianRupee, PackagePlus, LifeBuoy, MapPin, ArrowLeft, Navigation, Cpu, FileText } from 'lucide-react';
+import { Bell, ChevronsLeft, ChevronsRight, ChevronDown, ChevronUp, ShieldCheck, LayoutDashboard, ClipboardCheck, Map as MapIcon, ClipboardList, User, Briefcase, ListTodo, Building, Users, Shirt, Settings, GitBranch, Calendar, CalendarCheck2, ShieldHalf, FileDigit, GitPullRequest, Home, BriefcaseBusiness, UserPlus, IndianRupee, PackagePlus, LifeBuoy, MapPin, ArrowLeft, Navigation, Cpu, FileText, Smartphone } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { usePermissionsStore } from '../../store/permissionsStore';
 import Logo from '../ui/Logo';
@@ -55,6 +55,9 @@ export const allNavLinks: NavLinkConfig[] = [
     { to: '/hr/locations', label: 'Geo Locations', icon: MapPin, permission: 'manage_geo_locations' },
     // User‑specific geofencing management
     { to: '/attendance/locations', label: 'My Locations', icon: Navigation, permission: 'view_my_locations' },
+    // Device Management
+    { to: '/settings/devices', label: 'Linked Devices', icon: Smartphone, permission: 'view_profile' },
+    { to: '/admin/device-approvals', label: 'Device Approvals', icon: ShieldCheck, permission: 'manage_users' },
 ];
 
 

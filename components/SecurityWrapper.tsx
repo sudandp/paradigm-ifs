@@ -4,22 +4,33 @@ import { useSecurityCheck } from '../hooks/useSecurityCheck';
 import SecurityWarningModal from '../components/ui/SecurityWarningModal';
 import { api } from '../services/api';
 import { isAdmin } from '../utils/auth';
+import { getCurrentDevice, registerDevice, getDeviceLimits } from '../services/deviceService';
+import DeviceWarningDialog from './devices/DeviceWarningDialog';
+import { DeviceType } from '../types';
 
 interface SecurityWrapperProps {
     children: React.ReactNode;
 }
 
 /**
- * Security wrapper component that monitors for developer mode and location spoofing
- * AFTER user has logged in. Admin and developer roles are exempt from these checks.
+ * Security wrapper component that monitors for developer mode, location spoofing,
+ * and UNREGISTERED/UNAUTHORIZED DEVICES after user has logged in.
  */
 const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
     const { user } = useAuthStore();
     const securityCheck = useSecurityCheck();
     const [securityAlertSent, setSecurityAlertSent] = useState(false);
 
+    // Device validation state
+    const [deviceStatus, setDeviceStatus] = useState<'authorized' | 'pending' | 'revoked' | 'checking'>('checking');
+    const [deviceInfo, setDeviceInfo] = useState<{ id: string, name: string, type: DeviceType } | null>(null);
+    const [deviceMessage, setDeviceMessage] = useState('');
+    const [limits, setLimits] = useState<{ web: number; android: number; ios: number }>({ web: 1, android: 1, ios: 1 });
+
     // Check if current user is exempt from security checks (admin/developer)
-    const isExemptFromSecurityChecks = user && (isAdmin(user.role) || user.role === 'developer');
+    // NOTE: We might want admins to also be subject to device limits, but for now keeping consistency
+    // with existing security check pattern. However, device registration is beneficial for tracking.
+    const isExemptFromSecurityChecks = user && (user.role === 'developer'); 
 
     // Monitor security issues and send alerts (only for non-exempt users)
     useEffect(() => {
@@ -36,9 +47,103 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
         }
     }, [user, securityCheck, securityAlertSent, isExemptFromSecurityChecks]);
 
-    // If security issues detected for non-exempt users, show warning modal
+    // Perform Device Validation
+    useEffect(() => {
+        const checkDevice = async () => {
+            if (!user) return;
+
+            try {
+                // Get current device details and limits
+                const [{ deviceIdentifier, deviceType, deviceName, deviceInfo: dInfo }, devLimits] = await Promise.all([
+                    getCurrentDevice(),
+                    getDeviceLimits(user.role)
+                ]);
+                
+                setLimits(devLimits);
+
+                // For developers, we might just log but not block, or just standard register
+                // Let's standard register everyone to ensure logs are kept
+                const result = await registerDevice(
+                    user.id,
+                    user.role,
+                    deviceIdentifier,
+                    deviceType as DeviceType,
+                    deviceName,
+                    dInfo
+                );
+
+                if (result.success) {
+                    setDeviceStatus('authorized');
+                } else {
+                    // Registration failed or pending approval
+                    if (result.requiresApproval) {
+                        setDeviceStatus('pending');
+                        setDeviceInfo({ 
+                            id: result.request?.id || '', 
+                            name: deviceName, 
+                            type: deviceType as DeviceType 
+                        });
+                        setDeviceMessage(result.message);
+                    } else if (result.message.includes('revoked')) {
+                        setDeviceStatus('revoked');
+                        setDeviceInfo({ 
+                           id: '', 
+                           name: deviceName, 
+                           type: deviceType as DeviceType 
+                       });
+                    } else {
+                        // Other error
+                        setDeviceStatus('pending'); // Treat as pending/blocked
+                        setDeviceMessage(result.message);
+                    }
+                }
+
+            } catch (error) {
+                console.error('Device validation failed:', error);
+                // On error, we might want to fail open or closed?
+                // Fail open for now to avoid locking out due to network glitch
+                setDeviceStatus('authorized'); 
+            }
+        };
+
+        checkDevice();
+    }, [user]); // Run when user changes (login)
+
+    // 1. Check basic security (Dev mode / Location spoofing)
     if (user && !isExemptFromSecurityChecks && !securityCheck.isSecure) {
         return <SecurityWarningModal issues={securityCheck.issues} />;
+    }
+
+    // 2. Check Device Authorization
+    if (user && deviceStatus !== 'authorized' && deviceStatus !== 'checking') {
+        // If developer, maybe bypass?
+        if (user.role === 'developer') return <>{children}</>;
+
+        return (
+            <DeviceWarningDialog 
+                status={deviceStatus as any}
+                deviceName={deviceInfo?.name || 'Unknown Device'}
+                deviceType={deviceInfo?.type || 'web'}
+                limits={limits}
+                onLogout={() => useAuthStore.getState().logout()}
+                onRequestAccess={() => {
+                     // Reload to check status again
+                     window.location.reload();
+                }}
+            />
+        );
+    }
+    
+    // While checking device status...
+    if (user && deviceStatus === 'checking' && user.role !== 'developer') {
+         return (
+             <div className="flex h-screen w-full items-center justify-center bg-gray-50">
+                 <div className="flex flex-col items-center">
+                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
+                     <p className="text-gray-500 font-medium">Verifying device...</p>
+                 </div>
+             </div>
+         );
     }
 
     // Otherwise, render children normally
