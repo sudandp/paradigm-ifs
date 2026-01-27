@@ -257,54 +257,45 @@ const ProfilePage: React.FC = () => {
                             <div className="bg-[#0f291e]/80 backdrop-blur-md rounded-2xl border border-white/5 p-5 shadow-xl relative overflow-hidden group">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
                                 
+                                {/* 2x2 Grid for Attendance Times */}
                                 <div className="grid grid-cols-2 gap-3 mb-6 relative z-10">
-                                    <div className="text-center p-3 bg-black/20 rounded-xl border border-white/5">
-                                        <p className="text-[10px] text-gray-400 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <LogIn className="h-2.5 w-2.5 text-emerald-500" /> First Check In
+                                    <div className="text-center p-3 bg-black/30 rounded-xl border border-white/10">
+                                        <p className="text-[9px] text-emerald-400 mb-1 uppercase tracking-widest font-bold flex items-center justify-center gap-1">
+                                            <LogIn className="h-3 w-3" /> First In
                                         </p>
-                                        <p className="text-lg font-bold text-white font-mono">{formatTime(lastCheckInTime)}</p>
+                                        <p className="text-base font-bold text-white font-mono">{formatTime(lastCheckInTime)}</p>
                                     </div>
-                                    <div className="text-center p-3 bg-black/20 rounded-xl border border-white/5">
-                                        <p className="text-[10px] text-gray-400 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <LogOut className="h-2.5 w-2.5 text-rose-500" /> Last Check Out
+                                    <div className="text-center p-3 bg-black/30 rounded-xl border border-white/10">
+                                        <p className="text-[9px] text-rose-400 mb-1 uppercase tracking-widest font-bold flex items-center justify-center gap-1">
+                                            <LogOut className="h-3 w-3" /> Last Out
                                         </p>
-                                        <p className="text-lg font-bold text-white font-mono">{formatTime(lastCheckOutTime)}</p>
+                                        <p className="text-base font-bold text-white font-mono">{formatTime(lastCheckOutTime)}</p>
                                     </div>
-                                    <div className="text-center p-3 bg-black/20 rounded-xl border border-white/5">
-                                        <p className="text-[10px] text-gray-400 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <CheckCircle className="h-2.5 w-2.5 text-blue-500" /> Last Break In
+                                    <div className="text-center p-3 bg-black/30 rounded-xl border border-white/10">
+                                        <p className="text-[9px] text-blue-400 mb-1 uppercase tracking-widest font-bold flex items-center justify-center gap-1">
+                                            <CheckCircle className="h-3 w-3" /> Last B-In
                                         </p>
-                                        <p className="text-lg font-bold text-white font-mono">{formatTime(lastBreakInTime)}</p>
+                                        <p className="text-base font-bold text-white font-mono">{formatTime(lastBreakInTime)}</p>
                                     </div>
-                                    <div className="text-center p-3 bg-black/20 rounded-xl border border-white/5">
-                                        <p className="text-[10px] text-gray-400 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <CheckCircle className="h-2.5 w-2.5 text-amber-500" /> Last Break Out
+                                    <div className="text-center p-3 bg-black/30 rounded-xl border border-white/10">
+                                        <p className="text-[9px] text-amber-400 mb-1 uppercase tracking-widest font-bold flex items-center justify-center gap-1">
+                                            <CheckCircle className="h-3 w-3" /> Last B-Out
                                         </p>
-                                        <p className="text-lg font-bold text-white font-mono">{formatTime(lastBreakOutTime)}</p>
+                                        <p className="text-base font-bold text-white font-mono">{formatTime(lastBreakOutTime)}</p>
                                     </div>
                                 </div>
 
                                 {/* Break Duration Display */}
-                                <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                                <div className="mb-6 px-3 py-2 bg-blue-500/5 rounded-xl border border-blue-500/10 flex items-center justify-between relative z-10">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
-                                            <CheckCircle className="h-4 w-4" />
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Break Duration</p>
-                                            <p className="text-sm font-bold text-white font-mono">
-                                                {totalBreakDurationToday > 0 
-                                                    ? `${Math.floor(totalBreakDurationToday)}h ${Math.round((totalBreakDurationToday % 1) * 60)}m` 
-                                                    : '0h 0m'}
-                                            </p>
-                                        </div>
+                                        <CheckCircle className="h-4 w-4 text-blue-500" />
+                                        <span className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Total Break</span>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-[10px] text-gray-400 uppercase tracking-wider">Last Break</p>
-                                        <p className="text-xs font-medium text-gray-300">
-                                            {isOnBreak ? 'Ongoing' : (lastBreakOutTime ? format(new Date(lastBreakOutTime), 'HH:mm') : '-')}
-                                        </p>
-                                    </div>
+                                    <p className="text-sm font-bold text-white font-mono">
+                                        {totalBreakDurationToday > 0 
+                                            ? `${Math.floor(totalBreakDurationToday)}h ${Math.round((totalBreakDurationToday % 1) * 60)}m` 
+                                            : '0h 0m'}
+                                    </p>
                                 </div>
 
                                 {isAttendanceLoading ? (
