@@ -2,6 +2,9 @@ import fs from 'fs';
 const customCss = fs.readFileSync('custom.css', 'utf8');
 
 const theme = `@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+@import "react-date-range/dist/styles.css";
+@import "react-date-range/dist/theme/default.css";
 
 @theme {
   --color-accent: #006B3F;

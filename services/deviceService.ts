@@ -155,28 +155,31 @@ export async function isDeviceAuthorized(
       .from('user_devices')
       .select('*')
       .eq('user_id', userId)
-      .eq('device_identifier', deviceIdentifier)
-      .maybeSingle();
+      .ilike('device_identifier', deviceIdentifier)
+      .order('last_used_at', { ascending: false })
+      .limit(1);
     
     if (error) throw error;
     
-    if (!data) {
+    const singleData = data && data.length > 0 ? data[0] : null;
+    
+    if (!singleData) {
       return { authorized: false, status: 'not_found' };
     }
     
     const device: UserDevice = {
-      ...data,
-      userId: data.user_id,
-      deviceType: data.device_type,
-      deviceIdentifier: data.device_identifier,
-      deviceName: data.device_name,
-      deviceInfo: data.device_info || {},
-      registeredAt: data.registered_at,
-      lastUsedAt: data.last_used_at,
-      approvedById: data.approved_by_id,
-      approvedAt: data.approved_at,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
+      ...singleData,
+      userId: singleData.user_id,
+      deviceType: singleData.device_type,
+      deviceIdentifier: singleData.device_identifier,
+      deviceName: singleData.device_name,
+      deviceInfo: singleData.device_info || {},
+      registeredAt: singleData.registered_at,
+      lastUsedAt: singleData.last_used_at,
+      approvedById: singleData.approved_by_id,
+      approvedAt: singleData.approved_at,
+      createdAt: singleData.created_at,
+      updatedAt: singleData.updated_at,
     };
     
     return {
@@ -208,8 +211,10 @@ export async function registerDevice(
   message: string;
 }> {
   try {
-    // Check if device already exists (case-insensitive for extra safety)
-    const existingCheck = await isDeviceAuthorized(userId, deviceIdentifier.toLowerCase());
+    const normalizedId = deviceIdentifier.toLowerCase();
+    
+    // Check if device already exists
+    const existingCheck = await isDeviceAuthorized(userId, normalizedId);
     if (existingCheck.device) {
       if (existingCheck.status === 'active') {
         // Update last used time and sync newest info (battery, ip, etc.)
@@ -254,7 +259,7 @@ export async function registerDevice(
         .insert({
           user_id: userId,
           device_type: deviceType,
-          device_identifier: deviceIdentifier,
+          device_identifier: normalizedId,
           device_name: deviceName,
           device_info: deviceInfo,
           status: 'active',

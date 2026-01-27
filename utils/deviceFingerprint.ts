@@ -22,11 +22,16 @@ export async function detectDeviceType(): Promise<DeviceType> {
       return 'android';
     } else if (info.platform === 'ios') {
       return 'ios';
-    } else {
-      return 'web';
     }
+    
+    // Fallback check: Some "converted" apps might report 'web' platform 
+    // but the User Agent clearly says they are mobile.
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes('android')) return 'android';
+    if (ua.includes('iphone') || ua.includes('ipad')) return 'ios';
+    
+    return 'web';
   } catch (error) {
-    // If Device API fails, we're likely on web, but we can still check the platform from UA
     const ua = navigator.userAgent.toLowerCase();
     if (ua.includes('android')) return 'android';
     if (ua.includes('iphone') || ua.includes('ipad')) return 'ios';
@@ -131,17 +136,17 @@ async function getWebDeviceInfo(): Promise<DeviceInfo> {
     if (match) info.browserVersion = match[1];
   }
   
-  // Extract OS
-  if (ua.includes('Windows')) {
-    info.os = 'Windows';
-  } else if (ua.includes('Mac')) {
-    info.os = 'macOS';
-  } else if (ua.includes('Linux')) {
-    info.os = 'Linux';
-  } else if (ua.includes('Android')) {
+  // Extract OS - PRIORITIZE MOBILE (Android/iOS) over Generic (Linux/Mac)
+  if (ua.includes('Android')) {
     info.os = 'Android';
   } else if (ua.includes('iOS') || ua.includes('iPhone') || ua.includes('iPad')) {
     info.os = 'iOS';
+  } else if (ua.includes('Windows') || navigator.platform.includes('Win')) {
+    info.os = 'Windows';
+  } else if (ua.includes('Mac') || navigator.platform.includes('Mac')) {
+    info.os = 'macOS';
+  } else if (ua.includes('Linux') || navigator.platform.includes('Linux')) {
+    info.os = 'Linux';
   }
 
   // Use User-Agent Client Hints for more specific hardware info (Chrome/Edge/Opera)
@@ -190,29 +195,38 @@ async function getWebDeviceInfo(): Promise<DeviceInfo> {
  */
 export async function generateDeviceIdentifier(): Promise<string> {
   const deviceType = await detectDeviceType();
+  const PERSISTENT_ID_KEY = 'paradigm_device_id';
   
   if (deviceType === 'web') {
     // For web, use localStorage to persist the ID across refreshes/browser updates
-    const PERSISTENT_ID_KEY = 'paradigm_device_id';
     const existingId = localStorage.getItem(PERSISTENT_ID_KEY);
     
     if (existingId) {
-      return existingId;
+      return existingId.toLowerCase();
     }
     
     // Generate new fingerprint if none exists
-    const newId = generateWebFingerprint();
+    const newId = generateWebFingerprint().toLowerCase();
     localStorage.setItem(PERSISTENT_ID_KEY, newId);
     return newId;
   } else {
-    // For mobile (native), use the hardware UUID from Capacitor
+    // For mobile (native or webview), strongly prefer the hardware UUID from Capacitor
     try {
       const id = await Device.getId();
-      return id.identifier || generateFallbackFingerprint();
+      if (id.identifier) {
+        return id.identifier.toLowerCase();
+      }
     } catch (error) {
-      console.error('Error getting device ID:', error);
-      return generateFallbackFingerprint();
+      console.error('Error getting hardware device ID:', error);
     }
+
+    // Fallback to persistent web ID if hardware ID is unavailable (e.g. broken bridge)
+    const existingId = localStorage.getItem(PERSISTENT_ID_KEY);
+    if (existingId) return existingId.toLowerCase();
+
+    const fallbackId = generateFallbackFingerprint().toLowerCase();
+    localStorage.setItem(PERSISTENT_ID_KEY, fallbackId);
+    return fallbackId;
   }
 }
 
