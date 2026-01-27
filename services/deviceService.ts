@@ -245,6 +245,47 @@ export async function registerDevice(
         };
       }
     }
+
+    // FALLBACK: If device ID changed (flaky ID on some Android builds or Web/Incognito)
+    // but name and core info match, update the existing device record with new ID
+    if (deviceType === 'android' || deviceType === 'web') {
+      const { data: similarDevices } = await supabase
+        .from('user_devices')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('device_type', deviceType)
+        .eq('device_name', deviceName)
+        .eq('status', 'active')
+        .limit(1);
+
+      if (similarDevices && similarDevices.length > 0) {
+         const existing = similarDevices[0];
+         // Verify core metadata matches to avoid false positives
+         const oldInfo = existing.device_info || {};
+         const isMatch = deviceType === 'android' 
+            ? (oldInfo.osVersion === deviceInfo.osVersion && oldInfo.manufacturer === deviceInfo.manufacturer)
+            : (oldInfo.browser === deviceInfo.browser && oldInfo.os === deviceInfo.os);
+
+         if (isMatch) {
+            console.log(`Flaky ID detected for ${deviceType}. Updating existing device record with new ID.`);
+            await supabase
+              .from('user_devices')
+              .update({ 
+                device_identifier: normalizedId,
+                last_used_at: new Date().toISOString(),
+                device_info: deviceInfo 
+              })
+              .eq('id', existing.id);
+              
+            return {
+              success: true,
+              device: { ...existing, deviceIdentifier: normalizedId },
+              requiresApproval: false,
+              message: 'Device record updated successfully',
+            };
+         }
+      }
+    }
     
     // Get device limits
     const limits = await getDeviceLimits(roleId);
