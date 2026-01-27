@@ -22,7 +22,7 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
     const [securityAlertSent, setSecurityAlertSent] = useState(false);
 
     // Device validation state
-    const [deviceStatus, setDeviceStatus] = useState<'authorized' | 'pending' | 'revoked' | 'checking'>('checking');
+    const [deviceStatus, setDeviceStatus] = useState<'authorized' | 'pending' | 'revoked' | 'limit_reached' | 'checking'>('checking');
     const [deviceInfo, setDeviceInfo] = useState<{ id: string, name: string, type: DeviceType } | null>(null);
     const [deviceMessage, setDeviceMessage] = useState('');
     const [limits, setLimits] = useState<{ web: number; android: number; ios: number }>({ web: 1, android: 1, ios: 1 });
@@ -91,6 +91,14 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
                            name: deviceName, 
                            type: deviceType as DeviceType 
                        });
+                    } else if (result.message.includes('limit of')) {
+                        setDeviceStatus('limit_reached');
+                        setDeviceInfo({ 
+                           id: '', 
+                           name: deviceName, 
+                           type: deviceType as DeviceType 
+                       });
+                        setDeviceMessage(result.message);
                     } else {
                         // Other error
                         setDeviceStatus('pending'); // Treat as pending/blocked
@@ -121,6 +129,7 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
 
         return (
             <DeviceWarningDialog 
+                userId={user.id}
                 status={deviceStatus as any}
                 deviceName={deviceInfo?.name || 'Unknown Device'}
                 deviceType={deviceInfo?.type || 'web'}

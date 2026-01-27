@@ -108,6 +108,7 @@ const DeviceManagement: React.FC = () => {
             <UserDeviceList 
                 key={refreshKey} 
                 userId={user.id} 
+                userRole={user.role}
                 canManage={true} 
             />
         )}

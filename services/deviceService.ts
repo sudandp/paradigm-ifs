@@ -44,19 +44,22 @@ export async function getDeviceLimits(roleId: string): Promise<DeviceLimitsConfi
     const deviceLimits = attendanceSettings.deviceLimits || {};
     
     // Map role to staff category
-    let staffCategory = 'officeStaff';
+    let staffCategory = 'staff'; // Default category
     if (roleId === 'admin') {
       staffCategory = 'admin';
-    } else if (roleId === 'field_officer' || roleId === 'backend_field_officer') {
-      staffCategory = 'fieldStaff';
-    } else if (roleId === 'site_staff' || roleId === 'site_supervisor') {
-      staffCategory = 'siteStaff';
     }
     
-    return deviceLimits[staffCategory] || { web: 1, android: 1, ios: 1 };
+    // Explicitly defined limits based on user request:
+    // Admin: 5 Web, 2 Android, 1 iOS
+    // Others: 1 Web, 1 Android, 1 iOS
+    if (staffCategory === 'admin') {
+      return { web: 5, android: 2, ios: 1 };
+    }
+    
+    // Default for everyone else
+    return { web: 1, android: 1, ios: 1 };
   } catch (error) {
     console.error('Error getting device limits:', error);
-    // Return default limits
     return { web: 1, android: 1, ios: 1 };
   }
 }
@@ -298,20 +301,11 @@ export async function registerDevice(
         message: 'Device registered successfully',
       };
     } else {
-      // Exceeds limit - create approval request
-      const request = await createDeviceChangeRequest(
-        userId,
-        deviceType,
-        deviceIdentifier,
-        deviceName,
-        deviceInfo
-      );
-      
+      // Exceeds limit - provide clear message for self-management
       return {
         success: false,
-        request,
         requiresApproval: true,
-        message: `You have reached the limit of ${limit} ${deviceType} device(s). An approval request has been sent to administrators.`,
+        message: `You have reached your limit of ${limit} ${deviceType} device(s). Please remove an old device from the list to register this one.`,
       };
     }
   } catch (error) {

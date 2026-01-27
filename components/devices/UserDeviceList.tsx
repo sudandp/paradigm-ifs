@@ -26,6 +26,7 @@ import { formatDate } from '../../utils/date';
 
 interface UserDeviceListProps {
   userId: string;
+  userRole?: string;
   canManage?: boolean;
   className?: string;
   showTitle?: boolean;
@@ -33,6 +34,7 @@ interface UserDeviceListProps {
 
 const UserDeviceList: React.FC<UserDeviceListProps> = ({ 
   userId, 
+  userRole = 'staff',
   canManage = false,
   className = '',
   showTitle = true
@@ -42,11 +44,23 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
   const [currentDeviceIdentifier, setCurrentDeviceIdentifier] = useState<string>('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [viewedDevice, setViewedDevice] = useState<UserDevice | null>(null);
+  const [limits, setLimits] = useState<{ web: number; android: number; ios: number }>({ web: 1, android: 1, ios: 1 });
 
   useEffect(() => {
     loadDevices();
     identifyCurrentDevice();
-  }, [userId]);
+    loadLimits();
+  }, [userId, userRole]);
+
+  const loadLimits = async () => {
+    try {
+      const { getDeviceLimits } = await import('../../services/deviceService');
+      const devLimits = await getDeviceLimits(userRole);
+      setLimits(devLimits);
+    } catch (e) {
+      console.error('Error loading limits:', e);
+    }
+  };
 
   const loadDevices = async () => {
     try {
@@ -127,13 +141,13 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
           
           <div className="flex gap-2">
             <div className="px-3 py-1 bg-blue-50 border border-blue-100 rounded-lg text-xs font-semibold text-blue-700 flex items-center gap-1.5">
-              <Monitor className="w-3.5 h-3.5" /> Laptop / PC: {devices.filter(d => d.deviceType.toLowerCase() === 'web' && d.status.toLowerCase() === 'active').length}
+              <Monitor className="w-3.5 h-3.5" /> Laptop / PC: {devices.filter(d => d.deviceType.toLowerCase() === 'web' && d.status.toLowerCase() === 'active').length} / {limits.web}
             </div>
             <div className="px-3 py-1 bg-green-50 border border-green-100 rounded-lg text-xs font-semibold text-green-700 flex items-center gap-1.5">
-              <Smartphone className="w-3.5 h-3.5" /> Android: {devices.filter(d => d.deviceType.toLowerCase() === 'android' && d.status.toLowerCase() === 'active').length}
+              <Smartphone className="w-3.5 h-3.5" /> Android: {devices.filter(d => d.deviceType.toLowerCase() === 'android' && d.status.toLowerCase() === 'active').length} / {limits.android}
             </div>
             <div className="px-3 py-1 bg-gray-50 border border-gray-100 rounded-lg text-xs font-semibold text-gray-700 flex items-center gap-1.5">
-              <Smartphone className="w-3.5 h-3.5" /> iOS: {devices.filter(d => d.deviceType.toLowerCase() === 'ios' && d.status.toLowerCase() === 'active').length}
+              <Smartphone className="w-3.5 h-3.5" /> iOS: {devices.filter(d => d.deviceType.toLowerCase() === 'ios' && d.status.toLowerCase() === 'active').length} / {limits.ios}
             </div>
           </div>
         </div>
