@@ -9,6 +9,7 @@
 import { Device } from '@capacitor/device';
 import { App } from '@capacitor/app';
 import { Network } from '@capacitor/network';
+import { Preferences } from '@capacitor/preferences';
 import { DeviceInfo, DeviceType } from '../types';
 
 /**
@@ -197,37 +198,45 @@ export async function generateDeviceIdentifier(): Promise<string> {
   const deviceType = await detectDeviceType();
   const PERSISTENT_ID_KEY = 'paradigm_device_id';
   
-  if (deviceType === 'web') {
-    // For web, use localStorage to persist the ID across refreshes/browser updates
-    const existingId = localStorage.getItem(PERSISTENT_ID_KEY);
-    
-    if (existingId) {
-      return existingId.toLowerCase();
+  // 1. Try to get from Capacitor Preferences (most stable for hybrid/native)
+  try {
+    const { value: storedId } = await Preferences.get({ key: PERSISTENT_ID_KEY });
+    if (storedId) {
+      return storedId.toLowerCase();
     }
-    
-    // Generate new fingerprint if none exists
-    const newId = generateWebFingerprint().toLowerCase();
-    localStorage.setItem(PERSISTENT_ID_KEY, newId);
-    return newId;
-  } else {
-    // For mobile (native or webview), strongly prefer the hardware UUID from Capacitor
+  } catch (e) {
+    console.error('Error reading from Preferences:', e);
+  }
+
+  // 2. Fallback to localStorage (and migrate to Preferences if found)
+  const localId = localStorage.getItem(PERSISTENT_ID_KEY);
+  if (localId) {
+    const normalized = localId.toLowerCase();
+    try {
+      await Preferences.set({ key: PERSISTENT_ID_KEY, value: normalized });
+    } catch (e) {}
+    return normalized;
+  }
+
+  // 3. For mobile, try native hardware ID if nothing stored
+  if (deviceType !== 'web') {
     try {
       const id = await Device.getId();
       if (id.identifier) {
-        return id.identifier.toLowerCase();
+        const nativeId = id.identifier.toLowerCase();
+        await Preferences.set({ key: PERSISTENT_ID_KEY, value: nativeId });
+        return nativeId;
       }
-    } catch (error) {
-      console.error('Error getting hardware device ID:', error);
-    }
-
-    // Fallback to persistent web ID if hardware ID is unavailable (e.g. broken bridge)
-    const existingId = localStorage.getItem(PERSISTENT_ID_KEY);
-    if (existingId) return existingId.toLowerCase();
-
-    const fallbackId = generateFallbackFingerprint().toLowerCase();
-    localStorage.setItem(PERSISTENT_ID_KEY, fallbackId);
-    return fallbackId;
+    } catch (e) {}
   }
+
+  // 4. Generate new fingerprint as last resort
+  const newId = generateWebFingerprint().toLowerCase();
+  try {
+    await Preferences.set({ key: PERSISTENT_ID_KEY, value: newId });
+  } catch (e) {}
+  localStorage.setItem(PERSISTENT_ID_KEY, newId);
+  return newId;
 }
 
 /**
@@ -376,13 +385,26 @@ export async function generateDeviceName(): Promise<string> {
     const browser = info.browser || 'Browser';
     const os = info.os || info.platform || 'Unknown OS';
     return `${browser} on ${os}`;
-  } else if (deviceType === 'android') {
-    const model = info.deviceModel || 'Android Device';
-    return model;
-  } else if (deviceType === 'ios') {
-    const model = info.deviceModel || 'iOS Device';
-    return model;
+  } else {
+    // Clean up mobile names (avoid messy UserAgent strings in titles)
+    let model = info.deviceModel || '';
+    let manufacturer = info.manufacturer || '';
+
+    // Sanitize manufacturer: if it's bogus or generic, clear it
+    if (manufacturer.includes('Mozilla') || manufacturer.includes('Google Inc') || manufacturer.toLowerCase().includes('unknown')) {
+       manufacturer = '';
+    }
+
+    // Sanitize model: if it's too long or looks like a UA string, clear it
+    if (model.includes('Mozilla') || model.length > 25 || model.toLowerCase().includes('unknown')) {
+       model = '';
+    }
+
+    // Build friendly name
+    if (model && manufacturer) return `${manufacturer} ${model}`;
+    if (model) return model;
+    if (manufacturer) return `${manufacturer} ${deviceType === 'android' ? 'Android' : 'iOS'}`;
+    
+    return deviceType === 'android' ? 'Android Device' : 'iOS Device';
   }
-  
-  return 'Unknown Device';
 }
