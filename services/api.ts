@@ -831,6 +831,94 @@ export const api = {
   },
 
   /**
+   * Manually trigger missed check-outs for office staff.
+   * Identifies users with office roles who checked in today but have no check-out.
+   * Records a check-out at 19:00 (7 PM), logs it, and notifies appropriate users.
+   */
+  async triggerMissedCheckouts(): Promise<{ count: number }> {
+    const today = new Date();
+    const start = startOfDay(today).toISOString();
+    const end = endOfDay(today).toISOString();
+
+    // 1. Fetch all office staff
+    const officeRoles = ['admin', 'hr', 'finance', 'developer'];
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, name, role_id, reporting_manager_id')
+      .in('role_id', officeRoles);
+
+    if (userError) throw userError;
+    if (!userData) return { count: 0 };
+
+    const users = userData.map(u => toCamelCase({ ...u, role: u.role_id }));
+    let triggeredCount = 0;
+
+    for (const user of users) {
+      if (!user.id) continue;
+
+      // 2. Get latest attendance event for the day
+      const { data: events, error: eventError } = await supabase
+        .from('attendance_events')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('timestamp', start)
+        .lte('timestamp', end)
+        .order('timestamp', { ascending: false })
+        .limit(1);
+
+      if (eventError) continue;
+
+      const lastEvent = events?.[0];
+      // If the user has a check-in/break event but NO check-out yet today
+      if (lastEvent && lastEvent.type !== 'check-out') {
+        const checkoutTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 19, 0, 0).toISOString();
+        
+        // 3. Record the missed check-out
+        const { error: checkoutError } = await supabase.from('attendance_events').insert({
+          user_id: user.id,
+          timestamp: checkoutTime,
+          type: 'check-out',
+          reason: 'missed check out',
+          is_manual: true
+        });
+
+        if (checkoutError) continue;
+        triggeredCount++;
+
+        // 4. Log the action
+        const { data: sessionData } = await supabase.auth.getSession();
+        const performedBy = sessionData.session?.user?.id;
+        
+        await supabase.from('attendance_audit_logs').insert({
+          action: 'MANUAL_MISSED_CHECKOUT',
+          performed_by: performedBy,
+          target_user_id: user.id,
+          details: { message: 'Automatically triggered missed check-out at 19:00 due to staff failure to check out' }
+        });
+
+        // 5. Notify the staff member
+        await this.createNotification({
+          userId: user.id,
+          message: `Notice: A missed check-out has been automatically recorded for you at 7:00 PM today.`,
+          type: 'warning'
+        });
+
+        // 6. Notify the reporting manager
+        if (user.reportingManagerId) {
+          await this.createNotification({
+            userId: user.reportingManagerId,
+            message: `Automatic missed check-out triggered for ${user.name}.`,
+            type: 'info',
+            linkTo: '/hr/attendance'
+          });
+        }
+      }
+    }
+
+    return { count: triggeredCount };
+  },
+
+  /**
    * Retrieve all geofenced locations.  Returns an array of Location
    * objects with camelCased keys.
    */

@@ -27,6 +27,7 @@ const AttendanceSettings: React.FC = () => {
     const [newHolidayDate, setNewHolidayDate] = useState('');
     const [newRecurringN, setNewRecurringN] = useState(3);
     const [newRecurringDay, setNewRecurringDay] = useState('Saturday');
+    const [isTriggering, setIsTriggering] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
     useEffect(() => {
@@ -71,6 +72,26 @@ const AttendanceSettings: React.FC = () => {
                 [setting]: value
             }
         }));
+    };
+
+    const handleTriggerMissedCheckouts = async () => {
+        if (!window.confirm('This will record a manual check-out at 7:00 PM for all office staff who haven\'t checked out today. Continue?')) {
+            return;
+        }
+
+        setIsTriggering(true);
+        try {
+            const result = await api.triggerMissedCheckouts();
+            setToast({ 
+                message: `Successfully triggered missed check-outs for ${result.count} office staff.`, 
+                type: 'success' 
+            });
+        } catch (error) {
+            console.error('Failed to trigger missed check-outs:', error);
+            setToast({ message: 'Failed to trigger missed check-outs. Please try again.', type: 'error' });
+        } finally {
+            setIsTriggering(false);
+        }
     };
 
     const handleSave = async () => {
@@ -235,6 +256,24 @@ const AttendanceSettings: React.FC = () => {
                                 onChange={(e) => handleSettingChange('enableHoursBasedCalculation', e.target.checked)}
                             />
                         </div>
+
+                        {activeTab === 'office' && (
+                            <div className="mt-6 pt-6 border-t border-border/50">
+                                <h4 className="text-sm font-semibold text-primary-text mb-2">Automated Actions</h4>
+                                <p className="text-xs text-muted mb-4">
+                                    Use the button below to manually handle staff who missed their 7 PM check-out. 
+                                    This will notify both the employee and their manager.
+                                </p>
+                                <Button 
+                                    variant="outline" 
+                                    onClick={handleTriggerMissedCheckouts} 
+                                    isLoading={isTriggering}
+                                    className="border-red-500/30 hover:bg-red-500/10 text-red-400"
+                                >
+                                    <Clock className="mr-2 h-4 w-4" /> Trigger Missed Check-outs
+                                </Button>
+                            </div>
+                        )}
                     </section>
                     )}
 

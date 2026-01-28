@@ -1073,6 +1073,7 @@ export type NotificationType =
   | 'provisional_site_reminder'
   | 'security'
   | 'info'
+  | 'warning'
   | 'greeting';
 
 export interface Notification {
