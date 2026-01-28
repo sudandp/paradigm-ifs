@@ -72,11 +72,15 @@ const AddressDetails = () => {
     }, [watch, updateAddress]);
 
     useEffect(() => {
-        if (sameAsPresent) {
+        if (sameAsPresent && presentAddress) {
             setValue('permanent', presentAddress);
+            // Also copy verified status
+            if (data.address.present.verifiedStatus) {
+                setAddressVerifiedStatus('permanent', data.address.present.verifiedStatus);
+            }
             trigger('permanent'); // re-validate to remove any errors
         }
-    }, [sameAsPresent, presentAddress, setValue, trigger]);
+    }, [sameAsPresent, presentAddress, setValue, trigger, data.address.present.verifiedStatus, setAddressVerifiedStatus]);
     
     const handleManualInput = (type: 'present' | 'permanent', field: keyof NonNullable<Address['verifiedStatus']>) => {
         setAddressVerifiedStatus(type, { [field]: false });
@@ -93,6 +97,25 @@ const AddressDetails = () => {
                 setValue('present.city', details.city, { shouldValidate: true });
                 setValue('present.state', details.state, { shouldValidate: true });
                 setAddressVerifiedStatus('present', { city: true, state: true, pincode: true });
+            } catch (error) {
+                setPincodeError('Invalid Pincode. Please check and try again.');
+            } finally {
+                setIsPincodeLoading(false);
+            }
+        }
+    };
+
+    const handlePermanentPincodeBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
+        const pincode = e.target.value;
+        handleManualInput('permanent', 'pincode');
+        if (addressSettings.enablePincodeVerification && /^[1-9][0-9]{5}$/.test(pincode)) {
+            setIsPincodeLoading(true);
+            setPincodeError('');
+            try {
+                const details = await api.getPincodeDetails(pincode);
+                setValue('permanent.city', details.city, { shouldValidate: true });
+                setValue('permanent.state', details.state, { shouldValidate: true });
+                setAddressVerifiedStatus('permanent', { city: true, state: true, pincode: true });
             } catch (error) {
                 setPincodeError('Invalid Pincode. Please check and try again.');
             } finally {
@@ -177,7 +200,8 @@ const AddressDetails = () => {
                                 isVerified={!!data.address.permanent.verifiedStatus?.pincode} 
                                 hasValue={!!permanentAddress?.pincode}
                                 onManualInput={() => handleManualInput('permanent', 'pincode')}
-                                error={errors.permanent?.pincode?.message} registration={register('permanent.pincode')} />
+                                error={errors.permanent?.pincode?.message} registration={register('permanent.pincode')} 
+                                onBlur={handlePermanentPincodeBlur} />
                             <VerifiedInput label="City" id="permanent.city" 
                                 isVerified={!!data.address.permanent.verifiedStatus?.city} 
                                 hasValue={!!permanentAddress?.city}
