@@ -73,6 +73,10 @@ const getValidationSchema = (rules: { documents: DocumentRules }) => {
         bankProof: yup.mixed<UploadedFile | null>().nonNullable("Bank proof document is required."),
         uanProof: yup.mixed<UploadedFile | null>().nonNullable("UAN proof document is required."),
 
+        panCard: rules.documents.pan
+            ? yup.mixed<UploadedFile | null>().nonNullable("PAN card is required.")
+            : yup.mixed<UploadedFile | null>().optional().nullable(),
+
         salarySlip: rules.documents.salarySlip
             ? yup.mixed<UploadedFile | null>().nonNullable("Salary slip is required.")
             : yup.mixed<UploadedFile | null>().optional().nullable(),
@@ -91,6 +95,7 @@ type PreUploadFormData = {
     idProofFront: UploadedFile | null;
     idProofBack: UploadedFile | null;
     bankProof: UploadedFile | null;
+    panCard: UploadedFile | null;
     salarySlip: UploadedFile | null;
     uanProof: UploadedFile | null;
     family: { id: string; relation: FamilyMember['relation']; idProof: UploadedFile | null; phone: string; }[];
@@ -140,7 +145,7 @@ const PreUpload = () => {
 
     const { control, handleSubmit, formState: { errors }, getValues, watch } = useForm<PreUploadFormData>({
         resolver: yupResolver(validationSchema) as Resolver<PreUploadFormData>,
-        defaultValues: { aadhaarLinkedMobile: '', alternateMobile: '', photo: null, idProofType: 'Aadhaar', idProofFront: null, idProofBack: null, bankProof: null, salarySlip: null, uanProof: null, family: [], education: [] },
+        defaultValues: { aadhaarLinkedMobile: '', alternateMobile: '', photo: null, idProofType: 'Aadhaar', idProofFront: null, idProofBack: null, bankProof: null, panCard: null, salarySlip: null, uanProof: null, family: [], education: [] },
     });
 
     const { fields: familyFields, append: appendFamily, remove: removeFamily } = useFieldArray({ control, name: "family" });
@@ -167,17 +172,27 @@ const PreUpload = () => {
 
             // File Conversions
             const filePromises = [
-                formData.idProofFront ? fileToBase64(formData.idProofFront.file) : Promise.resolve(null),
-                (formData.idProofType === 'Aadhaar' || formData.idProofType === 'Voter ID') && formData.idProofBack ? fileToBase64(formData.idProofBack.file) : Promise.resolve(null),
-                formData.bankProof ? fileToBase64(formData.bankProof.file) : Promise.resolve(null),
-                formData.salarySlip ? fileToBase64(formData.salarySlip.file) : Promise.resolve(null),
-                formData.uanProof ? fileToBase64(formData.uanProof.file) : Promise.resolve(null),
-                ...formData.family.map((f) => f.idProof ? fileToBase64(f.idProof.file) : Promise.resolve(null)),
-                ...formData.education.map((e) => e.document ? fileToBase64(e.document.file) : Promise.resolve(null))
+                formData.idProofFront ? fileToBase64(formData.idProofFront.file!) : Promise.resolve(null),
+                (formData.idProofType === 'Aadhaar' || formData.idProofType === 'Voter ID') && formData.idProofBack ? fileToBase64(formData.idProofBack.file!) : Promise.resolve(null),
+                formData.bankProof ? fileToBase64(formData.bankProof.file!) : Promise.resolve(null),
+                formData.panCard ? fileToBase64(formData.panCard.file!) : Promise.resolve(null),
+                formData.salarySlip ? fileToBase64(formData.salarySlip.file!) : Promise.resolve(null),
+                formData.uanProof ? fileToBase64(formData.uanProof.file!) : Promise.resolve(null),
+                ...formData.family.map((f) => f.idProof ? fileToBase64(f.idProof.file!) : Promise.resolve(null)),
+                ...formData.education.map((e) => e.document ? fileToBase64(e.document.file!) : Promise.resolve(null))
             ];
-            const [idFrontFileData, idBackFileData, bankFileData, salaryFileData, uanFileData, ...otherFilesData] = await Promise.all(filePromises);
+            const [idFrontFileData, idBackFileData, bankFileData, panFileData, salaryFileData, uanFileData, ...otherFilesData] = await Promise.all(filePromises);
             const familyFilesData = otherFilesData.slice(0, formData.family.length);
             const educationFilesData = otherFilesData.slice(formData.family.length);
+
+            const panSchema = {
+                type: Type.OBJECT,
+                properties: {
+                    name: { type: Type.STRING, description: "Full name as shown on the PAN card." },
+                    panNumber: { type: Type.STRING, description: "The 10-character PAN number." },
+                    dob: { type: Type.STRING, description: "Date of birth in YYYY-MM-DD format." }
+                }
+            };
 
             // OCR Extraction Logic
             const extract = async (fileData: { base64: string, type: string } | null, schema: any, docType: string) => {
@@ -190,10 +205,11 @@ const PreUpload = () => {
                 return {};
             };
 
-            const [idFrontData, idBackData, bankData, salaryData, uanData, ...ocrResults] = await Promise.all([
+            const [idFrontData, idBackData, bankData, panData, salaryData, uanData, ...ocrResults] = await Promise.all([
                 extract(idFrontFileData, idFrontSchema, formData.idProofType as string),
                 (formData.idProofType === 'Aadhaar') ? extract(idBackFileData, addressSchema, 'Aadhaar') : Promise.resolve({}),
                 extract(bankFileData, bankProofSchema, 'Bank'),
+                extract(panFileData, panSchema, 'PAN'),
                 extract(salaryFileData, salarySlipSchema, 'Salary'),
                 extract(uanFileData, uanProofSchema, 'UAN'),
                 ...familyFilesData.map(fData => extract(fData, familyAadhaarSchema, 'Aadhaar')),
@@ -203,6 +219,12 @@ const PreUpload = () => {
             const familyOcrData = ocrResults.slice(0, familyFilesData.length);
             const educationOcrData = ocrResults.slice(familyFilesData.length);
             const idData = { ...idFrontData, ...idBackData };
+            // Merge PAN data if available
+            if (panData.panNumber) {
+                idData.panNumber = panData.panNumber.replace(/\s/g, '');
+                if (!idData.name) idData.name = panData.name;
+                if (!idData.dob) idData.dob = panData.dob;
+            }
 
             // Verification
             const nameOnId = idData.name || '';
@@ -418,7 +440,7 @@ const PreUpload = () => {
                             </div>
                         </div>
 
-                        <div className="border border-border rounded-lg p-4 bg-muted/10">
+                        <div className="border border-border rounded-lg p-4 bg-white">
                             <div className="flex items-center justify-between mb-4">
                                 <h4 className="text-sm font-semibold text-primary-text">Aadhaar Verification</h4>
                                 <div className="flex items-center gap-2">
@@ -452,6 +474,10 @@ const PreUpload = () => {
                             <Controller name="bankProof" control={control} render={({ field }) => <UploadDocument label="Bank Proof (Passbook/Cancelled Cheque)" file={field.value} onFileChange={field.onChange} error={errors.bankProof?.message as string} allowCapture verificationStatus={store.data.bank.verifiedStatus?.accountNumber} />} />
                             <Controller name="uanProof" control={control} render={({ field }) => <UploadDocument label="UAN Proof Document" file={field.value} onFileChange={field.onChange} error={errors.uanProof?.message as string} allowCapture verificationStatus={store.data.uan.verifiedStatus?.uanNumber} />} />
                         </div>
+
+                        {currentRules.documents.pan && (
+                            <Controller name="panCard" control={control} render={({ field }) => <UploadDocument label="PAN Card" file={field.value} onFileChange={field.onChange} error={errors.panCard?.message as string} allowCapture />} />
+                        )}
 
                         {currentRules.documents.salarySlip && <Controller name="salarySlip" control={control} render={({ field }) => <UploadDocument label={`Latest Salary Slip`} file={field.value} onFileChange={field.onChange} error={errors.salarySlip?.message as string} allowCapture />} />}
 

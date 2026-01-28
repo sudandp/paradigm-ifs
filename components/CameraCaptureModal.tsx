@@ -12,6 +12,7 @@ interface CameraCaptureModalProps {
   onClose: () => void;
   onCapture: (base64Image: string, mimeType: string) => void;
   captureGuidance?: 'document' | 'profile' | 'none';
+  autoConfirm?: boolean;
 }
 
 const createImage = (url: string): Promise<HTMLImageElement> =>
@@ -47,7 +48,7 @@ async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<string>
   return canvas.toDataURL('image/jpeg', 0.9);
 }
 
-const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({ isOpen, onClose, onCapture, captureGuidance = 'none' }) => {
+const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({ isOpen, onClose, onCapture, captureGuidance = 'none', autoConfirm = false }) => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -58,33 +59,82 @@ const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({ isOpen, onClose
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [croppedImage, setCroppedImage] = useState<string | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const captureInProgress = React.useRef(false);
 
   const handleCapture = async () => {
+    if (captureInProgress.current) return;
+    captureInProgress.current = true;
+
     try {
       setError(null);
-      // Use Capacitor's Camera plugin - this will request permission if needed
-      // and show the native Android permission dialog automatically
+      setIsProcessing(true);
+      setIsCameraActive(true);
+      setProcessingMessage('Opening camera...');
+      
+      // Check camera permissions first
+      const permissions = await Camera.checkPermissions();
+      
+      if (permissions.camera === 'denied') {
+        // Request permission
+        const requestResult = await Camera.requestPermissions({ permissions: ['camera'] });
+        
+        if (requestResult.camera === 'denied') {
+          setError('Camera permission denied. Please grant camera access in your device Settings to capture documents.');
+          setIsProcessing(false);
+          return;
+        }
+      }
+
+      // Use Capacitor's Camera plugin to capture photo
       const image = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
         resultType: CameraResultType.Base64,
         source: CameraSource.Camera,
+        saveToGallery: false,
+        promptLabelHeader: captureGuidance === 'profile' ? 'Capture Profile Photo' : 'Capture Document',
+        promptLabelPhoto: 'From Gallery',
+        promptLabelPicture: 'Take Photo',
       });
 
       if (image.base64String) {
         const dataUrl = `data:image/jpeg;base64,${image.base64String}`;
+        
+        if (autoConfirm) {
+           onCapture(image.base64String, 'image/jpeg');
+           onClose();
+           return;
+        }
+        
         setCapturedImage(dataUrl);
       }
     } catch (err: any) {
-      console.error('Camera capture failed:', err);
-      if (err.message && err.message.includes('permission')) {
-        setError('Camera permission denied. Please grant camera access in Settings.');
-      } else if (err.message && err.message.includes('cancelled')) {
-        // User cancelled, just close
+      const errorMessage = err?.message || '';
+      const isCancellation = 
+        errorMessage.toLowerCase().includes('cancelled') || 
+        errorMessage.toLowerCase().includes('canceled') || 
+        errorMessage.toLowerCase().includes('cancelled photos app');
+
+      if (isCancellation) {
         onClose();
-      } else {
-        setError('Failed to capture photo. Please try again.');
+        return;
       }
+
+      console.error('Camera capture failed:', err);
+      
+      if (errorMessage.toLowerCase().includes('permission')) {
+        setError('📸 Camera permission is required. Please enable camera access in your device Settings.');
+      } else {
+        setError('❌ Failed to capture photo. Please ensure your camera is working and try again.');
+      }
+    } finally {
+      setIsCameraActive(false);
+      // Small delay to allow native/PWA UI to finish closing animation
+      setTimeout(() => {
+        setIsProcessing(false);
+        captureInProgress.current = false;
+      }, 300);
     }
   };
 
@@ -169,18 +219,26 @@ const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({ isOpen, onClose
         </div>
       )}
 
-      <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent z-30 flex justify-between items-center">
+      <div className={`absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent z-30 flex justify-between items-center transition-opacity duration-300 ${isCameraActive ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <Button variant="icon" className="!text-white hover:!bg-white/20 !p-2" onClick={handleClose}>
           <ArrowLeft className="h-6 w-6" />
         </Button>
         <h3 className="text-lg font-bold flex-1 text-center">
-          {showCropper ? 'Crop Photo' : capturedImage ? 'Preview' : 'Capture Photo'}
+          {showCropper ? 'Crop Photo' : (capturedImage && !isProcessing) ? 'Preview' : 'Capture Photo'}
         </h3>
         <div className="w-10"></div>
       </div>
 
       <div className="flex-grow relative flex items-center justify-center overflow-hidden bg-black">
-        {error && !capturedImage && (
+        {isCameraActive && (
+          <div className="flex flex-col items-center text-white z-20">
+            <Loader2 className="h-12 w-12 animate-spin mb-4 text-accent" />
+            <p className="text-lg font-medium">Camera Active</p>
+            <p className="text-sm text-white/60 mt-2">Finish capture in the window above</p>
+          </div>
+        )}
+
+        {error && !capturedImage && !isCameraActive && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-4 text-center bg-black/50 z-10">
             <p className="mb-4">{error}</p>
             <Button onClick={handleCapture} className="!rounded-full !px-6">
@@ -192,7 +250,14 @@ const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({ isOpen, onClose
         {!capturedImage && !error && (
           <div className="flex flex-col items-center text-white">
             <Loader2 className="h-12 w-12 animate-spin mb-4" />
-            <p>Opening camera...</p>
+            <p className="text-lg font-medium">Opening camera...</p>
+            <p className="text-sm text-white/60 mt-2 text-center px-4">
+              {captureGuidance === 'profile' 
+                ? 'Position your face in the center of the frame'
+                : captureGuidance === 'document'
+                ? 'Ensure the entire document is visible and well-lit'
+                : 'Preparing camera...'}
+            </p>
           </div>
         )}
 
@@ -221,11 +286,11 @@ const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({ isOpen, onClose
             />
           </div>
         ) : (
-          displayImage && <img src={displayImage} alt="Preview" className="w-full h-full object-contain" />
+          displayImage && !isProcessing && <img src={displayImage} alt="Preview" className="w-full h-full object-contain" />
         )}
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent z-30">
+      <div className={`absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent z-30 transition-opacity duration-300 ${isCameraActive ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         {error && !capturedImage && <div className="mb-2 p-3 bg-red-500/30 text-white text-sm rounded-lg text-center">{error}</div>}
 
         {showCropper && (

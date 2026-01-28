@@ -10,6 +10,11 @@ if (!rootElement) {
 }
 
 import { SpeedInsights } from "@vercel/speed-insights/react";
+import { defineCustomElements } from '@ionic/pwa-elements/loader';
+
+// Initialize PWA elements for camera support in web browser
+defineCustomElements(window);
+
 
 const root = ReactDOM.createRoot(rootElement);
 root.render(

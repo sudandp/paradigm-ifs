@@ -15,15 +15,18 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({ file, onFileChange }
   const [error, setError] = useState('');
   const [isCameraOpen, setIsCameraOpen] = useState(false);
 
-  const handleFileSelect = useCallback(async (selectedFile: File) => {
+  const handleFileSelect = useCallback(async (selectedFile: File, base64FromCapture?: string) => {
     if (selectedFile && selectedFile.type.startsWith('image/')) {
       setError('');
+
+      // Use captured base64 if available, otherwise create object URL
+      const preview = base64FromCapture ? `data:${selectedFile.type};base64,${base64FromCapture}` : URL.createObjectURL(selectedFile);
 
       const fileData: UploadedFile = {
         name: selectedFile.name,
         type: selectedFile.type,
         size: selectedFile.size,
-        preview: URL.createObjectURL(selectedFile),
+        preview,
         file: selectedFile,
       };
       onFileChange(fileData);
@@ -38,13 +41,24 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({ file, onFileChange }
   };
 
   const handleCapture = useCallback(async (base64Image: string, mimeType: string) => {
-    const blob = await (await fetch(`data:${mimeType};base64,${base64Image}`)).blob();
-    const capturedFile = new File([blob], `capture-${Date.now()}.jpg`, { type: mimeType });
-    handleFileSelect(capturedFile);
+    try {
+      const byteString = atob(base64Image);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([ab], { type: mimeType });
+      const capturedFile = new File([blob], `capture-${Date.now()}.jpg`, { type: mimeType });
+      handleFileSelect(capturedFile, base64Image);
+    } catch (err) {
+      console.error("Error processing captured avatar:", err);
+      setError("Failed to process captured photo.");
+    }
   }, [handleFileSelect]);
 
   const handleRemove = () => {
-    if (file) {
+    if (file && !file.preview.startsWith('data:')) {
       URL.revokeObjectURL(file.preview);
     }
     onFileChange(null);
@@ -56,15 +70,19 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({ file, onFileChange }
   return (
     <div className="flex flex-col items-center space-y-2">
       {isCameraOpen && <CameraCaptureModal isOpen={isCameraOpen} onClose={() => setIsCameraOpen(false)} onCapture={handleCapture} captureGuidance="profile" />}
-      <div className="relative w-40 h-40">
-        <div className={`w-full h-full rounded-full bg-page flex items-center justify-center overflow-hidden border-2 transition-colors ${error ? 'border-red-500' : 'border-border'}`}>
+      <div className="relative w-40 h-40 group">
+        <div className={`
+          w-full h-full rounded-full bg-page flex items-center justify-center overflow-hidden 
+          border-2 transition-all duration-300 ring-4 ring-white shadow-2xl
+          ${error ? 'border-red-500' : 'border-accent/20 group-hover:border-accent/40'}
+        `}>
           {isLoading ? (
             <div className="flex flex-col items-center text-muted">
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <span className="text-xs mt-2">Processing...</span>
+              <Loader2 className="h-10 w-10 animate-spin text-accent" />
+              <span className="text-xs mt-2 font-medium">Processing...</span>
             </div>
           ) : file?.preview ? (
-            <img src={file.preview} alt="Profile preview" className="w-full h-full object-cover" />
+            <img src={file.preview} alt="Profile preview" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
           ) : (
             <ProfilePlaceholder />
           )}
@@ -74,7 +92,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({ file, onFileChange }
             type="button"
             onClick={handleRemove}
             id="avatar-delete-button"
-            className="avatar-delete-btn btn-icon absolute top-2 right-2 p-1.5 rounded-full transition-colors !bg-white/90 !text-red-600 hover:!bg-red-100"
+            className="avatar-delete-btn btn-icon absolute -top-1 -right-1 p-2 rounded-full transition-all !bg-white !text-red-600 shadow-lg hover:!bg-red-50 hover:scale-110 z-10"
             aria-label="Remove photo"
           >
             <Trash2 className="w-4 h-4" />

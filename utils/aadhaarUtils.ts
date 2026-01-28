@@ -200,6 +200,57 @@ export const decodeSecureQR = async (numericText: string): Promise<AadhaarData |
 
 export const parseAadhaarSecureText = (secureText: string): AadhaarData | null => {
     try {
+        // SD-JWT Handling
+        if (secureText.startsWith('eyJ')) {
+            const jwtParts = secureText.split('.');
+            if (jwtParts.length >= 2) {
+                const payloadBase64 = jwtParts[1].replace(/-/g, '+').replace(/_/g, '/');
+                const payload = JSON.parse(atob(payloadBase64));
+                
+                const disclosures = secureText.split('~').slice(1);
+                const data: any = {
+                    aadhaarNumber: 'QR-VERIFIED',
+                    address: { line1: '', city: '', state: '', pincode: '' }
+                };
+
+                // If payload.id is 12 digits, use it as a starting point
+                if (payload.id && /^\d{12}$/.test(payload.id)) {
+                    data.aadhaarNumber = payload.id;
+                }
+                
+                disclosures.forEach(d => {
+                    try {
+                        const base64 = d.trim().replace(/-/g, '+').replace(/_/g, '/');
+                        const decoded = JSON.parse(atob(base64));
+                        if (Array.isArray(decoded) && decoded.length >= 3) {
+                            const key = decoded[1];
+                            const val = decoded[2];
+                            
+                            // Aggressive search: if value is 12 digits, it's likely the Aadhaar number
+                            if (/^\d{12}$/.test(String(val))) {
+                                data.aadhaarNumber = String(val);
+                            }
+
+                            if (key === 'ResidentName' || key === 'Name') data.name = val;
+                            if (key === 'Dob' || key === 'DOB') data.dob = formatDobToISO(val);
+                            if (key === 'Gender') data.gender = formatGender(val);
+                            if (key === 'Address') {
+                                data.address.line1 = val;
+                                const pcMatch = val.match(/\d{6}$/);
+                                if (pcMatch) data.address.pincode = pcMatch[0];
+                            }
+                            if (key === 'Mobile') data.mobile = val;
+                            if (key === 'Email') data.email = val;
+                            if (key === 'ResidentImage' || key === 'Photo') data.photo = `data:image/jpeg;base64,${val}`;
+                        }
+                    } catch (e) {}
+                });
+                
+                if (data.name) return data as AadhaarData;
+            }
+        }
+// ... (rest of function unchanged, but ensure regex fallback in parseAadhaarZip picks up the 12 digits)
+
         const parts = secureText.split('~');
         if (parts.length < 5) return null;
 
@@ -298,18 +349,43 @@ export const parseAadhaarZip = async (file: File): Promise<AadhaarData | null> =
     try {
         const contents = await zip.loadAsync(file);
         let foundText = '';
+        let allZipText = '';
+        
         for (const filename of Object.keys(contents.files)) {
             if (!contents.files[filename].dir) {
-                const textProps = await contents.files[filename].async('string');
-                if (textProps.includes('<?xml') || textProps.includes('~') || textProps.includes('ResidentName')) {
-                    foundText = textProps;
-                    break;
+                const text = await contents.files[filename].async('string');
+                allZipText += ' ' + text;
+                if (!foundText && (text.includes('<?xml') || text.includes('~') || text.includes('ResidentName'))) {
+                    foundText = text;
                 }
             }
         }
-        if (!foundText) return null;
-        if (foundText.includes('~')) return parseAadhaarSecureText(foundText);
-        if (foundText.includes('<?xml')) return parseAadhaarQR(foundText);
+
+        if (!foundText && !allZipText) return null;
+        
+        let data: AadhaarData | null = null;
+        if (foundText) {
+            if (foundText.includes('~')) data = parseAadhaarSecureText(foundText);
+            else if (foundText.includes('<?xml')) data = parseAadhaarQR(foundText);
+        }
+
+        // Fallback: search for 12 digits in ALL text from the zip
+        if (!data || !data.aadhaarNumber || !/^\d{12}$/.test(data.aadhaarNumber)) {
+            const match = allZipText.match(/\d{12}/);
+            if (match) {
+                if (!data) {
+                    data = {
+                        name: '', dob: '', gender: '',
+                        address: { line1: '', city: '', state: '', pincode: '' },
+                        aadhaarNumber: match[0]
+                    };
+                } else {
+                    data.aadhaarNumber = match[0];
+                }
+            }
+        }
+        
+        return data;
     } catch (err) {
         console.error('Zip Error:', err);
     }
