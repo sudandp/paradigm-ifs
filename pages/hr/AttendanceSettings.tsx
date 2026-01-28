@@ -11,7 +11,7 @@ import DatePicker from '../../components/ui/DatePicker';
 import Toast from '../../components/ui/Toast';
 import Checkbox from '../../components/ui/Checkbox';
 import Select from '../../components/ui/Select';
-import type { StaffAttendanceRules, AttendanceSettings, RecurringHolidayRule } from '../../types';
+import type { StaffAttendanceRules, AttendanceSettings, RecurringHolidayRule, Role } from '../../types';
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import { api } from '../../services/api';
 
@@ -22,13 +22,30 @@ const AttendanceSettings: React.FC = () => {
     const [isDirty, setIsDirty] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    const [activeTab, setActiveTab] = useState<'office' | 'field' | 'site'>('office');
+    const [activeTab, setActiveTab] = useState<'office' | 'field' | 'site' | 'selections'>('office');
     const [newHolidayName, setNewHolidayName] = useState('');
     const [newHolidayDate, setNewHolidayDate] = useState('');
     const [newRecurringN, setNewRecurringN] = useState(3);
     const [newRecurringDay, setNewRecurringDay] = useState('Saturday');
     const [isTriggering, setIsTriggering] = useState(false);
+    const [allRoles, setAllRoles] = useState<Role[]>([]);
+    const [isLoadingRoles, setIsLoadingRoles] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+    useEffect(() => {
+        const fetchRoles = async () => {
+            setIsLoadingRoles(true);
+            try {
+                const roles = await api.getAppRoles();
+                setAllRoles(roles);
+            } catch (error) {
+                console.error('Failed to fetch roles:', error);
+            } finally {
+                setIsLoadingRoles(false);
+            }
+        };
+        fetchRoles();
+    }, []);
 
     useEffect(() => {
         setLocalAttendance(attendance);
@@ -41,18 +58,18 @@ const AttendanceSettings: React.FC = () => {
     // Load geofencing settings
     // No extra loading here, it's part of attendance settings
 
-    const currentRules = localAttendance[activeTab];
+    const currentRules = activeTab === 'selections' ? localAttendance.office : localAttendance[activeTab as 'office' | 'field' | 'site'];
     const currentHolidays = activeTab === 'office' ? officeHolidays : activeTab === 'field' ? fieldHolidays : siteHolidays;
 
     const handleAddHoliday = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (newHolidayName && newHolidayDate) {
+        if (newHolidayName && newHolidayDate && activeTab !== 'selections') {
             if (currentHolidays.some(h => h.date === newHolidayDate)) {
                 setToast({ message: 'A holiday for this date already exists.', type: 'error' });
                 return;
             }
             try {
-                await addHoliday(activeTab, { name: newHolidayName, date: newHolidayDate });
+                await addHoliday(activeTab as 'office' | 'field' | 'site', { name: newHolidayName, date: newHolidayDate });
                 setNewHolidayName('');
                 setNewHolidayDate('');
                 setToast({ message: 'Holiday added successfully.', type: 'success' });
@@ -64,18 +81,30 @@ const AttendanceSettings: React.FC = () => {
         }
     };
 
+    const handleRemoveHoliday = async (id: string) => {
+        if (activeTab !== 'selections') {
+            try {
+                await removeHoliday(activeTab as 'office' | 'field' | 'site', id);
+                setToast({ message: 'Holiday removed successfully.', type: 'success' });
+            } catch (error) {
+                setToast({ message: 'Failed to remove holiday.', type: 'error' });
+            }
+        }
+    };
+
     const handleSettingChange = (setting: keyof StaffAttendanceRules, value: any) => {
+        if (activeTab === 'selections') return;
         setLocalAttendance(prev => ({
             ...prev,
             [activeTab]: {
-                ...prev[activeTab],
+                ...prev[activeTab as 'office' | 'field' | 'site'],
                 [setting]: value
             }
         }));
     };
 
     const handleTriggerMissedCheckouts = async () => {
-        if (!window.confirm('This will record a manual check-out at 7:00 PM for all office staff who haven\'t checked out today. Continue?')) {
+        if (!window.confirm('This will record a manual check-out at 7:00 PM for all configured staff who haven\'t checked out today. Continue?')) {
             return;
         }
 
@@ -131,15 +160,21 @@ const AttendanceSettings: React.FC = () => {
                     <button onClick={() => setActiveTab('site')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'site' ? 'border-accent text-accent-dark' : 'border-transparent text-muted hover:text-accent-dark hover:border-accent'}`}>
                         Site Staff
                     </button>
+                    <button onClick={() => setActiveTab('selections')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'selections' ? 'border-accent text-accent-dark' : 'border-transparent text-muted hover:text-accent-dark hover:border-accent'}`}>
+                        Staff Selections
+                    </button>
                 </nav>
             </div>
 
             {activeTab === 'office' && <p className="text-sm text-muted -mt-4 mb-4">These rules apply to Admin, HR, and Finance roles.</p>}
-            {activeTab === 'field' && <p className="text-sm text-muted -mt-4 mb-4">These rules apply to Field Staff roies.</p>}
+            {activeTab === 'field' && <p className="text-sm text-muted -mt-4 mb-4">These rules apply to Field Staff roles.</p>}
             {activeTab === 'site' && <p className="text-sm text-muted -mt-4 mb-4">These rules apply to Site Staff (e.g. Site Managers, Security Guards).</p>}
+            {activeTab === 'selections' && <p className="text-sm text-muted -mt-4 mb-4">Select staff groups to include in automated actions like missed check-out triggers.</p>}
 
 
             <div className="space-y-6">
+                {activeTab !== 'selections' && (
+                <>
                 <section>
                     <h3 className="text-lg font-semibold text-primary-text mb-4 flex items-center"><Clock className="mr-2 h-5 w-5 text-muted" />Work Hours</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -241,39 +276,6 @@ const AttendanceSettings: React.FC = () => {
                                 onChange={(e) => handleSettingChange('dailyWorkingHours', { ...currentRules.dailyWorkingHours, max: parseFloat(e.target.value) || 9 })}
                             />
                         </div>
-                        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                            <p className="text-sm text-blue-400">
-                                <strong>Monthly Target:</strong> Automatically calculated based on days employee checks in. 
-                                Example: 20 check-in days × 8 hours = 160 hours target
-                            </p>
-                        </div>
-                        <div className="mt-4">
-                            <Checkbox
-                                id="enableHoursBasedCalculation"
-                                label="Enable Hours-Based Calculation"
-                                description="Calculate attendance based on hours worked instead of check-in/check-out"
-                                checked={currentRules.enableHoursBasedCalculation || false}
-                                onChange={(e) => handleSettingChange('enableHoursBasedCalculation', e.target.checked)}
-                            />
-                        </div>
-
-                        {activeTab === 'office' && (
-                            <div className="mt-6 pt-6 border-t border-border/50">
-                                <h4 className="text-sm font-semibold text-primary-text mb-2">Automated Actions</h4>
-                                <p className="text-xs text-muted mb-4">
-                                    Use the button below to manually handle staff who missed their 7 PM check-out. 
-                                    This will notify both the employee and their manager.
-                                </p>
-                                <Button 
-                                    variant="outline" 
-                                    onClick={handleTriggerMissedCheckouts} 
-                                    isLoading={isTriggering}
-                                    className="border-red-500/30 hover:bg-red-500/10 text-red-400"
-                                >
-                                    <Clock className="mr-2 h-4 w-4" /> Trigger Missed Check-outs
-                                </Button>
-                            </div>
-                        )}
                     </section>
                     )}
 
@@ -515,7 +517,7 @@ const AttendanceSettings: React.FC = () => {
                                         await addRecurringHoliday({
                                             day: newRecurringDay as any,
                                             n: newRecurringN,
-                                            type: activeTab
+                                            type: activeTab as 'office' | 'field' | 'site'
                                         });
                                         setToast({ message: 'Recurring holiday added successfully.', type: 'success' });
                                     } catch (error) {
@@ -553,7 +555,7 @@ const AttendanceSettings: React.FC = () => {
                                     </div>
                                 </div>
                             ))}
-                        {recurringHolidays.filter(rule => (rule.type || 'office') === activeTab).length === 0 && (
+                        {recurringHolidays.filter(rule => (rule.type || 'office') === (activeTab as any)).length === 0 && (
                             <p className="text-center text-muted py-4">No recurring holidays configured.</p>
                         )}
                     </div>
@@ -588,21 +590,195 @@ const AttendanceSettings: React.FC = () => {
                             currentHolidays.map(holiday => (
                                 <div key={holiday.id} className="flex justify-between items-start p-4 pr-6 border border-white/10 rounded-lg bg-white/5 mb-2">
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-medium text-primary-text truncate">{holiday.name}</p>
-                                        <p className="text-sm text-muted">{new Date(holiday.date.replace(/-/g, '/')).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                    </div>
-                                    <div className="ml-4 shrink-0">
-                                        <Button variant="icon" onClick={() => removeHoliday(activeTab, holiday.id)} aria-label={`Remove ${holiday.name}`} className="p-2 hover:bg-red-500/10 rounded-full transition-colors">
-                                            <Trash2 className="h-5 w-5 text-red-500" />
-                                        </Button>
-                                    </div>
+                                    <p className="font-medium text-primary-text truncate">{holiday.name}</p>
+                                    <p className="text-sm text-muted">{new Date(holiday.date.replace(/-/g, '/')).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                                 </div>
-                            ))
-                        ) : (
-                            <p className="text-center text-muted py-4">No holidays added yet for {activeTab} staff.</p>
-                        )}
+                                <div className="ml-4 shrink-0">
+                                    <Button variant="outline" size="sm" onClick={() => handleRemoveHoliday(holiday.id)} className="p-2 border-red-500/20 hover:bg-red-500/10 rounded-full transition-colors">
+                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-center text-muted py-4">No holidays added yet for {activeTab} staff.</p>
+                    )}
+                </div>
+            </section>
+            </>
+            )}
+
+                {/* Staff Selections Tab */}
+                {(activeTab as string) === 'selections' && (
+                <section className="space-y-8">
+                    <div>
+                        <h3 className="text-lg font-semibold text-primary-text mb-4 flex items-center"><Settings className="mr-2 h-5 w-5 text-muted" />Missed Check-out Configuration</h3>
+                        
+                        <div className="mb-8">
+                            <h4 className="text-sm font-medium text-muted mb-3 uppercase tracking-wider">1. Select Active Categories</h4>
+                            <p className="text-sm text-muted mb-4">Choose which staff categories should be included in the "Trigger Missed Check-outs" action.</p>
+                            <div className="flex flex-wrap gap-6 p-4 bg-page rounded-lg border border-border/50">
+                                <Checkbox
+                                    id="cat-office"
+                                    label="Office Staff"
+                                    checked={localAttendance.missedCheckoutConfig?.enabledGroups?.includes('office') ?? true}
+                                    onChange={(e) => {
+                                        const current = localAttendance.missedCheckoutConfig?.enabledGroups || ['office'];
+                                        const updated = e.target.checked 
+                                            ? [...new Set([...current, 'office' as const])]
+                                            : current.filter(g => g !== 'office');
+                                        setLocalAttendance(prev => ({ 
+                                            ...prev, 
+                                            missedCheckoutConfig: { 
+                                                ...(prev.missedCheckoutConfig || { enabledGroups: ['office'] }),
+                                                enabledGroups: updated 
+                                            } 
+                                        }));
+                                    }}
+                                />
+                                <Checkbox
+                                    id="cat-field"
+                                    label="Field Staff"
+                                    checked={localAttendance.missedCheckoutConfig?.enabledGroups?.includes('field') ?? false}
+                                    onChange={(e) => {
+                                        const current = localAttendance.missedCheckoutConfig?.enabledGroups || ['office'];
+                                        const updated = e.target.checked 
+                                            ? [...new Set([...current, 'field' as const])]
+                                            : current.filter(g => g !== 'field');
+                                        setLocalAttendance(prev => ({ 
+                                            ...prev, 
+                                            missedCheckoutConfig: { 
+                                                ...(prev.missedCheckoutConfig || { enabledGroups: ['office'] }),
+                                                enabledGroups: updated 
+                                            } 
+                                        }));
+                                    }}
+                                />
+                                <Checkbox
+                                    id="cat-site"
+                                    label="Site Staff"
+                                    checked={localAttendance.missedCheckoutConfig?.enabledGroups?.includes('site') ?? false}
+                                    onChange={(e) => {
+                                        const current = localAttendance.missedCheckoutConfig?.enabledGroups || ['office'];
+                                        const updated = e.target.checked 
+                                            ? [...new Set([...current, 'site' as const])]
+                                            : current.filter(g => g !== 'site');
+                                        setLocalAttendance(prev => ({ 
+                                            ...prev, 
+                                            missedCheckoutConfig: { 
+                                                ...(prev.missedCheckoutConfig || { enabledGroups: ['office'] }),
+                                                enabledGroups: updated 
+                                            } 
+                                        }));
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 className="text-sm font-medium text-muted mb-3 uppercase tracking-wider">2. Manage Category Roles</h4>
+                            <p className="text-sm text-muted mb-4">Assign individual roles to each category. Based on these selections, employees will be processed as Office, Field, or Site staff.</p>
+                            
+                            {isLoadingRoles ? (
+                                <div className="p-8 text-center text-muted bg-page rounded-lg border border-border/50">
+                                    <Clock className="animate-spin h-5 w-5 mx-auto mb-2 opacity-50" />
+                                    Loading available roles...
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {(['office', 'field', 'site'] as const).map(group => {
+                                        const groupRoles = localAttendance.missedCheckoutConfig?.roleMapping?.[group] || 
+                                            (group === 'office' ? ['admin', 'hr', 'finance', 'developer'] : 
+                                             group === 'field' ? ['field_staff', 'field_officer'] : 
+                                             ['site_manager', 'security_guard', 'supervisor']);
+                                        
+                                        return (
+                                            <div key={group} className="bg-page rounded-lg border border-border/50 flex flex-col h-full">
+                                                <div className="p-3 border-b border-border/30 bg-white/5 flex justify-between items-center">
+                                                    <span className="text-sm font-semibold uppercase tracking-tight">{group} Staff Roles</span>
+                                                    <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full">{groupRoles.length}</span>
+                                                </div>
+                                                <div className="p-3 flex-1 space-y-2 max-h-[300px] overflow-y-auto">
+                                                    {groupRoles.map(roleId => {
+                                                        const role = allRoles.find(r => r.id === roleId);
+                                                        return (
+                                                            <div key={roleId} className="flex items-center justify-between p-2 bg-white/5 rounded border border-border/10 group">
+                                                                <span className="text-xs truncate" title={roleId}>{role?.displayName || roleId}</span>
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        const mapping = localAttendance.missedCheckoutConfig?.roleMapping || { office: ['admin', 'hr', 'finance', 'developer'], field: ['field_staff', 'field_officer'], site: ['site_manager', 'security_guard', 'supervisor'] };
+                                                                        const updatedGroup = groupRoles.filter(r => r !== roleId);
+                                                                        setLocalAttendance(prev => ({
+                                                                            ...prev,
+                                                                            missedCheckoutConfig: {
+                                                                                ...(prev.missedCheckoutConfig || { enabledGroups: ['office'] }),
+                                                                                roleMapping: { ...mapping, [group]: updatedGroup }
+                                                                            }
+                                                                        }));
+                                                                    }}
+                                                                    className="text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                >
+                                                                    <Trash2 className="h-3 w-3" />
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {groupRoles.length === 0 && (
+                                                        <p className="text-[11px] text-muted text-center py-4 italic">No roles assigned</p>
+                                                    )}
+                                                </div>
+                                                <div className="p-3 border-t border-border/30 bg-white/5">
+                                                    <select 
+                                                        className="w-full bg-transparent border border-border/50 rounded p-1 text-xs text-primary-text outline-none focus:border-primary/50"
+                                                        value=""
+                                                        onChange={(e) => {
+                                                            if (!e.target.value) return;
+                                                            const roleId = e.target.value;
+                                                            const mapping = localAttendance.missedCheckoutConfig?.roleMapping || { office: ['admin', 'hr', 'finance', 'developer'], field: ['field_staff', 'field_officer'], site: ['site_manager', 'security_guard', 'supervisor'] };
+                                                            const updatedGroup = [...new Set([...groupRoles, roleId])];
+                                                            setLocalAttendance(prev => ({
+                                                                ...prev,
+                                                                missedCheckoutConfig: {
+                                                                    ...(prev.missedCheckoutConfig || { enabledGroups: ['office'] }),
+                                                                    roleMapping: { ...mapping, [group]: updatedGroup }
+                                                                }
+                                                            }));
+                                                        }}
+                                                    >
+                                                        <option value="" disabled className="bg-page">Assign Role...</option>
+                                                        {allRoles
+                                                            .filter(r => !groupRoles.includes(r.id))
+                                                            .map(role => (
+                                                                <option key={role.id} value={role.id} className="bg-page">{role.displayName || role.id}</option>
+                                                            ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </section>
+
+                        <div className="pt-6 border-t border-border/50">
+                            <h4 className="text-sm font-semibold text-primary-text mb-2">Automated Actions</h4>
+                            <p className="text-xs text-muted mb-4">
+                                Use the button below to manually handle staff who missed their 7 PM check-out. 
+                                This will process all groups selected above and notify both employees and their managers.
+                            </p>
+                            <Button 
+                                variant="outline" 
+                                onClick={handleTriggerMissedCheckouts} 
+                                isLoading={isTriggering}
+                                className="border-red-500/30 hover:bg-red-500/10 text-red-400"
+                                disabled={!localAttendance.missedCheckoutConfig?.enabledGroups?.length}
+                            >
+                                <Clock className="mr-2 h-4 w-4" /> Trigger Missed Check-outs
+                            </Button>
+                        </div>
+                    </section>
+                    )}
             </div>
         </div>
     );

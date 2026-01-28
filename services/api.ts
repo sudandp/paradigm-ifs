@@ -831,8 +831,22 @@ export const api = {
   },
 
   /**
-   * Manually trigger missed check-outs for office staff.
-   * Identifies users with office roles who checked in today but have no check-out.
+   * Retrieve all defined user roles from the system.
+   */
+  getAppRoles: async (): Promise<Role[]> => {
+    const { data, error } = await supabase
+      .from('roles')
+      .select('id, display_name');
+    if (error) throw error;
+    return (data || []).map(r => ({
+      id: r.id,
+      displayName: r.display_name
+    }));
+  },
+
+  /**
+   * Manually trigger missed check-outs for configured staff.
+   * Identifies users with selected roles/groups who checked in today but have no check-out.
    * Records a check-out at 19:00 (7 PM), logs it, and notifies appropriate users.
    */
   async triggerMissedCheckouts(): Promise<{ count: number }> {
@@ -840,12 +854,45 @@ export const api = {
     const start = startOfDay(today).toISOString();
     const end = endOfDay(today).toISOString();
 
-    // 1. Fetch all office staff
-    const officeRoles = ['admin', 'hr', 'finance', 'developer'];
+    // 1. Fetch missed check-out configuration
+    const settings = await this.getAttendanceSettings();
+    const config = settings.missedCheckoutConfig;
+    const enabledGroups = config?.enabledGroups || ['office'];
+    const roleMapping = config?.roleMapping;
+    
+    // 2. Identify roles to process
+    const rolesToProcessSet = new Set<string>();
+    
+    // Iterate through enabled groups (office, field, site)
+    enabledGroups.forEach(group => {
+      // Use mapping if available, otherwise use hardcoded defaults
+      if (roleMapping && roleMapping[group] && roleMapping[group].length > 0) {
+        roleMapping[group].forEach(r => rolesToProcessSet.add(r.toLowerCase()));
+      } else {
+        // Fallback to defaults
+        if (group === 'office') {
+          ['admin', 'hr', 'finance', 'developer'].forEach(r => rolesToProcessSet.add(r));
+        } else if (group === 'field') {
+          ['field_staff', 'field_officer'].forEach(r => rolesToProcessSet.add(r));
+        } else if (group === 'site') {
+          ['site_manager', 'security_guard', 'supervisor'].forEach(r => rolesToProcessSet.add(r));
+        }
+      }
+    });
+
+    // Handle legacy enabledRoles if any (for backward compatibility during migration)
+    if (config?.enabledRoles && config.enabledRoles.length > 0) {
+        config.enabledRoles.forEach(r => rolesToProcessSet.add(r.toLowerCase()));
+    }
+
+    const rolesToProcess = Array.from(rolesToProcessSet);
+    if (rolesToProcess.length === 0) return { count: 0 };
+
+    // 3. Fetch all users in identified roles
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('id, name, role_id, reporting_manager_id')
-      .in('role_id', officeRoles);
+      .in('role_id', rolesToProcess);
 
     if (userError) throw userError;
     if (!userData) return { count: 0 };
@@ -856,7 +903,7 @@ export const api = {
     for (const user of users) {
       if (!user.id) continue;
 
-      // 2. Get latest attendance event for the day
+      // 4. Get latest attendance event for the day
       const { data: events, error: eventError } = await supabase
         .from('attendance_events')
         .select('*')
@@ -873,7 +920,7 @@ export const api = {
       if (lastEvent && lastEvent.type !== 'check-out') {
         const checkoutTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 19, 0, 0).toISOString();
         
-        // 3. Record the missed check-out
+        // 5. Record the missed check-out
         const { error: checkoutError } = await supabase.from('attendance_events').insert({
           user_id: user.id,
           timestamp: checkoutTime,
@@ -885,7 +932,7 @@ export const api = {
         if (checkoutError) continue;
         triggeredCount++;
 
-        // 4. Log the action
+        // 6. Log the action
         const { data: sessionData } = await supabase.auth.getSession();
         const performedBy = sessionData.session?.user?.id;
         
@@ -893,17 +940,17 @@ export const api = {
           action: 'MANUAL_MISSED_CHECKOUT',
           performed_by: performedBy,
           target_user_id: user.id,
-          details: { message: 'Automatically triggered missed check-out at 19:00 due to staff failure to check out' }
+          details: { message: `Automatically triggered missed check-out at 19:00 for ${enabledGroups.join('/')} staff` }
         });
 
-        // 5. Notify the staff member
+        // 7. Notify the staff member
         await this.createNotification({
           userId: user.id,
           message: `Notice: A missed check-out has been automatically recorded for you at 7:00 PM today.`,
           type: 'warning'
         });
 
-        // 6. Notify the reporting manager
+        // 8. Notify the reporting manager
         if (user.reportingManagerId) {
           await this.createNotification({
             userId: user.reportingManagerId,

@@ -752,6 +752,15 @@ export interface AttendanceSettings {
   office: StaffAttendanceRules;
   field: StaffAttendanceRules;
   site: StaffAttendanceRules;
+  missedCheckoutConfig?: {
+    enabledGroups: ('office' | 'field' | 'site')[];
+    enabledRoles?: string[]; // Deprecated in favor of roleMapping
+    roleMapping?: {
+      office: string[];
+      field: string[];
+      site: string[];
+    };
+  };
 }
 
 export interface Holiday {
