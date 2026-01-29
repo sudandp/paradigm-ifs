@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useThemeStore } from '../../store/themeStore';
 import { User, AttendanceEvent } from '../../types';
 import Button from '../../components/ui/Button';
+import Pagination from '../../components/ui/Pagination';
 
 // Custom Marker CSS
 const markerStyles = `
@@ -72,6 +73,8 @@ const MyTeamPage: React.FC = () => {
   const [latestLocations, setLatestLocations] = useState<Record<string, { latitude: number; longitude: number; timestamp: string }>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
   
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -284,61 +287,73 @@ const MyTeamPage: React.FC = () => {
           <p>No team members found.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
-          {filteredMembers.map((member) => {
-            const loc = latestLocations[member.id];
-            return (
-              <Link
-                key={member.id}
-                to={`/my-team/${member.id}`}
-                className="group bg-card border border-border rounded-2xl p-4 hover:border-accent hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-xl bg-accent/10 text-accent flex items-center justify-center font-bold text-lg ring-2 ring-background overflow-hidden relative">
-                      {member.name.charAt(0)}
-                      {member.photoUrl && (
-                        <img 
-                          src={member.photoUrl} 
-                          alt={member.name}
-                          className="absolute inset-0 w-full h-full object-cover z-10"
-                        />
-                      )}
+        <div className="flex flex-col gap-6 pb-20">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredMembers
+              .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+              .map((member) => {
+              const loc = latestLocations[member.id];
+              return (
+                <Link
+                  key={member.id}
+                  to={`/my-team/${member.id}`}
+                  className="group bg-card border border-border rounded-2xl p-4 hover:border-accent hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="relative">
+                      <div className="w-12 h-12 rounded-xl bg-accent/10 text-accent flex items-center justify-center font-bold text-lg ring-2 ring-background overflow-hidden relative">
+                        {member.name.charAt(0)}
+                        {member.photoUrl && (
+                          <img 
+                            src={member.photoUrl} 
+                            alt={member.name}
+                            className="absolute inset-0 w-full h-full object-cover z-10"
+                          />
+                        )}
+                      </div>
+                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-card z-20 ${
+                        loc && isToday(new Date(loc.timestamp))
+                          ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' 
+                          : 'bg-red-500 shadow-[0_0_8px_rgba(239,44,44,0.4)]'
+                      }`} />
                     </div>
-                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-card z-20 ${
-                      loc && isToday(new Date(loc.timestamp))
-                        ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' 
-                        : 'bg-red-500 shadow-[0_0_8px_rgba(239,44,44,0.4)]'
-                    }`} />
+                    
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-primary-text truncate group-hover:text-accent transition-colors">
+                        {member.name}
+                      </h3>
+                      <p className="text-xs text-muted mb-2 truncate">
+                        {member.role.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                      </p>
+                      
+                      <div className="flex items-center gap-1.5 text-xs text-muted">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>
+                          {loc 
+                            ? `Active ${formatDistanceToNow(new Date(loc.timestamp))} ago`
+                            : 'No recent activity'
+                          }
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-primary-text truncate group-hover:text-accent transition-colors">
-                      {member.name}
-                    </h3>
-                    <p className="text-xs text-muted mb-2 truncate">
-                      {member.role.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                    </p>
-                    
-                    <div className="flex items-center gap-1.5 text-xs text-muted">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>
-                        {loc 
-                          ? `Active ${formatDistanceToNow(new Date(loc.timestamp))} ago`
-                          : 'No recent activity'
-                        }
-                      </span>
-                    </div>
+                  <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs font-medium text-accent">
+                    <span>View Details</span>
+                    <ChevronRight className="w-4 h-4" />
                   </div>
-                </div>
-                
-                <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs font-medium text-accent">
-                  <span>View Details</span>
-                  <ChevronRight className="w-4 h-4" />
-                </div>
-              </Link>
-            );
-          })}
+                </Link>
+              );
+            })}
+          </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredMembers.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 

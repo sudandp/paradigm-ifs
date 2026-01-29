@@ -12,6 +12,7 @@ import { ProfilePlaceholder } from '../../components/ui/ProfilePlaceholder';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { isAdmin } from '../../utils/auth';
+import Pagination from '../../components/ui/Pagination';
 
 interface TeamMember extends User {
     lastCheckIn?: string;
@@ -28,6 +29,8 @@ const TeamActivity: React.FC = () => {
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(12);
     const isMobile = useMediaQuery('(max-width: 767px)');
 
     useEffect(() => {
@@ -444,9 +447,22 @@ const TeamActivity: React.FC = () => {
                                 <p className="text-muted">No team members found</p>
                             </div>
                         ) : (
-                            teamMembers.map(member => (
-                                <MemberCard key={member.id} member={member} />
-                            ))
+                            <>
+                                {teamMembers
+                                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                    .map(member => (
+                                        <MemberCard key={member.id} member={member} />
+                                    ))}
+                                
+                                <Pagination 
+                                    currentPage={currentPage}
+                                    totalItems={teamMembers.length}
+                                    pageSize={pageSize}
+                                    onPageChange={setCurrentPage}
+                                    onPageSizeChange={setPageSize}
+                                    className="mt-6 col-span-full"
+                                />
+                            </>
                         )}
                     </div>
 
