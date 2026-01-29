@@ -26,7 +26,7 @@ type LeaveRequestFormData = {
 };
 
 const getLeaveValidationSchema = (threshold: number) => yup.object({
-    leaveType: yup.string<LeaveType>().oneOf(['Earned', 'Sick', 'Floating', 'Comp Off']).required('Leave type is required'),
+    leaveType: yup.string<LeaveType>().oneOf(['Earned', 'Sick', 'Floating', 'Comp Off', 'Loss of Pay']).required('Leave type is required'),
     startDate: yup.string().required('Start date is required'),
     endDate: yup.string().required('End date is required')
         .test('is-after-start', 'End date must be on or after start date', function (value) {
@@ -124,7 +124,8 @@ const ApplyLeave: React.FC = () => {
         if (!user) return;
         try {
             // Check balance before submitting (only for new requests)
-            if (!isEditMode) {
+            // Skip balance check for 'Loss of Pay' as it doesn't consume balance
+            if (!isEditMode && formData.leaveType !== 'Loss of Pay') {
                 const balance = await api.getLeaveBalancesForUser(user.id);
                 const startDate = new Date(formData.startDate.replace(/-/g, '/'));
                 const endDate = new Date(formData.endDate.replace(/-/g, '/'));
@@ -160,7 +161,7 @@ const ApplyLeave: React.FC = () => {
         <div className={`min-h-screen bg-page ${isMobile ? 'pb-20' : 'p-6'}`}>
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             
-            <div className={`mx-auto ${isMobile ? 'w-full' : 'max-w-2xl bg-card rounded-2xl shadow-card overflow-hidden'}`}>
+            <div className="w-full bg-card rounded-2xl shadow-card overflow-hidden">
                 <header 
                     className={`p-4 flex items-center gap-4 ${isMobile ? 'fixed top-0 left-0 right-0 z-50 bg-[#041b0f] border-b border-[#1f3d2b]' : 'border-b'}`}
                     style={isMobile ? { paddingTop: 'calc(1rem + env(safe-area-inset-top))' } : {}}
@@ -180,6 +181,7 @@ const ApplyLeave: React.FC = () => {
                                     <option value="Sick">Sick</option>
                                     <option value="Floating">Floating</option>
                                     <option value="Comp Off">Comp Off</option>
+                                    <option value="Loss of Pay">Loss of Pay</option>
                                 </Select>
                             )} />
 

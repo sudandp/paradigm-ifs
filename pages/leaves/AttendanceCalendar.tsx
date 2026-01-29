@@ -155,7 +155,7 @@ const AttendanceCalendar: React.FC = () => {
         switch (status) {
             case 'present': return 'bg-emerald-500 text-white border-emerald-600 shadow-sm'; // Vibrant Green
             case 'absent': return 'bg-rose-500 text-white border-rose-600 shadow-sm'; // Vibrant Red/Pink
-            case 'holiday': return 'bg-red-600 text-white border-red-700 shadow-sm'; // Deep Red
+            case 'holiday': return 'bg-pink-500 text-white border-pink-600 shadow-sm'; // Pink
             case 'floating-holiday': return 'bg-amber-500 text-white border-amber-600 shadow-sm'; // Vibrant Amber
             case 'holiday-present': return 'bg-violet-600 text-white border-violet-700 shadow-sm'; // Vibrant Purple
             default: return 'bg-gray-50 text-gray-400 border-gray-100'; // Neutral
@@ -201,7 +201,7 @@ const AttendanceCalendar: React.FC = () => {
             <div className="mt-3 flex gap-3 text-xs text-muted justify-center flex-wrap">
                 <div className="flex items-center gap-1"><div className="w-2 h-2 bg-emerald-500 border border-emerald-600 rounded-sm"></div> Present</div>
                 <div className="flex items-center gap-1"><div className="w-2 h-2 bg-rose-500 border border-rose-600 rounded-sm"></div> Absent</div>
-                <div className="flex items-center gap-1"><div className="w-2 h-2 bg-red-600 border border-red-700 rounded-sm"></div> Holiday</div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 bg-pink-500 border border-pink-600 rounded-sm"></div> Holiday</div>
                 <div className="flex items-center gap-1"><div className="w-2 h-2 bg-amber-500 border border-amber-600 rounded-sm"></div> Floating Holiday</div>
                 <div className="flex items-center gap-1"><div className="w-2 h-2 bg-violet-600 border border-violet-700 rounded-sm"></div> Holiday Present</div>
             </div>
