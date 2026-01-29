@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
+import Pagination from '../../components/ui/Pagination';
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import { 
   getPendingDeviceRequests, 
@@ -29,6 +30,8 @@ const DeviceApprovals: React.FC = () => {
   const [rejectDialog, setRejectDialog] = useState<{ id: string, name: string } | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
 
   useEffect(() => {
     loadRequests();
@@ -113,60 +116,73 @@ const DeviceApprovals: React.FC = () => {
           <p className="text-gray-500 mt-2">There are no pending device requests requiring approval.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4">
-          {requests.map((request) => (
-            <div key={request.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:shadow-md transition-shadow">
-              
-              {/* User Info */}
-              <div className="flex items-center gap-4 min-w-[200px]">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                  {request.userName?.charAt(0) || 'U'}
+        <div className="flex flex-col gap-6">
+          <div className="grid grid-cols-1 gap-4">
+            {requests
+              .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+              .map((request) => (
+              <div key={request.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:shadow-md transition-shadow">
+                
+                {/* User Info */}
+                <div className="flex items-center gap-4 min-w-[200px]">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                    {request.userName?.charAt(0) || 'U'}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{request.userName || 'Unknown User'}</h4>
+                    <p className="text-xs text-gray-500">Requested {formatDate(request.requestedAt)}</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900">{request.userName || 'Unknown User'}</h4>
-                  <p className="text-xs text-gray-500">Requested {formatDate(request.requestedAt)}</p>
-                </div>
-              </div>
 
-              {/* Device Info */}
-              <div className="flex-1 flex items-start gap-4 p-3 bg-gray-50 rounded-lg w-full md:w-auto">
-                <div className="mt-1">
-                  {request.deviceType === 'web' ? <Monitor className="w-5 h-5 text-blue-500" /> : <Smartphone className="w-5 h-5 text-green-500" />}
-                </div>
-                <div>
-                  <p className="font-medium text-gray-800">{request.deviceName}</p>
-                  <p className="text-xs text-gray-500 break-all">
-                    {request.deviceType.toUpperCase()} • {request.deviceInfo?.browser || request.deviceInfo?.platform}
-                  </p>
-                  {request.currentDeviceCount !== undefined && (
-                    <p className="text-xs text-amber-600 mt-1 flex items-center">
-                       <AlertCircle className="w-3 h-3 mr-1" />
-                       User has {request.currentDeviceCount} active {request.deviceType} device(s)
+                {/* Device Info */}
+                <div className="flex-1 flex items-start gap-4 p-3 bg-gray-50 rounded-lg w-full md:w-auto">
+                  <div className="mt-1">
+                    {request.deviceType === 'web' ? <Monitor className="w-5 h-5 text-blue-500" /> : <Smartphone className="w-5 h-5 text-green-500" />}
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-800">{request.deviceName}</p>
+                    <p className="text-xs text-gray-500 break-all">
+                      {request.deviceType.toUpperCase()} • {request.deviceInfo?.browser || request.deviceInfo?.platform}
                     </p>
-                  )}
+                    {request.currentDeviceCount !== undefined && (
+                      <p className="text-xs text-amber-600 mt-1 flex items-center">
+                         <AlertCircle className="w-3 h-3 mr-1" />
+                         User has {request.currentDeviceCount} active {request.deviceType} device(s)
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                  <Button 
+                    onClick={() => handleRejectInit(request.id, request.deviceName)}
+                    className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 flex-1 md:flex-none"
+                    disabled={!!processingId}
+                  >
+                    <X className="w-4 h-4 mr-2" /> Reject
+                  </Button>
+                  <Button 
+                    onClick={() => handleApprove(request.id, request.deviceName)}
+                    className="bg-primary hover:bg-primary-dark text-white flex-1 md:flex-none"
+                    isLoading={processingId === request.id}
+                    disabled={!!processingId}
+                  >
+                    <Check className="w-4 h-4 mr-2" /> Approve
+                  </Button>
                 </div>
               </div>
+            ))}
+          </div>
 
-              {/* Actions */}
-              <div className="flex items-center gap-3 w-full md:w-auto">
-                <Button 
-                  onClick={() => handleRejectInit(request.id, request.deviceName)}
-                  className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 flex-1 md:flex-none"
-                  disabled={!!processingId}
-                >
-                  <X className="w-4 h-4 mr-2" /> Reject
-                </Button>
-                <Button 
-                  onClick={() => handleApprove(request.id, request.deviceName)}
-                  className="bg-primary hover:bg-primary-dark text-white flex-1 md:flex-none"
-                  isLoading={processingId === request.id}
-                  disabled={!!processingId}
-                >
-                  <Check className="w-4 h-4 mr-2" /> Approve
-                </Button>
-              </div>
-            </div>
-          ))}
+          <Pagination
+            currentPage={currentPage}
+            totalItems={requests.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[12, 24, 48, 96]}
+          />
         </div>
       )}
 

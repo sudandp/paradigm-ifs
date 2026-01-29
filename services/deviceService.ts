@@ -449,23 +449,54 @@ export async function approveDeviceRequest(
     if (fetchError) throw fetchError;
     if (!request) throw new Error('Request not found');
     
-    // Create the device record as active
-    const { data: device, error: deviceError } = await supabase
+    // Check if device already exists (e.g. revoked or pending)
+    const { data: existingDevice } = await supabase
       .from('user_devices')
-      .insert({
-        user_id: request.user_id,
-        device_type: request.device_type,
-        device_identifier: request.device_identifier,
-        device_name: request.device_name,
-        device_info: request.device_info,
-        status: 'active',
-        approved_by_id: approvedById,
-        approved_at: new Date().toISOString(),
-      })
-      .select()
+      .select('id')
+      .eq('user_id', request.user_id)
+      .eq('device_identifier', request.device_identifier)
       .single();
+
+    let deviceData;
     
-    if (deviceError) throw deviceError;
+    if (existingDevice) {
+      // Update existing device
+      const { data, error } = await supabase
+        .from('user_devices')
+        .update({
+          status: 'active',
+          device_name: request.device_name,
+          device_info: request.device_info,
+          approved_by_id: approvedById,
+          approved_at: new Date().toISOString(),
+          last_used_at: new Date().toISOString()
+        })
+        .eq('id', existingDevice.id)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      deviceData = data;
+    } else {
+      // Create new device record
+      const { data, error } = await supabase
+        .from('user_devices')
+        .insert({
+          user_id: request.user_id,
+          device_type: request.device_type,
+          device_identifier: request.device_identifier,
+          device_name: request.device_name,
+          device_info: request.device_info,
+          status: 'active',
+          approved_by_id: approvedById,
+          approved_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      deviceData = data;
+    }
     
     // Update the request status
     const { error: updateError } = await supabase
@@ -485,18 +516,18 @@ export async function approveDeviceRequest(
     return {
       success: true,
       device: {
-        ...device,
-        userId: device.user_id,
-        deviceType: device.device_type,
-        deviceIdentifier: device.device_identifier,
-        deviceName: device.device_name,
-        deviceInfo: device.device_info || {},
-        registeredAt: device.registered_at,
-        lastUsedAt: device.last_used_at,
-        approvedById: device.approved_by_id,
-        approvedAt: device.approved_at,
-        createdAt: device.created_at,
-        updatedAt: device.updated_at,
+        ...deviceData,
+        userId: deviceData.user_id,
+        deviceType: deviceData.device_type,
+        deviceIdentifier: deviceData.device_identifier,
+        deviceName: deviceData.device_name,
+        deviceInfo: deviceData.device_info || {},
+        registeredAt: deviceData.registered_at,
+        lastUsedAt: deviceData.last_used_at,
+        approvedById: deviceData.approved_by_id,
+        approvedAt: deviceData.approved_at,
+        createdAt: deviceData.created_at,
+        updatedAt: deviceData.updated_at,
       },
     };
   } catch (error) {

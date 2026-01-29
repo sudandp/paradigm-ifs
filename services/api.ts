@@ -1345,7 +1345,8 @@ export const api = {
       { data: compOffData, error: compOffError },
       { data: otData, error: otError },
       { data: holidays, error: holidaysError },
-      recurringHolidays
+      recurringHolidays,
+      { data: yearEvents, error: eventsError }
     ] = await Promise.all([
       supabase.from('leave_requests')
         .select('leave_type, start_date, end_date, day_option')
@@ -1355,10 +1356,15 @@ export const api = {
       supabase.from('comp_off_logs').select('*').eq('user_id', userId),
       supabase.from('extra_work_logs').select('hours_worked').eq('user_id', userId).eq('claim_type', 'OT').eq('status', 'Approved').gte('work_date', format(startOfMonth(new Date()), 'yyyy-MM-dd')).lte('work_date', format(endOfMonth(new Date()), 'yyyy-MM-dd')),
       supabase.from('holidays').select('*'),
-      api.getRecurringHolidays()
+      api.getRecurringHolidays(),
+      supabase.from('attendance_events')
+        .select('timestamp')
+        .eq('user_id', userId)
+        .gte('timestamp', yearStart)
+        .lte('timestamp', `${currentYear}-12-31`)
     ]);
 
-    if (leavesError || compOffError || otError || holidaysError) throw new Error("Failed to fetch all leave balance data.");
+    if (leavesError || compOffError || otError || holidaysError || eventsError) throw new Error("Failed to fetch all leave balance data.");
 
     // Calculate Earned Leave dynamically if rule exists
     let earnedTotal = rules.annualEarnedLeaves || 0;
@@ -1370,16 +1376,45 @@ export const api = {
       earnedTotal = openingBalance + Math.floor(countableDays / rules.earnedLeaveAccrual.daysRequired) * rules.earnedLeaveAccrual.amountEarned;
     }
 
+    // Calculate Floating Holidays based on attendance on Recurring Holidays (e.g. 3rd Saturday)
+    // AND Comp Offs based on attendance on Sundays or Public Holidays
+    const attendedDates = new Set((yearEvents || []).map(e => format(new Date(e.timestamp), 'yyyy-MM-dd')));
+    const holidayDates = new Set(holidays.map(h => format(new Date(h.date), 'yyyy-MM-dd')));
+    
+    let floatingTotal = 0;
+    let dynamicCompOffTotal = 0;
+    
+    attendedDates.forEach(dateStr => {
+        const date = new Date(dateStr);
+        const dayName = format(date, 'EEEE');
+        
+        // Floating Holiday Check
+        const isFloatingRecurringHoliday = (recurringHolidays || []).some(rh => {
+             if (rh.type && rh.type !== staffType) return false;
+             if (rh.day !== dayName) return false;
+             if (rh.n === 0) return true; 
+             const dayOfMonth = date.getDate();
+             const nth = Math.ceil(dayOfMonth / 7);
+             return rh.n === nth;
+        });
+        if (isFloatingRecurringHoliday) floatingTotal++;
+
+        // Comp Off Accrual Check (Sunday or Public Holiday)
+        if (dayName === 'Sunday' || holidayDates.has(dateStr)) {
+            dynamicCompOffTotal++;
+        }
+    });
+
     const balance: LeaveBalance = {
       userId,
       earnedTotal,
       earnedUsed: 0,
       sickTotal: rules.annualSickLeaves || 0,
       sickUsed: 0,
-      floatingTotal: (rules.monthlyFloatingLeaves || 0) * 12,
+      floatingTotal,
       floatingUsed: 0,
-      compOffTotal: (compOffData || []).filter(log => log.status === 'earned').length, 
-      compOffUsed: (compOffData || []).filter(log => log.status === 'used').length,
+      compOffTotal: (compOffData || []).filter(log => log.status === 'earned' || log.status === 'used').length + dynamicCompOffTotal, 
+      compOffUsed: 0,
       otHoursThisMonth: (otData || []).reduce((sum, log) => sum + (log.hours_worked || 0), 0),
     };
 
@@ -1388,6 +1423,7 @@ export const api = {
       if (leave.leave_type === 'Earned') balance.earnedUsed += leaveAmount;
       if (leave.leave_type === 'Sick') balance.sickUsed += leaveAmount;
       if (leave.leave_type === 'Floating') balance.floatingUsed += leaveAmount;
+      if (leave.leave_type === 'Comp Off') balance.compOffUsed += leaveAmount;
     });
 
     return balance;
@@ -1963,7 +1999,8 @@ export const api = {
     const updatedHistory = [...((request.approval_history as any[]) || []), newHistoryRecord];
     
     // If finalConfirmationRole is 'reporting_manager' and the approver IS the reporting manager, approve directly
-    if (finalConfirmationRole === 'reporting_manager' && isReportingManager) {
+    // OR if the leave type is 'Comp Off' (Manager approval is final)
+    if ((finalConfirmationRole === 'reporting_manager' && isReportingManager) || request.leave_type === 'Comp Off') {
       const { error } = await supabase.from('leave_requests').update({ 
         status: 'approved', 
         current_approver_id: null, 
@@ -1979,8 +2016,11 @@ export const api = {
         actor: { id: approverId, name: approverData.name, role: 'admin' }
       });
       
-      // If it's a Comp Off leave, mark a log as used
+      // If it's a Comp Off leave, mark a log as used/consumed works differently now with dynamic logic
+      // But we still track 'used' status for reporting if manual logs exist
       if (request.leave_type === 'Comp Off') {
+        // Only update status if there are manual logs available to "consume"
+        // With dynamic accrual, this step is less critical but good for consistency
         const { data: compOffLogs } = await supabase.from('comp_off_logs').select('id').eq('user_id', request.user_id).eq('status', 'earned').limit(Math.ceil(leaveDays));
         if (compOffLogs && compOffLogs.length > 0) {
            await supabase.from('comp_off_logs').update({ status: 'used', leave_request_id: id }).in('id', compOffLogs.map(l => l.id));
