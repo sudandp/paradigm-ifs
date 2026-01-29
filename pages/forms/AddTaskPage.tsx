@@ -272,7 +272,7 @@ const AddTaskPage: React.FC = () => {
 
     return (
         <div className={`p-4 md:p-6 ${isDark ? 'text-white' : ''}`}>
-            <div className={`${isDark ? 'bg-[#152b1b] border border-white/10' : 'bg-card'} p-8 rounded-xl shadow-card w-full max-w-3xl mx-auto`}>
+            <div className={`${isDark ? 'bg-[#152b1b] border border-white/10' : 'bg-card'} p-8 rounded-xl shadow-card w-full`}>
                 <div className="flex items-center mb-6">
                     <div className={`p-3 rounded-full mr-4 ${isDark ? 'bg-emerald-500/20' : 'bg-accent-light'}`}>
                         <CheckSquare className={`h-8 w-8 ${isDark ? 'text-emerald-400' : 'text-accent-dark'}`} />

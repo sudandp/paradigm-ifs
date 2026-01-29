@@ -763,10 +763,16 @@ const AttendanceSettings: React.FC = () => {
 
                         <div className="pt-6 border-t border-border/50">
                             <h4 className="text-sm font-semibold text-primary-text mb-2">Automated Actions</h4>
-                            <p className="text-xs text-muted mb-4">
-                                Use the button below to manually handle staff who missed their 7 PM check-out. 
-                                This will process all groups selected above and notify both employees and their managers.
-                            </p>
+                            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 mb-4">
+                                <p className="text-xs text-emerald-500 font-medium flex items-center">
+                                    <Clock className="h-3 w-3 mr-1.5" />
+                                    Auto-Checkout Active
+                                </p>
+                                <p className="text-xs text-muted mt-1">
+                                    The system automatically checks out eligible staff at your configured <strong>Check-out End Time</strong> (currently {localAttendance.office.fixedOfficeHours?.checkOutTime || '19:00'}).
+                                    This check runs every 15 minutes. You can also use the button below to manually run the trigger immediately for testing or overrides.
+                                </p>
+                            </div>
                             <Button 
                                 variant="outline" 
                                 onClick={handleTriggerMissedCheckouts} 
@@ -774,7 +780,7 @@ const AttendanceSettings: React.FC = () => {
                                 className="border-red-500/30 hover:bg-red-500/10 text-red-400"
                                 disabled={!localAttendance.missedCheckoutConfig?.enabledGroups?.length}
                             >
-                                <Clock className="mr-2 h-4 w-4" /> Trigger Missed Check-outs
+                                <Clock className="mr-2 h-4 w-4" /> Run Manual Trigger Now
                             </Button>
                         </div>
                     </section>

@@ -770,6 +770,7 @@ const AttendanceDashboard: React.FC = () => {
     const datePickerRef = useRef<HTMLDivElement>(null);
 
     const [selectedUser, setSelectedUser] = useState<string>('all');
+    const [selectedRole, setSelectedRole] = useState<string>('all');
     const [selectedStatus, setSelectedStatus] = useState<string>('all');
     
     // Manual Entry State
@@ -1110,6 +1111,7 @@ const AttendanceDashboard: React.FC = () => {
 
     const reportTypeId = useId();
     const employeeId = useId();
+    const roleId = useId();
     const statusId = useId();
     const recordTypeId = useId();
     const startDateId = useId();
@@ -1120,6 +1122,11 @@ const AttendanceDashboard: React.FC = () => {
             fetchDashboardData(dateRange.startDate, dateRange.endDate);
         }
     }, [dateRange, fetchDashboardData]);
+
+    const availableRoles = useMemo(() => {
+        const roles = new Set(users.map(u => u.role).filter(Boolean));
+        return Array.from(roles).sort();
+    }, [users]);
 
 
 
@@ -1171,9 +1178,15 @@ const AttendanceDashboard: React.FC = () => {
         const days = eachDayOfInterval({ start: dateRange.startDate, end: dateRange.endDate });
 
         // Filter users based on selection, and exclude management users
-        const filteredUsers = selectedUser === 'all' 
-            ? users.filter(u => u.role !== 'management') 
-            : users.filter(u => u.id === selectedUser && u.role !== 'management');
+        let filteredUsers = users.filter(u => u.role !== 'management');
+
+        if (selectedUser !== 'all') {
+            filteredUsers = filteredUsers.filter(u => u.id === selectedUser);
+        }
+        if (selectedRole !== 'all') {
+            filteredUsers = filteredUsers.filter(u => u.role === selectedRole);
+        }
+
         const targetUsers = filteredUsers;
 
         targetUsers.forEach(user => {
@@ -1299,16 +1312,23 @@ const AttendanceDashboard: React.FC = () => {
         }
 
         return filteredData;
-    }, [users, attendanceEvents, dateRange, selectedUser, selectedStatus, selectedRecordType, recurringHolidays]);
+    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, selectedStatus, selectedRecordType, recurringHolidays]);
 
     // 2. Attendance Log Data (Raw Events)
     const attendanceLogData: AttendanceLogDataRow[] = useMemo(() => {
         if (!dateRange.startDate || !dateRange.endDate) return [];
 
         // Exclude management users from logs
-        const filteredUsers = selectedUser === 'all' 
-            ? users.filter(u => u.role !== 'management') 
-            : users.filter(u => u.id === selectedUser && u.role !== 'management');
+        // Exclude management users from logs
+        let filteredUsers = users.filter(u => u.role !== 'management');
+
+        if (selectedUser !== 'all') {
+            filteredUsers = filteredUsers.filter(u => u.id === selectedUser);
+        }
+        if (selectedRole !== 'all') {
+            filteredUsers = filteredUsers.filter(u => u.role === selectedRole);
+        }
+
         const targetUsers = filteredUsers;
         const targetUserIds = new Set(targetUsers.map(u => u.id));
 
@@ -1336,7 +1356,7 @@ const AttendanceDashboard: React.FC = () => {
                 return a.time.localeCompare(b.time);
             });
 
-    }, [users, attendanceEvents, dateRange, selectedUser]);
+    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole]);
 
     // 3. Monthly Report Data (Aggregated)
     const monthlyReportData: MonthlyReportRow[] = useMemo(() => {
@@ -1345,9 +1365,16 @@ const AttendanceDashboard: React.FC = () => {
         const days = eachDayOfInterval({ start: dateRange.startDate, end: dateRange.endDate });
         
         // Exclude management users from monthly reports
-        const filteredUsers = selectedUser === 'all' 
-            ? users.filter(u => u.role !== 'management') 
-            : users.filter(u => u.id === selectedUser && u.role !== 'management');
+        // Exclude management users from monthly reports
+        let filteredUsers = users.filter(u => u.role !== 'management');
+
+        if (selectedUser !== 'all') {
+            filteredUsers = filteredUsers.filter(u => u.id === selectedUser);
+        }
+        if (selectedRole !== 'all') {
+            filteredUsers = filteredUsers.filter(u => u.role === selectedRole);
+        }
+
         const targetUsers = filteredUsers;
 
         return targetUsers.map(user => {
@@ -1509,7 +1536,7 @@ const AttendanceDashboard: React.FC = () => {
             return row.statuses.includes(selectedStatus);
         });
 
-    }, [users, attendanceEvents, dateRange, selectedUser, recurringHolidays]);
+    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, recurringHolidays]);
 
 
     // Determine which PDF component to render
@@ -1913,6 +1940,27 @@ const AttendanceDashboard: React.FC = () => {
                     </div>
 
                     <div>
+                        <label htmlFor={roleId} className="block text-xs font-medium text-gray-500 mb-1">Role</label>
+                        <select
+                            id={roleId}
+                            name="role"
+                            className="border rounded-md px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-green-500 outline-none max-w-[200px]"
+                            value={selectedRole}
+                            onChange={(e) => {
+                                setSelectedRole(e.target.value);
+                                setSelectedUser('all'); // Reset user selection when role changes
+                            }}
+                        >
+                            <option value="all">All Roles</option>
+                            {availableRoles.map(role => (
+                                <option key={role} value={role}>
+                                    {role ? role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
                         <label htmlFor={employeeId} className="block text-xs font-medium text-gray-500 mb-1">Employee</label>
                         <select
                             id={employeeId}
@@ -1922,9 +1970,12 @@ const AttendanceDashboard: React.FC = () => {
                             onChange={(e) => setSelectedUser(e.target.value)}
                         >
                             <option value="all">All Employees</option>
-                            {users.map(u => (
-                                <option key={u.id} value={u.id}>{u.name}</option>
-                            ))}
+                            {users
+                                .filter(u => selectedRole === 'all' || u.role === selectedRole)
+                                .map(u => (
+                                    <option key={u.id} value={u.id}>{u.name}</option>
+                                ))
+                            }
                         </select>
                     </div>
 

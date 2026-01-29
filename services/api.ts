@@ -918,7 +918,9 @@ export const api = {
       const lastEvent = events?.[0];
       // If the user has a check-in/break event but NO check-out yet today
       if (lastEvent && lastEvent.type !== 'check-out') {
-        const checkoutTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 19, 0, 0).toISOString();
+        // Parse configured check-out time (e.g. "18:00")
+        const [coHour, coMinute] = (settings.fixedOfficeHours?.checkOutTime || '19:00').split(':').map(Number);
+        const checkoutTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), coHour, coMinute, 0).toISOString();
         
         // 5. Record the missed check-out
         const { error: checkoutError } = await supabase.from('attendance_events').insert({
@@ -940,13 +942,13 @@ export const api = {
           action: 'MANUAL_MISSED_CHECKOUT',
           performed_by: performedBy,
           target_user_id: user.id,
-          details: { message: `Automatically triggered missed check-out at 19:00 for ${enabledGroups.join('/')} staff` }
+          details: { message: `Automatically triggered missed check-out at ${settings.fixedOfficeHours?.checkOutTime || '19:00'} for ${enabledGroups.join('/')} staff` }
         });
 
         // 7. Notify the staff member
         await this.createNotification({
           userId: user.id,
-          message: `Notice: A missed check-out has been automatically recorded for you at 7:00 PM today.`,
+          message: `Notice: A missed check-out has been automatically recorded for you at ${settings.fixedOfficeHours?.checkOutTime || '19:00'} today.`,
           type: 'warning'
         });
 

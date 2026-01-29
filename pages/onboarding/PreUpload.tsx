@@ -418,15 +418,17 @@ const PreUpload = () => {
     };
 
     return (
-        <div className="relative">
+        <>
             {isProcessing && (
-                <div className="absolute inset-0 bg-page/90 backdrop-blur-sm z-10 flex flex-col items-center justify-center rounded-xl animate-fade-in-scale">
-                    <Loader2 className="h-12 w-12 animate-spin text-accent" />
-                    <p className="mt-4 text-lg font-semibold text-primary-text">Processing Documents...</p>
-                    <p className="text-muted text-center max-w-xs">Our AI is analyzing your files. This may take a moment.</p>
+                <div className="fixed inset-0 bg-black/50 z-50 flex flex-col items-center justify-center animate-fade-in">
+                    <div className="bg-white p-8 rounded-xl shadow-xl">
+                        <Loader2 className="h-12 w-12 animate-spin text-accent mx-auto" />
+                        <p className="mt-4 text-lg font-semibold text-primary-text">Processing Documents...</p>
+                        <p className="text-muted text-center max-w-xs">Our AI is analyzing your files. This may take a moment.</p>
+                    </div>
                 </div>
             )}
-            <div className={`bg-card p-8 rounded-xl shadow-card w-full transition-all ${isProcessing ? 'blur-sm pointer-events-none' : ''}`}>
+            <div className="bg-card p-4 md:p-6 lg:p-8 rounded-xl shadow-card">
                 <MismatchModal {...mismatchModalState} onClose={() => setMismatchModalState({ isOpen: false, employeeName: '', bankName: '', reason: '' })} onOverride={handleOverride} />
                 <form onSubmit={handleSubmit(handleFormSubmit)}>
                     <FormHeader title="Document Collection" subtitle="Upload documents to auto-fill the application." />
@@ -617,7 +619,7 @@ const PreUpload = () => {
                     </footer>
                 </div>
             )}
-        </div>
+        </>
     );
 };
 

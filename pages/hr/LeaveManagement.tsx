@@ -448,7 +448,7 @@ const LeaveManagement: React.FC = () => {
                                         <td data-label="Employee" className="px-4 py-3 font-medium">{claim.userName}</td>
                                         <td data-label="Date & Type" className="px-4 py-3 text-muted">{format(new Date(claim.workDate), 'dd MMM, yyyy')} ({claim.workType})</td>
                                         <td data-label="Claim" className="px-4 py-3 text-muted">{claim.claimType}{claim.claimType === 'OT' ? ` (${claim.hoursWorked} hrs)` : ''}</td>
-                                        <td data-label="Reason" className="px-4 py-3 text-muted max-w-xs truncate">{claim.reason}</td>
+                                        <td data-label="Reason" className="px-4 py-3 text-muted whitespace-normal break-words max-w-sm">{claim.reason}</td>
                                         <td data-label="Status" className="px-4 py-3"><ClaimStatusChip status={claim.status} /></td>
                                         <td data-label="Actions" className="px-4 py-3">
                                             <div className="flex md:justify-start justify-end gap-2">
@@ -486,7 +486,7 @@ const LeaveManagement: React.FC = () => {
                                         <td data-label="Type" className="px-4 py-3 text-muted">{req.leaveType} {req.dayOption && `(${req.dayOption})`}</td>
                                         <td data-label="Dates" className="px-4 py-3 text-muted">{format(new Date(req.startDate.replace(/-/g, '/')), 'dd MMM')} - {format(new Date(req.endDate.replace(/-/g, '/')), 'dd MMM')}</td>
                                         <td data-label="Raised On" className="px-4 py-3 text-muted">{(req as any).createdAt ? format(new Date((req as any).createdAt), 'dd MMM, hh:mm a') : 'N/A'}</td>
-                                        <td data-label="Reason" className="px-4 py-3 text-muted max-w-xs truncate">{req.reason}</td>
+                                        <td data-label="Reason" className="px-4 py-3 text-muted whitespace-normal break-words max-w-sm">{req.reason}</td>
                                         <td data-label="Status" className="px-4 py-3"><StatusChip status={req.status} approverName={req.currentApproverName} approvalHistory={req.approvalHistory} /></td>
                                         <td data-label="Actions" className="px-4 py-3">
                                             <div className="flex md:justify-start justify-end">
