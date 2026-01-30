@@ -31,6 +31,9 @@ const GMC_RATES = [
 
 const validationSchema = yup.object({
     employeeName: yup.string().required('Employee name is required'),
+    employeeId: yup.string().optional(),
+    dateOfJoining: yup.string().required('Date of joining is required'),
+    designation: yup.string().required('Designation is required'),
     companyName: yup.string().required('Company name is required'),
     siteName: yup.string().required('Site name is required'),
     dob: yup.string().required('Date of birth is required'),
@@ -42,15 +45,51 @@ const validationSchema = yup.object({
         then: schema => schema.required('Spouse name is required'),
         otherwise: schema => schema.optional()
     }),
+    spouseDob: yup.string().when('maritalStatus', {
+        is: 'Married',
+        then: schema => schema.required('Spouse DOB is required'),
+        otherwise: schema => schema.optional()
+    }),
+    spouseGender: yup.string().when('maritalStatus', {
+        is: 'Married',
+        then: schema => schema.oneOf(['Male', 'Female']).required('Spouse gender is required'),
+        otherwise: schema => schema.optional()
+    }),
     spouseContact: yup.string().when('maritalStatus', {
         is: 'Married',
         then: schema => schema.required('Spouse contact is required').matches(/^[0-9]{10}$/, 'Must be a 10-digit number'),
         otherwise: schema => schema.optional()
     }),
-    fatherName: yup.string().optional(),
-    fatherDob: yup.string().optional(),
-    motherName: yup.string().optional(),
-    motherDob: yup.string().optional(),
+    fatherName: yup.string().when('maritalStatus', {
+        is: 'Single',
+        then: schema => schema.required('Father\'s name is required'),
+        otherwise: schema => schema.optional()
+    }),
+    fatherDob: yup.string().when('maritalStatus', {
+        is: 'Single',
+        then: schema => schema.required('Father\'s DOB is required'),
+        otherwise: schema => schema.optional()
+    }),
+    fatherGender: yup.string().when('maritalStatus', {
+        is: 'Single',
+        then: schema => schema.oneOf(['Male', 'Female']).required('Father\'s gender is required'),
+        otherwise: schema => schema.optional()
+    }),
+    motherName: yup.string().when('maritalStatus', {
+        is: 'Single',
+        then: schema => schema.required('Mother\'s name is required'),
+        otherwise: schema => schema.optional()
+    }),
+    motherDob: yup.string().when('maritalStatus', {
+        is: 'Single',
+        then: schema => schema.required('Mother\'s DOB is required'),
+        otherwise: schema => schema.optional()
+    }),
+    motherGender: yup.string().when('maritalStatus', {
+        is: 'Single',
+        then: schema => schema.oneOf(['Male', 'Female']).required('Mother\'s gender is required'),
+        otherwise: schema => schema.optional()
+    }),
     children: yup.array().of(
         yup.object({
             name: yup.string().required('Child name is required'),
@@ -92,12 +131,14 @@ const GMCForm: React.FC = () => {
         fetchData();
     }, []);
 
-    const { register, control, handleSubmit, watch, trigger, formState: { errors } } = useForm<GMCFormData>({
+    const { register, control, handleSubmit, watch, trigger, setValue, formState: { errors } } = useForm<GMCFormData>({
         resolver: yupResolver(validationSchema) as any,
         defaultValues: {
             maritalStatus: 'Single',
             children: [],
-            acknowledged: false
+            acknowledged: false,
+            fatherGender: 'Male',
+            motherGender: 'Female'
         }
     });
 
@@ -107,8 +148,19 @@ const GMCForm: React.FC = () => {
     });
 
     const watchDob = watch('dob');
+    const watchGender = watch('gender');
     const watchMaritalStatus = watch('maritalStatus');
     const watchChildren = watch('children');
+
+    useEffect(() => {
+        if (watchMaritalStatus === 'Married' && watchGender) {
+            if (watchGender === 'Male') {
+                setValue('spouseGender', 'Female');
+            } else if (watchGender === 'Female') {
+                setValue('spouseGender', 'Male');
+            }
+        }
+    }, [watchGender, watchMaritalStatus, setValue]);
 
     const employeeAge = useMemo(() => {
         if (!watchDob) return null;
@@ -124,20 +176,19 @@ const GMCForm: React.FC = () => {
     const handleNextStep = async () => {
         let fieldsToValidate: any[] = [];
         if (step === 1) {
-            fieldsToValidate = ['employeeName', 'companyName', 'siteName', 'dob', 'gender', 'contactNumber'];
+            fieldsToValidate = ['employeeName', 'employeeId', 'dateOfJoining', 'designation', 'companyName', 'siteName', 'dob', 'gender', 'contactNumber'];
         } else if (step === 2) {
+            fieldsToValidate = ['maritalStatus'];
             if (watchMaritalStatus === 'Single') {
-                fieldsToValidate = ['maritalStatus', 'fatherName', 'fatherDob', 'motherName', 'motherDob'];
-            } else {
-                fieldsToValidate = ['maritalStatus'];
-                if (watchMaritalStatus === 'Married') {
-                    fieldsToValidate.push('spouseName', 'spouseContact');
-                }
-                if (watchChildren && watchChildren.length > 0) {
-                    watchChildren.forEach((_, index) => {
-                        fieldsToValidate.push(`children.${index}.name`, `children.${index}.dob`, `children.${index}.gender`);
-                    });
-                }
+                fieldsToValidate.push('fatherName', 'fatherDob', 'fatherGender', 'motherName', 'motherDob', 'motherGender');
+            }
+            if (watchMaritalStatus === 'Married') {
+                fieldsToValidate.push('spouseName', 'spouseDob', 'spouseGender', 'spouseContact');
+            }
+            if (watchChildren && watchChildren.length > 0) {
+                watchChildren.forEach((_, index) => {
+                    fieldsToValidate.push(`children.${index}.name`, `children.${index}.dob`, `children.${index}.gender`);
+                });
             }
         }
 
@@ -164,6 +215,7 @@ const GMCForm: React.FC = () => {
 
             const finalData = {
                 ...sanitizeData(data),
+                employeeId: data.employeeId || `TEMP_${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
                 plan_name: insurancePlan ? `${insurancePlan.minAge}-${insurancePlan.maxAge} Tier` : 'N/A',
                 premium_amount: insurancePlan ? insurancePlan.rate : 0
             };
@@ -212,10 +264,10 @@ const GMCForm: React.FC = () => {
                     </div>
 
                     <div className="w-full p-8 space-y-6">
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-2xl mx-auto">
                             <Button
                                 onClick={downloadPdf}
-                                className="flex-1 flex items-center justify-center gap-2"
+                                className="flex-1 sm:flex-initial sm:px-10 flex items-center justify-center gap-3 h-14 !rounded-2xl !text-base shadow-lg shadow-accent/20"
                             >
                                 <Download className="h-5 w-5" />
                                 Download PDF Receipt
@@ -223,7 +275,7 @@ const GMCForm: React.FC = () => {
                             <Button
                                 variant="secondary"
                                 onClick={() => navigate('/auth/login')}
-                                className="flex-1 flex items-center justify-center gap-2"
+                                className="flex-1 sm:flex-initial sm:px-10 flex items-center justify-center gap-3 h-14 !rounded-2xl !text-base"
                             >
                                 <ArrowLeft className="h-5 w-5" />
                                 Back to Login
@@ -231,79 +283,117 @@ const GMCForm: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Hidden PDF content stays simplified for printing */}
-                    <div id="gmc-preview-content" className="hidden p-8 text-left bg-white text-black">
-                        <div className="flex justify-between items-center mb-8 border-b pb-4 border-gray-100">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-accent rounded-lg">
-                                    <Logo className="h-10 text-white invert" />
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold">Paradigm Services</h2>
-                                    <p className="text-xs text-gray-500 uppercase tracking-widest">GMC Enrollment Form</p>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-sm font-semibold">Date: {format(new Date(), 'dd MMM yyyy')}</p>
-                                <p className="text-xs text-gray-400">Ref: GMC-{Math.random().toString(36).substring(7).toUpperCase()}</p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-8 mb-8">
-                            <div className="space-y-4">
-                                <h3 className="text-[10px] font-black text-accent uppercase tracking-[0.2em] border-b border-gray-100 pb-1">Employee Profile</h3>
-                                <div className="space-y-2">
-                                    <div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase">Full Name</span><span className="text-sm font-bold">{submissionData?.employeeName}</span></div>
-                                    <div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase">Company</span><span className="text-sm font-bold">{submissionData?.companyName}</span></div>
-                                    <div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase">Work Site</span><span className="text-sm font-bold">{submissionData?.siteName}</span></div>
-                                </div>
-                            </div>
-                            <div className="space-y-4">
-                                <h3 className="text-[10px] font-black text-accent uppercase tracking-[0.2em] border-b border-gray-100 pb-1">Family Status</h3>
-                                <div className="space-y-2">
-                                    <div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase">Marital Status</span><span className="text-sm font-bold">{submissionData?.maritalStatus}</span></div>
-                                    {submissionData?.maritalStatus === 'Single' ? (
-                                        <>
-                                            <div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase">Father Name</span><span className="text-sm font-bold">{submissionData?.fatherName || 'N/A'}</span></div>
-                                            <div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase">Mother Name</span><span className="text-sm font-bold">{submissionData?.motherName || 'N/A'}</span></div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            {submissionData?.maritalStatus === 'Married' && (
-                                                <div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase">Spouse Name</span><span className="text-sm font-bold">{submissionData?.spouseName}</span></div>
-                                            )}
-                                            <div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase">No. of Children</span><span className="text-sm font-bold">{submissionData?.children?.length || 0}</span></div>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="p-6 bg-gray-50 rounded-xl border border-gray-100 mb-10 overflow-hidden relative">
-                            <div className="absolute top-0 right-0 p-4 opacity-5">
-                                <ShieldCheck className="h-20 w-20" />
-                            </div>
-                            <div className="relative z-10 flex justify-between items-center">
-                                <div>
-                                    <h3 className="text-[10px] font-black text-accent uppercase tracking-widest mb-1">Approved Insurance Tier</h3>
-                                    <p className="text-xl font-bold">{submissionData?.plan_name}</p>
-                                    <p className="text-[10px] text-gray-400">Premium calculated based on age {employeeAge} years</p>
+                    {/* Hidden PDF content moved off-screen for capture */}
+                    <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+                        <div id="gmc-preview-content" className="p-12 text-left bg-white text-black" style={{ width: '210mm', minHeight: '297mm' }}>
+                            <div className="flex justify-between items-start mb-10 border-b-4 border-accent pb-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 bg-accent rounded-xl">
+                                        <Logo className="h-12 text-white invert" />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-2xl font-black uppercase tracking-tight">Paradigm Services</h1>
+                                        <p className="text-[10px] text-accent font-bold uppercase tracking-[0.3em]">Corporate Health Services</p>
+                                    </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-[10px] font-bold text-gray-500 uppercase">Monthly Premium</p>
-                                    <p className="text-3xl font-black text-accent">₹{submissionData?.premium_amount}</p>
+                                    <h2 className="text-xl font-bold text-gray-900 mb-1">GMC ENROLLMENT RECORD</h2>
+                                    <p className="text-sm font-semibold text-gray-500">Date: {format(new Date(), 'dd MMM yyyy')}</p>
+                                    <p className="text-xs text-gray-400 font-mono">REF: GMC-{Math.random().toString(36).substring(7).toUpperCase()}</p>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-20 pt-10 border-t border-dashed border-gray-200">
-                            <div className="text-center">
-                                <div className="h-10 border-b border-gray-300 mb-2"></div>
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Employee Signature</p>
+                            <div className="grid grid-cols-2 gap-12 mb-10">
+                                <div className="space-y-6">
+                                    <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
+                                        <User className="h-4 w-4 text-accent" />
+                                        <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Employee Profile</h3>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Full Name</span><span className="text-sm font-bold text-gray-800">{submissionData?.employeeName}</span></div>
+                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Employee ID</span><span className="text-sm font-bold text-gray-800">{submissionData?.employeeId}</span></div>
+                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Designation</span><span className="text-sm font-bold text-gray-800">{submissionData?.designation}</span></div>
+                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Joining Date</span><span className="text-sm font-bold text-gray-800">{submissionData?.dateOfJoining}</span></div>
+                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Company</span><span className="text-sm font-bold text-gray-800">{submissionData?.companyName}</span></div>
+                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Work Site</span><span className="text-sm font-bold text-gray-800">{submissionData?.siteName}</span></div>
+                                    </div>
+                                </div>
+                                <div className="space-y-6">
+                                    <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
+                                        <Users className="h-4 w-4 text-accent" />
+                                        <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Family Structure</h3>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Marital Status</span><span className="text-sm font-bold text-gray-800">{submissionData?.maritalStatus}</span></div>
+                                        
+                                        {submissionData?.maritalStatus === 'Single' && (
+                                            <>
+                                                <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Father</span><span className="text-sm font-bold text-gray-800">{submissionData?.fatherName} ({submissionData?.fatherGender})</span></div>
+                                                <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Mother</span><span className="text-sm font-bold text-gray-800">{submissionData?.motherName} ({submissionData?.motherGender})</span></div>
+                                            </>
+                                        )}
+                                        
+                                        {submissionData?.maritalStatus === 'Married' && (
+                                            <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Spouse</span><span className="text-sm font-bold text-gray-800">{submissionData?.spouseName} ({submissionData?.spouseGender})</span></div>
+                                        )}
+                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">No. of Children</span><span className="text-sm font-bold text-gray-800">{submissionData?.children?.length || 0}</span></div>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="text-center">
-                                <div className="h-10 border-b border-gray-300 mb-2"></div>
-                                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400">HR Administrator</p>
+
+                            {submissionData?.children && submissionData.children.length > 0 && (
+                                <div className="mb-10">
+                                    <div className="flex items-center gap-2 border-b border-gray-100 pb-2 mb-4">
+                                        <Users className="h-4 w-4 text-accent" />
+                                        <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Children Details</h3>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        {submissionData.children.map((child: any, idx: number) => (
+                                            <div key={idx} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                                <p className="text-xs font-bold text-gray-800 mb-1">{child.name}</p>
+                                                <p className="text-[10px] text-gray-500">{child.gender} • DOB: {child.dob}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="p-8 bg-accent/5 rounded-2xl border-2 border-accent/10 mb-12 relative overflow-hidden">
+                                <ShieldCheck className="absolute -right-6 -bottom-6 h-32 w-32 text-accent/10 transform -rotate-12" />
+                                <div className="relative z-10 flex justify-between items-center">
+                                    <div>
+                                        <h3 className="text-[10px] font-black text-accent uppercase tracking-[0.2em] mb-2">Approved Insurance Policy</h3>
+                                        <p className="text-2xl font-black text-gray-900">{submissionData?.plan_name}</p>
+                                        <p className="text-xs text-gray-500 mt-1 font-medium">Group Medical Cover • Age Based Tier</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Monthly Premium</p>
+                                        <p className="text-4xl font-black text-accent">₹{submissionData?.premium_amount}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-24 pt-16 border-t border-dashed border-gray-200">
+                                <div className="text-center">
+                                    <div className="h-16 flex items-end justify-center border-b border-gray-300 mb-3 italic text-gray-400 text-sm">
+                                        Signed Electronically
+                                    </div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-900">Employee Signature</p>
+                                    <p className="text-[9px] text-gray-400 font-medium mt-1">{submissionData?.employeeName}</p>
+                                </div>
+                                <div className="text-center">
+                                    <div className="h-16 flex items-end justify-center border-b border-gray-300 mb-3">
+                                        <div className="p-2 border border-accent/20 rounded-md bg-accent/5 rotate-[-2deg]">
+                                            <Logo className="h-6 opacity-40 invert grayscale" />
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-900">Authorized Signatory</p>
+                                    <p className="text-[9px] text-gray-400 font-medium mt-1">Paradigm Services HR</p>
+                                </div>
+                            </div>
+
+                            <div className="mt-20 text-center">
+                                <p className="text-[8px] text-gray-300 uppercase tracking-[0.5em]">System Generated Receipt • No physical signature required</p>
                             </div>
                         </div>
                     </div>
@@ -382,6 +472,30 @@ const GMCForm: React.FC = () => {
                                         placeholder="As per salary documents"
                                         registration={register('employeeName')}
                                         error={errors.employeeName?.message}
+                                        className={isMobile ? 'public-form-input' : ''}
+                                        labelClassName={isMobile ? 'public-form-label' : ''}
+                                    />
+                                    <Input
+                                        label="Employee ID"
+                                        placeholder="Refer Payslip (Leave blank for temp ID)"
+                                        registration={register('employeeId')}
+                                        error={errors.employeeId?.message}
+                                        className={isMobile ? 'public-form-input' : ''}
+                                        labelClassName={isMobile ? 'public-form-label' : ''}
+                                    />
+                                    <Input
+                                        type="date"
+                                        label="Date of Joining"
+                                        registration={register('dateOfJoining')}
+                                        error={errors.dateOfJoining?.message}
+                                        className={isMobile ? 'public-form-input' : ''}
+                                        labelClassName={isMobile ? 'public-form-label' : ''}
+                                    />
+                                    <Input
+                                        label="Employee Designation"
+                                        placeholder="As per pay slip"
+                                        registration={register('designation')}
+                                        error={errors.designation?.message}
                                         className={isMobile ? 'public-form-input' : ''}
                                         labelClassName={isMobile ? 'public-form-label' : ''}
                                     />
@@ -490,7 +604,7 @@ const GMCForm: React.FC = () => {
                                         />
                                     </div>
 
-                                    {watchMaritalStatus === 'Single' ? (
+                                    {watchMaritalStatus === 'Single' && (
                                         <div className="space-y-8 animate-slide-up">
                                             <div className="flex items-center gap-2 mb-2">
                                                 <Users className="h-5 w-5 text-accent" />
@@ -507,14 +621,32 @@ const GMCForm: React.FC = () => {
                                                         className={isMobile ? 'public-form-input' : ''}
                                                         labelClassName={isMobile ? 'public-form-label' : ''}
                                                     />
-                                                    <Input
-                                                        type="date"
-                                                        label="Father's DOB"
-                                                        registration={register('fatherDob')}
-                                                        error={errors.fatherDob?.message}
-                                                        className={isMobile ? 'public-form-input' : ''}
-                                                        labelClassName={isMobile ? 'public-form-label' : ''}
-                                                    />
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <Input
+                                                            type="date"
+                                                            label="Father's DOB"
+                                                            registration={register('fatherDob')}
+                                                            error={errors.fatherDob?.message}
+                                                            className={isMobile ? 'public-form-input' : ''}
+                                                            labelClassName={isMobile ? 'public-form-label' : ''}
+                                                        />
+                                                        <div className="space-y-2">
+                                                            <label className={`text-[10px] font-black uppercase tracking-widest ${isMobile ? 'text-white/60' : 'text-muted'}`}>Gender</label>
+                                                            <Controller
+                                                                name="fatherGender"
+                                                                control={control}
+                                                                render={({ field }) => (
+                                                                    <select 
+                                                                        {...field}
+                                                                        className={`w-full h-10 px-3 rounded-xl border text-sm font-bold ${isMobile ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-border text-primary-text'}`}
+                                                                    >
+                                                                        <option value="Male">Male</option>
+                                                                        <option value="Female">Female</option>
+                                                                    </select>
+                                                                )}
+                                                            />
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <div className="space-y-6">
                                                     <h4 className={`text-xs font-black uppercase tracking-widest ${isMobile ? 'text-accent' : 'text-accent'}`}>Mother Details</h4>
@@ -526,124 +658,160 @@ const GMCForm: React.FC = () => {
                                                         className={isMobile ? 'public-form-input' : ''}
                                                         labelClassName={isMobile ? 'public-form-label' : ''}
                                                     />
-                                                    <Input
-                                                        type="date"
-                                                        label="Mother's DOB"
-                                                        registration={register('motherDob')}
-                                                        error={errors.motherDob?.message}
-                                                        className={isMobile ? 'public-form-input' : ''}
-                                                        labelClassName={isMobile ? 'public-form-label' : ''}
-                                                    />
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <Input
+                                                            type="date"
+                                                            label="Mother's DOB"
+                                                            registration={register('motherDob')}
+                                                            error={errors.motherDob?.message}
+                                                            className={isMobile ? 'public-form-input' : ''}
+                                                            labelClassName={isMobile ? 'public-form-label' : ''}
+                                                        />
+                                                        <div className="space-y-2">
+                                                            <label className={`text-[10px] font-black uppercase tracking-widest ${isMobile ? 'text-white/60' : 'text-muted'}`}>Gender</label>
+                                                            <Controller
+                                                                name="motherGender"
+                                                                control={control}
+                                                                render={({ field }) => (
+                                                                    <select 
+                                                                        {...field}
+                                                                        className={`w-full h-10 px-3 rounded-xl border text-sm font-bold ${isMobile ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-border text-primary-text'}`}
+                                                                    >
+                                                                        <option value="Female">Female</option>
+                                                                        <option value="Male">Male</option>
+                                                                    </select>
+                                                                )}
+                                                            />
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    ) : (
-                                        <>
-                                            {watchMaritalStatus === 'Married' && (
-                                                <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-2xl border animate-slide-up ${isMobile ? 'bg-accent/10 border-accent/20' : 'bg-accent-light/30 border-accent/10'}`}>
-                                                    <Input
-                                                        label="Spouse Name"
-                                                        placeholder="Husband/Wife full name"
-                                                        registration={register('spouseName')}
-                                                        error={errors.spouseName?.message}
-                                                        className={isMobile ? 'public-form-input' : ''}
-                                                        labelClassName={isMobile ? 'public-form-label' : ''}
-                                                    />
-                                                    <Input
-                                                        label="Spouse Contact"
-                                                        placeholder="10 digit number"
-                                                        registration={register('spouseContact')}
-                                                        error={errors.spouseContact?.message}
-                                                        maxLength={10}
-                                                        className={isMobile ? 'public-form-input' : ''}
-                                                        labelClassName={isMobile ? 'public-form-label' : ''}
-                                                    />
-                                                </div>
-                                            )}
+                                    )}
 
-                                            <div className="space-y-4">
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <h3 className={`font-bold ${isMobile ? 'text-white' : 'text-primary-text'}`}>Children Information</h3>
-                                                        <p className="text-xs text-muted">You can add up to 2 children.</p>
-                                                    </div>
-                                                    {fields.length < 2 && (
-                                                        <Button
-                                                            type="button"
-                                                            variant="secondary"
-                                                            size="sm"
-                                                            onClick={() => append({ name: '', dob: '', gender: 'Male' })}
-                                                            className={`!rounded-xl ${isMobile ? '!bg-white/10 !border-white/20 !text-white hover:!bg-white/20' : ''}`}
+                                    {watchMaritalStatus === 'Married' && (
+                                        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-2xl border animate-slide-up ${isMobile ? 'bg-accent/10 border-accent/20' : 'bg-accent-light/30 border-accent/10'}`}>
+                                            <div className="md:col-span-2">
+                                                <h4 className={`text-xs font-black uppercase tracking-widest mb-4 ${isMobile ? 'text-accent' : 'text-accent'}`}>Spouse Information</h4>
+                                            </div>
+                                            <Input
+                                                label="Spouse Name"
+                                                placeholder="Husband/Wife full name"
+                                                registration={register('spouseName')}
+                                                error={errors.spouseName?.message}
+                                                className={isMobile ? 'public-form-input' : ''}
+                                                labelClassName={isMobile ? 'public-form-label' : ''}
+                                            />
+                                            <Input
+                                                label="Spouse Contact"
+                                                placeholder="10 digit number"
+                                                registration={register('spouseContact')}
+                                                error={errors.spouseContact?.message}
+                                                maxLength={10}
+                                                className={isMobile ? 'public-form-input' : ''}
+                                                labelClassName={isMobile ? 'public-form-label' : ''}
+                                            />
+                                            <Input
+                                                type="date"
+                                                label="Spouse DOB"
+                                                registration={register('spouseDob')}
+                                                error={errors.spouseDob?.message}
+                                                className={isMobile ? 'public-form-input' : ''}
+                                                labelClassName={isMobile ? 'public-form-label' : ''}
+                                            />
+                                            <div className="space-y-2">
+                                                <label className={`text-sm font-semibold block mb-2 ${isMobile ? 'text-white/60 text-[10px] uppercase tracking-widest' : 'text-primary-text'}`}>Spouse Gender</label>
+                                                <Controller
+                                                    name="spouseGender"
+                                                    control={control}
+                                                    render={({ field }) => (
+                                                        <select 
+                                                            {...field}
+                                                            className={`w-full h-12 px-4 rounded-xl border-2 text-sm font-bold transition-all ${isMobile ? 'bg-white/5 border-white/10 text-white shadow-lg' : 'bg-white border-border text-primary-text'}`}
                                                         >
-                                                            <Plus className="h-4 w-4 mr-2" /> Add Child
-                                                        </Button>
+                                                            <option value="Male">Male</option>
+                                                            <option value="Female">Female</option>
+                                                        </select>
                                                     )}
-                                                </div>
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
 
-                                                {fields.length === 0 ? (
-                                                    <div className={`py-10 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center text-muted gap-2 ${isMobile ? 'border-white/10' : 'border-border'}`}>
-                                                        <Users className="h-8 w-8 opacity-20" />
-                                                        <p className="text-sm font-medium">No children declared yet</p>
-                                                    </div>
-                                                ) : (
-                                                    <div className="grid grid-cols-1 gap-4">
-                                                        {fields.map((field, index) => (
-                                                            <div key={field.id} className={`p-6 border rounded-2xl shadow-sm relative group transition-all ${isMobile ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-border hover:bg-page/30'}`}>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => remove(index)}
-                                                                    className={`absolute top-4 right-4 p-2 rounded-full transition-all ${isMobile ? 'text-gray-500 hover:text-red-400 hover:bg-red-400/10' : 'text-muted hover:text-red-500 hover:bg-red-50'}`}
-                                                                >
-                                                                    <Trash2 className="h-5 w-5" />
-                                                                </button>
-                                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                                                    <Input
-                                                                        label={`Child Name`}
-                                                                        registration={register(`children.${index}.name` as const)}
-                                                                        error={errors.children?.[index]?.name?.message}
-                                                                        className={isMobile ? 'public-form-input' : ''}
-                                                                        labelClassName={isMobile ? 'public-form-label' : ''}
-                                                                    />
-                                                                    <Input
-                                                                        type="date"
-                                                                        label="Date of Birth"
-                                                                        registration={register(`children.${index}.dob` as const)}
-                                                                        error={errors.children?.[index]?.dob?.message}
-                                                                        className={isMobile ? 'public-form-input' : ''}
-                                                                        labelClassName={isMobile ? 'public-form-label' : ''}
-                                                                    />
-                                                                    <div className="space-y-2">
-                                                                        <label className={`text-sm font-semibold block mb-2 ${isMobile ? 'text-white/60 text-[10px] uppercase tracking-widest' : 'text-primary-text'}`}>Gender</label>
-                                                                        <Controller
-                                                                            name={`children.${index}.gender` as const}
-                                                                            control={control}
-                                                                            render={({ field }) => (
-                                                                                <div className={`flex gap-2 p-1 border rounded-xl ${isMobile ? 'bg-white/5 border-white/10' : 'bg-page border-border'}`}>
-                                                                                    {['Male', 'Female'].map(option => (
-                                                                                        <button
-                                                                                            key={option}
-                                                                                            type="button"
-                                                                                            onClick={() => field.onChange(option)}
-                                                                                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
-                                                                                                field.value === option
-                                                                                                    ? (isMobile ? 'bg-accent text-white shadow-lg' : 'bg-white text-accent shadow-sm')
-                                                                                                    : (isMobile ? 'text-gray-500 hover:text-white' : 'text-muted hover:text-primary-text')
-                                                                                            }`}
-                                                                                        >
-                                                                                            {option}
-                                                                                        </button>
-                                                                                    ))}
-                                                                                </div>
-                                                                            )}
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
+                                    {(watchMaritalStatus === 'Married' || watchMaritalStatus === 'Divorced' || watchMaritalStatus === 'Widowed') && (
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <h3 className={`font-bold ${isMobile ? 'text-white' : 'text-primary-text'}`}>Children Information</h3>
+                                                    <p className="text-xs text-muted">You can add up to 2 children.</p>
+                                                </div>
+                                                {fields.length < 2 && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="secondary"
+                                                        size="sm"
+                                                        onClick={() => append({ name: '', dob: '', gender: 'Male' })}
+                                                        className={`!rounded-xl ${isMobile ? '!bg-white/10 !border-white/20 !text-white hover:!bg-white/20' : ''}`}
+                                                    >
+                                                        <Plus className="h-4 w-4 mr-2" /> Add Child
+                                                    </Button>
                                                 )}
                                             </div>
-                                        </>
+
+                                            {fields.length === 0 ? (
+                                                <div className={`py-10 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center text-muted gap-2 ${isMobile ? 'border-white/10' : 'border-border'}`}>
+                                                    <Users className="h-8 w-8 opacity-20" />
+                                                    <p className="text-sm font-medium">No children declared yet</p>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 gap-4">
+                                                    {fields.map((field, index) => (
+                                                        <div key={field.id} className={`p-6 border rounded-2xl shadow-sm relative group transition-all ${isMobile ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-border hover:bg-page/30'}`}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => remove(index)}
+                                                                className={`absolute top-4 right-4 p-2 rounded-full transition-all ${isMobile ? 'text-gray-500 hover:text-red-400 hover:bg-red-400/10' : 'text-muted hover:text-red-500 hover:bg-red-50'}`}
+                                                            >
+                                                                <Trash2 className="h-5 w-5" />
+                                                            </button>
+                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                                <Input
+                                                                    label={`Child Name`}
+                                                                    registration={register(`children.${index}.name` as const)}
+                                                                    error={errors.children?.[index]?.name?.message}
+                                                                    className={isMobile ? 'public-form-input' : ''}
+                                                                    labelClassName={isMobile ? 'public-form-label' : ''}
+                                                                />
+                                                                <Input
+                                                                    type="date"
+                                                                    label="Date of Birth"
+                                                                    registration={register(`children.${index}.dob` as const)}
+                                                                    error={errors.children?.[index]?.dob?.message}
+                                                                    className={isMobile ? 'public-form-input' : ''}
+                                                                    labelClassName={isMobile ? 'public-form-label' : ''}
+                                                                />
+                                                                <div className="space-y-2">
+                                                                    <label className={`text-sm font-semibold block mb-2 ${isMobile ? 'text-white/60 text-[10px] uppercase tracking-widest' : 'text-primary-text'}`}>Gender</label>
+                                                                    <Controller
+                                                                        name={`children.${index}.gender` as const}
+                                                                        control={control}
+                                                                        render={({ field }) => (
+                                                                            <select 
+                                                                                {...field}
+                                                                                className={`w-full h-10 px-3 rounded-xl border text-sm font-bold ${isMobile ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-border text-primary-text'}`}
+                                                                            >
+                                                                                <option value="Male">Male</option>
+                                                                                <option value="Female">Female</option>
+                                                                            </select>
+                                                                        )}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             </div>

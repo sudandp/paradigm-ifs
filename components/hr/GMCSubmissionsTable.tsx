@@ -28,11 +28,25 @@ const GMCSubmissionPdfTemplate: React.FC<{ sub: GmcSubmission }> = ({ sub }) => 
             <div className="grid grid-cols-2 gap-10 mb-10">
                 <div className="space-y-4">
                     <h3 className="text-[10px] font-black uppercase tracking-widest text-accent/60 mb-2">Member Identity</h3>
-                    <div>
-                        <p className="text-[10px] font-bold text-muted uppercase">Full Name</p>
-                        <p className="font-black text-xl">{sub.employeeName}</p>
-                    </div>
                     <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <p className="text-[10px] font-bold text-muted uppercase">Full Name</p>
+                            <p className="font-black text-lg leading-tight">{sub.employeeName}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-muted uppercase">Employee ID</p>
+                            <p className="font-bold">{sub.employeeId}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-muted uppercase">Designation</p>
+                            <p className="font-bold">{sub.designation}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-muted uppercase">Joining Date</p>
+                            <p className="font-bold">{sub.dateOfJoining}</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-2">
                         <div>
                             <p className="text-[10px] font-bold text-muted uppercase">Date of Birth</p>
                             <p className="font-bold">{sub.dob}</p>
@@ -41,10 +55,6 @@ const GMCSubmissionPdfTemplate: React.FC<{ sub: GmcSubmission }> = ({ sub }) => 
                             <p className="text-[10px] font-bold text-muted uppercase">Gender</p>
                             <p className="font-bold">{sub.gender}</p>
                         </div>
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-bold text-muted uppercase">Contact Number</p>
-                        <p className="font-bold">{sub.contactNumber}</p>
                     </div>
                 </div>
 
@@ -103,15 +113,17 @@ const GMCSubmissionPdfTemplate: React.FC<{ sub: GmcSubmission }> = ({ sub }) => 
                             {sub.maritalStatus === 'Married' && sub.spouseName && (
                                 <tr>
                                     <td className="py-3 font-bold text-accent">Spouse</td>
-                                    <td className="py-3 font-medium">{sub.spouseName}</td>
+                                    <td className="py-3 font-medium">{sub.spouseName} ({sub.spouseGender})</td>
+                                    <td className="py-3 font-medium">{sub.spouseDob}</td>
                                     <td className="py-3">{sub.spouseContact || '—'}</td>
                                 </tr>
                             )}
                             {sub.children?.map((child: any, idx: number) => (
                                 <tr key={idx}>
                                     <td className="py-3 font-bold text-accent">Child {idx + 1}</td>
-                                    <td className="py-3 font-medium">{child.name}</td>
-                                    <td className="py-3">{child.dob} ({child.gender})</td>
+                                    <td className="py-3 font-medium">{child.name} ({child.gender})</td>
+                                    <td className="py-3 font-medium">{child.dob}</td>
+                                    <td className="py-3">—</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -124,16 +136,16 @@ const GMCSubmissionPdfTemplate: React.FC<{ sub: GmcSubmission }> = ({ sub }) => 
                 <div className="mb-10">
                     <h3 className="text-[10px] font-black uppercase tracking-widest text-accent/60 mb-4">Parental Declarations</h3>
                     <div className="grid grid-cols-2 gap-6">
-                        {sub.fatherName && (
+                        {sub.maritalStatus === 'Single' && sub.fatherName && (
                             <div className="p-4 bg-gray-50 rounded-xl">
-                                <p className="text-[10px] font-bold text-muted uppercase">Father's Name</p>
+                                <p className="text-[10px] font-bold text-muted uppercase">Father's Name ({sub.fatherGender})</p>
                                 <p className="font-bold">{sub.fatherName}</p>
                                 <p className="text-xs text-muted">DOB: {sub.fatherDob || '—'}</p>
                             </div>
                         )}
-                        {sub.motherName && (
+                        {sub.maritalStatus === 'Single' && sub.motherName && (
                             <div className="p-4 bg-gray-50 rounded-xl">
-                                <p className="text-[10px] font-bold text-muted uppercase">Mother's Name</p>
+                                <p className="text-[10px] font-bold text-muted uppercase">Mother's Name ({sub.motherGender})</p>
                                 <p className="font-bold">{sub.motherName}</p>
                                 <p className="text-xs text-muted">DOB: {sub.motherDob || '—'}</p>
                             </div>
@@ -241,6 +253,9 @@ const GMCSubmissionsTable: React.FC = () => {
 
             const columns = [
                 { header: 'Employee Name', key: 'employeeName', width: 25 },
+                { header: 'Employee ID', key: 'employeeId', width: 15 },
+                { header: 'DOJ', key: 'dateOfJoining', width: 15 },
+                { header: 'Designation', key: 'designation', width: 20 },
                 { header: 'DOB', key: 'dob', width: 15 },
                 { header: 'Gender', key: 'gender', width: 10 },
                 { header: 'Contact', key: 'contactNumber', width: 15 },
@@ -250,8 +265,14 @@ const GMCSubmissionsTable: React.FC = () => {
                 { header: 'Plan Name', key: 'planName', width: 15 },
                 { header: 'Premium', key: 'premiumAmount', width: 10 },
                 { header: 'Father Name', key: 'fatherName', width: 20 },
+                { header: 'Father Gender', key: 'fatherGender', width: 10 },
+                { header: 'Father DOB', key: 'fatherDob', width: 15 },
                 { header: 'Mother Name', key: 'motherName', width: 20 },
+                { header: 'Mother Gender', key: 'motherGender', width: 10 },
+                { header: 'Mother DOB', key: 'motherDob', width: 15 },
                 { header: 'Spouse Name', key: 'spouseName', width: 20 },
+                { header: 'Spouse Gender', key: 'spouseGender', width: 10 },
+                { header: 'Spouse DOB', key: 'spouseDob', width: 15 },
                 { header: 'Submission Date', key: 'createdAtFormatted', width: 20 },
             ];
 
@@ -500,6 +521,9 @@ const GMCSubmissionsTable: React.FC = () => {
                                             </div>
                                             <div>
                                                 <p className="font-black text-primary-text leading-tight">{sub.employeeName}</p>
+                                                <p className="text-[10px] font-bold text-muted uppercase tracking-tight mt-0.5">
+                                                    ID: {sub.employeeId} • {sub.designation}
+                                                </p>
                                             </div>
                                         </div>
                                     </td>

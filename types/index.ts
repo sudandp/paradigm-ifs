@@ -1626,5 +1626,12 @@ export interface GmcSubmission {
   planName: string;
   premiumAmount: number;
   acknowledged: boolean;
+  employeeId: string;
+  dateOfJoining: string;
+  designation: string;
+  fatherGender?: string | null;
+  motherGender?: string | null;
+  spouseDob?: string | null;
+  spouseGender?: string | null;
   updatedAt: string;
 }
