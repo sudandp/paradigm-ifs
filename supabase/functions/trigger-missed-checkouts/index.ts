@@ -17,28 +17,25 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Fetch Attendance Settings
-    const { data: settingsData, error: settingsError } = await supabaseClient
-      .from('attendance_settings')
-      .select('settings')
-      .eq('id', 1) // Assuming single row settings
+    // 1. Fetch Core Settings
+    const { data: globalSettings, error: settingsError } = await supabaseClient
+      .from('settings')
+      .select('attendance_settings')
+      .eq('id', 'singleton')
       .single();
 
     if (settingsError) throw new Error(`Failed to fetch settings: ${settingsError.message}`);
     
-    const settings = settingsData?.settings || {};
-    const config = settings.missedCheckoutConfig;
-    const fixedHours = settings.fixedOfficeHours;
+    const attendanceSettings = globalSettings?.attendance_settings || {};
+    const config = attendanceSettings.missedCheckoutConfig;
+    // Office staff settings contain the fixed hours by default
+    const fixedHours = attendanceSettings.office?.fixedOfficeHours;
 
     // 2. Check if we should run based on time
-    // This function will likely run every 15-60 mins via cron.
-    // We need to check if current time >= configured checkout time using the Service Role timezone (UTC usually)
-    // However, the user sets time in local time (e.g. IST). 
-    // Ideally user stores timezone in settings, but for now we assume IST (User's context).
+    // Shift end logic: if current time >= configured checkout time
     
     const now = new Date();
-    // Convert current UTC time to IST for comparison (IST is UTC+5:30)
-    // This is a simplification. A robust solution would use a timezone library.
+    // Use IST offset for comparison as per user context
     const istOffset = 5.5 * 60 * 60 * 1000;
     const istDate = new Date(now.getTime() + istOffset);
     const currentHour = istDate.getUTCHours();
@@ -49,14 +46,13 @@ Deno.serve(async (req: Request) => {
     const [confHour, confMinute] = configuredTime.split(':').map(Number);
     const configuredTimeVal = confHour * 60 + confMinute;
 
-    // If current time is BEFORE configured time, do not run (unless forced? No, this is auto)
-    // We also want to avoid re-running if already done today.
-    // But since the cron might run every hour, and people might have checked in late, 
-    // we should simply look for "checked in but not checked out" users ONLY if we are past the checkout time.
-
     if (currentTimeVal < configuredTimeVal) {
       return new Response(
-        JSON.stringify({ message: `Current time (${currentHour}:${currentMinute} IST) is before configured checkout time (${configuredTime}). Skipping.` }),
+        JSON.stringify({ 
+          message: `Current time (${currentHour}:${currentMinute} IST) is before configured checkout time (${configuredTime}). Skipping.`,
+          currentTime: currentTimeVal,
+          targetTime: configuredTimeVal
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -223,7 +219,7 @@ Deno.serve(async (req: Request) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
-  } catch (error) {
+  } catch (error: any) {
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
