@@ -939,121 +939,28 @@ export const api = {
    * Records a check-out at 19:00 (7 PM), logs it, and notifies appropriate users.
    */
   async triggerMissedCheckouts(): Promise<{ count: number }> {
-    const today = new Date();
-    const start = startOfDay(today).toISOString();
-    const end = endOfDay(today).toISOString();
-
-    // 1. Fetch missed check-out configuration
-    const settings = await this.getAttendanceSettings();
-    const config = settings.missedCheckoutConfig;
-    const enabledGroups = config?.enabledGroups || ['office'];
-    const roleMapping = config?.roleMapping;
-    
-    // 2. Identify roles to process
-    const rolesToProcessSet = new Set<string>();
-    
-    // Iterate through enabled groups (office, field, site)
-    enabledGroups.forEach(group => {
-      // Use mapping if available, otherwise use hardcoded defaults
-      if (roleMapping && roleMapping[group] && roleMapping[group].length > 0) {
-        roleMapping[group].forEach(r => rolesToProcessSet.add(r.toLowerCase()));
-      } else {
-        // Fallback to defaults
-        if (group === 'office') {
-          ['admin', 'hr', 'finance', 'developer'].forEach(r => rolesToProcessSet.add(r));
-        } else if (group === 'field') {
-          ['field_staff', 'field_officer'].forEach(r => rolesToProcessSet.add(r));
-        } else if (group === 'site') {
-          ['site_manager', 'security_guard', 'supervisor'].forEach(r => rolesToProcessSet.add(r));
-        }
+    const { data: { session } } = await supabase.auth.getSession();
+    const { data, error } = await supabase.functions.invoke('trigger-missed-checkouts', {
+      body: { manual: true },
+      headers: {
+        Authorization: `Bearer ${session?.access_token || ''}`
       }
     });
 
-    // Handle legacy enabledRoles if any (for backward compatibility during migration)
-    if (config?.enabledRoles && config.enabledRoles.length > 0) {
-        config.enabledRoles.forEach(r => rolesToProcessSet.add(r.toLowerCase()));
+    if (error) {
+      console.error('Edge Function Error:', error);
+      throw error;
     }
 
-    const rolesToProcess = Array.from(rolesToProcessSet);
-    if (rolesToProcess.length === 0) return { count: 0 };
-
-    // 3. Fetch all users in identified roles
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id, name, role_id, reporting_manager_id')
-      .in('role_id', rolesToProcess);
-
-    if (userError) throw userError;
-    if (!userData) return { count: 0 };
-
-    const users = userData.map(u => toCamelCase({ ...u, role: u.role_id }));
-    let triggeredCount = 0;
-
-    for (const user of users) {
-      if (!user.id) continue;
-
-      // 4. Get latest attendance event for the day
-      const { data: events, error: eventError } = await supabase
-        .from('attendance_events')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('timestamp', start)
-        .lte('timestamp', end)
-        .order('timestamp', { ascending: false })
-        .limit(1);
-
-      if (eventError) continue;
-
-      const lastEvent = events?.[0];
-      // If the user has a check-in/break event but NO check-out yet today
-      if (lastEvent && lastEvent.type !== 'check-out') {
-        // Parse configured check-out time (e.g. "18:00")
-        const [coHour, coMinute] = (settings.fixedOfficeHours?.checkOutTime || '19:00').split(':').map(Number);
-        const checkoutTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), coHour, coMinute, 0).toISOString();
-        
-        // 5. Record the missed check-out
-        const { error: checkoutError } = await supabase.from('attendance_events').insert({
-          user_id: user.id,
-          timestamp: checkoutTime,
-          type: 'check-out',
-          reason: 'missed check out',
-          is_manual: true
-        });
-
-        if (checkoutError) continue;
-        triggeredCount++;
-
-        // 6. Log the action
-        const { data: sessionData } = await supabase.auth.getSession();
-        const performedBy = sessionData.session?.user?.id;
-        
-        await supabase.from('attendance_audit_logs').insert({
-          action: 'MANUAL_MISSED_CHECKOUT',
-          performed_by: performedBy,
-          target_user_id: user.id,
-          details: { message: `Automatically triggered missed check-out at ${settings.fixedOfficeHours?.checkOutTime || '19:00'} for ${enabledGroups.join('/')} staff` }
-        });
-
-        // 7. Notify the staff member
-        await this.createNotification({
-          userId: user.id,
-          message: `Notice: A missed check-out has been automatically recorded for you at ${settings.fixedOfficeHours?.checkOutTime || '19:00'} today.`,
-          type: 'warning'
-        });
-
-        // 8. Notify the reporting manager
-        if (user.reportingManagerId) {
-          await this.createNotification({
-            userId: user.reportingManagerId,
-            message: `Automatic missed check-out triggered for ${user.name}.`,
-            type: 'info',
-            linkTo: '/hr/attendance'
-          });
-        }
-      }
+    // The function returns a report. We sum the usersProcessed across all groups for the UI count.
+    let totalProcessed = 0;
+    if (data?.groups) {
+      Object.values(data.groups).forEach((g: any) => {
+        if (g.usersProcessed) totalProcessed += g.usersProcessed;
+      });
     }
 
-    return { count: triggeredCount };
+    return { count: totalProcessed };
   },
 
   /**

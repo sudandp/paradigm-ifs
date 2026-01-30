@@ -12,6 +12,15 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // 0. Parse Request Body
+    let isManualOverride = false;
+    try {
+      const body = await req.json();
+      isManualOverride = !!body.manual;
+    } catch {
+      // No body or invalid body is fine, defaults to false
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SERVICE_ROLE_KEY') ?? ''
@@ -78,8 +87,9 @@ Deno.serve(async (req: Request) => {
       const timeParts = checkoutTime.includes('.') ? checkoutTime.split('.') : checkoutTime.split(':');
       const [confHour, confMinute] = timeParts.map(Number);
       const configuredTimeVal = confHour * 60 + (confMinute || 0);
+      const isPastTime = currentTimeVal >= configuredTimeVal;
 
-      if (currentTimeVal < configuredTimeVal) {
+      if (!isPastTime && !isManualOverride) {
         report.groups[group] = { 
           status: 'skipped', 
           reason: 'before checkout time', 
@@ -94,7 +104,7 @@ Deno.serve(async (req: Request) => {
       const mappedRoles = roleMapping[group];
       
       if (mappedRoles && mappedRoles.length > 0) {
-        mappedRoles.forEach((r: string) => rolesToProcessSet.add(r));
+        mappedRoles.forEach((r: string) => rolesToProcessSet.add(r.toLowerCase()));
       } else {
         // Default Role Logic (with robust fallbacks)
         if (group === 'office') {
@@ -113,15 +123,20 @@ Deno.serve(async (req: Request) => {
       }
 
       // Fetch Users in these roles
-      const { data: users, error: userError } = await supabaseClient
+      const { data: rawUsers, error: userError } = await supabaseClient
         .from('users')
-        .select('id, name, role_id')
-        .in('role_id', roles);
+        .select('id, name, role_id');
 
       if (userError) {
         report.groups[group] = { status: 'error', reason: userError.message };
         continue;
       }
+
+      // Manual filtering for case-insensitive role matching
+      const users = rawUsers.filter(u => {
+        const role = u.role_id?.toLowerCase();
+        return roles && roles.includes(role);
+      });
 
       // Process Users
       let processed = 0;
