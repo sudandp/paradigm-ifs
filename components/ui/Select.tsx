@@ -4,13 +4,14 @@ import { type UseFormRegisterReturn } from 'react-hook-form';
 
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
+  labelClassName?: string;
   error?: string;
   registration?: UseFormRegisterReturn;
   icon?: React.ReactNode;
   children: React.ReactNode;
 }
 
-const Select: React.FC<SelectProps> = ({ label, id, error, registration, icon, children, ...props }) => {
+const Select: React.FC<SelectProps> = ({ label, labelClassName, id, error, registration, icon, children, ...props }) => {
   const generatedId = useId();
   const selectId = id || generatedId;
   const { className, ...otherProps } = props;
@@ -43,7 +44,7 @@ const Select: React.FC<SelectProps> = ({ label, id, error, registration, icon, c
   return (
     <div>
       {label && (
-        <label htmlFor={selectId} className="block text-sm font-medium text-muted">
+        <label htmlFor={selectId} className={labelClassName || "block text-sm font-medium text-muted"}>
           {label}
         </label>
       )}

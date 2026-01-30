@@ -295,6 +295,23 @@ export const api = {
 
   saveDraft: async (data: OnboardingData) => api._saveSubmission(data, true),
 
+  submitGmcPublicForm: async (data: any) => {
+    const { error } = await supabase.from('gmc_form_submissions').insert([toSnakeCase(data)]);
+    if (error) throw error;
+  },
+
+  getEntities: async (): Promise<Entity[]> => {
+    const { data, error } = await supabase.from('entities').select('*').order('name');
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
+
+  getGroups: async (): Promise<OrganizationGroup[]> => {
+    const { data, error } = await supabase.from('organization_groups').select('*').order('name');
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
+
   submitOnboarding: async (data: OnboardingData) => {
     const { draftId } = await api._saveSubmission(data, false);
     const submittedData = await api.getOnboardingDataById(draftId);

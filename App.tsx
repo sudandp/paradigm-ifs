@@ -117,6 +117,10 @@ const Biometrics = lazyWithRetry(() => import('./pages/onboarding/Biometrics'));
 const Review = lazyWithRetry(() => import('./pages/onboarding/Review'));
 const AadhaarScannerPage = lazyWithRetry(() => import('./pages/onboarding/AadhaarScannerPage'));
 
+// Public Forms
+const FormsSelection = lazyWithRetry(() => import('./pages/public/FormsSelection'));
+const GMCForm = lazyWithRetry(() => import('./pages/public/GMCForm'));
+
 // Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { IdleTimeoutManager } from './components/auth/IdleTimeoutManager';
@@ -518,7 +522,7 @@ const App: React.FC = () => {
       {user && <IdleTimeoutManager />}
       <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div></div>}>
       <Routes>
-        {/* 1. Public Authentication Routes */}
+        {/* 1. Public Authentication & Form Routes */}
         <Route path="/auth" element={<AuthLayout />}>
           <Route index element={<Navigate to="login" replace />} />
           <Route path="login" element={<Login />} />
@@ -527,6 +531,9 @@ const App: React.FC = () => {
           <Route path="update-password" element={<UpdatePassword />} />
           <Route path="logout" element={<LogoutPage />} />
         </Route>
+
+        <Route path="/public/forms" element={<FormsSelection />} />
+        <Route path="/public/forms/gmc" element={<GMCForm />} />
 
         {/* 2. Page for unverified users */}
         <Route path="/pending-approval" element={user && user.role === 'unverified' ? <PendingApproval /> : <Navigate to="/auth/login" replace />} />
