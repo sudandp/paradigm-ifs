@@ -9,7 +9,8 @@ import type {
   SubmissionCostBreakdown, AppModule, Role, SupportTicket, TicketPost, TicketComment, VerificationResult, CompOffLog,
   ExtraWorkLog, PerfiosVerificationData, HolidayListItem, UniformRequestItem, IssuedTool, RecurringHolidayRule,
   BiometricDevice, ChecklistTemplate, FieldReport, FieldAttendanceViolation,
-  NotificationRule, NotificationType, Company, GmcPolicySettings, StaffAttendanceRules
+  NotificationRule, NotificationType, Company, GmcPolicySettings, StaffAttendanceRules,
+  GmcSubmission
 } from '../types';
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { 
@@ -298,6 +299,77 @@ export const api = {
   submitGmcPublicForm: async (data: any) => {
     const { error } = await supabase.from('gmc_form_submissions').insert([toSnakeCase(data)]);
     if (error) throw error;
+  },
+
+  getGmcSubmissions: async (filters?: { 
+    name?: string, 
+    site?: string, 
+    role?: string, 
+    company?: string,
+    minAge?: number,
+    maxAge?: number,
+    maritalStatus?: string,
+    startDate?: string,
+    endDate?: string,
+    page?: number,
+    limit?: number 
+  }): Promise<{ data: GmcSubmission[], total: number }> => {
+    const { 
+      name, site, role, company, 
+      minAge, maxAge, maritalStatus,
+      startDate, endDate,
+      page, limit 
+    } = filters || {};
+    let query = supabase.from('gmc_form_submissions').select('*', { count: 'exact' });
+
+    if (name) query = query.ilike('employee_name', `%${name}%`);
+    if (site) query = query.eq('site_name', site);
+    // Role is not explicitly in the GMCForm data but can be searched in the employee_name/details if needed.
+    // However, the user asked for "search by name,site,role,etc". 
+    // I'll assume role might be added later or we search in related user data if available.
+    // For now, I'll filter by the fields we have.
+    if (company) query = query.eq('company_name', company);
+    if (maritalStatus) query = query.eq('marital_status', maritalStatus);
+
+    if (minAge !== undefined || maxAge !== undefined) {
+      const today = new Date();
+      if (maxAge !== undefined) {
+        // maxAge 30 means DOB must be >= (Today - 31 years + 1 day)
+        const minDob = new Date(today.getFullYear() - maxAge - 1, today.getMonth(), today.getDate() + 1);
+        query = query.gte('dob', format(minDob, 'yyyy-MM-dd'));
+      }
+      if (minAge !== undefined) {
+        // minAge 18 means DOB must be <= (Today - 18 years)
+        const maxDob = new Date(today.getFullYear() - minAge, today.getMonth(), today.getDate());
+        query = query.lte('dob', format(maxDob, 'yyyy-MM-dd'));
+      }
+    }
+
+    if (startDate) {
+      query = query.gte('updated_at', startOfDay(new Date(startDate)).toISOString());
+    }
+    if (endDate) {
+      query = query.lte('updated_at', endOfDay(new Date(endDate)).toISOString());
+    }
+
+    const currentPage = page || 1;
+    const currentLimit = limit || 10;
+    const isExport = limit === -1;
+
+    if (!isExport) {
+        const from = (currentPage - 1) * currentLimit;
+        const to = from + currentLimit - 1;
+        query = query.range(from, to);
+    }
+
+    const { data, error, count } = await query
+      .order('updated_at', { ascending: false });
+
+    if (error) throw error;
+    return {
+      data: (data || []).map(toCamelCase),
+      total: count || 0
+    };
   },
 
   getEntities: async (): Promise<Entity[]> => {

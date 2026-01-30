@@ -1606,3 +1606,25 @@ export interface FieldReport {
   
   createdAt: string;
 }
+
+export interface GmcSubmission {
+  id: string;
+  employeeName: string;
+  companyName: string;
+  siteName: string;
+  dob: string;
+  gender: string;
+  contactNumber: string;
+  maritalStatus: string;
+  spouseName?: string | null;
+  spouseContact?: string | null;
+  fatherName?: string | null;
+  fatherDob?: string | null;
+  motherName?: string | null;
+  motherDob?: string | null;
+  children?: any[] | null;
+  planName: string;
+  premiumAmount: number;
+  acknowledged: boolean;
+  updatedAt: string;
+}

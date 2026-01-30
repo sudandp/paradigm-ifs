@@ -733,13 +733,13 @@ const GMCForm: React.FC = () => {
                             </div>
                         )}
 
-                        <div className={`flex flex-col sm:flex-row gap-4 pt-10 border-t ${isMobile ? 'border-white/10' : 'border-border'}`}>
+                        <div className={`flex flex-col sm:flex-row justify-end gap-4 pt-10 border-t ${isMobile ? 'border-white/10' : 'border-border'}`}>
                             {step > 1 && (
                                 <Button
                                     type="button"
                                     variant="secondary"
                                     onClick={() => setStep(step - 1)}
-                                    className={`sm:w-32 h-14 !rounded-2xl !shadow-none ${isMobile ? '!bg-white/10 !border-white/20 !text-white hover:!bg-white/20' : '!bg-white'}`}
+                                    className={`sm:w-32 h-12 !rounded-2xl !shadow-none ${isMobile ? '!bg-white/10 !border-white/20 !text-white hover:!bg-white/20' : '!bg-white'}`}
                                     disabled={isSubmitting}
                                 >
                                     Back
@@ -748,7 +748,7 @@ const GMCForm: React.FC = () => {
                             <Button
                                 type={step === 3 ? "submit" : "button"}
                                 onClick={step === 3 ? undefined : handleNextStep}
-                                className="flex-1 h-14 !rounded-2xl !text-lg !font-black !shadow-lg shadow-accent/20"
+                                className="w-full sm:w-64 h-12 !rounded-2xl !text-base !font-bold !shadow-lg shadow-accent/20"
                                 isLoading={isSubmitting}
                             >
                                 {step === 3 ? 'Confirm & Secure Enrollment' : 'Continue to Next Step'}

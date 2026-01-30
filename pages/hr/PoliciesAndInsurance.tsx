@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import PolicyManagement from './PolicyManagement';
 import InsuranceManagement from './InsuranceManagement';
-import { ShieldHalf, FileText } from 'lucide-react';
+import GMCSubmissionsTable from '../../components/hr/GMCSubmissionsTable';
+import { ShieldHalf, FileText, ClipboardList } from 'lucide-react';
 
-type Tab = 'policies' | 'insurance';
+type Tab = 'policies' | 'insurance' | 'gmc';
 
 const PoliciesAndInsurance: React.FC = () => {
     const [activeTab, setActiveTab] = useState<Tab>('policies');
@@ -36,12 +37,23 @@ const PoliciesAndInsurance: React.FC = () => {
                         <ShieldHalf className="h-5 w-5" />
                         <span>Insurance Plans</span>
                     </button>
+                    <button
+                        onClick={() => setActiveTab('gmc')}
+                        className={`flex items-center gap-2 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'gmc'
+                                ? 'border-accent text-accent-dark'
+                                : 'border-transparent text-muted hover:text-primary-text hover:border-gray-300'
+                            }`}
+                    >
+                        <ClipboardList className="h-5 w-5" />
+                        <span>Forms GMC</span>
+                    </button>
                 </nav>
             </div>
 
             <div className="border-0 shadow-none md:bg-card md:p-8 md:rounded-xl md:shadow-card">
                 {activeTab === 'policies' && <PolicyManagement />}
                 {activeTab === 'insurance' && <InsuranceManagement />}
+                {activeTab === 'gmc' && <GMCSubmissionsTable />}
             </div>
         </div>
     );
