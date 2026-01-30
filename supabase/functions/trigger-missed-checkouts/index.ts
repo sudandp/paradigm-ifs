@@ -38,7 +38,21 @@ Deno.serve(async (req: Request) => {
     const currentMinute = istDate.getUTCMinutes();
     const currentTimeVal = currentHour * 60 + currentMinute;
 
-    const report: any = {
+    interface GroupResult {
+      status: 'skipped' | 'completed' | 'error';
+      reason?: string;
+      configuredTime?: string;
+      currentTime?: string;
+      usersProcessed?: number;
+      processedSummary?: string;
+    }
+
+    interface ProcessReport {
+      executionTime: string;
+      groups: Record<string, GroupResult>;
+    }
+
+    const report: ProcessReport = {
       executionTime: istDate.toISOString(),
       groups: {}
     };
@@ -60,8 +74,10 @@ Deno.serve(async (req: Request) => {
 
       // Check Timing for this specific group
       const checkoutTime = rules.fixedOfficeHours?.checkOutTime || '19:00';
-      const [confHour, confMinute] = checkoutTime.split(':').map(Number);
-      const configuredTimeVal = confHour * 60 + confMinute;
+      // Handle both ':' and '.' as separators
+      const timeParts = checkoutTime.includes('.') ? checkoutTime.split('.') : checkoutTime.split(':');
+      const [confHour, confMinute] = timeParts.map(Number);
+      const configuredTimeVal = confHour * 60 + (confMinute || 0);
 
       if (currentTimeVal < configuredTimeVal) {
         report.groups[group] = { 
@@ -188,9 +204,10 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
