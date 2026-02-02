@@ -20,14 +20,7 @@ import { api } from '../../services/api';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import html2pdf from 'html2pdf.js';
 
-const GMC_RATES = [
-    { minAge: 0, maxAge: 17, rate: 120 },
-    { minAge: 18, maxAge: 35, rate: 200 },
-    { minAge: 36, maxAge: 45, rate: 225 },
-    { minAge: 46, maxAge: 55, rate: 345 },
-    { minAge: 56, maxAge: 60, rate: 560 },
-    { minAge: 61, maxAge: 65, rate: 730 },
-];
+
 
 const validationSchema = yup.object({
     employeeName: yup.string().required('Employee name is required'),
@@ -47,7 +40,10 @@ const validationSchema = yup.object({
     }),
     spouseDob: yup.string().when('maritalStatus', {
         is: 'Married',
-        then: schema => schema.required('Spouse DOB is required'),
+        then: schema => schema.required('Spouse DOB is required').test('is-adult', 'Spouse must be at least 18 years old', (value) => {
+            if (!value) return false;
+            return differenceInYears(new Date(), new Date(value)) >= 18;
+        }),
         otherwise: schema => schema.optional()
     }),
     spouseGender: yup.string().when('maritalStatus', {
@@ -93,7 +89,10 @@ const validationSchema = yup.object({
     children: yup.array().of(
         yup.object({
             name: yup.string().required('Child name is required'),
-            dob: yup.string().required('Child DOB is required'),
+            dob: yup.string().required('Child DOB is required').test('is-eligible', 'Child must be 25 years or younger', (value) => {
+                if (!value) return false;
+                return differenceInYears(new Date(), new Date(value)) <= 25;
+            }),
             gender: yup.string().oneOf(['Male', 'Female', 'Other']).required('Child gender is required'),
         })
     ).max(2, 'Only 2 children allowed').optional(),
@@ -104,7 +103,9 @@ type GMCFormData = yup.InferType<typeof validationSchema>;
 
 const GMCForm: React.FC = () => {
     const navigate = useNavigate();
-    const [step, setStep] = useState(1);
+
+    const [gmcRates, setGmcRates] = useState<any[]>([]);
+
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
     const [submissionData, setSubmissionData] = useState<any>(null);
@@ -116,14 +117,16 @@ const GMCForm: React.FC = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [entitiesData, groupsData] = await Promise.all([
+                const [entitiesData, groupsData, ratesData] = await Promise.all([
                     api.getEntities(),
-                    api.getGroups()
+                    api.getGroups(),
+                    api.getGMCRates()
                 ]);
                 setSites(entitiesData);
                 setCompanies(groupsData);
+                setGmcRates(ratesData);
             } catch (error) {
-                console.error('Failed to fetch sites/companies:', error);
+                console.error('Failed to fetch data:', error);
             } finally {
                 setIsLoadingData(false);
             }
@@ -167,36 +170,54 @@ const GMCForm: React.FC = () => {
         return differenceInYears(new Date(), new Date(watchDob));
     }, [watchDob]);
 
-    const insurancePlan = useMemo(() => {
-        if (employeeAge === null) return null;
-        const tier = GMC_RATES.find(r => employeeAge >= r.minAge && employeeAge <= r.maxAge);
-        return tier || null;
-    }, [employeeAge]);
-
-    const handleNextStep = async () => {
-        let fieldsToValidate: any[] = [];
-        if (step === 1) {
-            fieldsToValidate = ['employeeName', 'employeeId', 'dateOfJoining', 'designation', 'companyName', 'siteName', 'dob', 'gender', 'contactNumber'];
-        } else if (step === 2) {
-            fieldsToValidate = ['maritalStatus'];
-            if (watchMaritalStatus === 'Single') {
-                fieldsToValidate.push('fatherName', 'fatherDob', 'fatherGender', 'motherName', 'motherDob', 'motherGender');
-            }
-            if (watchMaritalStatus === 'Married') {
-                fieldsToValidate.push('spouseName', 'spouseDob', 'spouseGender', 'spouseContact');
-            }
-            if (watchChildren && watchChildren.length > 0) {
-                watchChildren.forEach((_, index) => {
-                    fieldsToValidate.push(`children.${index}.name`, `children.${index}.dob`, `children.${index}.gender`);
-                });
-            }
-        }
-
-        const isValid = await trigger(fieldsToValidate as any);
-        if (isValid) {
-            setStep(step + 1);
-        }
+    const getRateForAge = (age: number) => {
+        const tier = gmcRates.find(r => age >= r.minAge && age <= r.maxAge);
+        return tier ? tier.rate : 0;
     };
+
+    const premiumBreakdown = useMemo(() => {
+        let total = 0;
+        const breakdown = [];
+
+        // Employee
+        if (employeeAge !== null) {
+            const rate = getRateForAge(employeeAge);
+            breakdown.push({ name: 'Employee', age: employeeAge, rate });
+            total += rate;
+        }
+
+        // Spouse
+        if (watchMaritalStatus === 'Married' && watch('spouseDob')) {
+            const spouseAge = differenceInYears(new Date(), new Date(watch('spouseDob')));
+            if (spouseAge >= 18) {
+                const rate = getRateForAge(spouseAge);
+                breakdown.push({ name: 'Spouse', age: spouseAge, rate });
+                total += rate;
+            } else {
+                 breakdown.push({ name: 'Spouse', age: spouseAge, rate: 0, error: 'Not eligible (Minor < 18)' });
+            }
+        }
+
+        // Children
+        if (watchChildren && watchChildren.length > 0) {
+            watchChildren.forEach((child, index) => {
+                if (child.dob) {
+                    const childAge = differenceInYears(new Date(), new Date(child.dob));
+                    if (childAge <= 25) {
+                         const rate = getRateForAge(childAge);
+                         breakdown.push({ name: `Child ${index + 1}`, age: childAge, rate });
+                         total += rate;
+                    } else {
+                        breakdown.push({ name: `Child ${index + 1}`, age: childAge, rate: 0, error: 'Not eligible (Age > 25)' });
+                    }
+                }
+            });
+        }
+
+        return { breakdown, total };
+    }, [employeeAge, watchMaritalStatus, watch('spouseDob'), watchChildren]);
+
+
 
     const onSubmit = async (data: GMCFormData) => {
         setIsSubmitting(true);
@@ -216,8 +237,8 @@ const GMCForm: React.FC = () => {
             const finalData = {
                 ...sanitizeData(data),
                 employeeId: data.employeeId || `TEMP_${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-                plan_name: insurancePlan ? `${insurancePlan.minAge}-${insurancePlan.maxAge} Tier` : 'N/A',
-                premium_amount: insurancePlan ? insurancePlan.rate : 0
+                plan_name: `GMC Family Cover (Total: ₹${premiumBreakdown.total})`,
+                premium_amount: premiumBreakdown.total
             };
             
             await api.submitGmcPublicForm(finalData);
@@ -367,7 +388,7 @@ const GMCForm: React.FC = () => {
                                         <p className="text-xs text-gray-500 mt-1 font-medium">Group Medical Cover • Age Based Tier</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Monthly Premium</p>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Monthly Premium</p>
                                         <p className="text-4xl font-black text-accent">₹{submissionData?.premium_amount}</p>
                                     </div>
                                 </div>
@@ -413,11 +434,11 @@ const GMCForm: React.FC = () => {
                             <Button 
                                 variant="secondary"
                                 size="sm"
-                                onClick={() => step === 1 ? navigate('/public/forms') : setStep(step - 1)}
+                                onClick={() => navigate('/public/forms')}
                                 className={`!rounded-xl ${isMobile ? '!bg-white/10 !border-white/20 !text-white' : ''}`}
                             >
                                 <ArrowLeft className="h-5 w-5 mr-1" />
-                                {step === 1 ? 'Exit' : 'Prev'}
+                                Exit
                             </Button>
 
                             {/* Mobile-only centered logo placeholder to maintain spacing if needed, but we'll use absolute centering */}
@@ -433,25 +454,7 @@ const GMCForm: React.FC = () => {
                         
                         {/* Stepper on the right */}
                         <div className="flex items-center justify-center md:justify-end gap-2 overflow-x-auto no-scrollbar scroll-smooth w-full md:w-auto">
-                            {[1, 2, 3].map((s) => (
-                                <React.Fragment key={s}>
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                                            step === s 
-                                                ? 'bg-accent text-white shadow-lg ring-4 ring-accent-light' 
-                                                : step > s 
-                                                    ? 'bg-accent text-white' 
-                                                    : 'bg-page text-muted border border-border'
-                                        }`}>
-                                            {step > s ? <CheckCircle2 className="h-4 w-4" /> : s}
-                                        </div>
-                                        <span className={`text-xs font-bold whitespace-nowrap ${step === s ? 'text-primary-text' : 'text-muted'}`}>
-                                            {s === 1 ? 'Identity' : s === 2 ? 'Family' : 'Review'}
-                                        </span>
-                                    </div>
-                                    {s < 3 && <ChevronRight className="h-4 w-4 text-border" />}
-                                </React.Fragment>
-                            ))}
+
                         </div>
                     </div>
                 </header>
@@ -459,10 +462,9 @@ const GMCForm: React.FC = () => {
                 <div className="flex-grow">
                     <div className="w-full p-6 md:p-10">
                         <form onSubmit={handleSubmit(onSubmit)} className="space-y-12">
-                        {step === 1 && (
                             <div className="space-y-8 animate-fade-in">
                                 <div>
-                                    <h2 className={`text-2xl font-bold mb-2 ${isMobile ? 'text-white' : 'text-primary-text'}`}>Identity Details</h2>
+                                    <h2 className={`text-2xl font-bold mb-2 ${isMobile ? 'text-white' : 'text-primary-text'}`}>GMC Coverage Request</h2>
                                     <p className={`${isMobile ? 'text-gray-400' : 'text-muted'} text-sm`}>Please provide your official employment and personal information.</p>
                                 </div>
 
@@ -568,9 +570,6 @@ const GMCForm: React.FC = () => {
                                     />
                                 </div>
                             </div>
-                        )}
-
-                        {step === 2 && (
                             <div className="space-y-8 animate-fade-in">
                                 <div>
                                     <h2 className={`text-2xl font-bold mb-2 ${isMobile ? 'text-white' : 'text-primary-text'}`}>Family & Marital Structure</h2>
@@ -815,31 +814,40 @@ const GMCForm: React.FC = () => {
                                     )}
                                 </div>
                             </div>
-                        )}
-
-                        {step === 3 && (
                             <div className="space-y-8 animate-fade-in">
                                 <div>
                                     <h2 className={`text-2xl font-bold mb-2 ${isMobile ? 'text-white' : 'text-primary-text'}`}>Plan Recommendation</h2>
                                     <p className={`${isMobile ? 'text-gray-400' : 'text-muted'} text-sm`}>Your customized insurance tier based on verified records.</p>
                                 </div>
 
-                                {insurancePlan ? (
-                                    <div className="p-8 bg-gradient-to-br from-accent to-accent-dark rounded-3xl text-white shadow-xl shadow-accent/20 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden group">
-                                        <div className="absolute -right-10 -bottom-10 opacity-10 transform rotate-12 group-hover:scale-110 transition-transform duration-700">
-                                            <ShieldCheck className="h-64 w-64" />
-                                        </div>
-                                        <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20 shrink-0">
-                                            <Heart className="h-12 w-12 text-white fill-white/20" />
-                                        </div>
-                                        <div className="flex-1 text-center md:text-left z-10">
-                                            <h3 className="text-white/70 font-bold text-xs uppercase tracking-widest mb-1">Recommended Policy</h3>
-                                            <p className="text-3xl font-black">{insurancePlan.minAge}-{insurancePlan.maxAge} Tier</p>
-                                            <p className="text-white/80 text-sm mt-1">GMC Cover for Age {employeeAge}</p>
-                                        </div>
-                                        <div className="w-full md:w-auto text-center md:text-right md:pl-10 md:border-l border-white/20 z-10">
-                                            <p className="text-white/70 font-bold text-xs uppercase mb-1">Monthly Premium</p>
-                                            <p className="text-4xl font-black">₹{insurancePlan.rate}</p>
+                                {premiumBreakdown.total > 0 ? (
+                                    <div className="space-y-6">
+                                        <div className="p-6 bg-gradient-to-br from-accent to-accent-dark rounded-3xl text-white shadow-xl shadow-accent/20 relative overflow-hidden">
+                                            <div className="absolute -right-10 -bottom-10 opacity-10 transform rotate-12">
+                                                <ShieldCheck className="h-64 w-64" />
+                                            </div>
+                                            
+                                            <div className="relative z-10">
+                                                <h3 className="font-bold text-xs uppercase tracking-widest mb-6 opacity-80">Premium Breakdown</h3>
+                                                <div className="space-y-3 mb-6">
+                                                    {premiumBreakdown.breakdown.map((item, idx) => (
+                                                        <div key={idx} className="flex justify-between items-center border-b border-white/10 pb-2 last:border-0">
+                                                            <div>
+                                                                <p className="font-bold text-sm">{item.name}</p>
+                                                                <p className="text-xs opacity-70">Age: {item.age} {item.error && <span className="text-rose-300 ml-1">({item.error})</span>}</p>
+                                                            </div>
+                                                            <p className="font-bold text-lg">₹{item.rate}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                
+                                                <div className="pt-4 border-t border-white/20 flex justify-between items-end">
+                                                    <div>
+                                                        <p className="text-xs font-bold uppercase tracking-widest opacity-70 mb-1">Total Monthly Premium</p>
+                                                        <p className="text-3xl font-black">₹{premiumBreakdown.total}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 ) : (
@@ -851,7 +859,7 @@ const GMCForm: React.FC = () => {
                                             <h3 className="font-bold text-rose-900 text-lg">Incomplete Data</h3>
                                             <p className="text-rose-500 text-sm">Please return to Step 1 and provide a valid Date of Birth.</p>
                                         </div>
-                                        <Button variant="secondary" size="sm" onClick={() => setStep(1)}>Fix Now</Button>
+                                        <Button variant="secondary" size="sm" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Fix Now</Button>
                                     </div>
                                 )}
 
@@ -899,27 +907,15 @@ const GMCForm: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                        )}
+
 
                         <div className={`flex flex-col sm:flex-row justify-end gap-4 pt-10 border-t ${isMobile ? 'border-white/10' : 'border-border'}`}>
-                            {step > 1 && (
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    onClick={() => setStep(step - 1)}
-                                    className={`sm:w-32 h-12 !rounded-2xl !shadow-none ${isMobile ? '!bg-white/10 !border-white/20 !text-white hover:!bg-white/20' : '!bg-white'}`}
-                                    disabled={isSubmitting}
-                                >
-                                    Back
-                                </Button>
-                            )}
                             <Button
-                                type={step === 3 ? "submit" : "button"}
-                                onClick={step === 3 ? undefined : handleNextStep}
+                                type="submit"
                                 className="w-full sm:w-64 h-12 !rounded-2xl !text-base !font-bold !shadow-lg shadow-accent/20"
                                 isLoading={isSubmitting}
                             >
-                                {step === 3 ? 'Confirm & Secure Enrollment' : 'Continue to Next Step'}
+                                Confirm & Secure Enrollment
                                 <ChevronRight className="h-5 w-5 ml-2" />
                             </Button>
                         </div>

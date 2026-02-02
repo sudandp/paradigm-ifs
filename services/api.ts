@@ -68,18 +68,24 @@ const INDIAN_STATES = [
   'Uttarakhand', 'West Bengal', 'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Puducherry', 'Chandigarh'
 ];
 
+const CITY_NAME_MAP: Record<string, string> = {
+  'Bangalore': 'Bengaluru',
+  'Mysore': 'Mysuru',
+  'Mangalore': 'Mangaluru',
+  'Vizag': 'Visakhapatnam',
+  'Hydrabat': 'Hyderabad',
+  'Cochin': 'Kochi'
+};
+
 const CITY_TO_STATE_MAP: Record<string, string> = {
   'Hyderabad': 'Telangana',
-  'Hydrabat': 'Telangana',
   'Secunderabad': 'Telangana',
   'Warangal': 'Telangana',
   'Nizamabad': 'Telangana',
   'Bengaluru': 'Karnataka',
-  'Bangalore': 'Karnataka',
   'Hubballi': 'Karnataka',
   'Dharwad': 'Karnataka',
   'Mysuru': 'Karnataka',
-  'Mysore': 'Karnataka',
   'Mangaluru': 'Karnataka',
   'Mumbai': 'Maharashtra',
   'Pune': 'Maharashtra',
@@ -88,7 +94,6 @@ const CITY_TO_STATE_MAP: Record<string, string> = {
   'New Delhi': 'Delhi',
   'Kochi': 'Kerala',
   'Visakhapatnam': 'Andhra Pradesh',
-  'Vizag': 'Andhra Pradesh',
   'Vijayawada': 'Andhra Pradesh'
 };
 
@@ -339,6 +344,38 @@ export const api = {
 
   submitGmcPublicForm: async (data: any) => {
     const { error } = await supabase.from('gmc_form_submissions').insert([toSnakeCase(data)]);
+    if (error) throw error;
+  },
+
+  getGMCRates: async (): Promise<{ id: number, minAge: number, maxAge: number, rate: number }[]> => {
+    const { data, error } = await supabase
+        .from('gmc_rates')
+        .select('*')
+        .order('min_age', { ascending: true });
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
+
+  updateGMCRate: async (id: number, updates: { minAge?: number, maxAge?: number, rate?: number }): Promise<void> => {
+    const { error } = await supabase
+        .from('gmc_rates')
+        .update(toSnakeCase(updates))
+        .eq('id', id);
+    if (error) throw error;
+  },
+
+  addGMCRate: async (rateData: { minAge: number, maxAge: number, rate: number }): Promise<void> => {
+    const { error } = await supabase
+        .from('gmc_rates')
+        .insert([toSnakeCase(rateData)]);
+    if (error) throw error;
+  },
+
+  deleteGMCRate: async (id: number): Promise<void> => {
+    const { error } = await supabase
+        .from('gmc_rates')
+        .delete()
+        .eq('id', id);
     if (error) throw error;
   },
 
@@ -627,19 +664,47 @@ export const api = {
       if (!str || typeof str !== 'string') return '';
       const trimmed = str.trim();
       if (!trimmed) return '';
-      const cleaned = trimmed.replace(/,\s*$/, '');
-      return cleaned.toLowerCase().split(/\s+/).map(word => 
+      // Remove common suffixes like "State", "City", "Union Territory"
+      let cleaned = trimmed.replace(/,\s*$/, '').replace(/\s+(State|Union\s+Territory|City)$/i, '');
+      const n = cleaned.toLowerCase().split(/\s+/).map(word => 
         word.charAt(0).toUpperCase() + word.slice(1)
       ).join(' ');
+      return CITY_NAME_MAP[n] || n;
     };
 
     const inferState = (city: string, text: string) => {
       const normalizedCity = normalize(city);
-      if (CITY_TO_STATE_MAP[normalizedCity]) return CITY_TO_STATE_MAP[normalizedCity];
+      if (normalizedCity && CITY_TO_STATE_MAP[normalizedCity]) return CITY_TO_STATE_MAP[normalizedCity];
       
-      const combinedText = (text || '').toLowerCase() + ' ' + normalizedCity.toLowerCase();
+      const lowerText = (text || '').toLowerCase();
+      // 1. Scan for primary city names in text
+      for (const [c, s] of Object.entries(CITY_TO_STATE_MAP)) {
+        if (lowerText.includes(c.toLowerCase())) return s;
+      }
+      
+      // 2. Scan for city aliases in text
+      for (const [alt, norm] of Object.entries(CITY_NAME_MAP)) {
+        if (lowerText.includes(alt.toLowerCase()) && CITY_TO_STATE_MAP[norm]) {
+          return CITY_TO_STATE_MAP[norm];
+        }
+      }
+      
+      // 3. Scan for explicit state names in text
       for (const s of INDIAN_STATES) {
-        if (combinedText.includes(s.toLowerCase())) return s;
+        if (lowerText.includes(s.toLowerCase())) return s;
+      }
+      return null;
+    };
+
+    const inferCity = (text: string) => {
+      const lowerText = (text || '').toLowerCase();
+      // Match primary city names first
+      for (const c of Object.keys(CITY_TO_STATE_MAP)) {
+        if (lowerText.includes(c.toLowerCase())) return c;
+      }
+      // Match city aliases
+      for (const [alt, norm] of Object.entries(CITY_NAME_MAP)) {
+        if (lowerText.includes(alt.toLowerCase())) return norm;
       }
       return null;
     };
@@ -647,22 +712,28 @@ export const api = {
     // 1. Fetch data in parallel
     const [subResults, userResults, orgResults] = await Promise.all([
       supabase.from('onboarding_submissions').select('user_id, address').in('user_id', userIds).not('address', 'is', null),
-      supabase.from('users').select('id, organization_id').in('id', userIds),
+      supabase.from('users').select('id, organization_id, organization_name').in('id', userIds),
       supabase.from('organizations').select('id, address')
     ]);
 
     const locations: Record<string, { state: string; city: string }> = {};
     const orgMap = new Map((orgResults.data || []).map(o => [o.id, o.address]));
     const userToOrg = new Map((userResults.data || []).map(u => [u.id, u.organization_id]));
+    const userToOrgName = new Map((userResults.data || []).map(u => [u.id, u.organization_name]));
 
     // 2. Fallback: Use Organization/Site address for users
     userIds.forEach(uid => {
       const orgId = userToOrg.get(uid);
+      const orgName = userToOrgName.get(uid);
       const orgAddr = orgId ? orgMap.get(orgId) : null;
-      if (orgAddr) {
-        const inferredState = inferState('', orgAddr as string);
-        if (inferredState) {
-          locations[uid] = { state: inferredState, city: 'Other' };
+      
+      const combinedText = `${orgName || ''} ${orgAddr || ''}`;
+      if (combinedText.trim()) {
+        const state = inferState('', combinedText);
+        let city = inferCity(combinedText);
+        
+        if (state) {
+          locations[uid] = { state, city: city || 'Other' };
         }
       }
     });
@@ -670,14 +741,19 @@ export const api = {
     // 3. Primary: Use Onboarding Submission address (Overwrite with more specific data)
     (subResults.data || []).forEach(sub => {
       const addr = sub.address as any;
-      const stateRaw = addr?.present?.state || addr?.permanent?.state;
-      const cityRaw = addr?.present?.city || addr?.permanent?.city;
+      // Handle various address formats (nested vs flat)
+      const stateRaw = addr?.present?.state || addr?.permanent?.state || addr?.state;
+      const cityRaw = addr?.present?.city || addr?.permanent?.city || addr?.city;
       
       let state = normalize(normalizeStateName(stateRaw));
       let city = normalize(cityRaw);
 
       if (!state && city) {
         state = inferState(city, '');
+      } else if (!state && !city && typeof addr === 'string') {
+        // Handle case where address might be a raw string
+        state = inferState('', addr);
+        city = inferCity(addr);
       }
 
       if (state && sub.user_id) {
