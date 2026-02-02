@@ -579,7 +579,7 @@ export const api = {
   },
   getFieldStaff: async () => api.getUsers().then(users => users.filter((u: any) => u.role === 'field_staff')),
 
-  getTeamStates: async (userIds: string[]): Promise<Record<string, string>> => {
+  getTeamLocations: async (userIds: string[]): Promise<Record<string, { state: string; city: string }>> => {
     if (userIds.length === 0) return {};
     const { data, error } = await supabase
       .from('onboarding_submissions')
@@ -589,15 +589,17 @@ export const api = {
 
     if (error) throw error;
 
-    const states: Record<string, string> = {};
+    const locations: Record<string, { state: string; city: string }> = {};
     (data || []).forEach(sub => {
       const addr = sub.address as any;
       const state = addr?.present?.state || addr?.permanent?.state;
-      if (state && sub.user_id) {
-        states[sub.user_id] = state;
+      const city = addr?.present?.city || addr?.permanent?.city;
+      
+      if (state && city && sub.user_id) {
+        locations[sub.user_id] = { state, city };
       }
     });
-    return states;
+    return locations;
   },
   /**
    * Fetch users who should receive check‑in/out notifications.

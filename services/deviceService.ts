@@ -52,9 +52,14 @@ export async function getDeviceLimits(roleId: string): Promise<DeviceLimitsConfi
     
     // Explicitly defined limits based on user request:
     // Admin: 5 Web, 2 Android, 1 iOS
+    // Management, Hr Ops, Finance Manager: 5 Web, 5 Android, 5 iOS
     // Others: 1 Web, 1 Android, 1 iOS
     if (staffCategory === 'admin') {
       return { web: 5, android: 2, ios: 1 };
+    }
+
+    if (['management', 'hr_ops', 'finance_manager'].includes(normalizedRole)) {
+      return { web: 5, android: 5, ios: 5 };
     }
     
     // Default for everyone else

@@ -73,9 +73,9 @@ const MyTeamPage: React.FC = () => {
   const [latestLocations, setLatestLocations] = useState<Record<string, { latitude: number; longitude: number; timestamp: string }>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedState, setSelectedState] = useState('All States');
-  const [availableStates, setAvailableStates] = useState<string[]>([]);
-  const [memberStates, setMemberStates] = useState<Record<string, string>>({});
+  const [selectedLocation, setSelectedLocation] = useState('All');
+  const [availableLocations, setAvailableLocations] = useState<Record<string, string[]>>({});
+  const [memberLocations, setMemberLocations] = useState<Record<string, { state: string; city: string }>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
   
@@ -124,13 +124,26 @@ const MyTeamPage: React.FC = () => {
       // Fetch locations in the background
       const userIds = members.map(m => m.id);
       
-      // Fetch states in the background
-      api.getTeamStates(userIds).then(statesMap => {
-        setMemberStates(statesMap);
-        const uniqueStates = Array.from(new Set(Object.values(statesMap))).sort();
-        setAvailableStates(uniqueStates);
+      // Fetch locations in the background
+      api.getTeamLocations(userIds).then(locMap => {
+        setMemberLocations(locMap);
+        
+        // Group cities by state
+        const grouped: Record<string, string[]> = {};
+        Object.values(locMap).forEach(({ state, city }) => {
+          if (!grouped[state]) grouped[state] = [];
+          if (!grouped[state].includes(city)) grouped[state].push(city);
+        });
+
+        // Sort states and cities
+        const sortedGrouped: Record<string, string[]> = {};
+        Object.keys(grouped).sort().forEach(state => {
+          sortedGrouped[state] = grouped[state].sort();
+        });
+
+        setAvailableLocations(sortedGrouped);
       }).catch(err => {
-        console.error('Error fetching team states:', err);
+        console.error('Error fetching team locations:', err);
       });
 
       // Fetch locations in the background
@@ -191,12 +204,24 @@ const MyTeamPage: React.FC = () => {
       const matchesSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.role.toLowerCase().includes(searchQuery.toLowerCase().replace(/\s+/g, '_'));
       
-      const memberState = memberStates[m.id];
-      const matchesState = selectedState === 'All States' || memberState === selectedState;
+      const loc = memberLocations[m.id];
+      let matchesLocation = selectedLocation === 'All';
       
-      return matchesSearch && matchesState;
+      if (!matchesLocation && loc) {
+        if (selectedLocation.startsWith('state:')) {
+          const state = selectedLocation.replace('state:', '');
+          matchesLocation = loc.state === state;
+        } else if (selectedLocation.startsWith('city:')) {
+          const parts = selectedLocation.split(':');
+          const state = parts[1];
+          const city = parts[2];
+          matchesLocation = loc.state === state && loc.city === city;
+        }
+      }
+      
+      return matchesSearch && matchesLocation;
     });
-  }, [teamMembers, searchQuery, selectedState, memberStates]);
+  }, [teamMembers, searchQuery, selectedLocation, memberLocations]);
 
   // Update Markers
   useEffect(() => {
@@ -267,13 +292,18 @@ const MyTeamPage: React.FC = () => {
           
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
             <select
-              value={selectedState}
-              onChange={(e) => setSelectedState(e.target.value)}
-              className="w-full sm:w-48 px-3 py-2 bg-card border border-border rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-sm appearance-none cursor-pointer"
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              className="w-full sm:w-56 px-3 py-2 bg-card border border-border rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-sm appearance-none cursor-pointer"
             >
-              <option value="All States">All States</option>
-              {availableStates.map(state => (
-                <option key={state} value={state}>{state}</option>
+              <option value="All">All Locations</option>
+              {Object.entries(availableLocations).map(([state, cities]) => (
+                <optgroup key={state} label={state}>
+                  <option value={`state:${state}`}>All {state}</option>
+                  {cities.map(city => (
+                    <option key={`${state}-${city}`} value={`city:${state}:${city}`}>{city}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
 
