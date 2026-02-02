@@ -82,6 +82,8 @@
     color: #4b5563;
     line-height: 1.6;
     margin-bottom: 32px;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .device-warning-info-box {
@@ -96,7 +98,7 @@
 .device-warning-info-box h3 {
     font-size: 16px;
     font-weight: 600;
-    color: #92400e;
+    color: #92400e !important;
     margin-bottom: 12px;
 }
 
@@ -108,9 +110,10 @@
 
 .device-warning-info-box li {
     font-size: 14px;
-    color: #78350f;
+    color: #78350f !important;
     padding: 8px 0;
     border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+    overflow-wrap: break-word;
 }
 
 .device-warning-info-box li:last-child {
@@ -119,7 +122,7 @@
 
 .device-warning-info-note {
     font-size: 13px;
-    color: #92400e;
+    color: #92400e !important;
     font-style: italic;
     margin: 0;
 }
@@ -243,17 +246,42 @@
 
 /* Mobile responsive */
 @media (max-width: 640px) {
+    .device-warning-overlay {
+        padding: 10px;
+    }
+
     .device-warning-dialog {
-        padding: 24px;
+        padding: 24px 16px;
+        border-radius: 16px;
     }
 
     .device-warning-title {
-        font-size: 24px;
+        font-size: 22px;
+        margin-bottom: 12px;
+    }
+
+    .device-warning-icon {
+        margin-bottom: 16px;
     }
 
     .device-warning-icon svg {
         width: 48px;
         height: 48px;
+    }
+
+    .device-warning-description {
+        font-size: 14px;
+        margin-bottom: 24px;
+    }
+
+    .device-warning-info-box {
+        padding: 16px;
+        margin-bottom: 24px;
+    }
+
+    .device-warning-device-name {
+        font-size: 16px;
+        word-break: break-all;
     }
 }
 
@@ -303,7 +331,7 @@
 .device-policy-summary {
     margin-top: 16px;
     font-size: 13px;
-    color: #92400e;
+    color: #92400e !important;
     text-align: center;
     opacity: 0.8;
 }

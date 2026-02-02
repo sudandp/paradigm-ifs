@@ -114,7 +114,9 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
         <h1 className="device-warning-title">{message.title}</h1>
         
         <div className="device-warning-device-info">
-          <p className="device-warning-device-name">{deviceName}</p>
+          <p className="device-warning-device-name" title={deviceName}>
+            {deviceName.length > 50 ? `${deviceName.substring(0, 47)}...` : deviceName}
+          </p>
           <p className="device-warning-device-type">
             {deviceType.charAt(0).toUpperCase() + deviceType.slice(1)} Device
           </p>
@@ -131,7 +133,9 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
               {existingDevices.filter(d => d.deviceType === deviceType).map(device => (
                 <div key={device.id} className="device-item-mini">
                   <div className="device-item-info">
-                    <span className="device-item-name">{device.deviceName}</span>
+                    <span className="device-item-name" title={device.deviceName}>
+                      {device.deviceName.length > 30 ? `${device.deviceName.substring(0, 27)}...` : device.deviceName}
+                    </span>
                   </div>
                   <button 
                     onClick={() => handleRemoveDevice(device.id)}

@@ -29,7 +29,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string> 
     if (data.address) {
       const { road, suburb, city, village, town, state, country } = data.address;
       // Prioritize a concise address: Road, Suburb, and City/Village/Town
-      const shortAddress = [road, suburb, city || village || town]
+      const shortAddress = [road, suburb, city || village || town, state]
         .filter(Boolean)
         .join(', ');
       

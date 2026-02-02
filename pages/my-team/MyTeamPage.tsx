@@ -73,6 +73,9 @@ const MyTeamPage: React.FC = () => {
   const [latestLocations, setLatestLocations] = useState<Record<string, { latitude: number; longitude: number; timestamp: string }>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedState, setSelectedState] = useState('All States');
+  const [availableStates, setAvailableStates] = useState<string[]>([]);
+  const [memberStates, setMemberStates] = useState<Record<string, string>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
   
@@ -120,6 +123,17 @@ const MyTeamPage: React.FC = () => {
       
       // Fetch locations in the background
       const userIds = members.map(m => m.id);
+      
+      // Fetch states in the background
+      api.getTeamStates(userIds).then(statesMap => {
+        setMemberStates(statesMap);
+        const uniqueStates = Array.from(new Set(Object.values(statesMap))).sort();
+        setAvailableStates(uniqueStates);
+      }).catch(err => {
+        console.error('Error fetching team states:', err);
+      });
+
+      // Fetch locations in the background
       api.getLatestLocations(userIds).then(locations => {
         setLatestLocations(locations);
       }).catch(err => {
@@ -173,11 +187,16 @@ const MyTeamPage: React.FC = () => {
   }, [theme]);
 
   const filteredMembers = useMemo(() => {
-    return teamMembers.filter(m => 
-      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.role.toLowerCase().includes(searchQuery.toLowerCase().replace(/\s+/g, '_'))
-    );
-  }, [teamMembers, searchQuery]);
+    return teamMembers.filter(m => {
+      const matchesSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.role.toLowerCase().includes(searchQuery.toLowerCase().replace(/\s+/g, '_'));
+      
+      const memberState = memberStates[m.id];
+      const matchesState = selectedState === 'All States' || memberState === selectedState;
+      
+      return matchesSearch && matchesState;
+    });
+  }, [teamMembers, searchQuery, selectedState, memberStates]);
 
   // Update Markers
   useEffect(() => {
@@ -246,15 +265,28 @@ const MyTeamPage: React.FC = () => {
             </Link>
           )}
           
-          <div className="relative w-full md:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search team member..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full !pl-10 pr-4 py-2 bg-card border border-border rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-sm"
-            />
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+            <select
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+              className="w-full sm:w-48 px-3 py-2 bg-card border border-border rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-sm appearance-none cursor-pointer"
+            >
+              <option value="All States">All States</option>
+              {availableStates.map(state => (
+                <option key={state} value={state}>{state}</option>
+              ))}
+            </select>
+
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search team member..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full !pl-10 pr-4 py-2 bg-card border border-border rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-sm"
+              />
+            </div>
           </div>
         </div>
       </div>

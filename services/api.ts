@@ -578,6 +578,27 @@ export const api = {
     return api.getAttendanceEvents(userId, startTs, endTs);
   },
   getFieldStaff: async () => api.getUsers().then(users => users.filter((u: any) => u.role === 'field_staff')),
+
+  getTeamStates: async (userIds: string[]): Promise<Record<string, string>> => {
+    if (userIds.length === 0) return {};
+    const { data, error } = await supabase
+      .from('onboarding_submissions')
+      .select('user_id, address')
+      .in('user_id', userIds)
+      .not('address', 'is', null);
+
+    if (error) throw error;
+
+    const states: Record<string, string> = {};
+    (data || []).forEach(sub => {
+      const addr = sub.address as any;
+      const state = addr?.present?.state || addr?.permanent?.state;
+      if (state && sub.user_id) {
+        states[sub.user_id] = state;
+      }
+    });
+    return states;
+  },
   /**
    * Fetch users who should receive check‑in/out notifications.
    * Includes HR, operations managers, admins, developers and site managers.
