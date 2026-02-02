@@ -589,14 +589,30 @@ export const api = {
 
     if (error) throw error;
 
+    const normalize = (str: any) => {
+      if (!str || typeof str !== 'string') return '';
+      const trimmed = str.trim();
+      if (!trimmed) return '';
+      // Title Case: "BENGALURU" -> "Bengaluru"
+      return trimmed.toLowerCase().split(/\s+/).map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+    };
+
     const locations: Record<string, { state: string; city: string }> = {};
     (data || []).forEach(sub => {
       const addr = sub.address as any;
-      const state = addr?.present?.state || addr?.permanent?.state;
-      const city = addr?.present?.city || addr?.permanent?.city;
+      const stateRaw = addr?.present?.state || addr?.permanent?.state;
+      const cityRaw = addr?.present?.city || addr?.permanent?.city;
       
-      if (state && city && sub.user_id) {
-        locations[sub.user_id] = { state, city };
+      const state = normalize(stateRaw);
+      const city = normalize(cityRaw);
+
+      if (state && sub.user_id) {
+        locations[sub.user_id] = { 
+          state, 
+          city: city || 'Other'
+        };
       }
     });
     return locations;
