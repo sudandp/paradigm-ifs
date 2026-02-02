@@ -58,6 +58,47 @@ if (!apiKey) {
   ai = new GoogleGenAI({ apiKey });
 }
 
+// --- Location Constants & Helpers ---
+
+const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 
+  'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 
+  'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 
+  'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 
+  'Uttarakhand', 'West Bengal', 'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Puducherry', 'Chandigarh'
+];
+
+const CITY_TO_STATE_MAP: Record<string, string> = {
+  'Hyderabad': 'Telangana',
+  'Hydrabat': 'Telangana',
+  'Secunderabad': 'Telangana',
+  'Warangal': 'Telangana',
+  'Nizamabad': 'Telangana',
+  'Bengaluru': 'Karnataka',
+  'Bangalore': 'Karnataka',
+  'Hubballi': 'Karnataka',
+  'Dharwad': 'Karnataka',
+  'Mysuru': 'Karnataka',
+  'Mysore': 'Karnataka',
+  'Mangaluru': 'Karnataka',
+  'Mumbai': 'Maharashtra',
+  'Pune': 'Maharashtra',
+  'Chennai': 'Tamil Nadu',
+  'Delhi': 'Delhi',
+  'New Delhi': 'Delhi',
+  'Kochi': 'Kerala',
+  'Visakhapatnam': 'Andhra Pradesh',
+  'Vizag': 'Andhra Pradesh',
+  'Vijayawada': 'Andhra Pradesh'
+};
+
+const normalizeStateName = (str: string) => {
+  if (!str) return '';
+  const n = str.trim();
+  if (n.toLowerCase() === 'telugana') return 'Telangana';
+  return n;
+};
+
 
 // --- Helper Functions ---
 
@@ -581,32 +622,63 @@ export const api = {
 
   getTeamLocations: async (userIds: string[]): Promise<Record<string, { state: string; city: string }>> => {
     if (userIds.length === 0) return {};
-    const { data, error } = await supabase
-      .from('onboarding_submissions')
-      .select('user_id, address')
-      .in('user_id', userIds)
-      .not('address', 'is', null);
-
-    if (error) throw error;
 
     const normalize = (str: any) => {
       if (!str || typeof str !== 'string') return '';
       const trimmed = str.trim();
       if (!trimmed) return '';
-      // Title Case: "BENGALURU" -> "Bengaluru"
-      return trimmed.toLowerCase().split(/\s+/).map(word => 
+      const cleaned = trimmed.replace(/,\s*$/, '');
+      return cleaned.toLowerCase().split(/\s+/).map(word => 
         word.charAt(0).toUpperCase() + word.slice(1)
       ).join(' ');
     };
 
+    const inferState = (city: string, text: string) => {
+      const normalizedCity = normalize(city);
+      if (CITY_TO_STATE_MAP[normalizedCity]) return CITY_TO_STATE_MAP[normalizedCity];
+      
+      const combinedText = (text || '').toLowerCase() + ' ' + normalizedCity.toLowerCase();
+      for (const s of INDIAN_STATES) {
+        if (combinedText.includes(s.toLowerCase())) return s;
+      }
+      return null;
+    };
+
+    // 1. Fetch data in parallel
+    const [subResults, userResults, orgResults] = await Promise.all([
+      supabase.from('onboarding_submissions').select('user_id, address').in('user_id', userIds).not('address', 'is', null),
+      supabase.from('users').select('id, organization_id').in('id', userIds),
+      supabase.from('organizations').select('id, address')
+    ]);
+
     const locations: Record<string, { state: string; city: string }> = {};
-    (data || []).forEach(sub => {
+    const orgMap = new Map((orgResults.data || []).map(o => [o.id, o.address]));
+    const userToOrg = new Map((userResults.data || []).map(u => [u.id, u.organization_id]));
+
+    // 2. Fallback: Use Organization/Site address for users
+    userIds.forEach(uid => {
+      const orgId = userToOrg.get(uid);
+      const orgAddr = orgId ? orgMap.get(orgId) : null;
+      if (orgAddr) {
+        const inferredState = inferState('', orgAddr as string);
+        if (inferredState) {
+          locations[uid] = { state: inferredState, city: 'Other' };
+        }
+      }
+    });
+
+    // 3. Primary: Use Onboarding Submission address (Overwrite with more specific data)
+    (subResults.data || []).forEach(sub => {
       const addr = sub.address as any;
       const stateRaw = addr?.present?.state || addr?.permanent?.state;
       const cityRaw = addr?.present?.city || addr?.permanent?.city;
       
-      const state = normalize(stateRaw);
-      const city = normalize(cityRaw);
+      let state = normalize(normalizeStateName(stateRaw));
+      let city = normalize(cityRaw);
+
+      if (!state && city) {
+        state = inferState(city, '');
+      }
 
       if (state && sub.user_id) {
         locations[sub.user_id] = { 
@@ -615,6 +687,7 @@ export const api = {
         };
       }
     });
+
     return locations;
   },
   /**
