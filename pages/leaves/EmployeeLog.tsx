@@ -3,8 +3,9 @@ import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
 import type { AttendanceEvent } from '../../types';
 import { Loader2, MapPin, Clock, Calendar } from 'lucide-react';
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { processDailyEvents } from '../../utils/attendanceCalculations';
 
 type TimeRange = 'day' | 'week' | 'month';
 
@@ -13,7 +14,8 @@ interface GroupedAttendance {
     events: AttendanceEvent[];
     checkIns: AttendanceEvent[];
     checkOuts: AttendanceEvent[];
-    totalMinutes: number;
+    totalWorkMinutes: number;
+    totalBreakMinutes: number;
 }
 
 const EmployeeLog: React.FC = () => {
@@ -76,7 +78,8 @@ const EmployeeLog: React.FC = () => {
                     events: [],
                     checkIns: [],
                     checkOuts: [],
-                    totalMinutes: 0
+                    totalWorkMinutes: 0,
+                    totalBreakMinutes: 0
                 };
             }
             groups[dateKey].events.push(event);
@@ -87,26 +90,12 @@ const EmployeeLog: React.FC = () => {
             }
         });
 
-        // Calculate total worked time for each day
+        // Calculate total worked time and break time for each day
         Object.values(groups).forEach((group) => {
-            const sortedEvents = [...group.events].sort(
-                (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-            );
-
-            let totalMinutes = 0;
-            let checkInTime: Date | null = null;
-
-            sortedEvents.forEach((event) => {
-                const eventTime = new Date(event.timestamp);
-                if (event.type === 'check-in') {
-                    checkInTime = eventTime;
-                } else if (event.type === 'check-out' && checkInTime) {
-                    totalMinutes += differenceInMinutes(eventTime, checkInTime);
-                    checkInTime = null;
-                }
-            });
-
-            group.totalMinutes = totalMinutes;
+            const { totalHours, breakHours } = processDailyEvents(group.events);
+            // processDailyEvents returns hours, convert to minutes for display formatting
+            group.totalWorkMinutes = (totalHours * 60) - (breakHours * 60);
+            group.totalBreakMinutes = breakHours * 60;
         });
 
         return Object.values(groups).sort((a, b) => b.date.localeCompare(a.date));
@@ -242,8 +231,13 @@ const EmployeeLog: React.FC = () => {
                                         {format(new Date(group.date), 'EEEE, dd MMMM yyyy')}
                                     </span>
                                 </div>
-                                <div className="text-white text-sm font-medium bg-white/20 px-3 py-1 rounded-full">
-                                    {formatDuration(group.totalMinutes)}
+                                <div className="flex gap-3">
+                                    <div className="text-white text-xs font-medium bg-emerald-500/20 border border-emerald-400/30 px-2 py-1 rounded-md flex items-center gap-1">
+                                        <span className="opacity-75">Work:</span> {formatDuration(group.totalWorkMinutes)}
+                                    </div>
+                                    <div className="text-white text-xs font-medium bg-amber-500/20 border border-amber-400/30 px-2 py-1 rounded-md flex items-center gap-1">
+                                        <span className="opacity-75">Break:</span> {formatDuration(group.totalBreakMinutes)}
+                                    </div>
                                 </div>
                             </div>
 

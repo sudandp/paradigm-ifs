@@ -10,7 +10,7 @@ import type {
   ExtraWorkLog, PerfiosVerificationData, HolidayListItem, UniformRequestItem, IssuedTool, RecurringHolidayRule,
   BiometricDevice, ChecklistTemplate, FieldReport, FieldAttendanceViolation,
   NotificationRule, NotificationType, Company, GmcPolicySettings, StaffAttendanceRules,
-  GmcSubmission
+  GmcSubmission, UserHoliday
 } from '../types';
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { 
@@ -602,6 +602,39 @@ export const api = {
     }
     return formattedData;
   },
+
+  getUserHolidays: async (userId: string): Promise<UserHoliday[]> => {
+    const { data, error } = await supabase
+      .from('user_holidays')
+      .select('*')
+      .eq('user_id', userId);
+    if (error && error.code !== 'PGRST116') {
+      // If table doesn't exist yet, we'll return empty array and log error
+      console.warn("User holidays table might not exist:", error);
+      return [];
+    }
+    return (data || []).map(toCamelCase);
+  },
+
+  saveUserHolidays: async (userId: string, holidays: { holidayName: string; holidayDate: string; year: number }[]): Promise<void> => {
+    // Delete existing for the same year
+    const year = holidays[0]?.year || new Date().getFullYear();
+    await supabase.from('user_holidays').delete().eq('user_id', userId).eq('year', year);
+    
+    // Insert new ones
+    if (holidays.length > 0) {
+      const { error } = await supabase.from('user_holidays').insert(
+        holidays.map(h => ({
+          user_id: userId,
+          holiday_name: h.holidayName,
+          holiday_date: h.holidayDate,
+          year: h.year
+        }))
+      );
+      if (error) throw error;
+    }
+  },
+
   getUserById: async (id: string): Promise<User | null> => {
     const { data, error } = await supabase
       .from('users')

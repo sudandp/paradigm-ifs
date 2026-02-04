@@ -727,9 +727,10 @@ export interface StaffAttendanceRules {
   enableBreakTracking?: boolean;
   lunchBreakDuration?: number; // minutes, default 60
   // Holiday restrictions
-  maxHolidaysPerCategory?: number; // 12
-  adminAllocatedHolidays?: number; // 7
-  employeeHolidays?: number; // 5
+  maxHolidaysPerCategory?: number; // Total limit (e.g., 10)
+  adminAllocatedHolidays?: number; // Limit for admin (e.g., 5)
+  employeeHolidays?: number; // Limit for employee selection (e.g., 5)
+  enableCustomHolidays?: boolean; // Whether users can pick their own holidays
   // Weekly off configuration
   weeklyOffDays?: number[]; // [0] for Sunday, [0,6] for Sunday and Saturday
   // Field Staff Site/Travel Tracking
@@ -746,6 +747,14 @@ export interface StaffAttendanceRules {
     android: number; // Number of allowed Android devices
     ios: number; // Number of allowed iOS devices
   };
+}
+
+export interface UserHoliday {
+  id: string;
+  userId: string;
+  holidayName: string;
+  holidayDate: string;
+  year: number;
 }
 
 export interface AttendanceSettings {

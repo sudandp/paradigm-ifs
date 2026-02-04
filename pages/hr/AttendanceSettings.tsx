@@ -14,6 +14,7 @@ import Select from '../../components/ui/Select';
 import type { StaffAttendanceRules, AttendanceSettings, RecurringHolidayRule, Role } from '../../types';
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import { api } from '../../services/api';
+import { FIXED_HOLIDAYS, HOLIDAY_SELECTION_POOL } from '../../utils/constants';
 
 const AttendanceSettings: React.FC = () => {
     const { attendance, officeHolidays, fieldHolidays, siteHolidays, recurringHolidays, addHoliday, removeHoliday, addRecurringHoliday, removeRecurringHoliday, updateAttendanceSettings: updateStore } = useSettingsStore();
@@ -59,11 +60,31 @@ const AttendanceSettings: React.FC = () => {
     // No extra loading here, it's part of attendance settings
 
     const currentRules = activeTab === 'selections' ? localAttendance.office : localAttendance[activeTab as 'office' | 'field' | 'site'];
-    const currentHolidays = activeTab === 'office' ? officeHolidays : activeTab === 'field' ? fieldHolidays : siteHolidays;
+    const currentHolidaysFromStore = activeTab === 'office' ? officeHolidays : activeTab === 'field' ? fieldHolidays : siteHolidays;
+    const currentYear = new Date().getFullYear();
+    
+    // Merge fixed holidays with store holidays, ensuring no duplicates by name
+    const currentHolidays = [
+        ...FIXED_HOLIDAYS.map(fh => ({
+            id: `fixed-${fh.date}`,
+            name: fh.name,
+            date: `${currentYear}-${fh.date}`,
+            type: activeTab
+        })),
+        ...currentHolidaysFromStore.filter(h => !FIXED_HOLIDAYS.some(fh => fh.name === h.name))
+    ].sort((a, b) => new Date(a.date.replace(/-/g, '/')).getTime() - new Date(b.date.replace(/-/g, '/')).getTime());
 
     const handleAddHoliday = async (e: React.FormEvent) => {
         e.preventDefault();
         if (newHolidayName && newHolidayDate && activeTab !== 'selections') {
+            const adminAllocated = 5; // Fixed 5 admin holidays
+            const nonFixedHolidays = currentHolidays.filter(h => !FIXED_HOLIDAYS.some(fh => fh.name === h.name));
+            
+            if (nonFixedHolidays.length >= 0 && currentHolidays.length >= (currentRules.maxHolidaysPerCategory || 10)) {
+                setToast({ message: `Maximum total limit of 10 holidays reached.`, type: 'error' });
+                return;
+            }
+
             if (currentHolidays.some(h => h.date === newHolidayDate)) {
                 setToast({ message: 'A holiday for this date already exists.', type: 'error' });
                 return;
@@ -82,6 +103,7 @@ const AttendanceSettings: React.FC = () => {
     };
 
     const handleRemoveHoliday = async (id: string) => {
+        if (id.startsWith('fixed-')) return; // Cannot remove fixed holidays
         if (activeTab !== 'selections') {
             try {
                 await removeHoliday(activeTab as 'office' | 'field' | 'site', id);
@@ -563,12 +585,30 @@ const AttendanceSettings: React.FC = () => {
 
                 <section className="pt-6 border-t border-border">
                     <h3 className="text-lg font-semibold text-primary-text mb-4 flex items-center"><Calendar className="mr-2 h-5 w-5 text-muted" />Holiday List</h3>
+                    
+                    <div className="mb-6 space-y-4">
+                        <Checkbox
+                            id="enableCustomHolidays"
+                            label="Enable Custom Holiday Selection"
+                            description="Allow employees to select 5 holidays from the company selection list. Admin or HR will feed the remaining 5."
+                            checked={currentRules.enableCustomHolidays || false}
+                            onChange={(e) => handleSettingChange('enableCustomHolidays', e.target.checked)}
+                        />
+                    </div>
+
                     <div className="p-4 bg-page rounded-lg">
-                        <h4 className="font-semibold mb-2">Add New Holiday</h4>
-                        {activeTab === 'office' && currentRules.maxHolidaysPerCategory && (
+                        <h4 className="font-semibold mb-2">Add Admin Allocated Holiday</h4>
+                        {currentRules.enableCustomHolidays ? (
                             <div className="mb-3 text-sm text-muted">
-                                <span className="font-medium">Holidays: {currentHolidays.length} / {currentRules.maxHolidaysPerCategory || 12}</span>
-                                {currentHolidays.length >= (currentRules.maxHolidaysPerCategory || 12) && (
+                                <span className="font-medium">Admin Holidays: {currentHolidays.length} / {currentRules.adminAllocatedHolidays || 5}</span>
+                                {currentHolidays.length >= (currentRules.adminAllocatedHolidays || 5) && (
+                                    <span className="ml-2 text-red-500">Maximum admin limit reached</span>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="mb-3 text-sm text-muted">
+                                <span className="font-medium">Holidays: {currentHolidays.length} / {currentRules.maxHolidaysPerCategory || 10}</span>
+                                {currentHolidays.length >= (currentRules.maxHolidaysPerCategory || 10) && (
                                     <span className="ml-2 text-red-500">Maximum limit reached</span>
                                 )}
                             </div>
@@ -579,32 +619,62 @@ const AttendanceSettings: React.FC = () => {
                             <Button 
                                 type="submit" 
                                 className="w-full sm:w-auto h-[46px] px-8 text-sm"
-                                disabled={activeTab === 'office' && currentHolidays.length >= (currentRules.maxHolidaysPerCategory || 12)}
+                                disabled={currentHolidays.length >= (currentRules.enableCustomHolidays ? (currentRules.adminAllocatedHolidays || 5) : (currentRules.maxHolidaysPerCategory || 10))}
                             >
                                 <Plus className="mr-2 h-4 w-4" /> Add
                             </Button>
                         </form>
                     </div>
-                    <div className="mt-4 space-y-2">
-                        {currentHolidays.length > 0 ? (
-                            currentHolidays.map(holiday => (
-                                <div key={holiday.id} className="flex justify-between items-start p-4 pr-6 border border-white/10 rounded-lg bg-white/5 mb-2">
-                                    <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-primary-text truncate">{holiday.name}</p>
-                                    <p className="text-sm text-muted">{new Date(holiday.date.replace(/-/g, '/')).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                </div>
-                                <div className="ml-4 shrink-0">
-                                    <Button variant="outline" size="sm" onClick={() => handleRemoveHoliday(holiday.id)} className="p-2 border-red-500/20 hover:bg-red-500/10 rounded-full transition-colors">
-                                        <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
-                                </div>
+
+                    {currentRules.enableCustomHolidays && (
+                        <div className="mt-8 pt-6 border-t border-border/50">
+                            <h4 className="font-semibold mb-2 flex items-center text-primary-text">
+                                <Settings className="mr-2 h-4 w-4 text-muted" /> 
+                                Holiday Selection Pool
+                            </h4>
+                            <p className="text-sm text-muted mb-4">
+                                These are the 20 public holidays available for users to select their 5 choices from.
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto p-1">
+                                {HOLIDAY_SELECTION_POOL.map((h, i) => (
+                                    <div key={i} className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium truncate">{h.name}</p>
+                                            <p className="text-xs text-muted">{new Date(`${currentYear}${h.date}`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        ))
-                    ) : (
-                        <p className="text-center text-muted py-4">No holidays added yet for {activeTab} staff.</p>
+                        </div>
                     )}
-                </div>
-            </section>
+
+                    <div className="mt-8">
+                        <h4 className="font-semibold mb-4 text-primary-text">Allocated Holidays</h4>
+                        <div className="space-y-2">
+                            {currentHolidays.length > 0 ? (
+                                currentHolidays.map(holiday => (
+                                    <div key={holiday.id} className="flex justify-between items-start p-4 pr-6 border border-white/10 rounded-lg bg-white/5 mb-2">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-medium text-primary-text truncate">{holiday.name}</p>
+                                            <p className="text-sm text-muted">{new Date(holiday.date.replace(/-/g, '/')).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                                        </div>
+                                        <div className="ml-4 shrink-0">
+                                            {FIXED_HOLIDAYS.some(fh => fh.name === holiday.name) ? (
+                                                <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded uppercase font-semibold">Common</span>
+                                            ) : (
+                                                <Button variant="outline" size="sm" onClick={() => handleRemoveHoliday(holiday.id)} className="p-2 border-red-500/20 hover:bg-red-500/10 rounded-full transition-colors">
+                                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-center text-muted py-4">No allocated holidays yet for {activeTab} staff.</p>
+                            )}
+                        </div>
+                    </div>
+                </section>
             </>
             )}
 

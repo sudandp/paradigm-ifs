@@ -73,6 +73,7 @@ interface AuthState {
     lastBreakInTime: string | null;
     lastBreakOutTime: string | null;
     totalBreakDurationToday: number;
+    totalWorkingDurationToday: number;
     isOnBreak: boolean;
     loginWithEmail: (email: string, password: string, rememberMe: boolean) => Promise<{ error: { message: string } | null }>;
     signUp: (name: string, email: string, password: string) => Promise<{ error: { message: string } | null }>;
@@ -117,6 +118,7 @@ export const useAuthStore = create<AuthState>()(
         lastBreakInTime: null,
         lastBreakOutTime: null,
         totalBreakDurationToday: 0,
+        totalWorkingDurationToday: 0,
         isOnBreak: false,
         error: null,
         loading: false,
@@ -137,6 +139,7 @@ export const useAuthStore = create<AuthState>()(
             lastBreakInTime: null,
             lastBreakOutTime: null,
             totalBreakDurationToday: 0,
+            totalWorkingDurationToday: 0,
             isOnBreak: false,
             isLoginAnimationPending: false,
         }),
@@ -328,7 +331,7 @@ export const useAuthStore = create<AuthState>()(
                     return;
                 }
 
-                const { checkIn, checkOut, firstBreakIn, lastBreakIn, breakOut, breakHours } = processDailyEvents(events);
+                const { checkIn, checkOut, firstBreakIn, lastBreakIn, breakOut, breakHours, workingHours } = processDailyEvents(events);
                 const lastEvent = events[events.length - 1];
                 
                 set({
@@ -340,6 +343,7 @@ export const useAuthStore = create<AuthState>()(
                     lastBreakInTime: lastBreakIn,
                     lastBreakOutTime: breakOut,
                     totalBreakDurationToday: breakHours,
+                    totalWorkingDurationToday: workingHours,
                     isAttendanceLoading: false
                 });
             } catch (error) {

@@ -1,0 +1,107 @@
+import React, { useState, useMemo } from 'react';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, getDay } from 'date-fns';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import type { UserHoliday, Holiday } from '../../types';
+import { FIXED_HOLIDAYS } from '../../utils/constants';
+import Button from '../../components/ui/Button';
+
+interface HolidayCalendarProps {
+    adminHolidays: Holiday[];
+    userSelectedHolidays: UserHoliday[];
+    isLoading?: boolean;
+}
+
+const HolidayCalendar: React.FC<HolidayCalendarProps> = ({ adminHolidays, userSelectedHolidays, isLoading = false }) => {
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const currentYear = currentDate.getFullYear();
+
+    const daysInMonth = useMemo(() => {
+        return eachDayOfInterval({
+            start: startOfMonth(currentDate),
+            end: endOfMonth(currentDate)
+        });
+    }, [currentDate]);
+
+    const getDayStatus = (date: Date) => {
+        // 1. Check Fixed Common Holidays
+        const isFixed = FIXED_HOLIDAYS.some(fh => {
+            const datePart = fh.date.startsWith('-') ? fh.date : `-${fh.date}`;
+            const fixedDate = new Date(`${currentYear}${datePart}`.replace(/-/g, '/'));
+            return isSameDay(fixedDate, date);
+        });
+        if (isFixed) return 'fixed';
+
+        // 2. Check Admin/HR Allocated Holidays
+        const isAdminAllocated = adminHolidays.some(h => isSameDay(new Date(h.date), date));
+        if (isAdminAllocated) return 'admin';
+
+        // 3. Check User Selected Holidays
+        const isUserSelected = userSelectedHolidays.some(h => {
+             // holidayDate format in UserHoliday is likely YYYY-MM-DD
+             return isSameDay(new Date(h.holidayDate), date);
+        });
+        if (isUserSelected) return 'user';
+
+        return 'neutral';
+    };
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'fixed': return 'bg-emerald-600 text-white border-emerald-700 shadow-sm'; // Green for Common
+            case 'admin': return 'bg-amber-500 text-white border-amber-600 shadow-sm'; // Amber for Admin
+            case 'user': return 'bg-violet-600 text-white border-violet-700 shadow-sm'; // Purple for User
+            default: return 'bg-gray-50 text-gray-400 border-gray-100'; // Neutral
+        }
+    };
+
+    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const startDay = getDay(startOfMonth(currentDate));
+
+    return (
+        <div className="bg-card p-4 rounded-xl shadow-card border border-border w-full md:max-w-[320px] flex flex-col min-h-[380px]">
+            <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                <h3 className="text-sm font-semibold text-primary-text">Holiday Calendar</h3>
+                <div className="flex items-center gap-1">
+                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-3 w-3" /></Button>
+                    <span className="font-medium min-w-[80px] text-center text-sm">{format(currentDate, 'MMMM yyyy')}</span>
+                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="h-3 w-3" /></Button>
+                </div>
+            </div>
+
+            {isLoading ? (
+                <div className="flex-1 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>
+            ) : (
+                <div className="grid grid-cols-7 gap-1">
+                    {weekDays.map(d => (
+                        <div key={d} className="text-center text-xs font-medium text-muted py-1">{d}</div>
+                    ))}
+                    {Array.from({ length: startDay }).map((_, i) => (
+                        <div key={`empty-${i}`} className="aspect-square" />
+                    ))}
+                    {daysInMonth.map(date => {
+                        const status = getDayStatus(date);
+                        const colorClass = getStatusColor(status);
+                        return (
+                            <div key={date.toISOString()} className={`aspect-square rounded border flex flex-col items-center justify-center ${colorClass} transition-colors group relative cursor-help`}>
+                                <span className="text-sm font-semibold">{format(date, 'd')}</span>
+                                {status !== 'neutral' && (
+                                    <div className="absolute bottom-[-40px] left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-20 pointer-events-none transition-opacity">
+                                        {status === 'fixed' ? 'Common Holiday' : status === 'admin' ? 'Admin Allocated' : 'User Selected'}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+            
+            <div className="mt-auto pt-3 grid grid-cols-3 gap-x-3 gap-y-2 text-[14px] text-muted border-t border-border/50">
+                <div className="flex items-center gap-1.5 justify-center"><div className="w-2.5 h-2.5 bg-emerald-600 rounded-sm flex-shrink-0"></div> Gov Holiday</div>
+                <div className="flex items-center gap-1.5 justify-center"><div className="w-2.5 h-2.5 bg-amber-500 rounded-sm flex-shrink-0"></div> Admin</div>
+                <div className="flex items-center gap-1.5 justify-center"><div className="w-2.5 h-2.5 bg-violet-600 rounded-sm flex-shrink-0"></div> User Picked Holiday</div>
+            </div>
+        </div>
+    );
+};
+
+export default HolidayCalendar;

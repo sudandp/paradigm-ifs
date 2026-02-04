@@ -44,6 +44,7 @@ const ProfilePage: React.FC = () => {
         lastBreakInTime,
         lastBreakOutTime,
         totalBreakDurationToday,
+        totalWorkingDurationToday,
         checkAttendanceStatus 
     } = useAuthStore();
     const { permissions } = usePermissionsStore();
@@ -287,16 +288,30 @@ const ProfilePage: React.FC = () => {
                                 </div>
 
                                 {/* Break Duration Display */}
-                                <div className="mb-6 px-3 py-2 bg-blue-500/5 rounded-xl border border-blue-500/10 flex items-center justify-between relative z-10">
-                                    <div className="flex items-center gap-2">
-                                        <CheckCircle className="h-4 w-4 text-blue-500" />
-                                        <span className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Total Break</span>
+                                {/* Stats Grid: Break & Work */}
+                                <div className="grid grid-cols-2 gap-3 mb-6 relative z-10">
+                                    <div className="px-4 py-4 bg-blue-500/5 rounded-xl border border-blue-500/10 flex flex-col items-center justify-center gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <CheckCircle className="h-5 w-5 text-blue-500" />
+                                            <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">Total Break</span>
+                                        </div>
+                                        <p className="text-lg font-bold text-white font-mono">
+                                            {totalBreakDurationToday > 0 
+                                                ? `${Math.floor(totalBreakDurationToday)}h ${Math.round((totalBreakDurationToday % 1) * 60)}m` 
+                                                : '0h 0m'}
+                                        </p>
                                     </div>
-                                    <p className="text-sm font-bold text-white font-mono">
-                                        {totalBreakDurationToday > 0 
-                                            ? `${Math.floor(totalBreakDurationToday)}h ${Math.round((totalBreakDurationToday % 1) * 60)}m` 
-                                            : '0h 0m'}
-                                    </p>
+                                    <div className="px-4 py-4 bg-emerald-500/5 rounded-xl border border-emerald-500/10 flex flex-col items-center justify-center gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <ClipboardList className="h-5 w-5 text-emerald-500" />
+                                            <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">Total Work</span>
+                                        </div>
+                                        <p className="text-lg font-bold text-white font-mono">
+                                            {totalWorkingDurationToday > 0 
+                                                ? `${Math.floor(totalWorkingDurationToday)}h ${Math.round((totalWorkingDurationToday % 1) * 60)}m` 
+                                                : '0h 0m'}
+                                        </p>
+                                    </div>
                                 </div>
 
                                 {isAttendanceLoading ? (

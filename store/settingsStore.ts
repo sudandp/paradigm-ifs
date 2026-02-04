@@ -82,9 +82,10 @@ const initialAttendance: AttendanceSettings = {
     enableHoursBasedCalculation: true,
     enableBreakTracking: true,
     lunchBreakDuration: 60,
-    maxHolidaysPerCategory: 12,
-    adminAllocatedHolidays: 7,
+    maxHolidaysPerCategory: 10,
+    adminAllocatedHolidays: 5,
     employeeHolidays: 5,
+    enableCustomHolidays: false,
     weeklyOffDays: [0], // Sunday
   },
   field: {
@@ -110,6 +111,10 @@ const initialAttendance: AttendanceSettings = {
     minimumSitePercentage: 75,
     maximumTravelPercentage: 25,
     enableSiteTimeTracking: true,
+    maxHolidaysPerCategory: 10,
+    adminAllocatedHolidays: 5,
+    employeeHolidays: 5,
+    enableCustomHolidays: false,
   },
   site: {
     minimumHoursFullDay: 9,
@@ -130,6 +135,10 @@ const initialAttendance: AttendanceSettings = {
       min: 7,
       max: 9,
     },
+    maxHolidaysPerCategory: 10,
+    adminAllocatedHolidays: 5,
+    employeeHolidays: 5,
+    enableCustomHolidays: false,
   }
 };
 

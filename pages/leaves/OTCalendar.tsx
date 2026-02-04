@@ -73,22 +73,22 @@ const OTCalendar: React.FC = () => {
     const startDay = getDay(startOfMonth(currentDate)); // 0-6
 
     return (
-        <div className="md:bg-card md:p-3 md:rounded-xl md:shadow-card border-0 bg-transparent p-3 rounded-xl shadow-none w-full">
-            <div className="flex items-center justify-between mb-3">
+        <div className="bg-card p-4 rounded-xl shadow-card border border-border w-full md:max-w-[320px] flex flex-col min-h-[380px]">
+            <div className="flex items-center justify-between mb-3 flex-shrink-0">
                 <h3 className="text-sm font-semibold text-primary-text">OT Calendar</h3>
                 <div className="flex items-center gap-1">
-                    <Button variant="secondary" size="sm" className="!p-1 h-6 w-6" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-3 w-3" /></Button>
-                    <span className="font-medium min-w-[80px] text-center text-xs">{format(currentDate, 'MMMM yyyy')}</span>
-                    <Button variant="secondary" size="sm" className="!p-1 h-6 w-6" onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="h-3 w-3" /></Button>
+                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-3 w-3" /></Button>
+                    <span className="font-medium min-w-[80px] text-center text-sm">{format(currentDate, 'MMMM yyyy')}</span>
+                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="h-3 w-3" /></Button>
                 </div>
             </div>
 
             {isLoading ? (
-                <div className="flex justify-center py-5"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>
+                <div className="flex-1 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>
             ) : (
                 <div className="grid grid-cols-7 gap-1">
                     {weekDays.map(d => (
-                        <div key={d} className="text-center text-[10px] font-medium text-muted py-1">{d}</div>
+                        <div key={d} className="text-center text-xs font-medium text-muted py-1">{d}</div>
                     ))}
                     {/* Empty cells for start of month */}
                     {Array.from({ length: startDay }).map((_, i) => (
@@ -107,8 +107,9 @@ const OTCalendar: React.FC = () => {
                     })}
                 </div>
             )}
-            <div className="mt-3 flex gap-3 text-[10px] text-muted justify-center flex-wrap">
-                <div className="flex items-center gap-1"><div className="w-2 h-2 bg-blue-600 border border-blue-700 rounded-sm"></div> Overtime (&gt;8h)</div>
+            
+            <div className="mt-auto pt-3 flex flex-wrap gap-2 text-[10px] text-muted border-t border-border/50">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 bg-blue-600 rounded-sm"></div> Overtime (&gt;8h)</div>
             </div>
         </div>
     );
