@@ -106,8 +106,6 @@ const LeaveDashboard: React.FC = () => {
     // Holiday Selection State
     const [userHolidays, setUserHolidays] = useState<UserHoliday[]>([]);
     const [isHolidaySelectionEnabled, setIsHolidaySelectionEnabled] = useState(false);
-    const [isSavingHolidays, setIsSavingHolidays] = useState(false);
-    const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
     const [activeHolidayPool, setActiveHolidayPool] = useState<{ name: string; date: string }[]>([]);
     const currentYear = new Date().getFullYear();
 
@@ -188,7 +186,7 @@ const LeaveDashboard: React.FC = () => {
             
             // Map User Role to Staff Category (office, field, site)
             let staffCategory: keyof AttendanceSettings = 'field';
-            if (['admin', 'hr', 'finance', 'developer', 'management'].includes(user.role)) {
+            if (['admin', 'hr', 'finance', 'developer', 'management', 'office_staff', 'back_office_staff', 'bd'].includes(user.role)) {
                 staffCategory = 'office';
             } else if (['site_manager', 'site_supervisor'].includes(user.role)) {
                 staffCategory = 'site';
@@ -248,42 +246,7 @@ const LeaveDashboard: React.FC = () => {
         }
     };
 
-    const handleHolidaySelect = (holidayName: string, holidayDate: string) => {
-        const isSelected = userHolidays.some(h => h.holidayName === holidayName);
-        if (isSelected) {
-            setUserHolidays(userHolidays.filter(h => h.holidayName !== holidayName));
-        } else {
-            if (userHolidays.length >= 5) {
-                setToast({ message: 'You can only select up to 5 holidays.', type: 'error' });
-                return;
-            }
-            const newHoliday: UserHoliday = {
-                id: `temp-${Date.now()}`,
-                userId: user!.id,
-                holidayName,
-                holidayDate: `${currentYear}${holidayDate}`,
-                year: currentYear
-            };
-            setUserHolidays([...userHolidays, newHoliday]);
-        }
-    };
 
-    const saveHolidays = async () => {
-        if (userHolidays.length !== 5) {
-            setToast({ message: 'Please select exactly 5 holidays.', type: 'error' });
-            return;
-        }
-        setIsSavingHolidays(true);
-        try {
-            await api.saveUserHolidays(user!.id, userHolidays);
-            setToast({ message: 'Holidays saved successfully!', type: 'success' });
-            setIsHolidayModalOpen(false);
-        } catch (error) {
-            setToast({ message: 'Failed to save holidays.', type: 'error' });
-        } finally {
-            setIsSavingHolidays(false);
-        }
-    };
 
     const formatTabName = (tab: string) => tab.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     const filterTabs: Array<LeaveRequestStatus | 'all'> = ['all', 'pending_manager_approval', 'pending_hr_confirmation', 'approved', 'rejected'];
@@ -336,7 +299,7 @@ const LeaveDashboard: React.FC = () => {
                                         {userHolidays.length} / 5 Selected
                                     </span>
                                 </div>
-                                <Button onClick={() => setIsHolidayModalOpen(true)} className="w-full justify-center">
+                                <Button onClick={() => navigate('/leaves/holiday-selection')} className="w-full justify-center">
                                     {userHolidays.length > 0 ? 'Update Selection' : 'Select Holidays'}
                                 </Button>
                             </div>
@@ -368,7 +331,7 @@ const LeaveDashboard: React.FC = () => {
                                 </div>
                             </div>
                             
-                            <Button onClick={() => setIsHolidayModalOpen(true)} className="px-8 py-2.5">
+                            <Button onClick={() => navigate('/leaves/holiday-selection')} className="px-8 py-2.5">
                                 {userHolidays.length > 0 ? 'Update Selection' : 'Select Holidays'}
                             </Button>
                         </div>
@@ -376,57 +339,7 @@ const LeaveDashboard: React.FC = () => {
                 )
             )}
 
-            <Modal
-                isOpen={isHolidayModalOpen}
-                onClose={() => setIsHolidayModalOpen(false)}
-                title="Select Your 5 Holidays"
-                maxWidth="md:max-w-2xl"
-                onConfirm={saveHolidays}
-                confirmButtonText="Confirm Selection"
-                confirmButtonVariant="primary"
-                isLoading={isSavingHolidays}
-            >
-                <div className="space-y-6">
-                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3">
-                        <AlertTriangle className="h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-emerald-800 leading-relaxed font-medium">
-                            You must select exactly <span className="font-bold text-emerald-900 text-base mx-1">5</span> holidays from the list below. These are in addition to the 5 common fixed holidays.
-                        </p>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                        {activeHolidayPool.map((h, i) => {
-                            const isSelected = userHolidays.some(uh => uh.holidayName === h.name);
-                            return (
-                                <button
-                                    key={i}
-                                    onClick={() => handleHolidaySelect(h.name, h.date)}
-                                    className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 group
-                                        ${isSelected 
-                                            ? 'bg-emerald-50 border-emerald-500 shadow-sm ring-1 ring-emerald-500' 
-                                            : 'bg-white border-border hover:bg-gray-50 hover:border-gray-300'
-                                        }
-                                    `}
-                                >
-                                    <div className="text-left">
-                                        <p className={`text-sm font-bold transition-colors ${isSelected ? 'text-emerald-900' : 'text-primary-text group-hover:text-emerald-700'}`}>{h.name}</p>
-                                        <p className="text-xs text-muted mt-0.5">{new Date(`${currentYear}${h.date}`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                                    </div>
-                                    <div className={`
-                                        w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300
-                                        ${isSelected 
-                                            ? 'bg-emerald-500 border-emerald-500 text-white' 
-                                            : 'bg-transparent border-border text-transparent'
-                                        }
-                                    `}>
-                                        <Check className="h-4 w-4" />
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-            </Modal>
 
             {/* Attendance Calendar Section */}
             <div className="flex flex-col lg:flex-row gap-6 items-start overflow-x-auto pb-4 custom-scrollbar-horizontal">

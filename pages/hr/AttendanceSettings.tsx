@@ -431,7 +431,7 @@ const AttendanceSettings: React.FC = () => {
                 <section className="pt-6 border-t border-border">
                     <h3 className="text-lg font-semibold text-primary-text mb-4 flex items-center"><LifeBuoy className="mr-2 h-5 w-5 text-muted" />Leave Allocation</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div className="space-y-4">
+                        <div className="flex flex-col">
                             <Input
                                 label="Annual Earned Leaves"
                                 id="annualEarnedLeaves"
@@ -440,14 +440,23 @@ const AttendanceSettings: React.FC = () => {
                                 onChange={(e) => handleSettingChange('annualEarnedLeaves', parseInt(e.target.value, 10) || 0)}
                                 description="Base annual quota if dynamic accrual is disabled."
                             />
-                            <DatePicker
-                                label="Valid Till"
-                                id="earnedLeavesExpiryDate"
-                                value={currentRules.earnedLeavesExpiryDate || ''}
-                                onChange={(date) => handleSettingChange('earnedLeavesExpiryDate', date)}
-                            />
+                            <div className="mt-4">
+                                <DatePicker
+                                    label="Valid Till"
+                                    id="earnedLeavesExpiryDate"
+                                    value={currentRules.earnedLeavesExpiryDate || ''}
+                                    onChange={(date) => handleSettingChange('earnedLeavesExpiryDate', date)}
+                                />
+                                {!currentRules.earnedLeavesExpiryDate ? (
+                                    <p className="text-xs text-gray-400 mt-1">No Validity</p>
+                                ) : new Date(currentRules.earnedLeavesExpiryDate) < new Date(new Date().toISOString().split('T')[0]) ? (
+                                    <p className="text-xs text-amber-500 mt-1">⚠ Expired - Not Applicable</p>
+                                ) : (
+                                    <p className="text-xs text-emerald-500 mt-1">✓ Valid</p>
+                                )}
+                            </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="flex flex-col">
                             <Input
                                 label="Annual Sick Leaves"
                                 id="annualSickLeaves"
@@ -455,14 +464,23 @@ const AttendanceSettings: React.FC = () => {
                                 value={currentRules.annualSickLeaves}
                                 onChange={(e) => handleSettingChange('annualSickLeaves', parseInt(e.target.value, 10) || 0)}
                             />
-                            <DatePicker
-                                label="Valid Till"
-                                id="sickLeavesExpiryDate"
-                                value={currentRules.sickLeavesExpiryDate || ''}
-                                onChange={(date) => handleSettingChange('sickLeavesExpiryDate', date)}
-                            />
+                            <div className="mt-4">
+                                <DatePicker
+                                    label="Valid Till"
+                                    id="sickLeavesExpiryDate"
+                                    value={currentRules.sickLeavesExpiryDate || ''}
+                                    onChange={(date) => handleSettingChange('sickLeavesExpiryDate', date)}
+                                />
+                                {!currentRules.sickLeavesExpiryDate ? (
+                                    <p className="text-xs text-gray-400 mt-1">No Validity</p>
+                                ) : new Date(currentRules.sickLeavesExpiryDate) < new Date(new Date().toISOString().split('T')[0]) ? (
+                                    <p className="text-xs text-amber-500 mt-1">⚠ Expired - Not Applicable</p>
+                                ) : (
+                                    <p className="text-xs text-emerald-500 mt-1">✓ Valid</p>
+                                )}
+                            </div>
                         </div>
-                        <div className="space-y-4">
+                        <div className="flex flex-col">
                             <Input
                                 label="Monthly Floating Holidays"
                                 id="monthlyFloatingLeaves"
@@ -470,12 +488,21 @@ const AttendanceSettings: React.FC = () => {
                                 value={currentRules.monthlyFloatingLeaves}
                                 onChange={(e) => handleSettingChange('monthlyFloatingLeaves', parseInt(e.target.value, 10) || 0)}
                             />
-                            <DatePicker
-                                label="Valid Till"
-                                id="floatingLeavesExpiryDate"
-                                value={currentRules.floatingLeavesExpiryDate || ''}
-                                onChange={(date) => handleSettingChange('floatingLeavesExpiryDate', date)}
-                            />
+                            <div className="mt-4">
+                                <DatePicker
+                                    label="Valid Till"
+                                    id="floatingLeavesExpiryDate"
+                                    value={currentRules.floatingLeavesExpiryDate || ''}
+                                    onChange={(date) => handleSettingChange('floatingLeavesExpiryDate', date)}
+                                />
+                                {!currentRules.floatingLeavesExpiryDate ? (
+                                    <p className="text-xs text-gray-400 mt-1">No Validity</p>
+                                ) : new Date(currentRules.floatingLeavesExpiryDate) < new Date(new Date().toISOString().split('T')[0]) ? (
+                                    <p className="text-xs text-amber-500 mt-1">⚠ Expired - Not Applicable</p>
+                                ) : (
+                                    <p className="text-xs text-emerald-500 mt-1">✓ Valid</p>
+                                )}
+                            </div>
                         </div>
                     </div>
 

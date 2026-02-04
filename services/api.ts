@@ -581,6 +581,21 @@ export const api = {
     return { url: data.publicUrl, path: filePath };
   },
 
+  bulkUpdateUserLeaves: async (updates: { id: string; earned_leave_opening_balance: number; earned_leave_opening_date: string }[]): Promise<void> => {
+    // Use individual updates to avoid not-null constraint errors on other columns
+    for (const update of updates) {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          earned_leave_opening_balance: update.earned_leave_opening_balance,
+          earned_leave_opening_date: update.earned_leave_opening_date
+        })
+        .eq('id', update.id);
+      if (error) throw error;
+    }
+  },
+
+
   // --- Users & Orgs ---
   getUsers: async (filter?: { page?: number, pageSize?: number }): Promise<any> => {
     let query = supabase.from('users').select('*, role_id', { count: 'exact' });

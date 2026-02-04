@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { User } from '../../types';
-import { ShieldCheck, Plus, Edit, Trash2, Info, UserCheck, MapPin, Search, FilterX } from 'lucide-react';
+import { ShieldCheck, Plus, Edit, Trash2, Info, UserCheck, MapPin, Search, FilterX, FileSpreadsheet } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Toast from '../../components/ui/Toast';
@@ -13,6 +13,7 @@ import TableSkeleton from '../../components/skeletons/TableSkeleton';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import ApprovalModal from '../../components/admin/ApprovalModal';
 import LocationAssignmentModal from '../../components/admin/LocationAssignmentModal';
+import BulkEarnedLeaveModal from '../../components/admin/BulkEarnedLeaveModal';
 import Pagination from '../../components/ui/Pagination';
 import Input from '../../components/ui/Input';
 
@@ -29,6 +30,7 @@ const UserManagement: React.FC = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+    const [isBulkLeaveModalOpen, setIsBulkLeaveModalOpen] = useState(false);
 
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [currentUserForLocation, setCurrentUserForLocation] = useState<User | null>(null);
@@ -142,8 +144,23 @@ const UserManagement: React.FC = () => {
                 userName={currentUserForLocation?.name || ''}
             />
 
+            <BulkEarnedLeaveModal 
+                isOpen={isBulkLeaveModalOpen}
+                onClose={() => setIsBulkLeaveModalOpen(false)}
+                onSuccess={() => {
+                    setToast({ message: 'Bulk leave update successful!', type: 'success' });
+                    fetchUsers();
+                }}
+            />
+
             <AdminPageHeader title="User Management">
-                <Button onClick={handleAdd}><Plus className="mr-2 h-4 w-4" /> Add User</Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setIsBulkLeaveModalOpen(true)}>
+                        <FileSpreadsheet className="h-4 w-4 mr-2" />
+                        Bulk Update Leaves
+                    </Button>
+                    <Button onClick={handleAdd}><Plus className="mr-2 h-4 w-4" /> Add User</Button>
+                </div>
             </AdminPageHeader>
 
             <div className="mb-6 bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg text-sm">

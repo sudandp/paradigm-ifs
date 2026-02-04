@@ -63,6 +63,7 @@ const AttendanceSettings = lazyWithRetry(() => import('./pages/hr/AttendanceSett
 const NotificationsControl = lazyWithRetry(() => import('./pages/hr/NotificationsControl'));
 const LeaveDashboard = lazyWithRetry(() => import('./pages/leaves/LeaveDashboard'));
 const ApplyLeave = lazyWithRetry(() => import('./pages/leaves/ApplyLeave'));
+const HolidaySelectionPage = lazyWithRetry(() => import('./pages/leaves/HolidaySelectionPage'));
 const LeaveManagement = lazyWithRetry(() => import('./pages/hr/LeaveManagement'));
 const ApprovalWorkflow = lazyWithRetry(() => import('./pages/admin/ApprovalWorkflow'));
 const WorkflowChartFullScreen = lazyWithRetry(() => import('./pages/admin/WorkflowChartFullScreen'));
@@ -120,6 +121,9 @@ const AadhaarScannerPage = lazyWithRetry(() => import('./pages/onboarding/Aadhaa
 // Public Forms
 const FormsSelection = lazyWithRetry(() => import('./pages/public/FormsSelection'));
 const GMCForm = lazyWithRetry(() => import('./pages/public/GMCForm'));
+
+// Image Viewer
+const ImageViewerPage = lazyWithRetry(() => import('./pages/ImageViewerPage'));
 
 // Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -534,6 +538,9 @@ const App: React.FC = () => {
 
         <Route path="/public/forms" element={<FormsSelection />} />
         <Route path="/public/forms/gmc" element={<GMCForm />} />
+        
+        {/* Full-screen Image Viewer */}
+        <Route path="/image-viewer" element={<ImageViewerPage />} />
 
         {/* 2. Page for unverified users */}
         <Route path="/pending-approval" element={user && user.role === 'unverified' ? <PendingApproval /> : <Navigate to="/auth/login" replace />} />
@@ -657,6 +664,7 @@ const App: React.FC = () => {
           <Route element={<ProtectedRoute requiredPermission="apply_for_leave" />}>
             <Route path="leaves/dashboard" element={<LeaveDashboard />} />
             <Route path="leaves/apply" element={<ApplyLeave />} />
+            <Route path="leaves/holiday-selection" element={<HolidaySelectionPage />} />
           </Route>
 
           {/* HR */}
