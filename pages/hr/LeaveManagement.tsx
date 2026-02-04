@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
-import type { LeaveRequest, LeaveRequestStatus, ExtraWorkLog } from '../../types';
-import { Loader2, Check, X, Plus, XCircle, User, Calendar, FilterX, ChevronLeft, ChevronRight } from 'lucide-react';
+import type { LeaveRequest, LeaveRequestStatus, ExtraWorkLog, UserHoliday } from '../../types';
+import { Loader2, Check, X, Plus, XCircle, User, Calendar, FilterX, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { format } from 'date-fns';
@@ -59,8 +59,10 @@ const LeaveManagement: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [isLoading, setIsLoading] = useState(true);
-    const [filter, setFilter] = useState<LeaveRequestStatus | 'all' | 'claims'>('pending_manager_approval');
+    const [filter, setFilter] = useState<LeaveRequestStatus | 'all' | 'claims' | 'holiday_selection'>('pending_manager_approval');
     const [allUsers, setAllUsers] = useState<{ id: string; name: string }[]>([]);
+    const [userHolidays, setUserHolidays] = useState<(UserHoliday & { userName?: string })[]>([]);
+    const [poolHolidays, setPoolHolidays] = useState<any[]>([]);
     const [selectedUserId, setSelectedUserId] = useState<string>('all');
     const [selectedDate, setSelectedDate] = useState<string>('');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -141,14 +143,20 @@ const LeaveManagement: React.FC = () => {
                 pageSize: pageSize
             };
 
-            const [leaveRes, claimsRes] = await Promise.all([
+            const [leaveRes, claimsRes, allUserHolidaysRes, settingsRes] = await Promise.all([
                 api.getLeaveRequests(leaveFilter),
-                filter === 'claims' && isApprover ? api.getExtraWorkLogs(claimsFilter) : Promise.resolve({ data: [], total: 0 })
+                filter === 'claims' && isApprover ? api.getExtraWorkLogs(claimsFilter) : Promise.resolve({ data: [], total: 0 }),
+                filter === 'holiday_selection' ? api.getAllUserHolidays() : Promise.resolve([]),
+                filter === 'holiday_selection' ? api.getInitialAppData() : Promise.resolve(null)
             ]);
 
             setRequests(leaveRes.data);
             setClaims(claimsRes.data);
-            setTotalItems(filter === 'claims' ? claimsRes.total : leaveRes.total);
+            setUserHolidays(allUserHolidaysRes);
+            if (settingsRes) {
+                setPoolHolidays(settingsRes.holidays.filter(h => h.isPoolHoliday));
+            }
+            setTotalItems(filter === 'claims' ? claimsRes.total : (filter === 'holiday_selection' ? allUserHolidaysRes.length : leaveRes.total));
         } catch (error) {
             setToast({ message: 'Failed to load approval data.', type: 'error' });
         } finally {
@@ -237,7 +245,7 @@ const LeaveManagement: React.FC = () => {
         }
     };
 
-    const filterTabs: Array<LeaveRequestStatus | 'all' | 'claims'> = ['pending_manager_approval', 'claims', 'pending_hr_confirmation', 'approved', 'rejected', 'all']
+    const filterTabs: Array<LeaveRequestStatus | 'all' | 'claims' | 'holiday_selection'> = ['pending_manager_approval', 'claims', 'pending_hr_confirmation', 'holiday_selection', 'approved', 'rejected', 'all']
         .filter(tab => {
             // Hide 'pending_hr_confirmation' tab if finalConfirmationRole is 'reporting_manager'
             if (tab === 'pending_hr_confirmation' && finalConfirmationRole === 'reporting_manager') {
@@ -459,6 +467,53 @@ const LeaveManagement: React.FC = () => {
                                     </tr>
                                 ))
                             )}
+                        </tbody>
+                    </table>
+                </div>
+            ) : filter === 'holiday_selection' ? (
+                <div className="overflow-x-auto">
+                    <table className="min-w-full responsive-table">
+                        <thead>
+                            <tr>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Employee</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Status</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Selected Holidays</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border md:bg-card md:divide-y-0">
+                            {allUsers.filter(u => selectedUserId === 'all' || u.id === selectedUserId).map(userItem => {
+                                const selections = userHolidays.filter(h => h.userId === userItem.id);
+                                const isComplete = selections.length >= 5;
+                                const isPartial = selections.length > 0 && selections.length < 5;
+                                
+                                return (
+                                    <tr key={userItem.id}>
+                                        <td data-label="Employee" className="px-4 py-3 font-medium">{userItem.name}</td>
+                                        <td data-label="Status" className="px-4 py-3">
+                                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                                                isComplete ? 'bg-green-100 text-green-700' : 
+                                                isPartial ? 'bg-amber-100 text-amber-700' : 
+                                                'bg-gray-100 text-gray-500'
+                                            }`}>
+                                                {selections.length} / 5 Selected
+                                            </span>
+                                        </td>
+                                        <td data-label="Selected Holidays" className="px-4 py-3 text-sm text-muted">
+                                            {selections.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {selections.map((h, i) => (
+                                                        <span key={i} className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[11px] whitespace-nowrap">
+                                                            {h.holidayName} ({format(new Date(h.holidayDate.replace(/-/g, '/')), 'dd MMM')})
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="italic text-gray-400">No holidays selected</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

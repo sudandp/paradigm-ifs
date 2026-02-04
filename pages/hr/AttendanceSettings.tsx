@@ -431,28 +431,52 @@ const AttendanceSettings: React.FC = () => {
                 <section className="pt-6 border-t border-border">
                     <h3 className="text-lg font-semibold text-primary-text mb-4 flex items-center"><LifeBuoy className="mr-2 h-5 w-5 text-muted" />Leave Allocation</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <Input
-                            label="Annual Earned Leaves"
-                            id="annualEarnedLeaves"
-                            type="number"
-                            value={currentRules.annualEarnedLeaves}
-                            onChange={(e) => handleSettingChange('annualEarnedLeaves', parseInt(e.target.value, 10) || 0)}
-                            description="Base annual quota if dynamic accrual is disabled."
-                        />
-                        <Input
-                            label="Annual Sick Leaves"
-                            id="annualSickLeaves"
-                            type="number"
-                            value={currentRules.annualSickLeaves}
-                            onChange={(e) => handleSettingChange('annualSickLeaves', parseInt(e.target.value, 10) || 0)}
-                        />
-                        <Input
-                            label="Monthly Floating Holidays"
-                            id="monthlyFloatingLeaves"
-                            type="number"
-                            value={currentRules.monthlyFloatingLeaves}
-                            onChange={(e) => handleSettingChange('monthlyFloatingLeaves', parseInt(e.target.value, 10) || 0)}
-                        />
+                        <div className="space-y-4">
+                            <Input
+                                label="Annual Earned Leaves"
+                                id="annualEarnedLeaves"
+                                type="number"
+                                value={currentRules.annualEarnedLeaves}
+                                onChange={(e) => handleSettingChange('annualEarnedLeaves', parseInt(e.target.value, 10) || 0)}
+                                description="Base annual quota if dynamic accrual is disabled."
+                            />
+                            <DatePicker
+                                label="Valid Till"
+                                id="earnedLeavesExpiryDate"
+                                value={currentRules.earnedLeavesExpiryDate || ''}
+                                onChange={(date) => handleSettingChange('earnedLeavesExpiryDate', date)}
+                            />
+                        </div>
+                        <div className="space-y-4">
+                            <Input
+                                label="Annual Sick Leaves"
+                                id="annualSickLeaves"
+                                type="number"
+                                value={currentRules.annualSickLeaves}
+                                onChange={(e) => handleSettingChange('annualSickLeaves', parseInt(e.target.value, 10) || 0)}
+                            />
+                            <DatePicker
+                                label="Valid Till"
+                                id="sickLeavesExpiryDate"
+                                value={currentRules.sickLeavesExpiryDate || ''}
+                                onChange={(date) => handleSettingChange('sickLeavesExpiryDate', date)}
+                            />
+                        </div>
+                        <div className="space-y-4">
+                            <Input
+                                label="Monthly Floating Holidays"
+                                id="monthlyFloatingLeaves"
+                                type="number"
+                                value={currentRules.monthlyFloatingLeaves}
+                                onChange={(e) => handleSettingChange('monthlyFloatingLeaves', parseInt(e.target.value, 10) || 0)}
+                            />
+                            <DatePicker
+                                label="Valid Till"
+                                id="floatingLeavesExpiryDate"
+                                value={currentRules.floatingLeavesExpiryDate || ''}
+                                onChange={(date) => handleSettingChange('floatingLeavesExpiryDate', date)}
+                            />
+                        </div>
                     </div>
 
                     <div className="mt-8 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">

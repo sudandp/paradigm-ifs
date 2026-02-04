@@ -616,6 +616,23 @@ export const api = {
     return (data || []).map(toCamelCase);
   },
 
+  getAllUserHolidays: async (): Promise<(UserHoliday & { userName?: string })[]> => {
+    // Fetch all holidays and join with user names
+    const { data, error } = await supabase
+      .from('user_holidays')
+      .select('*, users(name)');
+    
+    if (error) {
+      console.warn("Error fetching all user holidays:", error);
+      return [];
+    }
+
+    return (data || []).map(item => ({
+      ...toCamelCase(item),
+      userName: item.users?.name || 'Unknown'
+    }));
+  },
+
   saveUserHolidays: async (userId: string, holidays: { holidayName: string; holidayDate: string; year: number }[]): Promise<void> => {
     // Delete existing for the same year
     const year = holidays[0]?.year || new Date().getFullYear();
@@ -1593,6 +1610,13 @@ export const api = {
       earnedTotal = openingBalance + Math.floor(countableDays / rules.earnedLeaveAccrual.daysRequired) * rules.earnedLeaveAccrual.amountEarned;
     }
 
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    // Check Earned Leave Expiry
+    if (rules.earnedLeavesExpiryDate && today > rules.earnedLeavesExpiryDate) {
+      earnedTotal = 0;
+    }
+
     // Calculate Floating Holidays based on attendance on Recurring Holidays (e.g. 3rd Saturday)
     // AND Comp Offs based on attendance on Sundays or Public Holidays
     const attendedDates = new Set((yearEvents || []).map(e => format(new Date(e.timestamp), 'yyyy-MM-dd')));
@@ -1622,11 +1646,20 @@ export const api = {
         }
     });
 
+    let sickTotal = rules.annualSickLeaves || 0;
+    if (rules.sickLeavesExpiryDate && today > rules.sickLeavesExpiryDate) {
+      sickTotal = 0;
+    }
+
+    if (rules.floatingLeavesExpiryDate && today > rules.floatingLeavesExpiryDate) {
+      floatingTotal = 0;
+    }
+
     const balance: LeaveBalance = {
       userId,
       earnedTotal,
       earnedUsed: 0,
-      sickTotal: rules.annualSickLeaves || 0,
+      sickTotal,
       sickUsed: 0,
       floatingTotal,
       floatingUsed: 0,

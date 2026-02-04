@@ -704,8 +704,11 @@ export interface StaffAttendanceRules {
   minimumHoursFullDay: number;
   minimumHoursHalfDay: number;
   annualEarnedLeaves: number;
+  earnedLeavesExpiryDate?: string; // ISO or YYYY-MM-DD
   annualSickLeaves: number;
+  sickLeavesExpiryDate?: string; // ISO or YYYY-MM-DD
   monthlyFloatingLeaves: number;
+  floatingLeavesExpiryDate?: string; // ISO or YYYY-MM-DD
   annualCompOffLeaves: number;
   enableAttendanceNotifications: boolean;
   sickLeaveCertificateThreshold: number;
