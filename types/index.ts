@@ -741,6 +741,7 @@ export interface StaffAttendanceRules {
     daysRequired: number; // e.g., 10
     amountEarned: number; // e.g., 0.5
   };
+  holidayPool?: { name: string; date: string }[];
   // Device limits configuration
   deviceLimits?: {
     web: number; // Number of allowed web devices

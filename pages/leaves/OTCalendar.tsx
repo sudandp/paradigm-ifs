@@ -73,8 +73,8 @@ const OTCalendar: React.FC = () => {
     const startDay = getDay(startOfMonth(currentDate)); // 0-6
 
     return (
-        <div className="bg-card p-4 rounded-xl shadow-card border border-border w-full md:max-w-[320px] flex flex-col min-h-[380px]">
-            <div className="flex items-center justify-between mb-3 flex-shrink-0">
+        <div className="bg-card p-5 rounded-xl shadow-card border border-border w-full md:max-w-[350px] flex flex-col min-h-[460px]">
+            <div className="flex items-center justify-between mb-6 flex-shrink-0">
                 <h3 className="text-sm font-semibold text-primary-text">OT Calendar</h3>
                 <div className="flex items-center gap-1">
                     <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-3 w-3" /></Button>
@@ -86,11 +86,10 @@ const OTCalendar: React.FC = () => {
             {isLoading ? (
                 <div className="flex-1 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>
             ) : (
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid grid-cols-7 gap-1 flex-1">
                     {weekDays.map(d => (
-                        <div key={d} className="text-center text-xs font-medium text-muted py-1">{d}</div>
+                        <div key={d} className="text-center text-[10px] font-bold text-muted uppercase tracking-wider py-1">{d}</div>
                     ))}
-                    {/* Empty cells for start of month */}
                     {Array.from({ length: startDay }).map((_, i) => (
                         <div key={`empty-${i}`} className="aspect-square" />
                     ))}
@@ -100,16 +99,16 @@ const OTCalendar: React.FC = () => {
 
                         return (
                             <div key={date.toISOString()} className={`aspect-square rounded border flex flex-col items-center justify-center transition-colors ${hasOT ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
-                                <span className="text-xs font-semibold">{format(date, 'd')}</span>
-                                {hasOT && <span className="text-[8px] font-bold">+{ot}h</span>}
+                                <span className="text-xs font-bold">{format(date, 'd')}</span>
+                                {hasOT && <span className="text-[9px] font-bold">+{ot}h</span>}
                             </div>
                         );
                     })}
                 </div>
             )}
             
-            <div className="mt-auto pt-3 flex flex-wrap gap-2 text-[10px] text-muted border-t border-border/50">
-                <div className="flex items-center gap-1"><div className="w-2 h-2 bg-blue-600 rounded-sm"></div> Overtime (&gt;8h)</div>
+            <div className="mt-4 pt-4 border-t border-border/50 flex flex-wrap gap-2 text-[11px] text-muted-foreground uppercase font-bold tracking-tight">
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"></div> Overtime (&gt;8h)</div>
             </div>
         </div>
     );

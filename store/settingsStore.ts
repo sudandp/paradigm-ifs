@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { AddressSettings, AttendanceSettings, Holiday, GmcPolicySettings, PerfiosApiSettings, GeminiApiSettings, OfflineOcrSettings, OtpSettings, ApiSettings, NotificationSettings, VerificationCosts, VerificationCostSetting, SiteManagementSettings, StaffAttendanceRules, RecurringHolidayRule } from '../types';
 import { api } from '../services/api';
+import { HOLIDAY_SELECTION_POOL } from '../utils/constants';
 
 interface SettingsState {
   address: AddressSettings;
@@ -86,6 +87,7 @@ const initialAttendance: AttendanceSettings = {
     adminAllocatedHolidays: 5,
     employeeHolidays: 5,
     enableCustomHolidays: false,
+    holidayPool: [...HOLIDAY_SELECTION_POOL],
     weeklyOffDays: [0], // Sunday
   },
   field: {
@@ -115,6 +117,7 @@ const initialAttendance: AttendanceSettings = {
     adminAllocatedHolidays: 5,
     employeeHolidays: 5,
     enableCustomHolidays: false,
+    holidayPool: [...HOLIDAY_SELECTION_POOL],
   },
   site: {
     minimumHoursFullDay: 9,
@@ -139,6 +142,7 @@ const initialAttendance: AttendanceSettings = {
     adminAllocatedHolidays: 5,
     employeeHolidays: 5,
     enableCustomHolidays: false,
+    holidayPool: [...HOLIDAY_SELECTION_POOL],
   }
 };
 

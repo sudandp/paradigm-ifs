@@ -179,7 +179,7 @@ const ApplyLeave: React.FC = () => {
                                 <Select label="Leave Type" {...field} error={errors.leaveType?.message} className={isMobile ? 'pro-select pro-select-arrow' : ''}>
                                     <option value="Earned">Earned</option>
                                     <option value="Sick">Sick</option>
-                                    <option value="Floating">Floating</option>
+                                    <option value="Floating">Floating Holiday</option>
                                     <option value="Comp Off">Comp Off</option>
                                     <option value="Loss of Pay">Loss of Pay</option>
                                 </Select>

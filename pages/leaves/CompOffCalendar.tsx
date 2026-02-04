@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, getDay } from 'date-fns';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import type { CompOffLog, LeaveRequest, AttendanceEvent } from '../../types';
+import type { CompOffLog, LeaveRequest, AttendanceEvent, UserHoliday } from '../../types';
 import { FIXED_HOLIDAYS, HOLIDAY_SELECTION_POOL } from '../../utils/constants';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -11,12 +11,13 @@ import Button from '../../components/ui/Button';
 interface CompOffCalendarProps {
     logs: CompOffLog[];
     leaveRequests?: LeaveRequest[];
+    userHolidays?: UserHoliday[];
     isLoading?: boolean;
 }
 
-const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests = [], isLoading = false }) => {
+const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests = [], userHolidays = [], isLoading = false }) => {
     const { user } = useAuthStore();
-    const { officeHolidays, fieldHolidays, recurringHolidays } = useSettingsStore();
+    const { officeHolidays, fieldHolidays, recurringHolidays, attendance } = useSettingsStore();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [events, setEvents] = useState<AttendanceEvent[]>([]);
     const [isLoadingEvents, setIsLoadingEvents] = useState(false);
@@ -55,6 +56,8 @@ const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests =
 
     const getDayStatus = (date: Date) => {
         const currentYear = date.getFullYear();
+        const staffCategory = user?.role === 'field_staff' ? 'field' : 'office';
+        const activePool = (attendance as any)?.[staffCategory]?.holidayPool || HOLIDAY_SELECTION_POOL;
 
         // 1. Check for taken comp-offs from leave requests
         const isTaken = leaveRequests.some(request => {
@@ -84,22 +87,27 @@ const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests =
             // Check if it's a Sunday (weekly off)
             const isSunday = getDay(date) === 0;
 
-            // Check for FIXED holidays
+            // Check for FIXED holidays (like Republic Day on 26th)
             const isFixedHoliday = FIXED_HOLIDAYS.some(fh => {
-                const datePart = fh.date.startsWith('-') ? fh.date : `-${fh.date}`;
-                const fixedDate = new Date(`${currentYear}${datePart}`.replace(/-/g, '/'));
+                const [m, d] = fh.date.split('-').map(Number);
+                const fixedDate = new Date(currentYear, m - 1, d);
                 return isSameDay(fixedDate, date);
             });
 
             // Check for Pool holidays
-            const isPoolHoliday = HOLIDAY_SELECTION_POOL.some(h => {
-                const datePart = h.date.startsWith('-') ? h.date : `-${h.date}`;
-                const poolDate = new Date(`${currentYear}${datePart}`.replace(/-/g, '/'));
+            // Only consider it a holiday if the user has selected it
+            const isPoolHoliday = userHolidays.some(uh => {
+                // uh.holidayDate is stored as "YYYY-MM-DD" in the database
+                const [y, m, d] = uh.holidayDate.split('-').map(Number);
+                const poolDate = new Date(y, m - 1, d);
                 return isSameDay(poolDate, date);
             });
 
             // Check for configured holidays
-            const isConfiguredHoliday = holidays.some(h => isSameDay(new Date(h.date), date));
+            const isConfiguredHoliday = holidays.some(h => {
+                const [y, m, d] = h.date.split('-').map(Number);
+                return isSameDay(new Date(y, m - 1, d), date);
+            });
 
             // If worked on any type of holiday/Sunday, it's earned comp-off
             if (isSunday || isFixedHoliday || isPoolHoliday || isConfiguredHoliday) {
@@ -124,8 +132,8 @@ const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests =
     const loading = isLoading || isLoadingEvents;
 
     return (
-        <div className="bg-card p-4 rounded-xl shadow-card border border-border w-full md:max-w-[320px] flex flex-col min-h-[380px]">
-            <div className="flex items-center justify-between mb-3 flex-shrink-0">
+        <div className="bg-card p-5 rounded-xl shadow-card border border-border w-full md:max-w-[350px] flex flex-col min-h-[460px]">
+            <div className="flex items-center justify-between mb-6 flex-shrink-0">
                 <h3 className="text-sm font-semibold text-primary-text">Comp Off Tracker</h3>
                 <div className="flex items-center gap-1">
                     <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-3 w-3" /></Button>
@@ -137,11 +145,10 @@ const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests =
             {loading ? (
                 <div className="flex-1 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>
             ) : (
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid grid-cols-7 gap-1 flex-1">
                     {weekDays.map(d => (
-                        <div key={d} className="text-center text-xs font-medium text-muted py-1">{d}</div>
+                        <div key={d} className="text-center text-[10px] font-bold text-muted uppercase tracking-wider py-1">{d}</div>
                     ))}
-                    {/* Empty cells for start of month */}
                     {Array.from({ length: startDay }).map((_, i) => (
                         <div key={`empty-${i}`} className="aspect-square" />
                     ))}
@@ -150,16 +157,16 @@ const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests =
                         const colorClass = getStatusColor(status);
                         return (
                             <div key={date.toISOString()} className={`aspect-square rounded border flex flex-col items-center justify-center ${colorClass} transition-colors`}>
-                                <span className="text-sm font-semibold">{format(date, 'd')}</span>
+                                <span className="text-xs font-bold">{format(date, 'd')}</span>
                             </div>
                         );
                     })}
                 </div>
             )}
             
-            <div className="mt-auto pt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[14px] text-muted border-t border-border/50">
-                <div className="flex items-center gap-1.5 justify-center"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm flex-shrink-0"></div> Earned</div>
-                <div className="flex items-center gap-1.5 justify-center"><div className="w-2.5 h-2.5 bg-red-500 rounded-sm flex-shrink-0"></div> Taken</div>
+            <div className="mt-4 pt-3 border-t border-border/50 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px] text-muted-foreground uppercase font-bold tracking-tight">
+                <div className="flex items-center gap-1.5 justify-center"><div className="w-2 h-2 bg-emerald-500 rounded-full flex-shrink-0"></div> Earned</div>
+                <div className="flex items-center gap-1.5 justify-center"><div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></div> Taken</div>
             </div>
         </div>
     );

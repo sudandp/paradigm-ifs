@@ -19,6 +19,7 @@ import UploadDocument from '../../components/UploadDocument';
 import AttendanceCalendar from './AttendanceCalendar';
 import CompOffCalendar from './CompOffCalendar';
 import OTCalendar from './OTCalendar';
+import YearlyAttendanceChart from './YearlyAttendanceChart';
 import EmployeeLog from './EmployeeLog';
 import Modal from '../../components/ui/Modal';
 import HolidayCalendar from './HolidayCalendar';
@@ -107,6 +108,7 @@ const LeaveDashboard: React.FC = () => {
     const [isHolidaySelectionEnabled, setIsHolidaySelectionEnabled] = useState(false);
     const [isSavingHolidays, setIsSavingHolidays] = useState(false);
     const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
+    const [activeHolidayPool, setActiveHolidayPool] = useState<{ name: string; date: string }[]>([]);
     const currentYear = new Date().getFullYear();
 
     const { officeHolidays, fieldHolidays } = useSettingsStore();
@@ -196,6 +198,7 @@ const LeaveDashboard: React.FC = () => {
 
             const userRules = settings[staffCategory];
             setIsHolidaySelectionEnabled(userRules.enableCustomHolidays || false);
+            setActiveHolidayPool(userRules.holidayPool || HOLIDAY_SELECTION_POOL);
             
             if (userRules.enableCustomHolidays) {
                 const selections = await api.getUserHolidays(user.id);
@@ -392,7 +395,7 @@ const LeaveDashboard: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                        {HOLIDAY_SELECTION_POOL.map((h, i) => {
+                        {activeHolidayPool.map((h, i) => {
                             const isSelected = userHolidays.some(uh => uh.holidayName === h.name);
                             return (
                                 <button
@@ -427,9 +430,10 @@ const LeaveDashboard: React.FC = () => {
 
             {/* Attendance Calendar Section */}
             <div className="flex flex-col lg:flex-row gap-6 items-start overflow-x-auto pb-4 custom-scrollbar-horizontal">
-                <AttendanceCalendar />
-                <CompOffCalendar logs={compOffLogs} leaveRequests={requests} isLoading={isLoading} />
+                <AttendanceCalendar leaveRequests={requests} userHolidays={userHolidays} />
+                <CompOffCalendar logs={compOffLogs} leaveRequests={requests} userHolidays={userHolidays} isLoading={isLoading} />
                 <HolidayCalendar adminHolidays={adminHolidays} userSelectedHolidays={userHolidays} isLoading={isLoading} />
+                <YearlyAttendanceChart />
                 {/* Show OT Calendar only for field staff */}
                 {user?.role === 'field_staff' && <OTCalendar />}
             </div>

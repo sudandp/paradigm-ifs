@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useSettingsStore } from '../../store/settingsStore';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
-import { Trash2, Plus, Settings, Calendar, Clock, LifeBuoy, Bell, Save, Monitor } from 'lucide-react';
+import { Trash2, Plus, Settings, Calendar, Clock, LifeBuoy, Bell, Save, Monitor, Edit } from 'lucide-react';
 import DatePicker from '../../components/ui/DatePicker';
 import Toast from '../../components/ui/Toast';
 import Checkbox from '../../components/ui/Checkbox';
@@ -32,6 +32,9 @@ const AttendanceSettings: React.FC = () => {
     const [allRoles, setAllRoles] = useState<Role[]>([]);
     const [isLoadingRoles, setIsLoadingRoles] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [newPoolHolidayName, setNewPoolHolidayName] = useState('');
+    const [newPoolHolidayDate, setNewPoolHolidayDate] = useState('');
+    const [editingPoolIndex, setEditingPoolIndex] = useState<number | null>(null);
 
     useEffect(() => {
         const fetchRoles = async () => {
@@ -112,6 +115,51 @@ const AttendanceSettings: React.FC = () => {
                 setToast({ message: 'Failed to remove holiday.', type: 'error' });
             }
         }
+    };
+
+    const handleAddPoolHoliday = () => {
+        if (!newPoolHolidayName || !newPoolHolidayDate) {
+            setToast({ message: 'Please provide both a name and a date.', type: 'error' });
+            return;
+        }
+
+        // Convert YYYY-MM-DD to -MM-DD format for consistency with constants if needed
+        const datePart = newPoolHolidayDate.substring(4); // Keep -MM-DD
+
+        const pool = [...(currentRules.holidayPool || HOLIDAY_SELECTION_POOL)];
+        pool.push({ name: newPoolHolidayName, date: datePart });
+        
+        handleSettingChange('holidayPool', pool);
+        setNewPoolHolidayName('');
+        setNewPoolHolidayDate('');
+    };
+
+    const handleRemovePoolHoliday = (index: number) => {
+        const pool = [...(currentRules.holidayPool || HOLIDAY_SELECTION_POOL)];
+        pool.splice(index, 1);
+        handleSettingChange('holidayPool', pool);
+    };
+
+    const handleEditPoolHoliday = (index: number) => {
+        const pool = [...(currentRules.holidayPool || HOLIDAY_SELECTION_POOL)];
+        const item = pool[index];
+        setNewPoolHolidayName(item.name);
+        setNewPoolHolidayDate(`${currentYear}${item.date}`);
+        setEditingPoolIndex(index);
+    };
+
+    const handleSavePoolEdit = () => {
+        if (editingPoolIndex === null) return;
+        
+        const dateStr = newPoolHolidayDate.substring(4);
+
+        const pool = [...(currentRules.holidayPool || HOLIDAY_SELECTION_POOL)];
+        pool[editingPoolIndex] = { name: newPoolHolidayName, date: dateStr };
+        
+        handleSettingChange('holidayPool', pool);
+        setNewPoolHolidayName('');
+        setNewPoolHolidayDate('');
+        setEditingPoolIndex(null);
     };
 
     const handleSettingChange = (setting: keyof StaffAttendanceRules, value: any) => {
@@ -632,15 +680,72 @@ const AttendanceSettings: React.FC = () => {
                                 <Settings className="mr-2 h-4 w-4 text-muted" /> 
                                 Holiday Selection Pool
                             </h4>
-                            <p className="text-sm text-muted mb-4">
-                                These are the 20 public holidays available for users to select their 5 choices from.
-                            </p>
+                            <div className="mb-6 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+                                <h4 className="text-sm font-semibold text-emerald-600 mb-4 flex items-center">
+                                    <Plus className="mr-2 h-4 w-4" /> {editingPoolIndex !== null ? 'Edit Pool Holiday' : 'Add to Selection Pool'}
+                                </h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                                    <Input 
+                                        label="Holiday Name" 
+                                        value={newPoolHolidayName} 
+                                        onChange={e => setNewPoolHolidayName(e.target.value)} 
+                                        placeholder="e.g. Christmas"
+                                    />
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-muted ml-1">Date (Year Ignored)</label>
+                                        <DatePicker 
+                                            id="pool-holiday-date"
+                                            label=""
+                                            value={newPoolHolidayDate} 
+                                            onChange={setNewPoolHolidayDate} 
+                                        />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button 
+                                            onClick={editingPoolIndex !== null ? handleSavePoolEdit : handleAddPoolHoliday}
+                                            className="flex-1 h-[46px] text-sm"
+                                        >
+                                            {editingPoolIndex !== null ? 'Update' : 'Add to Pool'}
+                                        </Button>
+                                        {editingPoolIndex !== null && (
+                                            <Button 
+                                                variant="secondary" 
+                                                onClick={() => {
+                                                    setEditingPoolIndex(null);
+                                                    setNewPoolHolidayName('');
+                                                    setNewPoolHolidayDate('');
+                                                }}
+                                                className="h-[46px] px-4"
+                                            >
+                                                Cancel
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto p-1">
-                                {HOLIDAY_SELECTION_POOL.map((h, i) => (
-                                    <div key={i} className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors">
+                                {(currentRules.holidayPool || HOLIDAY_SELECTION_POOL).map((h, i) => (
+                                    <div key={i} className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-lg group">
                                         <div className="min-w-0">
                                             <p className="text-sm font-medium truncate">{h.name}</p>
                                             <p className="text-xs text-muted">{new Date(`${currentYear}${h.date}`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                        </div>
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button 
+                                                onClick={() => handleEditPoolHoliday(i)}
+                                                className="p-1.5 hover:bg-white/10 rounded-md text-muted hover:text-primary transition-colors"
+                                                title="Edit"
+                                            >
+                                                <Edit className="h-4 w-4" />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleRemovePoolHoliday(i)}
+                                                className="p-1.5 hover:bg-red-500/10 rounded-md text-red-400 hover:text-red-500 transition-colors"
+                                                title="Remove"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
                                         </div>
                                     </div>
                                 ))}

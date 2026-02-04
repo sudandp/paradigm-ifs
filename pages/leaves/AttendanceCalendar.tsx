@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, getDay, isAfter, startOfDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, getDay, isAfter, startOfDay, endOfDay } from 'date-fns';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { api } from '../../services/api';
-import type { AttendanceEvent, UserHoliday } from '../../types';
+import type { AttendanceEvent, UserHoliday, LeaveRequest } from '../../types';
 import { FIXED_HOLIDAYS, HOLIDAY_SELECTION_POOL } from '../../utils/constants';
 import Button from '../../components/ui/Button';
 
-const AttendanceCalendar: React.FC = () => {
+interface AttendanceCalendarProps {
+    leaveRequests?: LeaveRequest[];
+    userHolidays?: UserHoliday[];
+}
+
+const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests = [], userHolidays = [] }) => {
     const { user } = useAuthStore();
     const { officeHolidays, fieldHolidays, attendance, recurringHolidays } = useSettingsStore();
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -124,6 +129,8 @@ const AttendanceCalendar: React.FC = () => {
 
     const getDayStatus = (date: Date) => {
         const currentYear = date.getFullYear();
+        const staffCategory = user?.role === 'field_staff' ? 'field' : 'office';
+        const activePool = (attendance as any)?.[staffCategory]?.holidayPool || HOLIDAY_SELECTION_POOL;
         
         // Check for attendance (present)
         const hasCheckIn = events.some(e => isSameDay(new Date(e.timestamp), date) && (e.type.toLowerCase().includes('check') || e.type.toLowerCase().includes('in')));
@@ -132,19 +139,24 @@ const AttendanceCalendar: React.FC = () => {
         const isRecurringHoliday = recurringHolidayDates.some(d => isSameDay(d, date));
 
         // Check for specific date holiday from admin settings (Company Holiday)
-        const isConfiguredHoliday = holidays.some(h => isSameDay(new Date(h.date), date));
+        const isConfiguredHoliday = holidays.some(h => {
+            const [y, m, d] = h.date.split('-').map(Number);
+            return isSameDay(new Date(y, m - 1, d), date);
+        });
 
         // Check for FIXED holidays (like Republic Day on 26th)
         const isFixedHoliday = FIXED_HOLIDAYS.some(fh => {
-            const datePart = fh.date.startsWith('-') ? fh.date : `-${fh.date}`;
-            const fixedDate = new Date(`${currentYear}${datePart}`.replace(/-/g, '/'));
+            const [m, d] = fh.date.split('-').map(Number);
+            const fixedDate = new Date(currentYear, m - 1, d);
             return isSameDay(fixedDate, date);
         });
 
         // Check for user-selected holidays from pool (like 15th - Sankranti)
-        const isPoolHoliday = HOLIDAY_SELECTION_POOL.some(h => {
-            const datePart = h.date.startsWith('-') ? h.date : `-${h.date}`;
-            const poolDate = new Date(`${currentYear}${datePart}`.replace(/-/g, '/'));
+        // Only show if the user has actually selected this holiday
+        const isPoolHoliday = userHolidays.some(uh => {
+            // uh.holidayDate is stored as "YYYY-MM-DD" in the database
+            const [y, m, d] = uh.holidayDate.split('-').map(Number);
+            const poolDate = new Date(y, m - 1, d);
             return isSameDay(poolDate, date);
         });
 
@@ -154,6 +166,15 @@ const AttendanceCalendar: React.FC = () => {
         // Check if it's a Sunday (weekly off)
         const isSunday = getDay(date) === 0;
 
+        // Check for Approved Leave
+        const isApprovedLeave = leaveRequests.some(req => {
+            if (req.status !== 'approved' && req.status !== 'pending_hr_confirmation') return false;
+            const start = new Date(req.startDate);
+            const end = new Date(req.endDate);
+            // Check intersection (inclusive)
+            return date >= startOfDay(start) && date <= endOfDay(end);
+        });
+
         // Priority Logic:
         // 1. If it's a holiday (recurring, fixed, or Sunday) AND the user checked in -> Holiday Present (comp-off earned)
         if ((isRecurringHoliday || isCompanyHoliday || isSunday) && hasCheckIn) {
@@ -161,14 +182,17 @@ const AttendanceCalendar: React.FC = () => {
         }
 
         // 2. If it's a holiday and NO check-in -> Holiday (or Floating Holiday)
-        if (isRecurringHoliday) return 'floating-holiday';
-        if (isCompanyHoliday) return 'company-holiday'; // Company holidays in distinct color (Fixed, Pool, Admin)
+        if (isRecurringHoliday) return 'floating-holiday'; // Yellow
+        if (isConfiguredHoliday || isFixedHoliday || isPoolHoliday) return 'company-holiday'; // Blue
         if (isSunday) return 'sunday'; // Sunday as weekly off
 
-        // 3. If it's not a holiday but has check-in -> Present
+        // 3. Approved Leave (Prioritized over Present)
+        if (isApprovedLeave) return 'leave';
+
+        // 4. If it's not a holiday but has check-in -> Present
         if (hasCheckIn) return 'present';
 
-        // 4. Check for absent (past date, no check-in, not holiday)
+        // 5. Check for absent (past date, no check-in, not holiday)
         const isPast = isAfter(startOfDay(new Date()), startOfDay(date)); // date < today
         if (isPast) return 'absent';
 
@@ -183,6 +207,7 @@ const AttendanceCalendar: React.FC = () => {
             case 'company-holiday': return 'bg-sky-400 text-white border-sky-500 shadow-sm'; // Sky Blue for Company Holiday
             case 'floating-holiday': return 'bg-amber-500 text-white border-amber-600 shadow-sm'; // Vibrant Amber
             case 'holiday-present': return 'bg-violet-600 text-white border-violet-700 shadow-sm'; // Vibrant Purple (Comp Off)
+            case 'leave': return 'bg-blue-600 text-white border-blue-700 shadow-sm'; // Blue for Leave
             default: return 'bg-gray-50 text-gray-400 border-gray-100'; // Neutral
         }
     };
@@ -191,8 +216,8 @@ const AttendanceCalendar: React.FC = () => {
     const startDay = getDay(startOfMonth(currentDate)); // 0-6
 
     return (
-        <div className="bg-card p-4 rounded-xl shadow-card border border-border w-full md:max-w-[320px] flex flex-col min-h-[380px]">
-            <div className="flex items-center justify-between mb-3 flex-shrink-0">
+        <div className="bg-card p-5 rounded-xl shadow-card border border-border w-full md:max-w-[350px] flex flex-col min-h-[460px]">
+            <div className="flex items-center justify-between mb-6 flex-shrink-0">
                 <h3 className="text-sm font-semibold text-primary-text">Attendance Calendar</h3>
                 <div className="flex items-center gap-1">
                     <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-3 w-3" /></Button>
@@ -204,11 +229,10 @@ const AttendanceCalendar: React.FC = () => {
             {isLoading ? (
                 <div className="flex-1 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>
             ) : (
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid grid-cols-7 gap-1 flex-1">
                     {weekDays.map(d => (
-                        <div key={d} className="text-center text-xs font-medium text-muted py-1">{d}</div>
+                        <div key={d} className="text-center text-[10px] font-bold text-muted uppercase tracking-wider py-1">{d}</div>
                     ))}
-                    {/* Empty cells for start of month */}
                     {Array.from({ length: startDay }).map((_, i) => (
                         <div key={`empty-${i}`} className="aspect-square" />
                     ))}
@@ -217,20 +241,21 @@ const AttendanceCalendar: React.FC = () => {
                         const colorClass = getStatusColor(status);
                         return (
                             <div key={date.toISOString()} className={`aspect-square rounded border flex flex-col items-center justify-center ${colorClass} transition-colors`}>
-                                <span className="text-sm font-semibold">{format(date, 'd')}</span>
+                                <span className="text-xs font-bold">{format(date, 'd')}</span>
                             </div>
                         );
                     })}
                 </div>
             )}
             
-            <div className="mt-auto pt-3 grid grid-cols-3 gap-x-3 gap-y-2 text-[14px] text-muted border-t border-border/50">
-                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm flex-shrink-0"></div> Present</div>
-                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-red-500 rounded-sm flex-shrink-0"></div> Absent</div>
-                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-rose-300 rounded-sm flex-shrink-0"></div> Week Off</div>
-                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-sky-400 rounded-sm flex-shrink-0"></div> Holiday</div>
-                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-amber-500 rounded-sm flex-shrink-0"></div> Floating</div>
-                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-violet-600 rounded-sm flex-shrink-0"></div> Comp Off</div>
+            <div className="mt-4 pt-3 border-t border-border/50 grid grid-cols-3 gap-x-2 gap-y-2 text-[11px] text-muted-foreground uppercase font-bold tracking-tight">
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-emerald-500 rounded-full flex-shrink-0"></div> Present</div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></div> Absent</div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-rose-300 rounded-full flex-shrink-0"></div> W.O</div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-sky-400 rounded-full flex-shrink-0"></div> Holiday</div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-amber-500 rounded-full flex-shrink-0"></div> Floating Holiday</div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-violet-600 rounded-full flex-shrink-0"></div> C.O</div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"></div> Leave</div>
             </div>
         </div>
     );
