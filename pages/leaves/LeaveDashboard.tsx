@@ -186,7 +186,7 @@ const LeaveDashboard: React.FC = () => {
             
             // Map User Role to Staff Category (office, field, site)
             let staffCategory: keyof AttendanceSettings = 'field';
-            if (['admin', 'hr', 'finance', 'developer', 'management', 'office_staff', 'back_office_staff', 'bd'].includes(user.role)) {
+            if (['admin', 'hr', 'finance', 'developer', 'management', 'office_staff', 'back_office_staff', 'bd', 'operation_manager', 'field_staff', 'finance_manager', 'hr_ops'].includes(user.role)) {
                 staffCategory = 'office';
             } else if (['site_manager', 'site_supervisor'].includes(user.role)) {
                 staffCategory = 'site';
