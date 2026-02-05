@@ -1,6 +1,6 @@
 // Attendance calculation utilities for hours-based attendance tracking
 
-import { differenceInMinutes, parseISO } from 'date-fns';
+import { differenceInMinutes, parseISO, isSameDay } from 'date-fns';
 import type { AttendanceEvent, DailyAttendanceStatus } from '../types';
 
 /**
@@ -65,12 +65,14 @@ export function calculateWorkingHours(
     }
   });
 
-  // Handle ongoing sessions (if any) - though usually we only calculate for finished ones or up to "now"
-  // For the purpose of "current status", we might not need to add the ongoing minutes here
-  // but for "total duration today", we should.
+  // Handle ongoing sessions (if any)
+  // Fix: Only add ongoing duration if the session started TODAY. 
+  // If it's a past check-in without a checkout, we ignore the ongoing time (completed time is 0 for that segment).
   const now = new Date();
   if (workStartTime) {
-    totalGrossWorkMinutes += differenceInMinutes(now, workStartTime);
+    if (isSameDay(now, workStartTime)) {
+       totalGrossWorkMinutes += differenceInMinutes(now, workStartTime);
+    }
   }
   if (breakStartTime) {
     totalBreakMinutes += differenceInMinutes(now, breakStartTime);

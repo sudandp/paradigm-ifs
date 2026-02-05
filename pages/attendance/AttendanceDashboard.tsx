@@ -1324,16 +1324,56 @@ const AttendanceDashboard: React.FC = () => {
                 // Check for recurring holidays
                 const isRecurringHoliday = recurringHolidays.some(rule => {
                     if (rule.day.toLowerCase() !== dayName.toLowerCase()) return false;
-                    // Calculate occurrence (e.g., 2nd Saturday)
                     const dayDate = day.getDate();
                     const occurrence = Math.ceil(dayDate / 7);
-
-                    const ruleType = rule.type || 'office'; // Default to office if not specified
+                    const ruleType = rule.type || 'office';
                     return rule.n === occurrence && ruleType === userCategory;
                 });
 
-                if (isRecurringHoliday) {
+                // Check for fixed holidays
+                const isFixedHoliday = FIXED_HOLIDAYS.some(fh => {
+                    const [m, d] = fh.date.split('-').map(Number);
+                    return day.getMonth() === (m - 1) && day.getDate() === d;
+                });
+
+                // Check for pool holidays (selected by user)
+                const isPoolHoliday = userHolidaysPool.some(uh => {
+                    const uhUserId = uh.userId || (uh as any).user_id;
+                    const hDate = uh.holidayDate || (uh as any).holiday_date;
+                    if (!uhUserId || !hDate) return false;
+                    
+                    // ROBUST ID MATCHING: Handle any casing or whitespace
+                    const matchId1 = String(uhUserId).trim().toLowerCase();
+                    const matchId2 = String(user.id).trim().toLowerCase();
+                    
+                    if (matchId1 !== matchId2) return false;
+
+                    // ROBUST DATE MATCHING
+                    const compareStr = format(day, 'yyyy-MM-dd');
+                    const compareMMDD = format(day, '-MM-dd');
+                    
+                    const hDateStr = String(hDate);
+                    return hDateStr.includes(compareStr) || 
+                           hDateStr.endsWith(compareMMDD) || 
+                           (hDateStr.startsWith('-') && compareStr.endsWith(hDateStr));
+                });
+
+                // Check for configured holidays (group based)
+                const isConfiguredHoliday = (userCategory === 'field' ? fieldHolidays : officeHolidays).some(h => {
+                    const hDateStr = String(h.date);
+                    const compareStr = format(day, 'yyyy-MM-dd');
+                    const compareMMDD = format(day, '-MM-dd');
+                    return hDateStr.includes(compareStr) || 
+                           hDateStr.endsWith(compareMMDD) || 
+                           (hDateStr.startsWith('-') && compareStr.endsWith(hDateStr));
+                });
+
+                const isHoliday = isFixedHoliday || isPoolHoliday || isConfiguredHoliday;
+
+                if (isHoliday) {
                     status = 'H';
+                } else if (isRecurringHoliday) {
+                    status = 'F/H';
                 } else if (isWeekend) {
                     status = 'W/O';
                 }
@@ -1412,7 +1452,7 @@ const AttendanceDashboard: React.FC = () => {
         }
 
         return filteredData;
-    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, selectedStatus, selectedRecordType, recurringHolidays]);
+    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, selectedStatus, selectedRecordType, recurringHolidays, leaves, userHolidaysPool, officeHolidays, fieldHolidays]);
 
     // 2. Attendance Log Data (Raw Events)
     const attendanceLogData: AttendanceLogDataRow[] = useMemo(() => {
@@ -1456,7 +1496,7 @@ const AttendanceDashboard: React.FC = () => {
                 return a.time.localeCompare(b.time);
             });
 
-    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, leaves]);
+    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, leaves, recurringHolidays, userHolidaysPool, officeHolidays, fieldHolidays]);
 
     // 3. Monthly Report Data (Aggregated)
     const monthlyReportData: MonthlyReportRow[] = useMemo(() => {
@@ -1505,27 +1545,26 @@ const AttendanceDashboard: React.FC = () => {
                         const compareStr = format(compareDay, 'yyyy-MM-dd');
                         const compareMMDD = format(compareDay, '-MM-dd');
                         
-                        if (typeof targetDate === 'string') {
-                             // 1. Try exact full date match
-                            if (targetDate.includes(compareStr)) return true;
+                        // Handle multiple formats: String, Date, objects
+                        const dateVal = String(targetDate).split(' ')[0].split('T')[0];
 
-                            // 2. Try partial MM-DD match (Year agnostic)
-                            if (targetDate.includes(compareMMDD)) return true;
-                            if (targetDate.endsWith(compareMMDD)) return true;
+                        // 1. Exact match
+                        if (dateVal === compareStr) return true;
+                        
+                        // 2. Partial match for year-agnostic pool holidays
+                        if (dateVal.includes(compareMMDD)) return true;
+                        if (dateVal.endsWith(compareMMDD)) return true;
 
-                            if (targetDate.startsWith('-')) {
-                                return compareStr.endsWith(targetDate);
-                            }
-                            
-                            const cleanDate = targetDate.split(' ')[0].split('T')[0];
-                            return cleanDate === compareStr;
+                        // 3. Pool format starting with '-'
+                        if (dateVal.startsWith('-')) {
+                            return compareStr.endsWith(dateVal);
                         }
-                        
-                        // 2. If it's a Date object
-                        if (targetDate instanceof Date) {
-                            return format(targetDate, 'yyyy-MM-dd') === compareStr;
-                        }
-                        
+
+                        // 4. Fallback for any weird separator
+                        const normalizedCompare = compareStr.replace(/-/g, '');
+                        const normalizedTarget = dateVal.replace(/[-\/]/g, '');
+                        if (normalizedTarget.includes(normalizedCompare)) return true;
+
                         return false;
                     } catch (e) {
                         return false;
@@ -1564,7 +1603,13 @@ const AttendanceDashboard: React.FC = () => {
                 const isPoolHoliday = userHolidaysPool.some(uh => {
                     const uhUserId = uh.userId || (uh as any).user_id;
                     const holidayDate = uh.holidayDate || (uh as any).holiday_date;
-                    return String(uhUserId) === String(user.id) && matchesDate(holidayDate, day);
+                    if (!uhUserId || !holidayDate) return false;
+                    
+                    // ROBUST ID MATCHING: Use toLowerCase() and trim for UUID comparison
+                    const matchId1 = String(uhUserId).trim().toLowerCase();
+                    const matchId2 = String(user.id).trim().toLowerCase();
+                    
+                    return matchId1 === matchId2 && matchesDate(holidayDate, day);
                 });
 
                 // 4. Check Configured holidays (Admin settings)

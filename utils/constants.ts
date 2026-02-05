@@ -1,5 +1,4 @@
 export const FIXED_HOLIDAYS = [
-    { name: 'New Year', date: '01-01', isFixed: true },
     { name: 'Republic Day', date: '01-26', isFixed: true },
     { name: 'May Day', date: '05-01', isFixed: true },
     { name: 'Independence Day', date: '08-15', isFixed: true },
@@ -8,6 +7,7 @@ export const FIXED_HOLIDAYS = [
 ];
 
 export const HOLIDAY_SELECTION_POOL = [
+    { name: 'New Year', date: '-01-01' },
     { name: 'Uttarayana Punyakala, Makara Sankranti Festival', date: '-01-15' },
     { name: 'Ugadi Festival', date: '-03-19' },
     { name: 'Khutub-E-Ramzan', date: '-03-21' },

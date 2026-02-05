@@ -632,20 +632,18 @@ export const api = {
   },
 
   getAllUserHolidays: async (): Promise<(UserHoliday & { userName?: string })[]> => {
-    // Fetch all holidays and join with user names
+    // Fetch all holidays directly. Removing join with users to ensure absolute reliability.
+    // Mapping name from the users list already fetched in the dashboard if needed.
     const { data, error } = await supabase
       .from('user_holidays')
-      .select('*, users(name)');
+      .select('*');
     
     if (error) {
       console.warn("Error fetching all user holidays:", error);
       return [];
     }
 
-    return (data || []).map(item => ({
-      ...toCamelCase(item),
-      userName: item.users?.name || 'Unknown'
-    }));
+    return (data || []).map(toCamelCase);
   },
 
   saveUserHolidays: async (userId: string, holidays: { holidayName: string; holidayDate: string; year: number }[]): Promise<void> => {
