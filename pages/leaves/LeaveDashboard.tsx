@@ -26,14 +26,17 @@ import HolidayCalendar from './HolidayCalendar';
 
 // --- Reusable Components ---
 
-const LeaveBalanceCard: React.FC<{ title: string; value: string; icon: React.ElementType }> = ({ title, value, icon: Icon }) => (
-    <div className="bg-card p-3 md:p-4 rounded-xl flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 border border-border text-center md:text-left w-full">
-        <div className="bg-accent-light p-2 md:p-3 rounded-full flex-shrink-0">
-            <Icon className="h-5 w-5 md:h-6 md:w-6 text-accent-dark" />
+const LeaveBalanceCard: React.FC<{ title: string; value: string; icon: React.ElementType; isExpired?: boolean }> = ({ title, value, icon: Icon, isExpired }) => (
+    <div className={`bg-card p-3 md:p-4 rounded-xl flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 border text-center md:text-left w-full ${isExpired ? 'border-amber-500/50 bg-amber-500/5' : 'border-border'}`}>
+        <div className={`${isExpired ? 'bg-amber-100' : 'bg-accent-light'} p-2 md:p-3 rounded-full flex-shrink-0`}>
+            <Icon className={`h-5 w-5 md:h-6 md:w-6 ${isExpired ? 'text-amber-600' : 'text-accent-dark'}`} />
         </div>
         <div className="flex-1">
-            <p className="text-xs md:text-sm text-muted font-medium">{title}</p>
-            <p className="text-lg md:text-2xl font-bold text-primary-text">{value}</p>
+            <div className="flex items-center justify-center md:justify-start gap-2">
+                <p className="text-xs md:text-sm text-muted font-medium">{title}</p>
+                {isExpired && <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold uppercase">Expired</span>}
+            </div>
+            <p className={`text-lg md:text-2xl font-bold ${isExpired ? 'text-amber-600' : 'text-primary-text'}`}>{value}</p>
         </div>
     </div>
 );
@@ -107,7 +110,8 @@ const LeaveDashboard: React.FC = () => {
     const [userHolidays, setUserHolidays] = useState<UserHoliday[]>([]);
     const [isHolidaySelectionEnabled, setIsHolidaySelectionEnabled] = useState(false);
     const [activeHolidayPool, setActiveHolidayPool] = useState<{ name: string; date: string }[]>([]);
-    const currentYear = new Date().getFullYear();
+    const [viewingDate, setViewingDate] = useState(new Date());
+    const currentYear = viewingDate.getFullYear();
 
     const { officeHolidays, fieldHolidays } = useSettingsStore();
 
@@ -123,8 +127,9 @@ const LeaveDashboard: React.FC = () => {
         setIsLoading(true);
         setIsCompOffHistoryDisabled(false);
         try {
+            const dateStr = format(viewingDate, 'yyyy-MM-dd');
             const [balanceData, requestsData, compOffData] = await Promise.all([
-                api.getLeaveBalancesForUser(user.id),
+                api.getLeaveBalancesForUser(user.id, dateStr),
                 api.getLeaveRequests({
                     userId: user.id,
                     status: filter === 'all' ? undefined : filter
@@ -143,9 +148,8 @@ const LeaveDashboard: React.FC = () => {
 
             // Calculate OT hours for field staff
             if (user.role === 'field_staff') {
-                const now = new Date();
-                const start = startOfMonth(now).toISOString();
-                const end = endOfMonth(now).toISOString();
+                const start = startOfMonth(viewingDate).toISOString();
+                const end = endOfMonth(viewingDate).toISOString();
                 const events = await api.getAttendanceEvents(user.id, start, end);
 
                 // Group by day
@@ -217,7 +221,7 @@ const LeaveDashboard: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [user, filter]);
+    }, [user, filter, viewingDate]);
 
     useEffect(() => {
         fetchData();
@@ -252,11 +256,31 @@ const LeaveDashboard: React.FC = () => {
     const filterTabs: Array<LeaveRequestStatus | 'all'> = ['all', 'pending_manager_approval', 'pending_hr_confirmation', 'approved', 'rejected'];
 
     const balanceCards = balance ? [
-        { title: 'Earned Leave', value: `${Math.max(0, balance.earnedTotal - balance.earnedUsed)} / ${balance.earnedTotal}`, icon: Briefcase },
-        { title: 'Sick Leave', value: `${Math.max(0, balance.sickTotal - balance.sickUsed)} / ${balance.sickTotal}`, icon: HeartPulse },
-        { title: 'Floating Holiday', value: `${Math.max(0, balance.floatingTotal - balance.floatingUsed)} / ${balance.floatingTotal}`, icon: Plane },
-        { title: 'Compensatory Off', value: `${Math.max(0, balance.compOffTotal - balance.compOffUsed)} / ${balance.compOffTotal}`, icon: CalendarClock },
-    ] : [];
+        { 
+            title: 'Earned Leave', 
+            value: `${Math.max(0, balance.earnedTotal - balance.earnedUsed)} / ${balance.earnedTotal}`, 
+            icon: Briefcase,
+            isExpired: balance.expiryStates?.earned 
+        },
+        { 
+            title: 'Sick Leave', 
+            value: `${Math.max(0, balance.sickTotal - balance.sickUsed)} / ${balance.sickTotal}`, 
+            icon: HeartPulse,
+            isExpired: balance.expiryStates?.sick
+        },
+        { 
+            title: 'Floating Holiday', 
+            value: `${Math.max(0, balance.floatingTotal - balance.floatingUsed)} / ${balance.floatingTotal}`, 
+            icon: Plane,
+            isExpired: balance.expiryStates?.floating
+        },
+        { 
+            title: 'Compensatory Off', 
+            value: `${Math.max(0, balance.compOffTotal - balance.compOffUsed)} / ${balance.compOffTotal}`, 
+            icon: CalendarClock,
+            isExpired: balance.expiryStates?.compOff
+        },
+    ].filter(card => !card.isExpired) : [];
 
     return (
         <div className="p-4 space-y-6">
@@ -343,7 +367,12 @@ const LeaveDashboard: React.FC = () => {
 
             {/* Attendance Calendar Section */}
             <div className="flex flex-col lg:flex-row gap-6 items-start overflow-x-auto pb-4 custom-scrollbar-horizontal">
-                <AttendanceCalendar leaveRequests={requests} userHolidays={userHolidays} />
+                <AttendanceCalendar 
+                    leaveRequests={requests} 
+                    userHolidays={userHolidays} 
+                    currentDate={viewingDate}
+                    setCurrentDate={setViewingDate}
+                />
                 <CompOffCalendar logs={compOffLogs} leaveRequests={requests} userHolidays={userHolidays} isLoading={isLoading} />
                 <HolidayCalendar adminHolidays={adminHolidays} userSelectedHolidays={userHolidays} isLoading={isLoading} />
                 <YearlyAttendanceChart />

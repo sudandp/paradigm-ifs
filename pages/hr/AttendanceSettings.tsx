@@ -554,13 +554,30 @@ const AttendanceSettings: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-                        <Input
-                            label="Annual Compensatory Off"
-                            id="annualCompOffLeaves"
-                            type="number"
-                            value={currentRules.annualCompOffLeaves}
-                            onChange={(e) => handleSettingChange('annualCompOffLeaves', parseInt(e.target.value, 10) || 0)}
-                        />
+                        <div className="flex flex-col">
+                            <Input
+                                label="Annual Compensatory Off"
+                                id="annualCompOffLeaves"
+                                type="number"
+                                value={currentRules.annualCompOffLeaves}
+                                onChange={(e) => handleSettingChange('annualCompOffLeaves', parseInt(e.target.value, 10) || 0)}
+                            />
+                            <div className="mt-4">
+                                <DatePicker
+                                    label="Valid Till"
+                                    id="compOffLeavesExpiryDate"
+                                    value={currentRules.compOffLeavesExpiryDate || ''}
+                                    onChange={(date) => handleSettingChange('compOffLeavesExpiryDate', date)}
+                                />
+                                {!currentRules.compOffLeavesExpiryDate ? (
+                                    <p className="text-xs text-gray-400 mt-1">No Validity</p>
+                                ) : new Date(currentRules.compOffLeavesExpiryDate) < new Date(new Date().toISOString().split('T')[0]) ? (
+                                    <p className="text-xs text-amber-500 mt-1">⚠ Expired - Not Applicable</p>
+                                ) : (
+                                    <p className="text-xs text-emerald-500 mt-1">✓ Valid</p>
+                                )}
+                            </div>
+                        </div>
                         <Input
                             label="Sick Leave Cert. After (Days)"
                             id="sickLeaveCertThreshold"

@@ -134,6 +134,15 @@ const ApplyLeave: React.FC = () => {
                 const typeKeyStr = `${formData.leaveType.toLowerCase()}Total`.replace('earnedtotal', 'earnedTotal').replace('sicktotal', 'sickTotal').replace('floatingtotal', 'floatingTotal').replace('compofftotal', 'compOffTotal');
                 const usedKeyStr = typeKeyStr.replace('Total', 'Used');
                 
+                // Expiry Check
+                const leaveTypeLower = formData.leaveType.toLowerCase().replace(' ', '') as 'earned' | 'sick' | 'floating' | 'compOff';
+                const isExpired = balance.expiryStates && balance.expiryStates[leaveTypeLower as keyof NonNullable<typeof balance.expiryStates>];
+                
+                if (isExpired) {
+                    setToast({ message: `The ${formData.leaveType} allocation has expired and is no longer available for use.`, type: 'error' });
+                    return;
+                }
+
                 const available = (balance[typeKeyStr as keyof LeaveBalance] as number) - (balance[usedKeyStr as keyof LeaveBalance] as number);
                 
                 if (available < duration) {

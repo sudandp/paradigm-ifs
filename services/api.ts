@@ -1570,8 +1570,12 @@ export const api = {
     });
     if (error && error.code !== '23505') throw error; // Ignore duplicates
   },
-  getLeaveBalancesForUser: async (userId: string): Promise<LeaveBalance> => {
-    const getStaffType = (role: UserRole): 'office' | 'field' => (['hr', 'admin', 'finance'].includes(role) ? 'office' : 'field');
+  getLeaveBalancesForUser: async (userId: string, asOfDate?: string): Promise<LeaveBalance> => {
+    const getStaffType = (role: UserRole): 'office' | 'field' | 'site' => {
+      if (['hr', 'admin', 'finance', 'developer', 'management', 'office_staff', 'back_office_staff', 'bd', 'operation_manager', 'field_staff', 'finance_manager', 'hr_ops'].includes(role)) return 'office';
+      if (['site_manager', 'site_supervisor'].includes(role)) return 'site';
+      return 'field';
+    };
     const [
       { data: settingsData, error: settingsError },
       { data: userData, error: userError }
@@ -1586,8 +1590,10 @@ export const api = {
     const staffType = getStaffType(userData.role_id);
     const rules = (toCamelCase(settingsData.attendance_settings) as AttendanceSettings)[staffType];
 
-    const currentYear = new Date().getFullYear();
+    const referenceDate = asOfDate ? new Date(asOfDate.replace(/-/g, '/')) : new Date();
+    const currentYear = referenceDate.getFullYear();
     const yearStart = `${currentYear}-01-01`;
+    const todayStr = format(referenceDate, 'yyyy-MM-dd');
 
     const [
       { data: approvedLeaves, error: leavesError },
@@ -1601,9 +1607,10 @@ export const api = {
         .select('leave_type, start_date, end_date, day_option')
         .eq('user_id', userId)
         .eq('status', 'approved')
-        .gte('start_date', yearStart),
+        .gte('start_date', yearStart)
+        .lte('start_date', `${currentYear}-12-31`),
       supabase.from('comp_off_logs').select('*').eq('user_id', userId),
-      supabase.from('extra_work_logs').select('hours_worked').eq('user_id', userId).eq('claim_type', 'OT').eq('status', 'Approved').gte('work_date', format(startOfMonth(new Date()), 'yyyy-MM-dd')).lte('work_date', format(endOfMonth(new Date()), 'yyyy-MM-dd')),
+      supabase.from('extra_work_logs').select('hours_worked').eq('user_id', userId).eq('claim_type', 'OT').eq('status', 'Approved').gte('work_date', format(startOfMonth(referenceDate), 'yyyy-MM-dd')).lte('work_date', format(endOfMonth(referenceDate), 'yyyy-MM-dd')),
       supabase.from('holidays').select('*'),
       api.getRecurringHolidays(),
       supabase.from('attendance_events')
@@ -1615,6 +1622,9 @@ export const api = {
 
     if (leavesError || compOffError || otError || holidaysError || eventsError) throw new Error("Failed to fetch all leave balance data.");
 
+    // Expiry Check Logic Helper
+    const isExpired = (expiryDate?: string) => expiryDate ? todayStr > expiryDate : false;
+
     // Calculate Earned Leave dynamically if rule exists
     let earnedTotal = rules.annualEarnedLeaves || 0;
     if (rules.earnedLeaveAccrual) {
@@ -1623,13 +1633,6 @@ export const api = {
       
       const countableDays = await api.getCountableDays(userId, openingDate, format(new Date(), 'yyyy-MM-dd'), holidays || [], recurringHolidays || [], rules);
       earnedTotal = openingBalance + Math.floor(countableDays / rules.earnedLeaveAccrual.daysRequired) * rules.earnedLeaveAccrual.amountEarned;
-    }
-
-    const today = format(new Date(), 'yyyy-MM-dd');
-
-    // Check Earned Leave Expiry
-    if (rules.earnedLeavesExpiryDate && today > rules.earnedLeavesExpiryDate) {
-      earnedTotal = 0;
     }
 
     // Calculate Floating Holidays based on attendance on Recurring Holidays (e.g. 3rd Saturday)
@@ -1661,14 +1664,15 @@ export const api = {
         }
     });
 
-    let sickTotal = rules.annualSickLeaves || 0;
-    if (rules.sickLeavesExpiryDate && today > rules.sickLeavesExpiryDate) {
-      sickTotal = 0;
-    }
+    const sickTotal = rules.annualSickLeaves || 0;
+    const compOffTotal = (compOffData || []).filter(log => log.status === 'earned' || log.status === 'used').length + dynamicCompOffTotal;
 
-    if (rules.floatingLeavesExpiryDate && today > rules.floatingLeavesExpiryDate) {
-      floatingTotal = 0;
-    }
+    const expiryStates = {
+      earned: isExpired(rules.earnedLeavesExpiryDate),
+      sick: isExpired(rules.sickLeavesExpiryDate),
+      floating: isExpired(rules.floatingLeavesExpiryDate),
+      compOff: isExpired(rules.compOffLeavesExpiryDate)
+    };
 
     const balance: LeaveBalance = {
       userId,
@@ -1678,18 +1682,44 @@ export const api = {
       sickUsed: 0,
       floatingTotal,
       floatingUsed: 0,
-      compOffTotal: (compOffData || []).filter(log => log.status === 'earned' || log.status === 'used').length + dynamicCompOffTotal, 
+      compOffTotal,
       compOffUsed: 0,
       otHoursThisMonth: (otData || []).reduce((sum, log) => sum + (log.hours_worked || 0), 0),
+      expiryStates
     };
 
     (approvedLeaves || []).forEach(leave => {
       const leaveAmount = leave.day_option === 'half' ? 0.5 : differenceInCalendarDays(new Date(leave.end_date), new Date(leave.start_date)) + 1;
-      if (leave.leave_type === 'Earned') balance.earnedUsed += leaveAmount;
-      if (leave.leave_type === 'Sick') balance.sickUsed += leaveAmount;
-      if (leave.leave_type === 'Floating') balance.floatingUsed += leaveAmount;
-      if (leave.leave_type === 'Comp Off') balance.compOffUsed += leaveAmount;
+      const leaveStart = leave.start_date;
+      
+      if (leave.leave_type === 'Earned') {
+        // Only count towards used if it was taken during validity, or if not expired
+        if (!expiryStates.earned || (rules.earnedLeavesExpiryDate && leaveStart <= rules.earnedLeavesExpiryDate)) {
+          balance.earnedUsed += leaveAmount;
+        }
+      }
+      if (leave.leave_type === 'Sick') {
+        if (!expiryStates.sick || (rules.sickLeavesExpiryDate && leaveStart <= rules.sickLeavesExpiryDate)) {
+          balance.sickUsed += leaveAmount;
+        }
+      }
+      if (leave.leave_type === 'Floating') {
+        if (!expiryStates.floating || (rules.floatingLeavesExpiryDate && leaveStart <= rules.floatingLeavesExpiryDate)) {
+          balance.floatingUsed += leaveAmount;
+        }
+      }
+      if (leave.leave_type === 'Comp Off') {
+        if (!expiryStates.compOff || (rules.compOffLeavesExpiryDate && leaveStart <= rules.compOffLeavesExpiryDate)) {
+          balance.compOffUsed += leaveAmount;
+        }
+      }
     });
+
+    // Capping Logic for expired leaves: if expired, available should be 0.
+    // We achieve this by setting used = total if expired and used < total.
+    // However, the dashboard calculation is (total - used).
+    // Better to keep total and used honest but add logic in dashboard or here.
+    // Let's keep it honest here and let the Dashboard handle visual "Expired" and capping.
 
     return balance;
   },

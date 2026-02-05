@@ -11,12 +11,13 @@ import Button from '../../components/ui/Button';
 interface AttendanceCalendarProps {
     leaveRequests?: LeaveRequest[];
     userHolidays?: UserHoliday[];
+    currentDate: Date;
+    setCurrentDate: (date: Date) => void;
 }
 
-const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests = [], userHolidays = [] }) => {
+const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests = [], userHolidays = [], currentDate, setCurrentDate }) => {
     const { user } = useAuthStore();
     const { officeHolidays, fieldHolidays, attendance, recurringHolidays } = useSettingsStore();
-    const [currentDate, setCurrentDate] = useState(new Date());
     const [events, setEvents] = useState<AttendanceEvent[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -137,7 +138,21 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests =
 
         // Check for configured recurring holiday (Floating Holiday)
         const isRecurringHoliday = recurringHolidayDates.some(d => isSameDay(d, date));
+        
+        // Expiry Check for Floating Holiday
+        const floatingExpiryDate = (attendance as any)?.[staffCategory]?.floatingLeavesExpiryDate;
+        const isFloatingExpired = floatingExpiryDate && format(date, 'yyyy-MM-dd') > floatingExpiryDate;
 
+        // Check for general expiry (if all allocation rules are expired, hide highlights)
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const earnedExpiry = (attendance as any)?.[staffCategory]?.earnedLeavesExpiryDate;
+        const sickExpiry = (attendance as any)?.[staffCategory]?.sickLeavesExpiryDate;
+        const compOffExpiry = (attendance as any)?.[staffCategory]?.compOffLeavesExpiryDate;
+        
+        const isEarnedExpired = earnedExpiry && dateStr > earnedExpiry;
+        const isSickExpired = sickExpiry && dateStr > sickExpiry;
+        const isCompOffExpired = compOffExpiry && dateStr > compOffExpiry;
+        
         // Check for specific date holiday from admin settings (Company Holiday)
         const isConfiguredHoliday = holidays.some(h => {
             const [y, m, d] = h.date.split('-').map(Number);
@@ -151,10 +166,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests =
             return isSameDay(fixedDate, date);
         });
 
-        // Check for user-selected holidays from pool (like 15th - Sankranti)
-        // Only show if the user has actually selected this holiday
         const isPoolHoliday = userHolidays.some(uh => {
-            // uh.holidayDate is stored as "YYYY-MM-DD" in the database
             const [y, m, d] = uh.holidayDate.split('-').map(Number);
             const poolDate = new Date(y, m - 1, d);
             return isSameDay(poolDate, date);
@@ -165,6 +177,10 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests =
 
         // Check if it's a Sunday (weekly off)
         const isSunday = getDay(date) === 0;
+
+        // Define if all holiday-related rules are expired
+        // If everything is expired, we shouldn't show "fixed" highlights that imply an active allocation period.
+        const isAllocationExpired = isFloatingExpired && isEarnedExpired && isSickExpired && isCompOffExpired;
 
         // Check for Approved Leave
         const isApprovedLeave = leaveRequests.some(req => {
@@ -181,18 +197,21 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests =
             return 'holiday-present';
         }
 
-        // 2. If it's a holiday and NO check-in -> Holiday (or Floating Holiday)
-        if (isRecurringHoliday) return 'floating-holiday'; // Yellow
+        // 2. Approved Leave
+        if (isApprovedLeave) return 'leave';
+
+        // 3. If it's not a holiday but has check-in -> Present
+        if (hasCheckIn) return 'present';
+
+        // 4. If allocation is expired, everything else is neutral
+        if (isAllocationExpired) return 'neutral';
+
+        // 5. If it's a holiday and NO check-in -> Holiday (or Floating Holiday)
+        if (isRecurringHoliday && !isFloatingExpired) return 'floating-holiday'; // Yellow
         if (isConfiguredHoliday || isFixedHoliday || isPoolHoliday) return 'company-holiday'; // Blue
         if (isSunday) return 'sunday'; // Sunday as weekly off
 
-        // 3. Approved Leave (Prioritized over Present)
-        if (isApprovedLeave) return 'leave';
-
-        // 4. If it's not a holiday but has check-in -> Present
-        if (hasCheckIn) return 'present';
-
-        // 5. Check for absent (past date, no check-in, not holiday)
+        // 6. Check for absent (past date, no check-in, not holiday)
         const isPast = isAfter(startOfDay(new Date()), startOfDay(date)); // date < today
         if (isPast) return 'absent';
 

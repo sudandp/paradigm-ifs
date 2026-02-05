@@ -710,6 +710,7 @@ export interface StaffAttendanceRules {
   monthlyFloatingLeaves: number;
   floatingLeavesExpiryDate?: string; // ISO or YYYY-MM-DD
   annualCompOffLeaves: number;
+  compOffLeavesExpiryDate?: string; // ISO or YYYY-MM-DD
   enableAttendanceNotifications: boolean;
   sickLeaveCertificateThreshold: number;
   geofencingEnabled?: boolean;
@@ -888,7 +889,7 @@ export interface CompOffLog {
 
 export interface LeaveBalance {
   userId: string;
-  [key: string]: number | string; // To allow indexing with a string
+  [key: string]: number | string | { earned: boolean; sick: boolean; floating: boolean; compOff: boolean; } | undefined; // To allow indexing with a string
   earnedTotal: number;
   earnedUsed: number;
   sickTotal: number;
@@ -898,6 +899,12 @@ export interface LeaveBalance {
   compOffTotal: number;
   compOffUsed: number;
   otHoursThisMonth: number;
+  expiryStates?: {
+    earned: boolean;
+    sick: boolean;
+    floating: boolean;
+    compOff: boolean;
+  };
 }
 
 export interface LeaveRequest {
