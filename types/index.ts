@@ -92,6 +92,8 @@ export interface User {
   salaryHoldDate?: string | null; // ISO String
   earnedLeaveOpeningBalance?: number;
   earnedLeaveOpeningDate?: string; // YYYY-MM-DD
+  sickLeaveOpeningBalance?: number;
+  sickLeaveOpeningDate?: string; // YYYY-MM-DD
 }
 
 export interface BiometricDevice {
@@ -744,6 +746,9 @@ export interface StaffAttendanceRules {
   earnedLeaveAccrual?: {
     daysRequired: number; // e.g., 10
     amountEarned: number; // e.g., 0.5
+  };
+  sickLeaveAccrual?: {
+    monthlyAmount: number; // e.g., 1 - sick leaves accrued per month
   };
   holidayPool?: { name: string; date: string }[];
   // Device limits configuration

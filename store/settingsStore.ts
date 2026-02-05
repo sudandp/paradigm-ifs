@@ -89,6 +89,9 @@ const initialAttendance: AttendanceSettings = {
     enableCustomHolidays: false,
     holidayPool: [...HOLIDAY_SELECTION_POOL],
     weeklyOffDays: [0], // Sunday
+    sickLeaveAccrual: {
+      monthlyAmount: 1,
+    },
   },
   field: {
     minimumHoursFullDay: 9,
@@ -118,6 +121,9 @@ const initialAttendance: AttendanceSettings = {
     employeeHolidays: 5,
     enableCustomHolidays: false,
     holidayPool: [...HOLIDAY_SELECTION_POOL],
+    sickLeaveAccrual: {
+      monthlyAmount: 1,
+    },
   },
   site: {
     minimumHoursFullDay: 9,
@@ -143,6 +149,9 @@ const initialAttendance: AttendanceSettings = {
     employeeHolidays: 5,
     enableCustomHolidays: false,
     holidayPool: [...HOLIDAY_SELECTION_POOL],
+    sickLeaveAccrual: {
+      monthlyAmount: 1,
+    },
   }
 };
 

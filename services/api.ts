@@ -15,7 +15,7 @@ import type {
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { 
   differenceInCalendarDays, format, startOfMonth, endOfMonth, 
-  startOfDay, endOfDay, eachDayOfInterval, isSameDay, getDay
+  startOfDay, endOfDay, eachDayOfInterval, isSameDay, getDay, differenceInMonths, startOfYear
 } from 'date-fns';
 import { dispatchNotificationFromRules } from './notificationService';
 import { calculateSiteTravelTime, validateFieldStaffAttendance } from '../utils/fieldStaffTracking';
@@ -1579,7 +1579,7 @@ export const api = {
       { data: userData, error: userError }
     ] = await Promise.all([
       supabase.from('settings').select('attendance_settings').eq('id', 'singleton').single(),
-      supabase.from('users').select('role_id, earned_leave_opening_balance, earned_leave_opening_date').eq('id', userId).single()
+      supabase.from('users').select('role_id, earned_leave_opening_balance, earned_leave_opening_date, sick_leave_opening_balance, sick_leave_opening_date').eq('id', userId).single()
     ]);
 
     if (settingsError || !settingsData?.attendance_settings) throw new Error('Could not load attendance rules.');
@@ -1663,6 +1663,17 @@ export const api = {
     });
 
     const sickTotal = rules.annualSickLeaves || 0;
+    
+    // Calculate Sick Leave dynamically if monthly accrual rule exists
+    let calculatedSickTotal = sickTotal;
+    if (rules.sickLeaveAccrual) {
+      const openingBalance = userData.sick_leave_opening_balance || 0;
+      const openingDate = userData.sick_leave_opening_date || format(startOfYear(referenceDate), 'yyyy-MM-dd');
+      
+      // Calculate months elapsed from opening date to reference date
+      const monthsElapsed = differenceInMonths(referenceDate, new Date(openingDate.replace(/-/g, '/')));
+      calculatedSickTotal = openingBalance + (monthsElapsed * rules.sickLeaveAccrual.monthlyAmount);
+    }
     const compOffTotal = (compOffData || []).filter(log => log.status === 'earned' || log.status === 'used').length + dynamicCompOffTotal;
 
     const expiryStates = {
@@ -1676,7 +1687,7 @@ export const api = {
       userId,
       earnedTotal,
       earnedUsed: 0,
-      sickTotal,
+      sickTotal: calculatedSickTotal,
       sickUsed: 0,
       floatingTotal,
       floatingUsed: 0,
