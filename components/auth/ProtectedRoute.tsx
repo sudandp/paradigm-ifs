@@ -26,9 +26,20 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredPermission, chi
     return <Navigate to="/auth/login" replace />;
   }
 
-  // Normalize the user's role to match the keys in our permissions store (which are lowercase)
-  const normalizedRole = user.role?.toLowerCase() || '';
-  const userPermissions = permissions[normalizedRole] || permissions[user.role] || [];
+  const getPermissions = () => {
+    if (!user || !permissions) return [];
+    const roleId = user.roleId?.toLowerCase() || '';
+    const roleName = user.role?.toLowerCase() || '';
+    const roleNameUnderscore = roleName.replace(/\s+/g, '_');
+
+    return permissions[roleId] || 
+           permissions[roleName] || 
+           permissions[roleNameUnderscore] || 
+           permissions[user.role] || 
+           [];
+  };
+
+  const userPermissions = getPermissions();
   const hasAccess = isAdmin(user.role) || userPermissions.includes(requiredPermission);
 
   if (!hasAccess) {

@@ -14,9 +14,25 @@ const MobileHome: React.FC = () => {
 
     if (!user) return null;
 
-    // Filter links based on user permissions
+    // Robust permission lookup that handles role naming variations
+    const getPermissions = () => {
+        if (!user || !permissions) return [];
+        const roleId = user.roleId?.toLowerCase() || '';
+        const roleName = user.role?.toLowerCase() || '';
+        const roleNameUnderscore = roleName.replace(/\s+/g, '_');
+
+        return permissions[roleId] || 
+               permissions[roleName] || 
+               permissions[roleNameUnderscore] || 
+               permissions[user.role] || 
+               [];
+    };
+
+    const userPermissions = getPermissions();
+
+    // Filter links based on user permissions (admins see everything)
     const availableLinks = user ? allNavLinks
-        .filter(link => permissions[user.role]?.includes(link.permission))
+        .filter(link => isAdmin(user.role) || userPermissions.includes(link.permission))
         .sort((a, b) => a.label.localeCompare(b.label))
         : [];
 

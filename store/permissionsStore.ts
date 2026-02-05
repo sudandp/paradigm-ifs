@@ -63,7 +63,7 @@ const defaultPermissions: Record<UserRole, Permission[]> = {
   ],
   operation_manager: [
     'view_operations_dashboard', 'view_all_attendance', 'view_own_attendance',
-    'apply_for_leave', 'manage_leave_requests', 'manage_tasks', 'access_support_desk',
+    'apply_for_leave', 'manage_leave_requests', 'access_support_desk',
     'view_my_team', 'view_field_reports', 'view_field_staff_tracking',
     'manage_geo_locations', 'view_my_locations', 'view_profile',
     'download_attendance_report',

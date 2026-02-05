@@ -64,8 +64,23 @@ export const allNavLinks: NavLinkConfig[] = [
 const SidebarContent: React.FC<{ isCollapsed: boolean, onLinkClick?: () => void, onExpand?: () => void, hideHeader?: boolean, mode?: 'light' | 'dark', isMobile?: boolean }> = ({ isCollapsed, onLinkClick, onExpand, hideHeader = false, mode = 'light', isMobile = false }) => {
     const { user } = useAuthStore();
     const { permissions } = usePermissionsStore();
+    const getPermissions = () => {
+        if (!user || !permissions) return [];
+        const roleId = user.roleId?.toLowerCase() || '';
+        const roleName = user.role?.toLowerCase() || '';
+        const roleNameUnderscore = roleName.replace(/\s+/g, '_');
+
+        return permissions[roleId] || 
+               permissions[roleName] || 
+               permissions[roleNameUnderscore] || 
+               permissions[user.role] || 
+               [];
+    };
+
+    const userPermissions = getPermissions();
+
     const availableNavLinks = user ? allNavLinks
-        .filter(link => isAdmin(user.role) || permissions[user.role]?.includes(link.permission))
+        .filter(link => isAdmin(user.role) || userPermissions.includes(link.permission))
         .sort((a, b) => a.label.localeCompare(b.label))
         : [];
 
