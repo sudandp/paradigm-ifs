@@ -279,8 +279,8 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
               if (!isFuture) floatingHolidays++;
           }
       } else if (approvedLeave) {
-          const leaveType = approvedLeave.leaveType?.toLowerCase();
-          if (leaveType === 'sick') {
+          const leaveType = (approvedLeave.leaveType || (approvedLeave as any).leave_type || '').toLowerCase();
+          if (leaveType === 'sick' || leaveType === 'sick leave') {
               status = 'S/L';
               sickLeaves++;
           } else if (leaveType === 'comp off' || leaveType === 'comp-off' || leaveType === 'compoff' || leaveType === 'c/o') {
