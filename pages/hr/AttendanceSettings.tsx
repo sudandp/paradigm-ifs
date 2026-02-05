@@ -553,6 +553,21 @@ const AttendanceSettings: React.FC = () => {
                         </div>
                     </div>
 
+                    <div className="mt-8 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+                        <h4 className="text-sm font-semibold text-emerald-600 mb-4 flex items-center">
+                            <LifeBuoy className="mr-2 h-4 w-4" /> Sick Leave Accrual Rule
+                        </h4>
+                        <div className="flex flex-col gap-4">
+                            <Checkbox
+                                id="enableSickAccrual"
+                                label="Enable Monthly Sick Leave Accrual"
+                                description="Automatically grant 1 day of sick leave for every month with attendance."
+                                checked={!!currentRules.enableSickLeaveAccrual}
+                                onChange={(e) => handleSettingChange('enableSickLeaveAccrual', e.target.checked)}
+                            />
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
                         <div className="flex flex-col">
                             <Input

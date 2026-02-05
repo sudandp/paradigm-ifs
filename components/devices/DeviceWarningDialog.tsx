@@ -88,9 +88,9 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
       case 'revoked':
         return {
           title: 'Device Access Revoked',
-          description: 'Access from this device has been revoked. Please contact your administrator.',
-          actionText: 'Contact Administrator',
-          showRequestButton: false,
+          description: 'Access from this device has been revoked. You can request access again if this was a mistake.',
+          actionText: 'Request Access',
+          showRequestButton: true,
         };
       default:
         return {

@@ -9,7 +9,7 @@ export const getAppUserProfile = async (supabaseUser: SupabaseUser): Promise<App
     try {
         let { data, error } = await supabase
             .from('users')
-            .select('*, role_id')
+            .select('*, role:roles(display_name)')
             .eq('id', supabaseUser.id)
             .single();
 
@@ -25,7 +25,7 @@ export const getAppUserProfile = async (supabaseUser: SupabaseUser): Promise<App
             const { data: createdData, error: insertError } = await supabase
                 .from('users')
                 .insert(newUserProfile)
-                .select('*, role_id')
+                .select('*, role:roles(display_name)')
                 .single();
 
             if (insertError) {
@@ -43,12 +43,16 @@ export const getAppUserProfile = async (supabaseUser: SupabaseUser): Promise<App
             return null;
         }
 
+        const roleData = data.role;
+        const roleName = (Array.isArray(roleData) ? roleData[0]?.display_name : (roleData as any)?.display_name) || data.role_id;
+
         return {
             id: data.id,
             name: data.name,
             email: supabaseUser.email || '',
             phone: data.phone,
-            role: data.role_id, // Use role_id
+            role: roleName, 
+            roleId: data.role_id,
             organizationId: data.organization_id,
             organizationName: data.organization_name,
             reportingManagerId: data.reporting_manager_id,

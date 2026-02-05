@@ -247,11 +247,56 @@ export async function registerDevice(
           message: 'Device registration is pending approval',
         };
       } else if (existingCheck.status === 'revoked') {
-        return {
-          success: false,
-          requiresApproval: false,
-          message: 'This device has been revoked. Please contact administrator.',
-        };
+        // If revoked, check if we can re-activate (within limits)
+        const limits = await getDeviceLimits(roleId);
+        const currentCount = await getActiveDeviceCount(userId, deviceType);
+        const limit = limits[deviceType];
+        
+        if (currentCount < limit) {
+          // Re-activate
+          const { data, error } = await supabase
+            .from('user_devices')
+            .update({
+              status: 'active',
+              last_used_at: new Date().toISOString(),
+              device_info: deviceInfo,
+              approved_by_id: userId,
+              approved_at: new Date().toISOString(),
+            })
+            .eq('id', existingCheck.device.id)
+            .select()
+            .single();
+          
+          if (error) throw error;
+          
+          await logDeviceActivity(userId, data.id, 'registration', deviceInfo);
+          
+          return {
+            success: true,
+            device: {
+              ...data,
+              userId: data.user_id,
+              deviceType: data.device_type,
+              deviceIdentifier: data.device_identifier,
+              deviceName: data.device_name,
+              deviceInfo: data.device_info || {},
+              registeredAt: data.registered_at,
+              lastUsedAt: data.last_used_at,
+              approvedById: data.approved_by_id,
+              approvedAt: data.approved_at,
+              createdAt: data.created_at,
+              updatedAt: data.updated_at,
+            },
+            requiresApproval: false,
+            message: 'Device re-activated successfully',
+          };
+        } else {
+          return {
+            success: false,
+            requiresApproval: true,
+            message: `This device was previously revoked. You have reached your limit of ${limit} ${deviceType} device(s). Please remove an old device to re-register this one.`,
+          };
+        }
       }
     }
 

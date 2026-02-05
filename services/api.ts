@@ -15,7 +15,7 @@ import type {
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { 
   differenceInCalendarDays, format, startOfMonth, endOfMonth, 
-  startOfDay, endOfDay, eachDayOfInterval, isSameDay, getDay, differenceInMonths, startOfYear
+  startOfDay, endOfDay, eachDayOfInterval, isSameDay, getDay
 } from 'date-fns';
 import { dispatchNotificationFromRules } from './notificationService';
 import { calculateSiteTravelTime, validateFieldStaffAttendance } from '../utils/fieldStaffTracking';
@@ -1569,9 +1569,20 @@ export const api = {
     if (error && error.code !== '23505') throw error; // Ignore duplicates
   },
   getLeaveBalancesForUser: async (userId: string, asOfDate?: string): Promise<LeaveBalance> => {
-    const getStaffType = (role: UserRole): 'office' | 'field' | 'site' => {
-      if (['hr', 'admin', 'finance', 'developer', 'management', 'office_staff', 'back_office_staff', 'bd', 'operation_manager', 'field_staff', 'finance_manager', 'hr_ops'].includes(role)) return 'office';
-      if (['site_manager', 'site_supervisor'].includes(role)) return 'site';
+    const getStaffType = (role: string): 'office' | 'field' | 'site' => {
+      const r = (role || '').toLowerCase();
+      // Office Roles
+      if ([
+        'hr', 'admin', 'finance', 'developer', 'management', 'office_staff', 
+        'back_office_staff', 'bd', 'operation_manager', 'field_staff',
+        'finance_manager', 'hr_ops', 'business developer', 'unverified',
+        'operation manager', 'field staff', 'finance manager', 'hr ops'
+      ].includes(r)) return 'office';
+      
+      // Site Roles
+      if (['site_manager', 'site_supervisor', 'site manager', 'site supervisor'].includes(r)) return 'site';
+      
+      // Default to field (includes 'field_staff', 'field staff', etc.)
       return 'field';
     };
     const [
@@ -1579,13 +1590,26 @@ export const api = {
       { data: userData, error: userError }
     ] = await Promise.all([
       supabase.from('settings').select('attendance_settings').eq('id', 'singleton').single(),
-      supabase.from('users').select('role_id, earned_leave_opening_balance, earned_leave_opening_date, sick_leave_opening_balance, sick_leave_opening_date').eq('id', userId).single()
+      supabase.from('users')
+        .select(`
+          role_id, 
+          role:roles(display_name),
+          earned_leave_opening_balance, 
+          earned_leave_opening_date, 
+          sick_leave_opening_balance, 
+          sick_leave_opening_date
+        `)
+        .eq('id', userId)
+        .single()
     ]);
 
     if (settingsError || !settingsData?.attendance_settings) throw new Error('Could not load attendance rules.');
     if (userError) throw userError;
 
-    const staffType = getStaffType(userData.role_id);
+    // Get role name from join or fallback to role_id string
+    const roleData = userData.role;
+    const roleName = (Array.isArray(roleData) ? roleData[0]?.display_name : (roleData as any)?.display_name) || userData.role_id;
+    const staffType = getStaffType(roleName);
     const rules = (toCamelCase(settingsData.attendance_settings) as AttendanceSettings)[staffType];
 
     const referenceDate = asOfDate ? new Date(asOfDate.replace(/-/g, '/')) : new Date();
@@ -1662,18 +1686,42 @@ export const api = {
         }
     });
 
-    const sickTotal = rules.annualSickLeaves || 0;
-    
-    // Calculate Sick Leave dynamically if monthly accrual rule exists
-    let calculatedSickTotal = sickTotal;
-    if (rules.sickLeaveAccrual) {
-      const openingBalance = userData.sick_leave_opening_balance || 0;
-      const openingDate = userData.sick_leave_opening_date || format(startOfYear(referenceDate), 'yyyy-MM-dd');
+    let sickTotal = 0;
+    if (rules.enableSickLeaveAccrual) {
+      const explicitOpeningDate = userData.sick_leave_opening_date;
+      let openingBalance = 0;
+      let startDateStr = yearStart;
+
+      if (explicitOpeningDate) {
+        const openingYear = new Date(explicitOpeningDate.replace(/-/g, '/')).getFullYear();
+        if (openingYear === currentYear) {
+          openingBalance = userData.sick_leave_opening_balance || 0;
+          startDateStr = explicitOpeningDate;
+        }
+      }
       
-      // Calculate months elapsed from opening date to reference date
-      const monthsElapsed = differenceInMonths(referenceDate, new Date(openingDate.replace(/-/g, '/')));
-      calculatedSickTotal = openingBalance + (monthsElapsed * rules.sickLeaveAccrual.monthlyAmount);
+      const accrualStart = new Date(Math.max(new Date(startDateStr.replace(/-/g, '/')).getTime(), new Date(yearStart.replace(/-/g, '/')).getTime()));
+      let current = startOfMonth(accrualStart);
+      let accruedDays = 0;
+
+      // Group attendance events by month
+      const attendanceMonths = new Set((yearEvents || []).map(e => format(new Date(e.timestamp), 'yyyy-MM')));
+
+      // Start from the accrual start and iterate until the end of the month being viewed
+      const endBoundary = endOfMonth(referenceDate);
+      
+      while (current <= endBoundary) {
+        const monthStr = format(current, 'yyyy-MM');
+        if (attendanceMonths.has(monthStr)) {
+          accruedDays += 1; // 1 day per month if present
+        }
+        current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+      }
+      sickTotal = openingBalance + accruedDays;
+    } else {
+      sickTotal = rules.annualSickLeaves || 0;
     }
+
     const compOffTotal = (compOffData || []).filter(log => log.status === 'earned' || log.status === 'used').length + dynamicCompOffTotal;
 
     const expiryStates = {
@@ -1687,7 +1735,7 @@ export const api = {
       userId,
       earnedTotal,
       earnedUsed: 0,
-      sickTotal: calculatedSickTotal,
+      sickTotal,
       sickUsed: 0,
       floatingTotal,
       floatingUsed: 0,

@@ -71,7 +71,8 @@ export interface User {
   name: string;
   email: string;
   phone?: string;
-  role: UserRole;
+  role: string; // Display name for UI
+  roleId: string; // UUID from database
   organizationId?: string;
   organizationName?: string;
   reportingManagerId?: string;
@@ -747,9 +748,7 @@ export interface StaffAttendanceRules {
     daysRequired: number; // e.g., 10
     amountEarned: number; // e.g., 0.5
   };
-  sickLeaveAccrual?: {
-    monthlyAmount: number; // e.g., 1 - sick leaves accrued per month
-  };
+  enableSickLeaveAccrual?: boolean;
   holidayPool?: { name: string; date: string }[];
   // Device limits configuration
   deviceLimits?: {
