@@ -1,19 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { format, getDaysInMonth, startOfMonth, endOfMonth, eachDayOfInterval, startOfDay, isAfter, isSameDay } from 'date-fns';
+import { format, getDaysInMonth, startOfMonth, endOfMonth, eachDayOfInterval, startOfDay, isAfter, isSameDay, isWithinInterval, endOfDay } from 'date-fns';
 import { Download } from 'lucide-react';
 import { api } from '../../services/api';
 import { processDailyEvents, calculateWorkingHours, isLateCheckIn, isEarlyCheckOut } from '../../utils/attendanceCalculations';
-import type { AttendanceEvent, User, StaffAttendanceRules } from '../../types';
+import type { AttendanceEvent, User, StaffAttendanceRules, UserHoliday } from '../../types';
 import Button from '../ui/Button';
 import { useSettingsStore } from '../../store/settingsStore';
+import { FIXED_HOLIDAYS } from '../../utils/constants';
 
-interface MonthlyHoursReportProps {
-  month: number; // 1-12
-  year: number;
-  userId?: string; // If provided, show single employee; otherwise show all
-}
-
-interface DailyData {
+export interface DailyData {
   date: number;
   status: string;
   inTime: string;
@@ -27,29 +22,54 @@ interface DailyData {
   shift: string;
 }
 
-interface EmployeeMonthlyData {
+export interface EmployeeMonthlyData {
   employeeId: string;
   employeeName: string;
-  totalGrossWorkDuration: number; // hours
-  totalNetWorkDuration: number; // hours (previously totalWorkDuration)
-  totalBreakDuration: number; // hours
-  totalOT: number; // hours (new)
-  present: number;
-  absent: number;
-  weeklyOff: number;
+  userName?: string; // For MonthlyReportRow compatibility
+  statuses: string[]; // For MonthlyReportRow compatibility
+  totalGrossWorkDuration: number;
+  totalNetWorkDuration: number;
+  totalBreakDuration: number;
+  totalOT: number;
+  presentDays: number;
+  absentDays: number;
+  weekOffs: number;
   holidays: number;
-  leaves: number;
+  holidayPresents: number;
+  weekendPresents: number;
+  halfDays: number;
+  sickLeaves: number;
+  earnedLeaves: number;
+  floatingHolidays: number;
+  compOffs: number;
+  lossOfPays: number;
+  workFromHomeDays: number;
+  totalPayableDays: number;
   averageWorkingHrs: number;
   totalDurationPlusOT: number;
   shiftCounts: { [key: string]: number };
   dailyData: DailyData[];
+  present: number; // legacy if needed
+  absent: number; // legacy if needed
+  weeklyOff: number; // legacy if needed
+  leaves: number; // legacy if needed
+  lossOfPay: number; // legacy if needed
 }
 
-const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, userId }) => {
+interface MonthlyHoursReportProps {
+  month: number; // 1-12
+  year: number;
+  userId?: string; // If provided, show single employee; otherwise show all
+  data?: EmployeeMonthlyData[]; // If provided, use this data directly
+}
+
+const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, userId, data: externalData }) => {
   const [reportData, setReportData] = useState<EmployeeMonthlyData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!externalData);
   const [users, setUsers] = useState<User[]>([]);
-  const { attendance, officeHolidays, fieldHolidays, siteHolidays } = useSettingsStore();
+  const [leaves, setLeaves] = useState<any[]>([]); // New state for leaves
+  const [userHolidaysPool, setUserHolidaysPool] = useState<UserHoliday[]>([]);
+  const { attendance, officeHolidays, fieldHolidays, siteHolidays, recurringHolidays } = useSettingsStore();
 
   const getStaffCategory = (role: string): 'office' | 'field' | 'site' => {
     const r = role.toLowerCase();
@@ -59,8 +79,13 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
   };
 
   useEffect(() => {
-    loadReportData();
-  }, [month, year, userId]);
+    if (externalData) {
+      setReportData(externalData);
+      setLoading(false);
+    } else {
+      loadReportData();
+    }
+  }, [month, year, userId, externalData]);
 
   const loadReportData = async () => {
     setLoading(true);
@@ -78,9 +103,19 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
       
       const employeeReports: EmployeeMonthlyData[] = [];
 
+      // Fetch leaves for the month
+      const { data: leavesData } = await api.getLeaveRequests();
+      setLeaves(leavesData || []);
+
+      // Fetch user holidays pool
+      const userHolidaysData = await api.getAllUserHolidays();
+      setUserHolidaysPool(userHolidaysData || []);
+
       for (const user of targetUsers) {
         const events = await api.getAttendanceEvents(user.id, format(startDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd'));
-        const monthlyData = processEmployeeMonth(user, events, year, month);
+        const userLeaves = (leavesData || []).filter((l: any) => l.userId === user.id && l.status === 'approved');
+        // Pass userHolidaysData directly to avoid stale state issues
+        const monthlyData = processEmployeeMonth(user, events, userLeaves, userHolidaysData || [], year, month);
         employeeReports.push(monthlyData);
       }
 
@@ -92,7 +127,7 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
     }
   };
 
-  const processEmployeeMonth = (user: User, events: AttendanceEvent[], year: number, month: number): EmployeeMonthlyData => {
+  const processEmployeeMonth = (user: User, events: AttendanceEvent[], userLeaves: any[], userHolidays: any[], year: number, month: number): EmployeeMonthlyData => {
     const daysInMonth = getDaysInMonth(new Date(year, month - 1));
     const dailyData: DailyData[] = [];
     
@@ -100,10 +135,22 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
     let totalNetWorkDuration = 0;
     let totalBreakDuration = 0;
     let totalOT = 0;
-    let present = 0;
-    let absent = 0;
-    let weeklyOff = 0;
+    let presentDays = 0;
+    let absentDays = 0;
+    let halfDays = 0;
+    let weekOffs = 0; // alias for weeklyOff
     let holidaysCount = 0;
+    let leavesCount = 0;
+    let floatingHolidays = 0;
+    let lossOfPay = 0;
+    let holidayPresents = 0;
+    let weekendPresents = 0;
+    let sickLeaves = 0;
+    let earnedLeaves = 0;
+    let compOffs = 0;
+    let workFromHomeDays = 0;
+
+    let weeklyOff = 0; // legacy counter if still used in the loop
 
     const shiftCounts: { [key: string]: number } = {};
     let daysPresentInWeek = 0;
@@ -118,68 +165,96 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
       const isSunday = currentDate.getDay() === 0; // 0 = Sunday
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const dayEvents = events.filter(e => e.timestamp.startsWith(dateStr));
-      const isHoliday = categoryHolidays.some(h => h.date === dateStr);
+      
+      const approvedLeave = userLeaves.find((l: any) => 
+          isWithinInterval(currentDate, {
+              start: startOfDay(new Date(l.startDate)),
+              end: endOfDay(new Date(l.endDate))
+          })
+      );
+      
+      // Helper for robust holiday/leave date matching
+      const matchesDate = (targetDate: any, compareDay: Date) => {
+    if (!targetDate) return false;
+    try {
+      const compareStr = format(compareDay, 'yyyy-MM-dd');
+      const compareMMDD = format(compareDay, '-MM-dd');
+      
+      if (typeof targetDate === 'string') {
+        // 1. Try exact full date match
+        if (targetDate.includes(compareStr)) return true;
 
-      if (dayEvents.length === 0) {
-        let status = '-';
-        const today = startOfDay(new Date());
-        const isFuture = isAfter(currentDate, today);
-        const isToday = isSameDay(currentDate, today);
+        // 2. Try partial MM-DD match (Year agnostic)
+        if (targetDate.includes(compareMMDD)) return true;
+        if (targetDate.endsWith(compareMMDD)) return true;
 
-        if (isSameDay(currentDate, startOfDay(currentDate))) {
-             if (currentDate.getDay() === 1) daysPresentInWeek = 0; // Reset on Monday
+        if (targetDate.startsWith('-')) {
+          return compareStr.endsWith(targetDate);
         }
-
-        if (isSunday) {
-           // User Requirement: "first week off dont apply this changes... so first W/O... should start even 1,2,3... W/O will be granted"
-           // Logic: If it's the first Sunday of the month (day <= 7), grant W/O automatically (if not future).
-           // For subsequent weeks, apply the >= 4 days present rule.
-           const isFirstSunday = day <= 7;
-           
-           if (!isFuture) {
-             if (isFirstSunday || daysPresentInWeek >= 4) {
-               status = 'W/O';
-               weeklyOff++;
-             } else {
-               status = '-';
-             }
-           } else {
-              status = '-';
-           }
-        } else if (isHoliday) {
-          status = 'H';
-          if (!isFuture) holidaysCount++;
-        } else {
-          // Normal day, no events
-          if (!isFuture && !isToday) {
-            status = 'A';
-            absent++;
-          }
-        }
-
-        dailyData.push({
-          date: day,
-          status,
-          inTime: '-',
-          outTime: '-',
-          grossDuration: '-',
-          breakIn: '-',
-          breakOut: '-',
-          breakDuration: '-',
-          netWorkedHours: '-',
-          ot: '-',
-          shift: '-',
-        });
-        continue;
+        
+        const cleanDate = targetDate.split(' ')[0].split('T')[0];
+        return cleanDate === compareStr;
       }
+      
+      // 2. If it's a Date object
+      if (targetDate instanceof Date) {
+        return format(targetDate, 'yyyy-MM-dd') === compareStr;
+      }
+      
+      return false;
+    } catch (e) {
+      return false;
+    }
+  };
 
-      const { checkIn, checkOut, breakIn, breakOut, workingHours: netHours, breakHours, totalHours: grossHours } = processDailyEvents(dayEvents);
+      // 1. Check FIXED holidays
+      const isFixedHoliday = FIXED_HOLIDAYS.some(fh => {
+          const [m, d] = fh.date.split('-').map(Number);
+          return currentDate.getMonth() === (m - 1) && currentDate.getDate() === d;
+      });
 
-      let duration = netHours;
-      let breakInTime = breakIn ? format(new Date(breakIn), 'HH:mm') : '-';
-      let breakOutTime = breakOut ? format(new Date(breakOut), 'HH:mm') : '-';
-      let ot = 0;
+      // 2. Check POOL holidays (User selected)
+      const isPoolHoliday = userHolidays.some(uh => {
+          const uhUserId = uh.userId || (uh as any).user_id;
+          const holidayDate = uh.holidayDate || (uh as any).holiday_date;
+          return String(uhUserId) === String(user.id) && matchesDate(holidayDate, currentDate);
+      });
 
+      // 3. Check Configured holidays (Admin settings)
+      const isConfiguredHoliday = categoryHolidays.some(h => 
+          matchesDate(h.date, currentDate)
+      );
+
+      // 4. Check Recurring holiday (Floating Holiday)
+      const isRecurringHoliday = recurringHolidays.some(rule => {
+          if (rule.day.toLowerCase() !== format(currentDate, 'EEEE').toLowerCase()) return false;
+          const occurrence = Math.ceil(currentDate.getDate() / 7);
+          const ruleType = rule.type || 'office';
+          return rule.n === occurrence && ruleType === (category === 'site' ? 'office' : category); 
+      });
+
+      const isHoliday = isFixedHoliday || isPoolHoliday || isConfiguredHoliday;
+
+      const hasActivity = dayEvents.length > 0;
+      let status = '-';
+      const today = startOfDay(new Date());
+      const isFuture = isAfter(currentDate, today);
+      const isToday = isSameDay(currentDate, today);
+
+      // Reset daysPresentInWeek on Monday
+      if (currentDate.getDay() === 1) daysPresentInWeek = 0;
+
+      let currentDayInTime = '-';
+      let currentDayOutTime = '-';
+      let currentDayGrossDuration = '-';
+      let currentDayBreakIn = '-';
+      let currentDayBreakOut = '-';
+      let currentDayBreakDuration = '-';
+      let currentDayNetWorkedHours = '-';
+      let currentDayOT = '-';
+      let currentDayShift = '-';
+
+      // Helper to format time
       const formatTime = (hrs: number) => {
         const totalMinutes = Math.round(hrs * 60);
         const h = Math.floor(totalMinutes / 60);
@@ -187,119 +262,203 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
         return `${h}:${String(m).padStart(2, '0')}`;
       };
 
-      if (checkIn && checkOut) {
-        // Calculate OT
-        const maxDailyHours = rules.dailyWorkingHours?.max || 9;
-        ot = Math.max(0, netHours - maxDailyHours);
+      if (isHoliday) {
+          if (hasActivity) {
+              status = 'HP';
+              if (!isFuture) holidayPresents++;
+          } else {
+              status = 'H';
+              if (!isFuture) holidaysCount++;
+          }
+      } else if (isRecurringHoliday) {
+          if (hasActivity) {
+              status = 'HP'; // Or FHP? The diff says HP.
+              if (!isFuture) holidayPresents++; // Count as holiday present
+          } else {
+              status = 'F/H';
+              if (!isFuture) floatingHolidays++;
+          }
+      } else if (approvedLeave) {
+          const leaveType = approvedLeave.leaveType?.toLowerCase();
+          if (leaveType === 'sick') {
+              status = 'S/L';
+              sickLeaves++;
+          } else if (leaveType === 'comp off' || leaveType === 'comp-off' || leaveType === 'compoff' || leaveType === 'c/o') {
+              status = 'C/O';
+              compOffs++;
+          } else if (leaveType === 'floating' || leaveType === 'floating holiday') {
+              status = 'F/H';
+              floatingHolidays++;
+          } else if (leaveType === 'loss of pay' || leaveType === 'lop') {
+              status = 'A';
+              lossOfPay++; // Increment lossOfPay counter
+          } else {
+              status = 'E/L';
+              earnedLeaves++;
+          }
+      } else if (hasActivity) {
+        const { 
+          checkIn, 
+          checkOut, 
+          firstBreakIn, 
+          lastBreakIn, 
+          breakOut: lastBreakOut, 
+          workingHours: netHours, 
+          breakHours, 
+          totalHours: grossHours 
+        } = processDailyEvents(dayEvents);
+
+        let duration = netHours;
+        currentDayBreakIn = firstBreakIn ? format(new Date(firstBreakIn), 'HH:mm') : '-';
+        currentDayBreakOut = lastBreakOut ? format(new Date(lastBreakOut), 'HH:mm') : '-';
+        let ot = 0;
+
+        if (checkIn && checkOut) {
+          // Calculate OT
+          const maxDailyHours = rules.dailyWorkingHours?.max || 9;
+          ot = Math.max(0, netHours - maxDailyHours);
+          
+          totalNetWorkDuration += duration;
+          totalGrossWorkDuration += grossHours;
+          totalBreakDuration += breakHours;
+          totalOT += ot;
+
+          // Count as present only if >= half day hours
+          if (duration >= (rules.minimumHoursHalfDay || 4)) {
+              presentDays++;
+          }
+        }
+
+        // Track days present in current week for W/O calculation
+        if (duration >= (rules.minimumHoursHalfDay || 4)) {
+            daysPresentInWeek++;
+        }
+
+        // Determine shift type
+        let shift = '-';
+        if (checkIn) {
+          const checkInDate = new Date(checkIn);
+          const hour = checkInDate.getHours();
+          const minutes = checkInDate.getMinutes();
+          const timeVal = hour + minutes / 60; // Decimal time for comparison
+
+          // Shift A: 7 AM start (+/-). Cutoff < 8:30
+          // GS: 9 AM start (+/-). 8:30 - 11:30
+          // Shift B: 1 PM start (+/-). 11:30 - 20:00
+          // Shift C: 9 PM start (+/-). > 20:00
+
+          if (timeVal >= 5 && timeVal < 8.5) { // 05:00 to 08:30
+             shift = 'Shift A'; 
+          } else if (timeVal >= 8.5 && timeVal < 11.5) { // 08:30 to 11:30 (9am +/- 2ish)
+             shift = 'GS';
+          } else if (timeVal >= 11.5 && timeVal < 20) { // 11:30 to 20:00
+             shift = 'Shift B';
+          } else {
+             shift = 'Shift C'; // Night
+          }
+        }
+        if (shift !== '-') {
+          shiftCounts[shift] = (shiftCounts[shift] || 0) + 1;
+        }
+
+        const fullDayHours = rules.minimumHoursFullDay || 8;
+        const halfDayHours = rules.minimumHoursHalfDay || 4;
         
-        totalNetWorkDuration += duration;
-        totalGrossWorkDuration += grossHours;
-        totalBreakDuration += breakHours;
-        totalOT += ot;
-        present++;
-      }
-
-      // Track days present in current week for W/O calculation
-       if (currentDate.getDay() === 1) daysPresentInWeek = 0; // Reset on Monday if processed here
-       if (duration >= (rules.minimumHoursHalfDay || 4)) {
-           daysPresentInWeek++;
-       }
-
-      // Determine shift type
-      let shift = '-';
-      if (checkIn) {
-        const checkInDate = new Date(checkIn);
-        const hour = checkInDate.getHours();
-        const minutes = checkInDate.getMinutes();
-        const timeVal = hour + minutes / 60; // Decimal time for comparison
-
-        // Shift A: 7 AM start (+/-). Cutoff < 8:30
-        // GS: 9 AM start (+/-). 8:30 - 11:30
-        // Shift B: 1 PM start (+/-). 11:30 - 20:00
-        // Shift C: 9 PM start (+/-). > 20:00
-
-        if (timeVal >= 5 && timeVal < 8.5) { // 05:00 to 08:30
-           shift = 'Shift A'; 
-        } else if (timeVal >= 8.5 && timeVal < 11.5) { // 08:30 to 11:30 (9am +/- 2ish)
-           shift = 'GS';
-        } else if (timeVal >= 11.5 && timeVal < 20) { // 11:30 to 20:00
-           shift = 'Shift B';
+        if (isSunday) {
+            status = 'WOP';
+            if (!isFuture) weekendPresents++;
         } else {
-           shift = 'Shift C'; // Night
+            if (duration >= fullDayHours) {
+                status = 'P';
+            } else if (duration >= halfDayHours) {
+                status = '1/2P';
+                halfDays++; // Increment halfDays counter
+            } else {
+                status = 'P'; // Default to P even if low hours if worked? Or should it be half? 
+                // Usually if worked any hours it counts towards something.
+            }
         }
-      }
-      if (shift !== '-') {
-        shiftCounts[shift] = (shiftCounts[shift] || 0) + 1;
-      }
 
-      let status = '-'; // Default to nothing
-      const fullDayHours = rules.minimumHoursFullDay || 8;
-      const halfDayHours = rules.minimumHoursHalfDay || 4;
-      
-      const today = startOfDay(new Date());
-      const isFuture = isAfter(currentDate, today);
-      const isToday = isSameDay(currentDate, today);
+        currentDayInTime = checkIn ? format(new Date(checkIn), 'HH:mm') : '-';
+        currentDayOutTime = checkOut ? format(new Date(checkOut), 'HH:mm') : '-';
+        currentDayGrossDuration = grossHours > 0 ? formatTime(grossHours) : '-';
+        currentDayBreakDuration = breakHours > 0 ? formatTime(breakHours) : '-';
+        currentDayNetWorkedHours = netHours > 0 ? formatTime(netHours) : '-';
+        currentDayOT = ot > 0 ? formatTime(ot) : '-';
+        currentDayShift = shift || '-';
 
-      if (duration >= fullDayHours) status = 'P';
-      else if (duration >= halfDayHours) status = '1/2P';
-      else if (isSunday) {
-         // Same logic for processed Sundays
-         const isFirstSunday = day <= 7;
-         if (!isFuture) {
-             if (isFirstSunday || daysPresentInWeek >= 4) {
-                status = 'W/O';
-                weeklyOff++;
-             } else {
-                status = '-'; 
-             }
-         } else {
-            status = '-';
-         }
-      } else if (isHoliday) {
-        status = 'H';
-        if (!isFuture) holidaysCount++;
+      } else if (isSunday) {
+          const isFirstSunday = day <= 7;
+          if (!isFuture) {
+              if (isFirstSunday || daysPresentInWeek >= 4) {
+                  status = 'W/O';
+                  weekOffs++; // Increment weekOffs counter
+              } else {
+                  status = 'A';
+                  absentDays++;
+              }
+          }
+          daysPresentInWeek = 0; // Reset for next week
       } else {
-        // Only mark Absent if it's strictly in the past
-        // If it's today or future, and criteria not met, stay as '-'
-        if (!isFuture && !isToday) {
-          status = 'A';
-          absent++;
-        }
+          // Normal day, no events, no holiday, no leave
+          if (!isFuture && !isToday) {
+            status = 'A';
+            absentDays++;
+          }
       }
 
       dailyData.push({
         date: day,
         status,
-        inTime: checkIn ? format(new Date(checkIn), 'HH:mm') : '-',
-        outTime: checkOut ? format(new Date(checkOut), 'HH:mm') : '-',
-        grossDuration: grossHours > 0 ? formatTime(grossHours) : '-',
-        breakIn: breakInTime,
-        breakOut: breakOutTime,
-        breakDuration: breakHours > 0 ? formatTime(breakHours) : '-',
-        netWorkedHours: netHours > 0 ? formatTime(netHours) : '-',
-        ot: ot > 0 ? formatTime(ot) : '-',
-        shift: shift || '-',
+        inTime: currentDayInTime,
+        outTime: currentDayOutTime,
+        grossDuration: currentDayGrossDuration,
+        breakIn: currentDayBreakIn,
+        breakOut: currentDayBreakOut,
+        breakDuration: currentDayBreakDuration,
+        netWorkedHours: currentDayNetWorkedHours,
+        ot: currentDayOT,
+        shift: currentDayShift,
       });
     }
 
-    const averageWorkingHrs = present > 0 ? totalNetWorkDuration / present : 0;
+    const averageWorkingHrs = presentDays > 0 ? totalNetWorkDuration / presentDays : 0;
+
+    const totalPayableDays = presentDays + weekOffs + holidaysCount + weekendPresents + holidayPresents + (halfDays * 0.5) 
+                             + sickLeaves + earnedLeaves + floatingHolidays + compOffs + workFromHomeDays;
 
     return {
       employeeId: user.id,
       employeeName: user.name,
+      userName: user.name,
+      statuses: dailyData.map(d => d.status),
       totalGrossWorkDuration,
       totalNetWorkDuration,
       totalBreakDuration,
       totalOT,
-      present,
-      absent,
-      weeklyOff,
+      presentDays,
+      halfDays,
+      absentDays,
+      weekOffs: weeklyOff,
       holidays: holidaysCount,
-      leaves: 0, // TODO: Calculate from leave requests
+      holidayPresents,
+      weekendPresents,
+      sickLeaves,
+      earnedLeaves,
+      floatingHolidays,
+      compOffs,
+      lossOfPays: lossOfPay,
+      workFromHomeDays,
+      totalPayableDays,
       averageWorkingHrs: Math.round(averageWorkingHrs * 100) / 100,
       totalDurationPlusOT: totalNetWorkDuration,
       shiftCounts,
       dailyData,
+      present: presentDays,
+      absent: absentDays,
+      weeklyOff,
+      leaves: leavesCount,
+      lossOfPay
     };
   };
 
@@ -338,8 +497,10 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
                 Total OT: {employee.totalOT.toFixed(2)} Hrs
               </p>
               <p>
-                Present: {employee.present}, Absent: {employee.absent}, WeeklyOff: {employee.weeklyOff}, 
-                Holidays: {employee.holidays}, Leaves: {employee.leaves}
+                Present: {employee.presentDays}, Half Days: {employee.halfDays}, Absent: {employee.absentDays}, WeeklyOff: {employee.weekOffs}, 
+                Holidays: {employee.holidays}, Leaves: {employee.leaves}, F/H: {employee.floatingHolidays}, 
+                LOP: {employee.lossOfPay}, HP: {employee.holidayPresents}, WOP: {employee.weekendPresents},
+                Total Payable Days: {employee.totalPayableDays}
               </p>
               <p>
                 Average Working Hrs: {employee.averageWorkingHrs.toFixed(2)} Hrs
@@ -371,6 +532,8 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
                         (day.status === '1/2P' || day.status === 'C/O') ? 'text-blue-600' : 
                         day.status === 'W/O' ? 'text-gray-500' : 
                         day.status === 'H' ? 'text-orange-600' :
+                        day.status === 'F/H' ? 'text-yellow-600' :
+                        day.status === 'LOP' ? 'text-red-400' :
                         'text-red-600'
                       }>
                         {day.status}

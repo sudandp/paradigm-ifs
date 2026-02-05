@@ -18,7 +18,8 @@ import type {
     AttendanceSettings,
     OnboardingData,
     Organization,
-    CompOffLog
+    CompOffLog,
+    UserHoliday
 } from '../../types';
 import ManualAttendanceModal from '../../components/attendance/ManualAttendanceModal';
 import AttendanceAuditReport from '../../components/attendance/AttendanceAuditReport';
@@ -39,6 +40,7 @@ import {
     differenceInMinutes,
     isSaturday,
     isSunday,
+    isSameDay,
     isWithinInterval,
     startOfDay,
     endOfDay
@@ -66,6 +68,7 @@ import {
     MonthlyReportRow,
     GenericReportColumn
 } from '../../utils/excelExport';
+import { FIXED_HOLIDAYS } from '../../utils/constants';
 import LoadingScreen from '../../components/ui/LoadingScreen';
 import {
     Chart,
@@ -710,6 +713,7 @@ const MonthlyReportPdfComponent: React.FC<{ data: MonthlyReportRow[]; dateRange:
                         <td className="border p-1 border-gray-400">HP</td>
                         <td className="border p-1 border-gray-400 bg-green-50 text-green-800">S/L</td>
                         <td className="border p-1 border-gray-400 bg-blue-50 text-blue-800">E/L</td>
+                        <td className="border p-1 border-gray-400 bg-yellow-50 text-yellow-800">F/H</td>
                         <td className="border p-1 border-gray-400 bg-purple-50 text-purple-800">C/O</td>
                         <td className="border p-1 border-gray-400 font-bold">Total</td>
                     </tr>
@@ -731,11 +735,30 @@ const MonthlyReportPdfComponent: React.FC<{ data: MonthlyReportRow[]; dateRange:
                             <td className="border p-1 border-gray-400">{row.holidayPresents}</td>
                             <td className="border p-1 border-gray-400 bg-green-50">{row.sickLeaves}</td>
                             <td className="border p-1 border-gray-400 bg-blue-50">{row.earnedLeaves}</td>
+                            <td className="border p-1 border-gray-400 bg-yellow-50">{row.floatingHolidays}</td>
                             <td className="border p-1 border-gray-400 bg-purple-50">{row.compOffs}</td>
                             <td className="border p-1 border-gray-400 font-bold">{row.totalPayableDays}</td>
                         </tr>
                     ))}
                 </tbody>
+                <tfoot>
+                    <tr className="bg-gray-100 font-bold">
+                        <td className="border p-1 border-gray-400 text-left" colSpan={days.length + 1}>Total</td>
+                        <td className="border p-1 border-gray-400">{data.reduce((acc, row) => acc + row.presentDays, 0)}</td>
+                        <td className="border p-1 border-gray-400">{data.reduce((acc, row) => acc + row.halfDays, 0)}</td>
+                        <td className="border p-1 border-gray-400 text-blue-700">{data.reduce((acc, row) => acc + row.workFromHomeDays, 0)}</td>
+                        <td className="border p-1 border-gray-400">{data.reduce((acc, row) => acc + row.absentDays, 0)}</td>
+                        <td className="border p-1 border-gray-400">{data.reduce((acc, row) => acc + row.weekOffs, 0)}</td>
+                        <td className="border p-1 border-gray-400">{data.reduce((acc, row) => acc + row.holidays, 0)}</td>
+                        <td className="border p-1 border-gray-400">{data.reduce((acc, row) => acc + row.weekendPresents, 0)}</td>
+                        <td className="border p-1 border-gray-400">{data.reduce((acc, row) => acc + row.holidayPresents, 0)}</td>
+                        <td className="border p-1 border-gray-400 text-green-800">{data.reduce((acc, row) => acc + row.sickLeaves, 0)}</td>
+                        <td className="border p-1 border-gray-400 text-blue-800">{data.reduce((acc, row) => acc + row.earnedLeaves, 0)}</td>
+                        <td className="border p-1 border-gray-400 text-yellow-800">{data.reduce((acc, row) => acc + row.floatingHolidays, 0)}</td>
+                        <td className="border p-1 border-gray-400 text-purple-800">{data.reduce((acc, row) => acc + row.compOffs, 0)}</td>
+                        <td className="border p-1 border-gray-400 font-bold">{data.reduce((acc, row) => acc + row.totalPayableDays, 0)}</td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     );
@@ -746,7 +769,7 @@ const AttendanceDashboard: React.FC = () => {
     const { user } = useAuthStore();
     const currentUserRole = user?.role;
     const { permissions } = usePermissionsStore();
-    const { recurringHolidays } = useSettingsStore();
+    const { recurringHolidays, officeHolidays, fieldHolidays } = useSettingsStore();
 
     const [users, setUsers] = useState<User[]>([]);
     const usersRef = useRef<User[]>([]);
@@ -754,6 +777,7 @@ const AttendanceDashboard: React.FC = () => {
 
     const [attendanceEvents, setAttendanceEvents] = useState<AttendanceEvent[]>([]);
     const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
+    const [userHolidaysPool, setUserHolidaysPool] = useState<UserHoliday[]>([]);
     const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -865,10 +889,17 @@ const AttendanceDashboard: React.FC = () => {
                 const startStr = bufferStartDate.toISOString();
                 const endStr = dateRange.endDate.toISOString();
 
-                const [events, compOffs] = await Promise.all([
+                const [events, compOffs, userHolidays, userLeaves] = await Promise.all([
                     api.getAttendanceEvents(user.id, startStr, endStr),
-                    api.getCompOffLogs(user.id)
+                    api.getCompOffLogs(user.id),
+                    api.getUserHolidays(user.id),
+                    api.getLeaveRequests({ userId: user.id, startDate: startStr, endDate: endStr, status: 'approved' })
                 ]);
+                
+                const leavesData = Array.isArray(userLeaves) ? userLeaves : (userLeaves as any).data || [];
+                
+                // POPULATE GLOBAL STATE FOR REPORT COMPONENT
+                setUserHolidaysPool(userHolidays || []);
 
                 // Calculate Stats
                 // Generate logs for extended period to ensure continuity for weekend rules
@@ -878,6 +909,43 @@ const AttendanceDashboard: React.FC = () => {
                 let logs = extendedDays.map(day => {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const dayEvents = events.filter(e => format(new Date(e.timestamp), 'yyyy-MM-dd') === dateStr);
+                    
+                    // Helper for robust holiday/leave date matching
+                    const matchesDate = (targetDate: any, compareDay: Date) => {
+                        if (!targetDate) return false;
+                        try {
+                            const compareStr = format(compareDay, 'yyyy-MM-dd');
+                            const compareMMDD = format(compareDay, '-MM-dd'); // Matches pool format
+                            
+                            if (typeof targetDate === 'string') {
+                                // 1. Try exact full date match (YYYY-MM-DD)
+                                if (targetDate.includes(compareStr)) return true;
+
+                                // 2. Try partial MM-DD match (Year agnostic for selected holidays)
+                                // This handles cases where pool holidays are saved as "-01-15" or even "2026-01-15" vs "2025-01-15"
+                                if (targetDate.includes(compareMMDD)) return true;
+                                if (targetDate.endsWith(compareMMDD)) return true;
+
+                                // 3. Handle specific pool format starting with '-'
+                                if (targetDate.startsWith('-')) {
+                                    return compareStr.endsWith(targetDate);
+                                }
+                                
+                                // 4. Fallback: Clean string splitting
+                                const cleanDate = targetDate.split(' ')[0].split('T')[0];
+                                return cleanDate === compareStr;
+                            }
+                            
+                            // 5. If it's a Date object
+                            if (targetDate instanceof Date) {
+                                return format(targetDate, 'yyyy-MM-dd') === compareStr;
+                            }
+                            
+                            return false;
+                        } catch (e) {
+                            return false;
+                        }
+                    };
 
                     let status = 'A'; // Absent
                     let checkIn = '-';
@@ -889,6 +957,8 @@ const AttendanceDashboard: React.FC = () => {
                     const isWeekend = dayName === 'Sunday';
                     const officeRoles = ['admin', 'super_admin', 'hr', 'finance'];
                     const isOfficeRole = officeRoles.includes(user.role?.toLowerCase() || '');
+
+                    // 1. Recurring
                     const isRecurringHoliday = recurringHolidays.some(rule => {
                         if (rule.day.toLowerCase() !== dayName.toLowerCase()) return false;
                         const occurrence = Math.ceil(day.getDate() / 7);
@@ -896,18 +966,46 @@ const AttendanceDashboard: React.FC = () => {
                         return rule.n === occurrence && (rule.type || 'office') === userRoleType;
                     });
 
-                    if (isRecurringHoliday) status = 'H'; // Holiday
-                    else if (isWeekend) status = 'W/O'; // Week Off
+                    // 2. Fixed
+                    const isFixedHoliday = FIXED_HOLIDAYS.some(fh => {
+                        const [m, d] = fh.date.split('-').map(Number);
+                        return day.getMonth() === (m - 1) && day.getDate() === d;
+                    });
 
-                    if (dayEvents.length > 0) {
-                        if (isRecurringHoliday) {
-                            status = 'H/P'; // Holiday Present
-                        } else if (isWeekend) {
-                            status = 'W/P'; // Week Off Present
-                        } else {
-                            status = 'P'; // Present
-                        }
+                    // 3. Pool (Selected)
+                    const isPoolHoliday = userHolidays.some(uh => {
+                        const hDate = uh.holidayDate || (uh as any).holiday_date;
+                        return matchesDate(hDate, day);
+                    });
 
+                    const isHoliday = isRecurringHoliday || isFixedHoliday || isPoolHoliday;
+
+                    // 4. Approved Leave
+                    const approvedLeave = leavesData.find((l: any) => 
+                        isWithinInterval(day, {
+                            start: startOfDay(new Date(l.startDate)),
+                            end: endOfDay(new Date(l.endDate))
+                        })
+                    );
+
+                    const hasActivity = dayEvents.length > 0;
+
+                    if (isHoliday) {
+                        status = hasActivity ? 'HP' : 'H';
+                    } else if (approvedLeave) {
+                        const leaveType = approvedLeave.leaveType?.toLowerCase();
+                        if (leaveType === 'sick') status = 'S/L';
+                        else if (leaveType === 'comp off' || leaveType === 'compoff' || leaveType === 'c/o') status = 'C/O';
+                        else if (leaveType === 'loss of pay' || leaveType === 'lop') status = 'A';
+                        else status = 'E/L';
+                    } else if (hasActivity) {
+                        if (isWeekend) status = 'W/P';
+                        else status = 'P';
+                    } else if (isWeekend) {
+                        status = 'W/O';
+                    }
+
+                    if (hasActivity) {
                         // Sort events
                         dayEvents.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
                         const checkInEvent = dayEvents.find(e => e.type === 'check-in');
@@ -1007,15 +1105,17 @@ const AttendanceDashboard: React.FC = () => {
             const queryStart = startDate < today ? startDate : startOfToday();
             const queryEnd = endDate > today ? endDate : endOfToday();
 
-            const [events, leavesResponse] = await Promise.all([
+            const [events, leavesResponse, holidaysResponse] = await Promise.all([
                 api.getAllAttendanceEvents(queryStart.toISOString(), queryEnd.toISOString()),
-                api.getLeaveRequests({ startDate: queryStart.toISOString(), endDate: queryEnd.toISOString(), status: 'approved' })
+                api.getLeaveRequests({ startDate: queryStart.toISOString(), endDate: queryEnd.toISOString(), status: 'approved' }),
+                api.getAllUserHolidays()
             ]);
 
             setAttendanceEvents(events);
             // Extract the data array from the paginated response
             const leavesData = Array.isArray(leavesResponse) ? leavesResponse : leavesResponse.data;
             setLeaves(leavesData);
+            setUserHolidaysPool(holidaysResponse || []);
 
             // --- Calculate "Today" Stats ---
             const todayStr = format(today, 'yyyy-MM-dd');
@@ -1356,7 +1456,7 @@ const AttendanceDashboard: React.FC = () => {
                 return a.time.localeCompare(b.time);
             });
 
-    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole]);
+    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, leaves]);
 
     // 3. Monthly Report Data (Aggregated)
     const monthlyReportData: MonthlyReportRow[] = useMemo(() => {
@@ -1364,7 +1464,6 @@ const AttendanceDashboard: React.FC = () => {
 
         const days = eachDayOfInterval({ start: dateRange.startDate, end: dateRange.endDate });
         
-        // Exclude management users from monthly reports
         // Exclude management users from monthly reports
         let filteredUsers = users.filter(u => u.role !== 'management');
 
@@ -1386,16 +1485,55 @@ const AttendanceDashboard: React.FC = () => {
             let holidays = 0;
             let weekendPresents = 0;
             let holidayPresents = 0;
+
+            let daysPresentInWeek = 0; // Track for WO rule
             // New counters
             let sickLeaves = 0;
             let earnedLeaves = 0;
+            let floatingHolidays = 0;
             let compOffs = 0;
+            let lossOfPays = 0;
             let workFromHomeDays = 0;
 
             days.forEach(day => {
                 const dateStr = format(day, 'yyyy-MM-dd');
+                
+                // Helper for robust holiday/leave date matching
+                const matchesDate = (targetDate: any, compareDay: Date) => {
+                    if (!targetDate) return false;
+                    try {
+                        const compareStr = format(compareDay, 'yyyy-MM-dd');
+                        const compareMMDD = format(compareDay, '-MM-dd');
+                        
+                        if (typeof targetDate === 'string') {
+                             // 1. Try exact full date match
+                            if (targetDate.includes(compareStr)) return true;
+
+                            // 2. Try partial MM-DD match (Year agnostic)
+                            if (targetDate.includes(compareMMDD)) return true;
+                            if (targetDate.endsWith(compareMMDD)) return true;
+
+                            if (targetDate.startsWith('-')) {
+                                return compareStr.endsWith(targetDate);
+                            }
+                            
+                            const cleanDate = targetDate.split(' ')[0].split('T')[0];
+                            return cleanDate === compareStr;
+                        }
+                        
+                        // 2. If it's a Date object
+                        if (targetDate instanceof Date) {
+                            return format(targetDate, 'yyyy-MM-dd') === compareStr;
+                        }
+                        
+                        return false;
+                    } catch (e) {
+                        return false;
+                    }
+                };
+
                 const dayEvents = attendanceEvents.filter(e =>
-                    e.userId === user.id && format(new Date(e.timestamp), 'yyyy-MM-dd') === dateStr
+                    String(e.userId) === String(user.id) && format(new Date(e.timestamp), 'yyyy-MM-dd') === dateStr
                 );
 
                 const hasActivity = dayEvents.length > 0;
@@ -1407,7 +1545,7 @@ const AttendanceDashboard: React.FC = () => {
                 const officeRoles = ['admin', 'super_admin', 'hr', 'finance'];
                 const userCategory = officeRoles.includes(user.role?.toLowerCase() || '') ? 'office' : 'field';
 
-                // Check recurring holiday
+                // 1. Check Recurring holiday (Floating Holiday)
                 const isRecurringHoliday = recurringHolidays.some(rule => {
                     if (rule.day.toLowerCase() !== dayName.toLowerCase()) return false;
                     const dayDate = day.getDate();
@@ -1416,9 +1554,29 @@ const AttendanceDashboard: React.FC = () => {
                     return rule.n === occurrence && ruleType === userCategory;
                 });
 
+                // 2. Check FIXED holidays
+                const isFixedHoliday = FIXED_HOLIDAYS.some(fh => {
+                    const [m, d] = fh.date.split('-').map(Number);
+                    return day.getMonth() === (m - 1) && day.getDate() === d;
+                });
+
+                // 3. Check POOL holidays (User selected)
+                const isPoolHoliday = userHolidaysPool.some(uh => {
+                    const uhUserId = uh.userId || (uh as any).user_id;
+                    const holidayDate = uh.holidayDate || (uh as any).holiday_date;
+                    return String(uhUserId) === String(user.id) && matchesDate(holidayDate, day);
+                });
+
+                // 4. Check Configured holidays (Admin settings)
+                const isConfiguredHoliday = (userCategory === 'field' ? fieldHolidays : officeHolidays).some(h => 
+                    matchesDate(h.date, day)
+                );
+
+                const isCompanyHoliday = isFixedHoliday || isPoolHoliday || isConfiguredHoliday;
+
                 // Find approved leaves for this user on this day and get the leave type
                 const approvedLeave = leaves.find(l => 
-                    l.userId === user.id && 
+                    String(l.userId) === String(user.id) && 
                     l.status === 'approved' &&
                     isWithinInterval(day, { 
                         start: startOfDay(new Date(l.startDate)), 
@@ -1428,7 +1586,43 @@ const AttendanceDashboard: React.FC = () => {
 
                 let status = '';
 
-                if (hasActivity) {
+                // NEW PERMANENT PRIORITY: Holiday > Approved Leave > Work Activity > Weekend > Absent
+                if (isCompanyHoliday) {
+                    if (hasActivity) {
+                        status = 'HP';
+                        holidayPresents++;
+                    } else {
+                        status = 'H';
+                        holidays++;
+                    }
+                } else if (isRecurringHoliday) {
+                    if (hasActivity) {
+                        status = 'HP';
+                        holidayPresents++;
+                    } else {
+                        status = 'F/H';
+                        floatingHolidays++;
+                    }
+                } else if (approvedLeave) {
+                    const leaveType = approvedLeave.leaveType?.toLowerCase();
+                    if (leaveType === 'sick') {
+                        status = 'S/L';
+                        sickLeaves++;
+                    } else if (leaveType === 'comp off' || leaveType === 'comp-off' || leaveType === 'compoff' || leaveType === 'c/o') {
+                        status = 'C/O';
+                        compOffs++;
+                    } else if (leaveType === 'floating' || leaveType === 'floating holiday') {
+                        status = 'F/H';
+                        floatingHolidays++;
+                    } else if (leaveType === 'loss of pay' || leaveType === 'loss-of-pay' || leaveType === 'lop') {
+                        status = 'A';
+                        absentDays++;
+                        lossOfPays++;
+                    } else {
+                        status = 'E/L';
+                        earnedLeaves++;
+                    }
+                } else if (hasActivity) {
                     // Calculate worked hours
                     const sortedEvents = dayEvents.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
                     const checkInEvent = sortedEvents.find(e => e.type === 'check-in');
@@ -1442,77 +1636,56 @@ const AttendanceDashboard: React.FC = () => {
                     }
                     
                     const workedHours = workedMinutes / 60;
-                    
-                    // Determine if full day or half day based on attendance settings
-                    // Default thresholds: 6 hours for full day, 3 hours for half day
                     const minHoursFullDay = 6;
                     const minHoursHalfDay = 3;
                     
                     const isFullDay = workedHours >= minHoursFullDay;
                     const isHalfDay = !isFullDay && workedHours >= minHoursHalfDay;
-                    
-                    // Check if work from home (based on location name)
                     const isWorkFromHome = checkInEvent?.locationName?.toLowerCase().includes('work from home') ||
                                           checkOutEvent?.locationName?.toLowerCase().includes('work from home');
                     
-                    // Worked
-                    // Worked
-                    if (isRecurringHoliday) {
-                        status = 'H/P'; // Holiday Present
-                        holidayPresents++;
-                    } else if (isWeekend) {
-                        status = 'W/P'; // Week Off Present (Weekend Present)
+                    if (isWeekend) {
+                        status = 'WOP';
                         weekendPresents++;
                     } else if (isWorkFromHome) {
-                        status = 'W/H'; // Work from Home
+                        status = 'W/H';
                         workFromHomeDays++; 
                     } else {
                         if (isFullDay) {
-                            status = 'P'; // Full day present
+                            status = 'P';
                             presentDays++;
                         } else if (isHalfDay) {
-                            status = '0.5P'; // Half day present
+                            status = '0.5P';
                             halfDays++;
                         } else {
-                            // Worked but less than half day minimum - still count as present
-                            status = 'P';
+                            status = 'P'; // Treat minimal activity as P for safety if threshold not met? Or A?
                             presentDays++;
                         }
                     }
-                } else {
-                    // Not Worked
-                    if (isRecurringHoliday) {
-                        status = 'H';
-                        holidays++;
-                    } else if (isWeekend) {
-                        status = 'W/O'; // Week Off
+
+                    if (workedHours >= minHoursHalfDay) {
+                        daysPresentInWeek++;
+                    }
+                } else if (isWeekend) {
+                    const isFirstSunday = day.getDate() <= 7;
+                    if (isFirstSunday || daysPresentInWeek >= 4) {
+                        status = 'W/O';
                         weekOffs++;
-                    } else if (approvedLeave) {
-                        // Determine leave type from leave request data
-                        const leaveType = approvedLeave.leaveType?.toLowerCase();
-                        if (leaveType === 'sick') {
-                            status = 'S/L'; // Sick Leave
-                            sickLeaves++;
-                        } else if (leaveType === 'comp off' || leaveType === 'comp-off') {
-                            status = 'C/O'; // Comp Off
-                            compOffs++;
-                        } else {
-                            status = 'E/L'; // Earned Leave (default)
-                            earnedLeaves++;
-                        }
-                        // Note: Leaves are NOT added to presentDays anymore to keep columns clean, 
-                        // but they ARE added to totalPayableDays below.
                     } else {
                         status = 'A';
                         absentDays++;
                     }
+                    daysPresentInWeek = 0;
+                } else {
+                    status = 'A';
+                    absentDays++;
                 }
+                
                 statuses.push(status);
             });
 
-            // Payable days: P + WO + H + WOP + HP + 0.5 * halfDays + Leaves + W/H
             const totalPayableDays = presentDays + weekOffs + holidays + weekendPresents + holidayPresents + (halfDays * 0.5) 
-                                     + sickLeaves + earnedLeaves + compOffs + workFromHomeDays;
+                                     + sickLeaves + earnedLeaves + floatingHolidays + compOffs + workFromHomeDays;
 
             return {
                 userName: user.name,
@@ -1527,16 +1700,17 @@ const AttendanceDashboard: React.FC = () => {
                 totalPayableDays,
                 sickLeaves,
                 earnedLeaves,
+                floatingHolidays,
                 compOffs,
+                lossOfPays,
                 workFromHomeDays
             };
         }).filter(row => {
             if (selectedStatus === 'all') return true;
-            // Check if the user has the selected status on ANY day
             return row.statuses.includes(selectedStatus);
         });
 
-    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, recurringHolidays]);
+    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, recurringHolidays, leaves, userHolidaysPool, officeHolidays, fieldHolidays]);
 
 
     // Determine which PDF component to render
@@ -1994,7 +2168,9 @@ const AttendanceDashboard: React.FC = () => {
                             <option value="A">Absent (A)</option>
                             <option value="S/L">Sick Leave (S/L)</option>
                             <option value="E/L">Earned Leave (E/L)</option>
+                            <option value="F/H">Floating Holiday (F/H)</option>
                             <option value="C/O">Comp Off (C/O)</option>
+                            <option value="LOP">Loss of Pay (LOP)</option>
                             <option value="W/H">Work From Home (W/H)</option>
                             <option value="W/O">Week Off (W/O)</option>
                             <option value="W/P">Week Off Present (W/P)</option>
@@ -2049,7 +2225,7 @@ const AttendanceDashboard: React.FC = () => {
             {reportType === 'workHours' && (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100">
                     <MonthlyHoursReport 
-                        month={dateRange.startDate?.getMonth() ? dateRange.startDate.getMonth() + 1 : new Date().getMonth() + 1}
+                        month={(dateRange.startDate?.getMonth() ?? new Date().getMonth()) + 1}
                         year={dateRange.startDate?.getFullYear() || new Date().getFullYear()}
                         userId={selectedUser === 'all' ? undefined : selectedUser}
                     />

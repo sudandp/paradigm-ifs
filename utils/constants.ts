@@ -1,4 +1,5 @@
 export const FIXED_HOLIDAYS = [
+    { name: 'New Year', date: '01-01', isFixed: true },
     { name: 'Republic Day', date: '01-26', isFixed: true },
     { name: 'May Day', date: '05-01', isFixed: true },
     { name: 'Independence Day', date: '08-15', isFixed: true },

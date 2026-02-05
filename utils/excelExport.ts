@@ -16,6 +16,8 @@ export interface MonthlyReportRow {
     sickLeaves: number;
     earnedLeaves: number;
     compOffs: number;
+    floatingHolidays: number; // New
+    lossOfPays: number;      // New
     workFromHomeDays: number;
 }
 
@@ -207,7 +209,7 @@ export const exportAttendanceToExcel = async (
     const dayNumbers = [
         '', // Employee Name column
         ...dayInterval.map(date => format(date, 'd')),
-        ...new Array(13).fill('') // Summary columns
+        ...new Array(12).fill('') // Summary columns (removed LOP)
     ];
     headerRow1.values = dayNumbers;
     headerRow1.height = 20;
@@ -229,7 +231,7 @@ export const exportAttendanceToExcel = async (
     const mainHeaders = [
         'Employee Name',
         ...dayInterval.map(date => format(date, 'EEE')),
-        'P', '1/2P', 'W/H', 'A', 'WO', 'H', 'WOP', 'HP', 'S/L', 'E/L', 'C/O', 'Total'
+        'P', '1/2P', 'W/H', 'A', 'WO', 'H', 'WOP', 'HP', 'S/L', 'E/L', 'F/H', 'C/O', 'Total'
     ];
     headerRow2.values = mainHeaders;
     headerRow2.height = 25;
@@ -247,7 +249,7 @@ export const exportAttendanceToExcel = async (
         worksheet.getColumn(i).width = 5;
     }
     // Summary columns widths
-    const lastColIndex = dayInterval.length + 14;
+    const lastColIndex = dayInterval.length + 15; // Removed LOP
     for (let i = dayInterval.length + 2; i <= lastColIndex; i++) {
         worksheet.getColumn(i).width = 7;
     }
@@ -274,6 +276,7 @@ export const exportAttendanceToExcel = async (
             row.holidayPresents,
             row.sickLeaves,
             row.earnedLeaves,
+            row.floatingHolidays,
             row.compOffs,
             row.totalPayableDays
         ];
@@ -284,11 +287,13 @@ export const exportAttendanceToExcel = async (
         // Apply background colors to special columns
         const col_SL = dayInterval.length + 11;
         const col_EL = dayInterval.length + 12;
-        const col_CO = dayInterval.length + 13;
-        const col_Total = dayInterval.length + 14;
+        const col_FH = dayInterval.length + 13;
+        const col_CO = dayInterval.length + 14;
+        const col_Total = dayInterval.length + 15;
 
         excelRow.getCell(col_SL).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } }; // Light Green
         excelRow.getCell(col_EL).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3F2FD' } }; // Light Blue
+        excelRow.getCell(col_FH).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF9C4' } }; // Light Yellow
         excelRow.getCell(col_CO).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3E5F5' } }; // Light Purple
         excelRow.getCell(col_Total).font = { bold: true };
 
@@ -307,7 +312,43 @@ export const exportAttendanceToExcel = async (
         currentRow++;
     });
 
-    // 5. Generate and Save
+    // 5. Add Total Row
+    const totalRow = worksheet.getRow(currentRow);
+    const summaryStartCol = dayInterval.length + 2;
+    const totalData = [
+        'Total',
+        ...new Array(dayInterval.length).fill(''),
+        data.reduce((acc, row) => acc + row.presentDays, 0),
+        data.reduce((acc, row) => acc + row.halfDays, 0),
+        data.reduce((acc, row) => acc + row.workFromHomeDays, 0),
+        data.reduce((acc, row) => acc + row.absentDays, 0),
+        data.reduce((acc, row) => acc + row.weekOffs, 0),
+        data.reduce((acc, row) => acc + row.holidays, 0),
+        data.reduce((acc, row) => acc + row.weekendPresents, 0),
+        data.reduce((acc, row) => acc + row.holidayPresents, 0),
+        data.reduce((acc, row) => acc + row.sickLeaves, 0),
+        data.reduce((acc, row) => acc + row.earnedLeaves, 0),
+        data.reduce((acc, row) => acc + row.floatingHolidays, 0),
+        data.reduce((acc, row) => acc + row.compOffs, 0),
+        data.reduce((acc, row) => acc + row.totalPayableDays, 0)
+    ];
+    totalRow.values = totalData;
+    totalRow.height = 25;
+    totalRow.font = { bold: true };
+    totalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+
+    // Borders for total row
+    totalRow.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+        };
+        if (Number(cell.col) > 1) cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+
+    // 6. Generate and Save
     const buffer = await workbook.xlsx.writeBuffer();
     const fileName = `Monthly_Attendance_Report_${format(dateRange.startDate, 'MMM_yyyy')}.xlsx`;
     saveAs(new Blob([buffer]), fileName);
