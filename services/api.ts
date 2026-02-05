@@ -1189,10 +1189,13 @@ export const api = {
    * Identifies users with selected roles/groups who checked in today but have no check-out.
    * Records a check-out at 19:00 (7 PM), logs it, and notifies appropriate users.
    */
-  async triggerMissedCheckouts(): Promise<{ count: number }> {
+  async triggerMissedCheckouts(settings?: AttendanceSettings): Promise<{ count: number }> {
     const { data: { session } } = await supabase.auth.getSession();
     const { data, error } = await supabase.functions.invoke('trigger-missed-checkouts', {
-      body: { manual: true },
+      body: { 
+        manual: true,
+        settings: settings ? toSnakeCase(settings) : undefined
+      },
       headers: {
         Authorization: `Bearer ${session?.access_token || ''}`
       }

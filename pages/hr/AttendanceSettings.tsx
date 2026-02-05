@@ -180,9 +180,9 @@ const AttendanceSettings: React.FC = () => {
 
         setIsTriggering(true);
         try {
-            const result = await api.triggerMissedCheckouts();
+            const result = await api.triggerMissedCheckouts(localAttendance);
             setToast({ 
-                message: `Successfully triggered missed check-outs for ${result.count} office staff.`, 
+                message: `Successfully triggered missed check-outs for ${result.count} staff.`, 
                 type: 'success' 
             });
         } catch (error) {

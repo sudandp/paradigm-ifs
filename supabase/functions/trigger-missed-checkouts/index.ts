@@ -14,9 +14,11 @@ Deno.serve(async (req: Request) => {
   try {
     // 0. Parse Request Body
     let isManualOverride = false;
+    let manualSettings = null;
     try {
       const body = await req.json();
       isManualOverride = !!body.manual;
+      manualSettings = body.settings;
     } catch {
       // No body or invalid body is fine, defaults to false
     }
@@ -26,19 +28,29 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Fetch Core Settings
-    const { data: globalSettings, error: settingsError } = await supabaseClient
-      .from('settings')
-      .select('attendance_settings')
-      .eq('id', 'singleton')
-      .single();
-
-    if (settingsError) throw new Error(`Failed to fetch settings: ${settingsError.message}`);
+    // 1. Resolve Settings (DB or Manual Override)
+    let attendanceSettings = manualSettings;
     
-    const attendanceSettings = globalSettings?.attendance_settings || {};
+    if (attendanceSettings) {
+      console.log('Using manual settings override from request body');
+    } else {
+      console.log('Fetching settings from database...');
+      const { data: globalSettings, error: settingsError } = await supabaseClient
+        .from('settings')
+        .select('attendance_settings')
+        .eq('id', 'singleton')
+        .single();
+
+      if (settingsError) throw new Error(`Failed to fetch settings: ${settingsError.message}`);
+      attendanceSettings = globalSettings?.attendance_settings || {};
+    }
+    
     const config = attendanceSettings.missedCheckoutConfig;
     const enabledGroups = config?.enabledGroups || ['office'];
     const roleMapping = config?.roleMapping || {};
+
+    console.log(`Enabled groups for processing: ${enabledGroups.join(', ')}`);
+    console.log(`Role mapping: ${JSON.stringify(roleMapping)}`);
 
     const now = new Date();
     const istOffset = 5.5 * 60 * 60 * 1000;
@@ -213,7 +225,11 @@ Deno.serve(async (req: Request) => {
         usersProcessed: processed,
         processedSummary: groupProcessedUsers.join(', ')
       };
+      
+      console.log(`[${group}] Completed: Processed ${processed} users: ${groupProcessedUsers.join(', ')}`);
     }
+
+    console.log('Final Report:', JSON.stringify(report, null, 2));
 
     return new Response(JSON.stringify(report), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
