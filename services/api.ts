@@ -1695,7 +1695,10 @@ export const api = {
       if (explicitOpeningDate) {
         const openingYear = new Date(explicitOpeningDate.replace(/-/g, '/')).getFullYear();
         if (openingYear === currentYear) {
-          openingBalance = userData.sick_leave_opening_balance || 0;
+          // PER REQUEST: Ignore opening balance on Jan 1st to prevent "carry forward" or default value artifacts.
+          // Accrual should start fresh. Only allow opening balance for mid-year migrations.
+          const isJanFirst = explicitOpeningDate.endsWith('-01-01');
+          openingBalance = isJanFirst ? 0 : (userData.sick_leave_opening_balance || 0);
           startDateStr = explicitOpeningDate;
         }
       }
