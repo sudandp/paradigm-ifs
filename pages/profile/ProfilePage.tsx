@@ -205,8 +205,9 @@ const ProfilePage: React.FC = () => {
     const isActionInProgress = isSubmittingAttendance; // removed isConfirmationModalOpen
 
     const handleLogoutClick = () => {
-        // Navigate to the dedicated logout page instead of opening a modal
-        navigate('/auth/logout');
+        // Use window.location for a more reliable navigation on mobile
+        // This ensures the logout page is accessed even when navigate() might have issues
+        window.location.hash = '#/auth/logout';
     };
 
     // handleConfirmLogout removed as it's now handled in LogoutPage.tsx
