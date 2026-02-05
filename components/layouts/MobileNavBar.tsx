@@ -46,7 +46,20 @@ const MobileNavBar: React.FC = () => {
     // --- Define Your Navigation Items Here ---
     const navItems = useMemo(() => {
         if (!user) return [];
-        const userPermissions = user.role ? (permissions[user.role] || []) : [];
+        const getPermissions = () => {
+            if (!user || !permissions) return [];
+            const roleId = user.roleId?.toLowerCase() || '';
+            const roleName = user.role?.toLowerCase() || '';
+            const roleNameUnderscore = roleName.replace(/\s+/g, '_');
+
+            return permissions[roleId] || 
+                   permissions[roleName] || 
+                   permissions[roleNameUnderscore] || 
+                   permissions[user.role] || 
+                   [];
+        };
+
+        const userPermissions = getPermissions();
 
         const allItems = [
             { key: 'home', to: '/mobile-home', label: 'Home', icon: Home, end: true, permission: 'view_mobile_nav_home' },

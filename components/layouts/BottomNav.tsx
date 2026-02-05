@@ -11,7 +11,20 @@ const BottomNav: React.FC = () => {
 
     if (!user) return null;
 
-    const userPermissions = permissions[user.role] || [];
+    const getPermissions = () => {
+        if (!user || !permissions) return [];
+        const roleId = user.roleId?.toLowerCase() || '';
+        const roleName = user.role?.toLowerCase() || '';
+        const roleNameUnderscore = roleName.replace(/\s+/g, '_');
+
+        return permissions[roleId] || 
+               permissions[roleName] || 
+               permissions[roleNameUnderscore] || 
+               permissions[user.role] || 
+               [];
+    };
+
+    const userPermissions = getPermissions();
 
     // Define mobile navigation items based on permissions
     const navItems = [

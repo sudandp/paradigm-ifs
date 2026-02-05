@@ -67,7 +67,7 @@ const defaultPermissions: Record<UserRole, Permission[]> = {
     'view_my_team', 'view_field_reports', 'view_field_staff_tracking',
     'manage_geo_locations', 'view_my_locations', 'view_profile',
     'download_attendance_report',
-    'view_mobile_nav_home', 'view_mobile_nav_tasks', 'view_mobile_nav_profile'
+    'view_mobile_nav_home', 'view_mobile_nav_profile'
   ],
   site_manager: ['view_site_dashboard', 'create_enrollment', 'view_own_attendance', 'apply_for_leave', 'manage_leave_requests', 'access_support_desk', 'view_profile',
     'view_mobile_nav_home', 'view_mobile_nav_tasks', 'view_mobile_nav_profile'
@@ -130,7 +130,7 @@ export const usePermissionsStore = create(
             
             // If valid permissions found, use them, but always ensure view_profile is there if it's a valid role
             // This is a safety measure to prevent lockout.
-            const basePermissions: Permission[] = ['view_profile', 'view_own_attendance'];
+            const basePermissions: Permission[] = ['view_profile', 'view_own_attendance', 'view_mobile_nav_home', 'view_mobile_nav_profile'];
             const mergedPermissions = [...new Set([...basePermissions, ...validPermissions])];
             const cleanId = role.id.toLowerCase();
             newPermissions[cleanId] = mergedPermissions;
@@ -138,7 +138,7 @@ export const usePermissionsStore = create(
           } else {
             const cleanId = role.id.toLowerCase();
             if (cleanId !== 'unverified' && !newPermissions[cleanId]) {
-              newPermissions[cleanId] = ['view_profile', 'view_own_attendance'];
+              newPermissions[cleanId] = ['view_profile', 'view_own_attendance', 'view_mobile_nav_home', 'view_mobile_nav_profile'];
               hasChanged = true;
             }
           }
