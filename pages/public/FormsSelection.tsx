@@ -68,8 +68,8 @@ const FormsSelection: React.FC = () => {
                                         }`} />
                                     </div>
                                     <div>
-                                        <h3 className={`font-bold text-lg ${isMobile ? '!text-[#041b0f]' : 'text-primary-text'}`}>{form.name}</h3>
-                                        <p className={`text-sm ${isMobile ? '!text-[#041b0f]/80' : 'text-muted'}`}>{form.description}</p>
+                                        <h3 className={`font-bold text-lg ${isMobile ? 'text-white' : 'text-primary-text'}`}>{form.name}</h3>
+                                        <p className={`text-sm ${isMobile ? 'text-white/70' : 'text-muted'}`}>{form.description}</p>
                                     </div>
                                 </div>
                                 <div className={`p-2 rounded-full transition-all transform group-hover:translate-x-1 ${

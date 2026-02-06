@@ -7,8 +7,10 @@ interface BeforeInstallPromptEvent extends Event {
     userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+import { usePWAStore } from '../../store/pwaStore';
+
 const PWAInstallPrompt: React.FC = () => {
-    const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+    const { deferredPrompt, clearDeferredPrompt } = usePWAStore();
     const [showInstallPrompt, setShowInstallPrompt] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
     const [isStandalone, setIsStandalone] = useState(false);
@@ -25,30 +27,18 @@ const PWAInstallPrompt: React.FC = () => {
         const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
         setIsIOS(iOS);
 
-        // Listen for the beforeinstallprompt event
-        const handleBeforeInstallPrompt = (e: Event) => {
-            e.preventDefault();
-            setDeferredPrompt(e as BeforeInstallPromptEvent);
-
-            // Show install prompt after 30 seconds
-            setTimeout(() => {
+        // Set a timer to show the prompt if it's available
+        let timer: NodeJS.Timeout;
+        if (deferredPrompt || (isIOS && !isInStandaloneMode)) {
+            timer = setTimeout(() => {
                 setShowInstallPrompt(true);
-            }, 30000);
-        };
-
-        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-        // Listen for app installed event
-        window.addEventListener('appinstalled', () => {
-            console.log('PWA installed successfully');
-            setShowInstallPrompt(false);
-            setDeferredPrompt(null);
-        });
+            }, 30000); // 30 seconds
+        }
 
         return () => {
-            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+            if (timer) clearTimeout(timer);
         };
-    }, []);
+    }, [deferredPrompt, isIOS, isStandalone]);
 
     const handleInstallClick = async () => {
         if (!deferredPrompt) return;
@@ -60,8 +50,8 @@ const PWAInstallPrompt: React.FC = () => {
         const { outcome } = await deferredPrompt.userChoice;
         console.log(`User ${outcome === 'accepted' ? 'accepted' : 'dismissed'} the install prompt`);
 
-        // Clear the deferred prompt
-        setDeferredPrompt(null);
+        // Clear the deferred prompt from store
+        clearDeferredPrompt();
         setShowInstallPrompt(false);
     };
 

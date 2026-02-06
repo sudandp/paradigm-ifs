@@ -85,7 +85,7 @@ const initialAttendance: AttendanceSettings = {
     lunchBreakDuration: 60,
     maxHolidaysPerCategory: 10,
     adminAllocatedHolidays: 5,
-    employeeHolidays: 5,
+    employeeHolidays: 6,
     enableCustomHolidays: false,
     holidayPool: [...HOLIDAY_SELECTION_POOL],
     weeklyOffDays: [0], // Sunday
@@ -115,7 +115,7 @@ const initialAttendance: AttendanceSettings = {
     enableSiteTimeTracking: true,
     maxHolidaysPerCategory: 10,
     adminAllocatedHolidays: 5,
-    employeeHolidays: 5,
+    employeeHolidays: 6,
     enableCustomHolidays: false,
     holidayPool: [...HOLIDAY_SELECTION_POOL],
   },
@@ -140,7 +140,7 @@ const initialAttendance: AttendanceSettings = {
     },
     maxHolidaysPerCategory: 10,
     adminAllocatedHolidays: 5,
-    employeeHolidays: 5,
+    employeeHolidays: 6,
     enableCustomHolidays: false,
     holidayPool: [...HOLIDAY_SELECTION_POOL],
   }

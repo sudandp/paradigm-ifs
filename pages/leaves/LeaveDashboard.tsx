@@ -320,13 +320,13 @@ const LeaveDashboard: React.FC = () => {
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-bold text-white">Holiday Selection</h3>
-                                    <p className="text-emerald-100/60 text-xs text-left">Pick 5 holidays from the company list</p>
+                                    <p className="text-emerald-100/60 text-xs text-left">Pick 6 holidays from the company list</p>
                                 </div>
                             </div>
                             <div className="flex flex-col items-center gap-3 w-full">
                                 <div className="px-3 py-1 bg-black/40 rounded-full border border-white/10">
-                                    <span className={`text-sm font-bold ${userHolidays.length === 5 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                        {userHolidays.length} / 5 Selected
+                                    <span className={`text-sm font-bold ${userHolidays.length === 6 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                        {userHolidays.length} / 6 Selected
                                     </span>
                                 </div>
                                 <Button onClick={() => navigate('/leaves/holiday-selection')} className="w-full justify-center">
@@ -344,19 +344,19 @@ const LeaveDashboard: React.FC = () => {
                             </div>
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900">Holiday Selection</h3>
-                                <p className="text-gray-500 text-sm">Pick 5 holidays from the company list to complete your allowance.</p>
+                                <p className="text-gray-500 text-sm">Pick 6 holidays from the company list to complete your allowance.</p>
                             </div>
                         </div>
                         
                         <div className="flex items-center gap-6">
                             <div className="flex flex-col items-end mr-2">
-                                <span className={`text-sm font-bold ${userHolidays.length === 5 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                    {userHolidays.length} / 5 Selected
+                                <span className={`text-sm font-bold ${userHolidays.length === 6 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                    {userHolidays.length} / 6 Selected
                                 </span>
                                 <div className="w-32 h-1.5 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
                                     <div 
-                                        className={`h-full transition-all duration-500 ${userHolidays.length === 5 ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                                        style={{ width: `${(userHolidays.length / 5) * 100}%` }}
+                                        className={`h-full transition-all duration-500 ${userHolidays.length === 6 ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                                        style={{ width: `${(userHolidays.length / 6) * 100}%` }}
                                     ></div>
                                 </div>
                             </div>

@@ -308,14 +308,26 @@ function generateFallbackFingerprint(): string {
   return hashString(components.join('|'));
 }
 
+// Cache fingerprints to avoid creating excessive WebGL contexts
+let cachedCanvasFingerprint: string | null = null;
+let cachedWebGLFingerprint: string | null = null;
+
 /**
- * Get canvas fingerprint
+ * Get canvas fingerprint (cached)
  */
 function getCanvasFingerprint(): string {
+  // Return cached value if available
+  if (cachedCanvasFingerprint !== null) {
+    return cachedCanvasFingerprint;
+  }
+
   try {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    if (!ctx) return '';
+    if (!ctx) {
+      cachedCanvasFingerprint = '';
+      return '';
+    }
     
     const text = 'Paradigm Device Fingerprint 🔒';
     ctx.textBaseline = 'top';
@@ -328,29 +340,44 @@ function getCanvasFingerprint(): string {
     ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
     ctx.fillText(text, 4, 17);
     
-    return canvas.toDataURL().substring(0, 50);
+    cachedCanvasFingerprint = canvas.toDataURL().substring(0, 50);
+    return cachedCanvasFingerprint;
   } catch (error) {
+    cachedCanvasFingerprint = '';
     return '';
   }
 }
 
 /**
- * Get WebGL fingerprint
+ * Get WebGL fingerprint (cached)
  */
 function getWebGLFingerprint(): string {
+  // Return cached value if available
+  if (cachedWebGLFingerprint !== null) {
+    return cachedWebGLFingerprint;
+  }
+
   try {
     const canvas = document.createElement('canvas');
     const gl = (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) as WebGLRenderingContext;
-    if (!gl) return '';
+    if (!gl) {
+      cachedWebGLFingerprint = '';
+      return '';
+    }
     
     const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-    if (!debugInfo) return '';
+    if (!debugInfo) {
+      cachedWebGLFingerprint = '';
+      return '';
+    }
     
     const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
     const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
     
-    return `${vendor}|${renderer}`.substring(0, 50);
+    cachedWebGLFingerprint = `${vendor}|${renderer}`.substring(0, 50);
+    return cachedWebGLFingerprint;
   } catch (error) {
+    cachedWebGLFingerprint = '';
     return '';
   }
 }

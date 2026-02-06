@@ -3,219 +3,214 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { api } from '../../services/api';
-import { UserHoliday, AttendanceSettings } from '../../types';
-import { HOLIDAY_SELECTION_POOL } from '../../utils/constants';
+import { FIXED_HOLIDAYS, HOLIDAY_SELECTION_POOL } from '../../utils/constants';
 import Button from '../../components/ui/Button';
+import { Calendar as CalendarIcon, Check, ChevronLeft, Info, Loader2, Save } from 'lucide-react';
 import Toast from '../../components/ui/Toast';
-import { ArrowLeft, AlertTriangle, Check, Calendar } from 'lucide-react';
+import HolidayCalendar from './HolidayCalendar';
+import type { UserHoliday, Holiday, StaffAttendanceRules } from '../../types';
 
 const HolidaySelectionPage: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuthStore();
-    const [userHolidays, setUserHolidays] = useState<UserHoliday[]>([]);
-    const [activeHolidayPool, setActiveHolidayPool] = useState<{ name: string; date: string }[]>([]);
-    const [isSavingHolidays, setIsSavingHolidays] = useState(false);
+    const { attendance } = useSettingsStore();
+    
     const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [userHolidays, setUserHolidays] = useState<UserHoliday[]>([]);
+    const [selectedHolidays, setSelectedHolidays] = useState<{ name: string; date: string }[]>([]);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
     const currentYear = new Date().getFullYear();
+    const userRole = user?.role?.toLowerCase();
+    const category = userRole?.includes('field') ? 'field' : userRole?.includes('site') ? 'site' : 'office';
+    const rules = attendance[category as 'office' | 'field' | 'site'] as StaffAttendanceRules;
+    
+    const holidayPool = rules?.holidayPool || HOLIDAY_SELECTION_POOL;
+    const maxEmployeeHolidays = 6;
 
     useEffect(() => {
-        const fetchData = async () => {
-            if (!user) return;
+        const fetchUserHolidays = async () => {
+            if (!user?.id) return;
             setIsLoading(true);
             try {
-                // Fetch Settings to determine pool
-                const settings = await api.getAttendanceSettings();
-                
-                // Map User Role to Staff Category (office, field, site)
-                let staffCategory: keyof AttendanceSettings = 'field';
-                // Using the updated logic from LeaveDashboard
-                if (['admin', 'hr', 'finance', 'developer', 'management', 'office_staff', 'back_office_staff', 'bd', 'operation_manager', 'field_staff', 'finance_manager', 'hr_ops'].includes(user.role)) {
-                    staffCategory = 'office';
-                } else if (['site_manager', 'site_supervisor'].includes(user.role)) {
-                    staffCategory = 'site';
-                } else {
-                    staffCategory = 'field';
-                }
-
-                const userRules = settings[staffCategory];
-                
-                // Redirect if not enabled
-                if (!userRules.enableCustomHolidays) {
-                     navigate('/leaves/dashboard');
-                     return;
-                }
-
-                setActiveHolidayPool(userRules.holidayPool || HOLIDAY_SELECTION_POOL);
-                
-                const selections = await api.getUserHolidays(user.id);
-                setUserHolidays(selections);
-
+                const holidays = await api.getUserHolidays(user.id);
+                setUserHolidays(holidays);
+                setSelectedHolidays(holidays.map(h => ({ name: h.holidayName, date: h.holidayDate })));
             } catch (error) {
-                console.error("Failed to load holiday data", error);
-                setToast({ message: "Failed to load configuration.", type: 'error' });
+                console.error('Failed to fetch user holidays:', error);
+                setToast({ message: 'Failed to load your holiday selections.', type: 'error' });
             } finally {
                 setIsLoading(false);
             }
         };
-        fetchData();
-    }, [user, navigate]);
 
-    const handleHolidaySelect = (holidayName: string, holidayDate: string) => {
-        const isSelected = userHolidays.some(h => h.holidayName === holidayName);
+        fetchUserHolidays();
+    }, [user?.id]);
+
+    const toggleHoliday = (name: string, date: string) => {
+        const isSelected = selectedHolidays.some(h => h.name === name);
         if (isSelected) {
-            setUserHolidays(userHolidays.filter(h => h.holidayName !== holidayName));
+            setSelectedHolidays(selectedHolidays.filter(h => h.name !== name));
         } else {
-            if (userHolidays.length >= 5) {
-                setToast({ message: 'You can only select up to 5 holidays.', type: 'error' });
+            if (selectedHolidays.length >= maxEmployeeHolidays) {
+                setToast({ message: `You can only select up to ${maxEmployeeHolidays} holidays.`, type: 'error' });
                 return;
             }
-            const newHoliday: UserHoliday = {
-                id: `temp-${Date.now()}`,
-                userId: user!.id,
-                holidayName,
-                holidayDate: `${currentYear}${holidayDate}`,
-                year: currentYear
-            };
-            setUserHolidays([...userHolidays, newHoliday]);
+            setSelectedHolidays([...selectedHolidays, { name, date }]);
         }
     };
 
-    const saveHolidays = async () => {
-        if (userHolidays.length !== 5) {
-            setToast({ message: 'Please select exactly 5 holidays.', type: 'error' });
+    const handleSave = async () => {
+        if (selectedHolidays.length !== maxEmployeeHolidays) {
+            setToast({ message: `Please select exactly ${maxEmployeeHolidays} holidays.`, type: 'error' });
             return;
         }
-        setIsSavingHolidays(true);
+
+        if (!user?.id) return;
+
+        setIsSaving(true);
         try {
-            await api.saveUserHolidays(user!.id, userHolidays);
-            setToast({ message: 'Holidays saved successfully!', type: 'success' });
-            // Navigate back after a short delay to show success
-            setTimeout(() => {
-                navigate('/leaves/dashboard');
-            }, 1000);
+            const holidaysToSave = selectedHolidays.map(h => ({
+                holidayName: h.name,
+                holidayDate: h.date.startsWith('-') ? `${currentYear}${h.date}` : h.date,
+                year: currentYear
+            }));
+            await api.saveUserHolidays(user.id, holidaysToSave);
+            setToast({ message: 'Holiday selection saved successfully!', type: 'success' });
+            setTimeout(() => navigate('/leaves/dashboard'), 1500);
         } catch (error) {
-            setToast({ message: 'Failed to save holidays.', type: 'error' });
-            setIsSavingHolidays(false);
+            console.error('Failed to save holidays:', error);
+            setToast({ message: 'Failed to save holiday selection.', type: 'error' });
+        } finally {
+            setIsSaving(false);
         }
     };
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-[#022c22] flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
+            <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                <Loader2 className="h-8 w-8 animate-spin text-accent mb-4" />
+                <p className="text-muted">Loading holiday pool...</p>
             </div>
         );
     }
 
+    // Prepare holidays for calendar view
+    const adminHolidays: Holiday[] = [
+        ...FIXED_HOLIDAYS.map(fh => ({
+            id: `fixed-${fh.date}`,
+            name: fh.name,
+            date: `${currentYear}-${fh.date}`,
+            type: category as any
+        }))
+    ];
+
+    const calendarUserHolidays = selectedHolidays.map(h => ({
+        id: `user-${h.name}`,
+        holidayName: h.name,
+        holidayDate: `${currentYear}${h.date}`, // Convert -MM-DD to YYYY-MM-DD
+        userId: user?.id || '',
+        year: currentYear
+    }));
+
     return (
-        <div className="min-h-screen bg-[#022c22] text-white p-4 pb-24 md:p-8">
+        <div className="p-4 md:p-6 pb-32">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             
-            <div className="max-w-2xl mx-auto space-y-6">
-                {/* Header Section */}
+            <div className="flex items-center gap-4 mb-8">
+                <Button variant="secondary" size="md" onClick={() => navigate('/leaves/dashboard')} className="p-2 rounded-full h-10 w-10 flex items-center justify-center">
+                    <ChevronLeft className="h-6 w-6" />
+                </Button>
                 <div>
-                    <button 
-                        onClick={() => navigate('/leaves/dashboard')} 
-                        className="mb-6 inline-flex items-center px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all font-medium text-sm border border-emerald-500/20"
-                    >
-                        <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
-                    </button>
-
-                    <div className="flex items-start gap-4">
-                        <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 hidden md:block">
-                             <Calendar className="h-8 w-8 text-emerald-400" />
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-bold text-white mb-2">Select Your Holidays</h1>
-                            <p className="text-emerald-100/60 leading-relaxed">Pick exactly 5 holidays from the list below to complete your annual leave plan.</p>
-                        </div>
-                    </div>
+                    <h1 className="text-2xl font-bold text-primary-text">Holiday Selection</h1>
+                    <p className="text-muted">Pick your optional holidays for {currentYear}</p>
                 </div>
+            </div>
 
-                {/* Progress Card */}
-                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 sticky top-4 z-10 shadow-xl">
-                    <div className="flex items-center gap-3 mb-3">
-                        {userHolidays.length === 5 ? (
-                            <div className="h-8 w-8 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
-                                <Check className="h-5 w-5 text-white" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Selection Section */}
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="bg-card rounded-2xl p-6 shadow-card border border-border">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-lg font-semibold flex items-center gap-2">
+                                <CalendarIcon className="h-5 w-5 text-accent" />
+                                Available Holidays
+                            </h2>
+                            <div className={`px-4 py-1 rounded-full text-sm font-medium ${selectedHolidays.length === maxEmployeeHolidays ? 'bg-emerald-500/10 text-emerald-500' : 'bg-accent/10 text-accent'}`}>
+                                {selectedHolidays.length} / {maxEmployeeHolidays} Selected
                             </div>
-                        ) : (
-                            <div className="h-8 w-8 rounded-full bg-amber-500/20 border border-amber-500/50 flex items-center justify-center shrink-0">
-                                <span className="text-amber-500 font-bold text-sm">{userHolidays.length}</span>
-                            </div>
-                        )}
-                        <p className={`text-sm font-medium ${userHolidays.length === 5 ? 'text-emerald-400' : 'text-emerald-100'}`}>
-                            {userHolidays.length === 5 
-                                ? "You have selected 5 of 5 holidays." 
-                                : `You have selected ${userHolidays.length} of 5 holidays.`}
-                        </p>
-                    </div>
-                    {/* Progress Bar */}
-                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                        <div 
-                            className={`h-full transition-all duration-500 ease-out ${userHolidays.length === 5 ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]' : 'bg-amber-400'}`}
-                            style={{ width: `${(userHolidays.length / 5) * 100}%` }}
-                        />
-                    </div>
-                </div>
+                        </div>
 
-                {/* Scrollable Holiday List */}
-                <div className="space-y-3">
-                    {activeHolidayPool.map((h, i) => {
-                        const isSelected = userHolidays.some(uh => uh.holidayName === h.name);
-                        return (
-                            <button
-                                key={i}
-                                onClick={() => handleHolidaySelect(h.name, h.date)}
-                                className={`w-full relative overflow-hidden group flex items-center justify-between p-4 md:p-5 rounded-xl border transition-all duration-300 text-left
-                                    ${isSelected 
-                                        ? 'bg-emerald-600 border-emerald-500 shadow-lg shadow-emerald-900/20 translate-x-1' 
-                                        : 'bg-[#06392c] border-emerald-500/10 hover:border-emerald-500/30 hover:bg-[#0a4536]'
-                                    }
-                                `}
+                        <div className="grid grid-cols-1 gap-3">
+                            {holidayPool.map((holiday, index) => {
+                                const isSelected = selectedHolidays.some(h => h.name === holiday.name);
+                                const dateObj = new Date(`${currentYear}${holiday.date}`);
+                                const formattedDate = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', weekday: 'short' });
+
+                                return (
+                                    <button
+                                        key={index}
+                                        onClick={() => toggleHoliday(holiday.name, holiday.date)}
+                                        className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 text-left ${
+                                            isSelected 
+                                            ? 'bg-accent/10 border-accent shadow-sm' 
+                                            : 'bg-transparent border-border hover:border-accent/50 hover:bg-white/5'
+                                        }`}
+                                    >
+                                        <div>
+                                            <p className="text-xl font-semibold text-white">{holiday.name}</p>
+                                            <p className="text-base font-bold text-white/70 mt-1">{formattedDate}</p>
+                                        </div>
+                                        <div className={`h-6 w-6 rounded-full flex items-center justify-center border transition-colors ${
+                                            isSelected 
+                                            ? 'bg-accent border-accent text-white' 
+                                            : 'border-border bg-card'
+                                        }`}>
+                                            {isSelected && <Check className="h-4 w-4" />}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4 pt-6 border-t border-border">
+                            <p className="text-sm text-muted flex items-center gap-2">
+                                <Info className="h-4 w-4" />
+                                Please select exactly {maxEmployeeHolidays} holidays from the pool.
+                            </p>
+                            <Button 
+                                onClick={handleSave} 
+                                isLoading={isSaving} 
+                                disabled={selectedHolidays.length !== maxEmployeeHolidays}
+                                className="w-full md:w-auto px-12 py-3 shadow-lg shadow-accent/20"
                             >
-                                {/* Background glow effect for selected item */}
-                                {isSelected && <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-transparent pointer-events-none" />}
-                                
-                                <div className="relative z-10">
-                                    <p className={`font-bold text-base md:text-lg mb-1 transition-colors ${isSelected ? 'text-white' : 'text-emerald-50 group-hover:text-white'}`}>
-                                        {h.name}
-                                    </p>
-                                    <p className={`text-xs md:text-sm transition-colors ${isSelected ? 'text-emerald-100' : 'text-emerald-400/60'}`}>
-                                        {new Date(`${currentYear}${h.date}`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                    </p>
-                                </div>
-                                <div className={`
-                                    w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ml-4
-                                    ${isSelected 
-                                        ? 'bg-white border-white scale-110' 
-                                        : 'bg-transparent border-emerald-500/30 group-hover:border-emerald-500/60'
-                                    }
-                                `}>
-                                    {isSelected && <Check className="h-4 w-4 text-emerald-600 stroke-[3]" />}
-                                </div>
-                            </button>
-                        );
-                    })}
+                                <Save className="mr-2 h-5 w-5" />
+                                Save Selection
+                            </Button>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Floating Bottom Action Bar */}
-                <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#022c22] via-[#022c22] to-transparent z-20">
-                    <div className="max-w-2xl mx-auto">
-                        <Button 
-                            onClick={saveHolidays} 
-                            isLoading={isSavingHolidays}
-                            disabled={userHolidays.length !== 5}
-                            className={`w-full py-4 text-lg font-bold shadow-xl transition-all duration-300 rounded-xl
-                                ${userHolidays.length === 5 
-                                    ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-900/50 hover:shadow-emerald-900/70 hover:-translate-y-1' 
-                                    : 'bg-gray-800 text-gray-400 cursor-not-allowed border border-gray-700'
-                                }
-                            `}
-                        >
-                            {userHolidays.length === 5 ? 'Confirm Selection' : `${5 - userHolidays.length} more to select`}
-                        </Button>
+                {/* Preview Section */}
+                <div className="space-y-6">
+                    <div className="sticky top-6">
+                        <h3 className="text-lg font-semibold mb-4 px-1">Calendar Preview</h3>
+                        <HolidayCalendar 
+                            adminHolidays={adminHolidays}
+                            userSelectedHolidays={calendarUserHolidays}
+                        />
+                        <div className="mt-6 p-4 bg-accent/5 border border-accent/10 rounded-xl space-y-3">
+                            <h4 className="text-sm font-semibold text-accent-dark">Legend</h4>
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="h-3 w-3 rounded-full bg-red-500"></div>
+                                <span className="text-muted">Company Holiday</span>
+                            </div>
+                            <div className={`flex items-center gap-3 text-sm transition-opacity ${selectedHolidays.length > 0 ? 'opacity-100' : 'opacity-50'}`}>
+                                <div className="h-3 w-3 rounded-full bg-emerald-500"></div>
+                                <span className="text-muted">Your Selection</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

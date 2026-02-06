@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { useSecurityCheck } from '../hooks/useSecurityCheck';
 import SecurityWarningModal from '../components/ui/SecurityWarningModal';
@@ -27,6 +27,9 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
     const [deviceMessage, setDeviceMessage] = useState('');
     const [limits, setLimits] = useState<{ web: number; android: number; ios: number }>({ web: 1, android: 1, ios: 1 });
 
+    // Track which user.id we've already checked to prevent re-running on profile updates
+    const lastCheckedUserId = useRef<string | null>(null);
+
     // Check if current user is exempt from security checks (admin/developer)
     // NOTE: We might want admins to also be subject to device limits, but for now keeping consistency
     // with existing security check pattern. However, device registration is beneficial for tracking.
@@ -47,10 +50,15 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
         }
     }, [user, securityCheck, securityAlertSent, isExemptFromSecurityChecks]);
 
-    // Perform Device Validation
+    // Perform Device Validation (memoized to avoid redundant calls)
     useEffect(() => {
         const checkDevice = async () => {
             if (!user) return;
+
+            // Skip if we've already checked this user
+            if (lastCheckedUserId.current === user.id) {
+                return;
+            }
 
             try {
                 // Get current device details and limits
@@ -74,6 +82,8 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
 
                 if (result.success) {
                     setDeviceStatus('authorized');
+                    // Mark this user as checked
+                    lastCheckedUserId.current = user.id;
                 } else {
                     // Registration failed or pending approval
                     if (result.requiresApproval) {
@@ -111,11 +121,12 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
                 // On error, we might want to fail open or closed?
                 // Fail open for now to avoid locking out due to network glitch
                 setDeviceStatus('authorized'); 
+                lastCheckedUserId.current = user.id;
             }
         };
 
         checkDevice();
-    }, [user]); // Run when user changes (login)
+    }, [user?.id]); // Only depend on user.id, not full user object
 
     // 1. Check basic security (Dev mode / Location spoofing)
     if (user && !isExemptFromSecurityChecks && !securityCheck.isSecure) {

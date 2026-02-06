@@ -91,26 +91,33 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests =
             }
         };
 
-        // Also refresh settings to ensure we have the latest holiday rules
+        // Only refresh settings if they're not already loaded (avoid redundant fetches)
         const fetchSettings = async () => {
             try {
-                console.log("Fetching attendance settings...");
-                const settings = await api.getAttendanceSettings();
-                console.log("Fetched settings:", settings);
-                useSettingsStore.getState().updateAttendanceSettings(settings);
+                // Check if we already have attendance settings loaded
+                const currentAttendance = useSettingsStore.getState().attendance;
+                if (!currentAttendance || Object.keys(currentAttendance).length === 0) {
+                    console.log("Fetching attendance settings...");
+                    const settings = await api.getAttendanceSettings();
+                    console.log("Fetched settings:", settings);
+                    useSettingsStore.getState().updateAttendanceSettings(settings);
+                }
             } catch (error) {
                 console.error("Failed to fetch attendance settings", error);
             }
         };
 
-        // Fetch recurring holidays from the database
+        // Fetch recurring holidays only if not already loaded
         const fetchRecurringHolidays = async () => {
             try {
-                console.log("Fetching recurring holidays...");
-                const holidays = await api.getRecurringHolidays();
-                console.log("Fetched recurring holidays:", holidays);
-                // Update the store directly
-                useSettingsStore.setState({ recurringHolidays: holidays });
+                const currentRecurring = useSettingsStore.getState().recurringHolidays;
+                if (!currentRecurring || currentRecurring.length === 0) {
+                    console.log("Fetching recurring holidays...");
+                    const holidays = await api.getRecurringHolidays();
+                    console.log("Fetched recurring holidays:", holidays);
+                    // Update the store directly
+                    useSettingsStore.setState({ recurringHolidays: holidays });
+                }
             } catch (error) {
                 console.error("Failed to fetch recurring holidays", error);
             }
