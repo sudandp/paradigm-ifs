@@ -48,6 +48,13 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // BYPASS: Never handle Auth callback URLs (Supabase/Google redirects)
+  // These URLs contain unique temporary codes and should always hit the network/Vite dev server
+  if (url.search.includes('code=') || url.search.includes('error=')) {
+    console.log('[SW] Bypassing Auth redirect:', url.pathname);
+    return; // Let the browser handle this request directly
+  }
+
   // Network-first for HTML, JS, CSS (always get fresh version)
   if (
     request.method === 'GET' && 
@@ -68,7 +75,11 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           // If network fails, try cache as fallback
-          return caches.match(request);
+          return caches.match(request).then((cachedResponse) => {
+            if (cachedResponse) return cachedResponse;
+            // If neither network nor cache works, throw so browser handled error page shows
+            throw new Error('Network and cache failed');
+          });
         })
     );
     return;
@@ -104,5 +115,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) {
     return; // Bypass service worker for cross-origin requests (Supabase, etc.)
   }
-  event.respondWith(fetch(request));
+  
+  // Default: let it fall through or respond with fetch
+  // event.respondWith(fetch(request)); // This can sometimes cause "already responded" errors, safer to just return and let browser handle if not in event.respondWith
 });

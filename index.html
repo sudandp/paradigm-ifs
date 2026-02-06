@@ -124,7 +124,25 @@
     <div id="modal-root"></div>
     <script type="module" src="/index.tsx"></script>
     <script>
+      // Service worker recovery logic: Unregister existing workers if they are in a broken state
       if ("serviceWorker" in navigator) {
+        const FIX_KEY = "pifs_sw_fix_v1";
+        if (!localStorage.getItem(FIX_KEY)) {
+          navigator.serviceWorker.getRegistrations().then(
+            (registrations) => {
+              for (let registration of registrations) {
+                registration.unregister();
+                console.log(
+                  "Unregistered legacy service worker for fix update.",
+                );
+              }
+              localStorage.setItem(FIX_KEY, "true");
+              // Reload to ensure clean registration
+              window.location.reload();
+            },
+          );
+        }
+
         window.addEventListener("load", () => {
           navigator.serviceWorker.register("/sw.js")
             .then((reg) =>
