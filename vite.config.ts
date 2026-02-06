@@ -61,6 +61,7 @@ export default defineConfig({
     // directories can trigger an unnecessary full reload.  Ignoring these patterns
     // prevents unwanted reloads when you download PDFs or other files during
     // development.
+    host: true,
     watch: {
       ignored: [
         '**/node_modules/**',

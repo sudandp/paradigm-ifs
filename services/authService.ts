@@ -85,19 +85,26 @@ const approveUser = async (userId: string, newRole: string) => {
 };
 
 const signInWithGoogle = async () => {
-    const redirectUrl = window.location.origin;
-    console.log("Initiating Google Sign-In with redirect URL:", redirectUrl);
+    // Determine the redirect URL.  In a production environment (such as a deployed
+    // web app or a Capacitor app using a custom scheme), this should match the
+    // configured authorized redirect URI in the Supabase/Google console.
+    // For local development, we use window.location.origin.
+    const origin = window.location.origin;
+    const redirectUrl = origin.endsWith('/') ? origin : `${origin}/`;
+    
+    console.log("Initiating Google Sign-In...");
+    console.log("Current Origin:", origin);
+    console.log("Target Redirect URL:", redirectUrl);
 
     // Warning for mobile/remote testing
     if (redirectUrl.includes('localhost') || redirectUrl.includes('127.0.0.1')) {
         if (window.location.protocol === 'https:') {
-             console.log("Environment: Production Capacitor App (or local https). Redirect URL is: " + redirectUrl);
-             console.warn("IMPORTANT: Ensure '" + redirectUrl + "' is added to your Supabase Redirect URLs for Google Sign-In to work in the installed app.");
+             console.log("Environment: Production/Secure Local. Redirect URL is: " + redirectUrl);
+             console.warn("IMPORTANT: Ensure '" + redirectUrl + "' is added to your Supabase Redirect URLs.");
         } else {
              console.warn(
-                "WARNING: You are using 'localhost' as the redirect URL. " +
-                "This will fail on mobile devices unless you are using a specific development setup (like IP-based access or Deep Links). " +
-                "If you are testing on a mobile browser, access the app via your LAN IP (e.g., http://192.168.x.x:5173) and add that to Supabase Redirect URLs."
+                "WARNING: You are using 'localhost' or '127.0.0.1' as the redirect URL. " +
+                "This may fail if there is a mismatch between the host used to access the app and the one whitelisted in Supabase."
             );
         }
     }
@@ -106,6 +113,9 @@ const signInWithGoogle = async () => {
         provider: 'google',
         options: {
             redirectTo: redirectUrl,
+            queryParams: {
+                prompt: 'select_account',
+            },
         }
     });
 };
