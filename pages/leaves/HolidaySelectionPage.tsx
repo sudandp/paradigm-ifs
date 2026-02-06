@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { api } from '../../services/api';
 import { FIXED_HOLIDAYS, HOLIDAY_SELECTION_POOL } from '../../utils/constants';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import Button from '../../components/ui/Button';
 import { Calendar as CalendarIcon, Check, ChevronLeft, Info, Loader2, Save } from 'lucide-react';
 import Toast from '../../components/ui/Toast';
@@ -14,6 +15,7 @@ const HolidaySelectionPage: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuthStore();
     const { attendance } = useSettingsStore();
+    const isMobile = useMediaQuery('(max-width: 768px)');
     
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -159,8 +161,8 @@ const HolidaySelectionPage: React.FC = () => {
                                         }`}
                                     >
                                         <div>
-                                            <p className="text-xl font-semibold text-white">{holiday.name}</p>
-                                            <p className="text-base font-bold text-white/70 mt-1">{formattedDate}</p>
+                                            <p className={`text-xl font-semibold ${isMobile ? 'text-white' : 'text-primary-text'}`}>{holiday.name}</p>
+                                            <p className={`text-base font-bold ${isMobile ? 'text-white/70' : 'text-muted'} mt-1`}>{formattedDate}</p>
                                         </div>
                                         <div className={`h-6 w-6 rounded-full flex items-center justify-center border transition-colors ${
                                             isSelected 
