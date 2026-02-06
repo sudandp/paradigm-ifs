@@ -106,83 +106,118 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
 
   return (
     <div className="device-warning-overlay">
-      <div className="device-warning-dialog">
-        <div className="device-warning-icon">
-          <AlertTriangle size={64} color="#f59e0b" />
+      <div className="device-warning-bg-blobs">
+        <div className="blob blob-1"></div>
+        <div className="blob blob-2"></div>
+        <div className="blob blob-3"></div>
+      </div>
+      
+      <div className="device-warning-card animate-fade-in-scale">
+        <div className="device-warning-header">
+          <div className={`device-warning-icon-wrapper status-${status}`}>
+            <AlertTriangle size={32} />
+          </div>
+          <h1 className="device-warning-title">{message.title}</h1>
         </div>
         
-        <h1 className="device-warning-title">{message.title}</h1>
-        
-        <div className="device-warning-device-info">
-          <p className="device-warning-device-name" title={deviceName}>
-            {deviceName.length > 50 ? `${deviceName.substring(0, 47)}...` : deviceName}
-          </p>
-          <p className="device-warning-device-type">
-            {deviceType.charAt(0).toUpperCase() + deviceType.slice(1)} Device
-          </p>
-        </div>
-        
-        <p className="device-warning-description">{message.description}</p>
-        
-        <div className="device-warning-info-box">
-          <h3>Your Active {deviceType.charAt(0).toUpperCase() + deviceType.slice(1)} Devices</h3>
-          {loadingDevices ? (
-            <p className="text-sm text-gray-500 py-2 text-center">Loading devices...</p>
-          ) : existingDevices.filter(d => d.deviceType === deviceType).length > 0 ? (
-            <div className="device-list-mini">
-              {existingDevices.filter(d => d.deviceType === deviceType).map(device => (
-                <div key={device.id} className="device-item-mini">
-                  <div className="device-item-info">
-                    <span className="device-item-name" title={device.deviceName}>
-                      {device.deviceName.length > 30 ? `${device.deviceName.substring(0, 27)}...` : device.deviceName}
-                    </span>
-                  </div>
-                  <button 
-                    onClick={() => handleRemoveDevice(device.id)}
-                    className="device-remove-btn"
-                    title="Remove Device"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
+        <div className="device-warning-content">
+          <div className="device-info-hero">
+            <div className="device-type-icon">
+              {deviceType === 'web' ? <Monitor size={24} /> : <Smartphone size={24} />}
             </div>
-          ) : (
-            <p className="text-sm text-gray-500 py-2 text-center">No other active {deviceType} devices found.</p>
-          )}
+            <div className="device-info-text">
+              <span className="device-label">Current Device</span>
+              <p className="device-name" title={deviceName}>
+                {deviceName.length > 40 ? `${deviceName.substring(0, 37)}...` : deviceName}
+              </p>
+              <span className="device-type-tag">
+                {deviceType.charAt(0).toUpperCase() + deviceType.slice(1)} Session
+              </span>
+            </div>
+          </div>
           
-          <div className="device-policy-summary">
-            <span>Limit: <strong>{limits[deviceType as keyof typeof limits]} {deviceType}</strong> device{(limits[deviceType as keyof typeof limits] || 1) > 1 ? 's' : ''}</span>
+          <p className="device-warning-description">{message.description}</p>
+          
+          <div className="device-active-section">
+            <div className="section-header">
+              <h3>Active {deviceType.charAt(0).toUpperCase() + deviceType.slice(1)} Devices</h3>
+              <span className="limit-indicator">
+                {existingDevices.filter(d => d.deviceType === deviceType).length} / {limits[deviceType as keyof typeof limits]}
+              </span>
+            </div>
+            
+            {loadingDevices ? (
+              <div className="loading-state">
+                <div className="spinner-small" />
+                <span>Syncing devices...</span>
+              </div>
+            ) : existingDevices.filter(d => d.deviceType === deviceType).length > 0 ? (
+              <div className="device-grid-mini">
+                {existingDevices.filter(d => d.deviceType === deviceType).map(device => (
+                  <div key={device.id} className="device-card-mini">
+                    <div className="device-card-header">
+                      <div className="device-card-icon">
+                        {deviceType === 'web' ? <Monitor size={20} /> : <Smartphone size={20} />}
+                      </div>
+                      <div className="device-card-info">
+                        <span className="device-card-name" title={device.deviceName}>
+                          {device.deviceName.length > 30 ? `${device.deviceName.substring(0, 27)}...` : device.deviceName}
+                        </span>
+                        <div className="device-card-meta">
+                          <span className="device-meta-tag status-active">Active</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="device-card-actions">
+                      <button 
+                        onClick={() => handleRemoveDevice(device.id)}
+                        className="device-action-btn delete"
+                        title="Remove Device"
+                      >
+                        <Trash2 size={14} />
+                        <span>Remove</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+
+            ) : (
+              <div className="empty-state-mini">
+                <p>No other active {deviceType} devices.</p>
+              </div>
+            )}
           </div>
         </div>
         
-        <div className="device-warning-actions">
+        <div className="device-warning-footer">
           {message.showRequestButton && (
             <button
-              className="device-warning-button device-warning-button-primary"
+              className="action-button-primary"
               onClick={onRequestAccess}
               disabled={isRequestingAccess}
             >
               {isRequestingAccess ? (
                 <>
                   <div className="spinner-small" />
-                  Sending Request...
+                  <span>Requesting...</span>
                 </>
               ) : (
                 <>
-                  <Send size={20} />
-                  {message.actionText}
+                  <Send size={18} />
+                  <span>{message.actionText}</span>
                 </>
               )}
             </button>
           )}
           
           <button
-            className="device-warning-button device-warning-button-secondary"
+            className="action-button-secondary"
             onClick={onLogout}
           >
-            <LogOut size={20} />
-            Logout
+            <LogOut size={18} />
+            <span>Logout</span>
           </button>
         </div>
       </div>
