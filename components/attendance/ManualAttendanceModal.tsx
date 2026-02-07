@@ -213,7 +213,7 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
                         <div className="grid grid-cols-2 gap-4 bg-blue-50/50 p-4 rounded-lg border border-blue-100">
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold text-gray-700 flex items-center">
-                                    <Clock className="w-3.5 h-3.5 mr-1.5 text-green-600" /> Check In <span className="text-red-500">*</span>
+                                    <Clock className="w-3.5 h-3.5 mr-1.5 text-green-600" /> Punch In <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="time"
@@ -226,7 +226,7 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
 
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold text-gray-700 flex items-center">
-                                    <Clock className="w-3.5 h-3.5 mr-1.5 text-red-600" /> Check Out <span className="text-red-500">*</span>
+                                    <Clock className="w-3.5 h-3.5 mr-1.5 text-red-600" /> Punch Out <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="time"

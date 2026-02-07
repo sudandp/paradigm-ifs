@@ -201,7 +201,7 @@ const TeamActivity: React.FC = () => {
                             ) : member.isPresent ? (
                                 <>
                                     <CheckCircle2 className="h-3 w-3 text-yellow-500" />
-                                    <span className="text-yellow-500">Checked Out</span>
+                                    <span className="text-yellow-500">Punched Out</span>
                                 </>
                             ) : (
                                 <>
@@ -276,7 +276,7 @@ const TeamActivity: React.FC = () => {
                 <div className="bg-accent/5 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-2">
                         <LogIn className="h-4 w-4 text-accent" />
-                        <span className="text-xs font-medium text-muted">Last Check In</span>
+                        <span className="text-xs font-medium text-muted">Last Punch In</span>
                     </div>
                     <p className="text-sm font-bold text-primary-text">
                         {member.lastCheckIn
@@ -293,7 +293,7 @@ const TeamActivity: React.FC = () => {
                 <div className="bg-accent/5 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-2">
                         <LogOut className="h-4 w-4 text-accent" />
-                        <span className="text-xs font-medium text-muted">Last Check Out</span>
+                        <span className="text-xs font-medium text-muted">Last Punch Out</span>
                     </div>
                     <p className="text-sm font-bold text-primary-text">
                         {member.lastCheckOut
@@ -326,7 +326,7 @@ const TeamActivity: React.FC = () => {
                             member.isPresent ? 'text-yellow-500' : 'text-red-500'
                         }`}>
                         {member.isCurrentlyWorking ? 'Working' :
-                            member.isPresent ? 'Checked Out' : 'Absent'}
+                            member.isPresent ? 'Punched Out' : 'Absent'}
                     </p>
                 </div>
             </div>
@@ -421,7 +421,7 @@ const TeamActivity: React.FC = () => {
                         <span className="text-xs font-medium text-muted">Present</span>
                     </div>
                     <p className="text-2xl font-bold text-yellow-500">
-                        {teamMembers.filter(m => m.isPresent).length}
+                        {teamMembers.filter(m => m.isPresent && !m.isCurrentlyWorking).length}
                     </p>
                 </div>
 

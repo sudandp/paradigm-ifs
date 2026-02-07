@@ -529,7 +529,7 @@ const BasicReportPdfLayout: React.FC<{ data: BasicReportDataRow[]; dateRange: Ra
                                                 fontWeight: 'bold',
                                             }}
                                         >
-                                            Check In
+                                            Punch In
                                         </th>
                                         <th
                                             style={{
@@ -541,7 +541,7 @@ const BasicReportPdfLayout: React.FC<{ data: BasicReportDataRow[]; dateRange: Ra
                                                 fontWeight: 'bold',
                                             }}
                                         >
-                                            Check Out
+                                            Punch Out
                                         </th>
                                         <th
                                             style={{
@@ -1832,8 +1832,8 @@ const AttendanceDashboard: React.FC = () => {
                         { header: 'Employee Name', key: 'userName', width: 25 },
                         { header: 'Date', key: 'date', width: 15 },
                         { header: 'Status', key: 'status', width: 15 },
-                        { header: 'Check In', key: 'checkIn', width: 15 },
-                        { header: 'Check Out', key: 'checkOut', width: 15 },
+                        { header: 'Punch In', key: 'checkIn', width: 15 },
+                        { header: 'Punch Out', key: 'checkOut', width: 15 },
                         { header: 'Hours', key: 'duration', width: 15 }
                     ];
                     dataToExport = basicReportData;
@@ -2234,9 +2234,9 @@ const AttendanceDashboard: React.FC = () => {
                             onChange={(e) => setSelectedRecordType(e.target.value)}
                         >
                             <option value="all">All Records</option>
-                            <option value="complete">Complete (Check-in & Check-out)</option>
-                            <option value="missing_checkout">Missing Check-out</option>
-                            <option value="missing_checkin">Missing Check-in</option>
+                            <option value="complete">Complete (Punch-in & Punch-out)</option>
+                            <option value="missing_checkout">Missing Punch-out</option>
+                            <option value="missing_checkin">Missing Punch-in</option>
                             <option value="incomplete">Incomplete (Any Missing)</option>
                         </select>
                     </div>

@@ -10,7 +10,7 @@ import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { api } from '../../services/api';
-import { User as UserIcon, Loader2, ClipboardList, LogOut, LogIn, Crosshair, CheckCircle } from 'lucide-react';
+import { User as UserIcon, Loader2, ClipboardList, LogOut, LogIn, Crosshair, CheckCircle, Info } from 'lucide-react';
 import { AvatarUpload } from '../../components/onboarding/AvatarUpload';
 import { format } from 'date-fns';
 import Modal from '../../components/ui/Modal';
@@ -57,9 +57,6 @@ const ProfilePage: React.FC = () => {
 
     const isMobile = useMediaQuery('(max-width: 767px)');
     const isMobileView = isMobile; // Apply mobile view for all users on mobile
-    // const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false); // Removed modal state
-    // const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false); // Removed modal state
-    // const [confirmationAction, setConfirmationAction] = useState<'check-in' | 'check-out' | null>(null); // Removed modal state
 
     useEffect(() => {
         const checkPermissions = async () => {
@@ -200,17 +197,11 @@ const ProfilePage: React.FC = () => {
         setIsSubmittingAttendance(false);
     };
 
-    // handleSlideConfirm, handleConfirmAction, handleCancelAction removed - now using navigation
-
-    const isActionInProgress = isSubmittingAttendance; // removed isConfirmationModalOpen
+    const isActionInProgress = isSubmittingAttendance;
 
     const handleLogoutClick = () => {
-        // Use window.location for a more reliable navigation on mobile
-        // This ensures the logout page is accessed even when navigate() might have issues
         window.location.hash = '#/auth/logout';
     };
-
-    // handleConfirmLogout removed as it's now handled in LogoutPage.tsx
 
     const formatTime = (isoString: string | null) => {
         if (!isoString) return '--:--';
@@ -231,8 +222,6 @@ const ProfilePage: React.FC = () => {
         return (
             <div className="p-4 space-y-8 md:bg-transparent bg-[#041b0f]">
                 {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
-                {/* Logout Modal removed */}
-                {/* Attendance Confirmation Modal removed */}
 
                 <div className="flex flex-col items-center text-center gap-4">
                     <AvatarUpload file={avatarFile} onFileChange={handlePhotoChange} />
@@ -288,7 +277,6 @@ const ProfilePage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Break Duration Display */}
                                 {/* Stats Grid: Break & Work */}
                                 <div className="grid grid-cols-2 gap-3 mb-6 relative z-10">
                                     <div className="px-4 py-4 bg-blue-500/5 rounded-xl border border-blue-500/10 flex flex-col items-center justify-center gap-2">
@@ -332,7 +320,7 @@ const ProfilePage: React.FC = () => {
                                                 `}
                                             >
                                                 <LogIn className={`h-5 w-5 ${!isCheckedIn && 'animate-pulse'}`} />
-                                                <span className="font-bold text-xs uppercase tracking-wider">Check In</span>
+                                                <span className="font-bold text-xs uppercase tracking-wider">Punch In</span>
                                             </button>
 
                                             <button
@@ -347,7 +335,7 @@ const ProfilePage: React.FC = () => {
                                                 `}
                                             >
                                                 <LogOut className="h-5 w-5" />
-                                                <span className="font-bold text-xs uppercase tracking-wider">Check Out</span>
+                                                <span className="font-bold text-xs uppercase tracking-wider">Punch Out</span>
                                             </button>
                                         </div>
                                         
@@ -481,8 +469,6 @@ const ProfilePage: React.FC = () => {
     return (
         <div className="w-full space-y-8">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
-            {/* Logout Modal removed */}
-            {/* Attendance Confirmation Modal removed */}
 
             <div className="relative overflow-hidden md:bg-white md:p-6 md:rounded-2xl md:shadow-lg flex flex-col md:flex-row items-center gap-6 border border-gray-100">
                 <div className="absolute top-0 left-0 w-full h-32 bg-[#006b3f] border-b-4 border-[#005632] shadow-lg"></div>
@@ -535,13 +521,13 @@ const ProfilePage: React.FC = () => {
                                 <div className="grid grid-cols-2 gap-5">
                                     <div className="text-center bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
                                         <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <LogIn className="h-3 w-3 text-emerald-600" /> First Check In
+                                            <LogIn className="h-3 w-3 text-emerald-600" /> First Punch In
                                         </p>
                                         <p className="text-2xl font-bold text-gray-900 font-mono">{formatTime(lastCheckInTime)}</p>
                                     </div>
                                     <div className="text-center bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
                                         <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <LogOut className="h-3 w-3 text-rose-600" /> Last Check Out
+                                            <LogOut className="h-3 w-3 text-rose-600" /> Last Punch Out
                                         </p>
                                         <p className="text-2xl font-bold text-gray-900 font-mono">{formatTime(lastCheckOutTime)}</p>
                                     </div>
@@ -563,6 +549,10 @@ const ProfilePage: React.FC = () => {
                                     <div className="flex items-center justify-center h-[56px] bg-gray-50 rounded-xl"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
                                 ) : (
                                     <div className="space-y-3">
+                                        <div className="flex items-center gap-2 mb-1 px-1">
+                                            <Info className="h-3.5 w-3.5 text-emerald-600" />
+                                            <span className="text-xs italic text-emerald-700 font-medium">Punch in is required when starting the day, and Punch out when the day ends</span>
+                                        </div>
                                         <div className="flex gap-4">
                                             <Button
                                                 onClick={() => navigate('/attendance/check-in')}
@@ -570,7 +560,7 @@ const ProfilePage: React.FC = () => {
                                                 className="flex-1 text-sm shadow-emerald-100 hover:shadow-emerald-200 transition-all font-bold uppercase tracking-wider"
                                                 disabled={isCheckedIn || isActionInProgress}
                                             >
-                                                <LogIn className="mr-2 h-4 w-4" /> Check In
+                                                <LogIn className="mr-2 h-4 w-4" /> Punch In
                                             </Button>
                                             <Button
                                                 onClick={() => navigate('/attendance/check-out')}
@@ -578,8 +568,12 @@ const ProfilePage: React.FC = () => {
                                                 className="flex-1 text-sm shadow-red-100 hover:shadow-red-200 transition-all font-bold uppercase tracking-wider"
                                                 disabled={!isCheckedIn || isOnBreak || isActionInProgress}
                                             >
-                                                <LogOut className="mr-2 h-4 w-4" /> Check Out
+                                                <LogOut className="mr-2 h-4 w-4" /> Punch Out
                                             </Button>
+                                        </div>
+                                        <div className="flex items-center gap-2 mb-1 px-1">
+                                            <Info className="h-3.5 w-3.5 text-blue-600" />
+                                            <span className="text-xs italic text-blue-700 font-medium">Break in when user goes for lunch is mandatory, or it will be a violation</span>
                                         </div>
                                         <div className="flex gap-4">
                                             <Button

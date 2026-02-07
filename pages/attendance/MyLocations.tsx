@@ -326,7 +326,7 @@ const MyLocations: React.FC = () => {
           <MapPin className="h-6 w-6 mr-2" /> My Locations
         </h2>
         <p className="text-muted mb-6">
-          These are the geofenced locations assigned to you. You may check in/out only when
+          These are the geofenced locations assigned to you. You may punch in/out only when
           within one of these locations. {canManageLocations ? 'Use the form below to add a new location.' : 'You can edit location names by clicking the edit button.'}
         </p>
 

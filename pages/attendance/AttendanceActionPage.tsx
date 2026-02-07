@@ -29,9 +29,9 @@ const AttendanceActionPage: React.FC = () => {
     // Determine action from URL
     const isCheckIn = location.pathname.includes('check-in');
     const isBreakIn = location.pathname.includes('break-in');
-    const isBreakOut = location.pathname.includes('break-out');
+    const isBreakOut = location.pathname.includes('break-out'); // Kept original as 'type' is not defined in this context
     
-    let action = isCheckIn ? 'Check In' : 'Check Out';
+    let action = isCheckIn ? 'Punch In' : 'Punch Out';
     if (isBreakIn) action = 'Break In';
     if (isBreakOut) action = 'Break Out';
 

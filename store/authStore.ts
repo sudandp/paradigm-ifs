@@ -55,8 +55,8 @@ const getFriendlyAuthError = (errorMessage: string): string => {
 
 const getActionTextForType = (type: string): string => {
     switch (type) {
-        case 'check-in': return 'checked in';
-        case 'check-out': return 'checked out';
+        case 'check-in': return 'punched in';
+        case 'check-out': return 'punched out';
         case 'break-in': return 'started a break';
         case 'break-out': return 'ended their break';
         default: return 'updated attendance';
@@ -448,7 +448,7 @@ export const useAuthStore = create<AuthState>()(
                         api.processFieldAttendance(user.id, today).catch(e => console.error('Violation check failed:', e));
                     }
 
-                    return { success: true, message: `Successfully ${newType.replace('-', ' ')}!` };
+                    return { success: true, message: `Successfully ${newType === 'check-in' ? 'punch in' : newType === 'check-out' ? 'punch out' : newType.replace('-', ' ')}!` };
                 };
 
                 // If still no valid position, record an attendance event with specific failure reason
@@ -517,7 +517,7 @@ export const useAuthStore = create<AuthState>()(
                             'violation',
                             {
                                 actorName: user.name || 'An employee',
-                                actionText: newType === 'check-in' ? 'checked in' : 'checked out',
+                                actionText: newType === 'check-in' ? 'punched in' : 'punched out',
                                 locString: ` outside their assigned geofence at ${locationName}`,
                                 title: '📍 Geofencing Violation',
                                 link: '/hr/field-staff-tracking',
@@ -535,7 +535,7 @@ export const useAuthStore = create<AuthState>()(
                         try {
                             locationName = await reverseGeocode(latitude, longitude);
                         } catch (err) {
-                            locationName = 'Mobile Check-in';
+                            locationName = 'Mobile Punch-in';
                         }
                     }
                 } catch (geoErr) {
@@ -547,7 +547,7 @@ export const useAuthStore = create<AuthState>()(
                 if (isViolation) {
                     return { 
                         success: true, 
-                        message: `Successfully ${newType.replace('-', ' ')}! (Note: Recorded as geofencing violation)` 
+                        message: `Successfully ${newType === 'check-in' ? 'punch in' : newType === 'check-out' ? 'punch out' : newType.replace('-', ' ')}! (Note: Recorded as geofencing violation)` 
                     };
                 }
                 
