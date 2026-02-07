@@ -112,7 +112,7 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
       setUserHolidaysPool(userHolidaysData || []);
 
       for (const user of targetUsers) {
-        const events = await api.getAttendanceEvents(user.id, format(startDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd'));
+        const events = await api.getAttendanceEvents(user.id, format(startDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd HH:mm:ss'));
         const userLeaves = (leavesData || []).filter((l: any) => l.userId === user.id && l.status === 'approved');
         // Pass userHolidaysData directly to avoid stale state issues
         const monthlyData = processEmployeeMonth(user, events, userLeaves, userHolidaysData || [], year, month);
