@@ -246,7 +246,7 @@ const DatePicker: React.FC<DatePickerProps> = ({ label, id, error, value, onChan
           aria-expanded={isOpen}
           aria-label={`Date picker for ${label}`}
         >
-          <span className={value ? 'text-white' : 'text-white/30'}>
+          <span className={value ? (isMobile ? 'text-white' : 'text-primary-text') : (isMobile ? 'text-white/30' : 'text-muted')}>
             {selectedDateDisplay}
           </span>
           <CalendarIcon className="h-4 w-4 text-emerald-500/50" />
