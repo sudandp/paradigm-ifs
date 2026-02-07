@@ -115,6 +115,11 @@ const UserManagement: React.FC = () => {
         return role ? role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A';
     }
 
+    const filteredUsers = users.filter(u => 
+        u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        u.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     return (
         <div className="p-4 border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
@@ -192,57 +197,125 @@ const UserManagement: React.FC = () => {
                 </Button>
             </div>
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full responsive-table">
-                    <thead>
-                        <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Name</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Email</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Role</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Site</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Biometric ID</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border md:bg-card md:divide-y-0">
-                        {isLoading ? (
-                            isMobile
-                                ? <tr><td colSpan={6}><TableSkeleton rows={3} cols={6} isMobile /></td></tr>
-                                : <TableSkeleton rows={5} cols={6} />
-                        ) : (
-                            users
-                            .filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()))
-                            .map((user) => (
-                            <tr key={user.id}>
-                                <td data-label="Name" className="px-6 py-4 font-medium">{user.name}</td>
-                                <td data-label="Email" className="px-6 py-4 text-sm text-muted">{user.email}</td>
-                                <td data-label="Role" className="px-6 py-4 text-sm text-muted">
-                                    {getRoleName(user.role)}
-                                    {user.role === 'unverified' && (
-                                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 ml-2">Pending Approval</span>
-                                    )}
-                                </td>
-                                <td data-label="Site" className="px-6 py-4 text-sm text-muted">
-                                    {user.organizationName || '-'}
-                                </td>
-                                <td data-label="Biometric ID" className="px-6 py-4 text-sm font-mono text-muted">
-                                    {user.biometricId || '-'}
-                                </td>
-                                <td data-label="Actions" className="px-6 py-4">
-                                    <div className="flex items-center gap-2 md:justify-start justify-end">
-                                        {user.role === 'unverified' && (
-                                            <Button variant="outline" size="sm" onClick={() => handleApprove(user)} aria-label={`Approve user ${user.name}`} title={`Approve user ${user.name}`}><UserCheck className="h-4 w-4 mr-2" />Approve</Button>
-                                        )}
-                                        <Button variant="icon" size="sm" onClick={() => handleEdit(user)} aria-label={`Edit user ${user.name}`} title={`Edit user ${user.name}`}><Edit className="h-4 w-4" /></Button>
-                                        <Button variant="icon" size="sm" onClick={() => handleManageLocations(user)} aria-label={`Manage Geofencing for ${user.name}`} title={`Manage Geofencing for ${user.name}`}><MapPin className="h-4 w-4 text-emerald-500" /></Button>
-                                        <Button variant="icon" onClick={() => handleDelete(user)} aria-label={`Delete user ${user.name}`} title={`Delete user ${user.name}`} className="p-2 hover:bg-red-500/10 rounded-full transition-colors"><Trash2 className="h-5 w-5 text-red-500" /></Button>
+            {/* Content Area */}
+            {isLoading ? (
+                <div className="w-full">
+                    {/* Desktop Skeleton */}
+                    <div className="hidden lg:block">
+                        <TableSkeleton rows={5} cols={6} />
+                    </div>
+                    {/* Mobile/Tablet Skeleton */}
+                    <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+                       {[1, 2, 3, 4].map(i => (
+                           <div key={i} className="bg-card p-4 rounded-xl border border-border h-40 animate-pulse"></div>
+                       ))}
+                    </div>
+                </div>
+            ) : (
+                <>
+                    {/* Mobile/Tablet View - Cards Grid */}
+                    <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {filteredUsers.map((user) => (
+                            <div key={user.id} className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col gap-3 h-full">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h3 className="font-semibold text-primary-text">{user.name}</h3>
+                                        <p className="text-sm text-muted">{user.email}</p>
                                     </div>
-                                </td>
-                            </tr>
-                        )))}
-                    </tbody>
-                </table>
-            </div>
+                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                        user.role === 'admin' ? 'bg-purple-100 text-purple-700' :
+                                        user.role === 'hr' ? 'bg-blue-100 text-blue-700' :
+                                        user.role === 'management' ? 'bg-emerald-100 text-emerald-700' :
+                                        user.role === 'unverified' ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-gray-100 text-gray-700'
+                                    }`}>
+                                        {getRoleName(user.role)}
+                                    </span>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-2 text-sm mt-1 flex-grow">
+                                    <div>
+                                        <span className="text-xs text-muted block">Site</span>
+                                        <span className="font-medium text-primary-text">{user.organizationName || '-'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-muted block">Biometric ID</span>
+                                        <span className="font-mono text-primary-text">{user.biometricId || '-'}</span>
+                                    </div>
+                                </div>
+
+                                <div className="pt-3 border-t border-border flex justify-end gap-2 mt-auto">
+                                    {user.role === 'unverified' && (
+                                        <Button variant="outline" size="sm" onClick={() => handleApprove(user)} className="flex-1">
+                                            <UserCheck className="h-4 w-4 mr-2" />Approve
+                                        </Button>
+                                    )}
+                                    <Button variant="icon" size="sm" onClick={() => handleEdit(user)} className="h-9 w-9 border border-border rounded-lg">
+                                        <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="icon" size="sm" onClick={() => handleManageLocations(user)} className="h-9 w-9 border border-border rounded-lg">
+                                        <MapPin className="h-4 w-4 text-emerald-500" />
+                                    </Button>
+                                    <Button variant="icon" size="sm" onClick={() => handleDelete(user)} className="h-9 w-9 border border-border rounded-lg hover:bg-red-50 text-red-500">
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                        {filteredUsers.length === 0 && (
+                            <div className="col-span-full text-center py-8 text-muted">
+                                No users found matching "{searchTerm}"
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Desktop View - Table */}
+                    <div className="hidden lg:block overflow-x-auto max-w-full">
+                        <table className="w-full table-auto responsive-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Name</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Email</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Role</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Site</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Biometric ID</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border md:bg-card md:divide-y-0">
+                                {filteredUsers.map((user) => (
+                                    <tr key={user.id}>
+                                        <td data-label="Name" className="px-6 py-4 font-medium">{user.name}</td>
+                                        <td data-label="Email" className="px-6 py-4 text-sm text-muted">{user.email}</td>
+                                        <td data-label="Role" className="px-6 py-4 text-sm text-muted">
+                                            {getRoleName(user.role)}
+                                            {user.role === 'unverified' && (
+                                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 ml-2">Pending Approval</span>
+                                            )}
+                                        </td>
+                                        <td data-label="Site" className="px-6 py-4 text-sm text-muted">
+                                            {user.organizationName || '-'}
+                                        </td>
+                                        <td data-label="Biometric ID" className="px-6 py-4 text-sm font-mono text-muted">
+                                            {user.biometricId || '-'}
+                                        </td>
+                                        <td data-label="Actions" className="px-6 py-4">
+                                            <div className="flex items-center gap-2 md:justify-start justify-end">
+                                                {user.role === 'unverified' && (
+                                                    <Button variant="outline" size="sm" onClick={() => handleApprove(user)} aria-label={`Approve user ${user.name}`} title={`Approve user ${user.name}`}><UserCheck className="h-4 w-4 mr-2" />Approve</Button>
+                                                )}
+                                                <Button variant="icon" size="sm" onClick={() => handleEdit(user)} aria-label={`Edit user ${user.name}`} title={`Edit user ${user.name}`}><Edit className="h-4 w-4" /></Button>
+                                                <Button variant="icon" size="sm" onClick={() => handleManageLocations(user)} aria-label={`Manage Geofencing for ${user.name}`} title={`Manage Geofencing for ${user.name}`}><MapPin className="h-4 w-4 text-emerald-500" /></Button>
+                                                <Button variant="icon" onClick={() => handleDelete(user)} aria-label={`Delete user ${user.name}`} title={`Delete user ${user.name}`} className="p-2 hover:bg-red-500/10 rounded-full transition-colors"><Trash2 className="h-5 w-5 text-red-500" /></Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
+            )}
 
             <Pagination 
                 currentPage={currentPage}
