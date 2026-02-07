@@ -307,6 +307,10 @@ const ProfilePage: React.FC = () => {
                                     <div className="flex items-center justify-center text-emerald-500 h-[60px] bg-black/20 rounded-xl border border-white/5"><Loader2 className="h-6 w-6 animate-spin" /></div>
                                 ) : (
                                     <div className="space-y-3 relative z-10">
+                                        <div className="flex items-center gap-2 mb-1 px-1">
+                                            <Info className="h-3.5 w-3.5 text-emerald-400" />
+                                            <span className="text-[10px] italic text-emerald-100/70 font-medium leading-tight">Punch in is required when starting the day, and Punch out when the day ends</span>
+                                        </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <button
                                                 onClick={() => navigate('/attendance/check-in')}
@@ -339,6 +343,10 @@ const ProfilePage: React.FC = () => {
                                             </button>
                                         </div>
                                         
+                                        <div className="flex items-center gap-2 mb-1 px-1">
+                                            <Info className="h-3.5 w-3.5 text-blue-400" />
+                                            <span className="text-[10px] italic text-blue-100/70 font-medium leading-tight">Break in when user goes for lunch is mandatory, or it will be a violation</span>
+                                        </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <button
                                                 onClick={() => navigate('/attendance/break-in')}
