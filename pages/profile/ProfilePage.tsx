@@ -348,7 +348,7 @@ const ProfilePage: React.FC = () => {
                                                         relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
                                                         ${isCheckedIn 
                                                             ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
-                                                            : 'bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg shadow-emerald-900/50 border border-emerald-500/30 active:scale-95'
+                                                            : 'bg-gradient-to-br from-emerald-600 to-emerald-800 text-white active:scale-95'
                                                         }
                                                     `}
                                                 >
@@ -363,7 +363,7 @@ const ProfilePage: React.FC = () => {
                                                         relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
                                                         ${(!isCheckedIn || isOnBreak)
                                                             ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
-                                                            : 'bg-gradient-to-br from-rose-600 to-rose-800 text-white shadow-lg shadow-rose-900/50 border border-rose-500/30 active:scale-95'
+                                                            : 'bg-gradient-to-br from-rose-600 to-rose-800 text-white active:scale-95'
                                                         }
                                                     `}
                                                 >
@@ -396,7 +396,7 @@ const ProfilePage: React.FC = () => {
                                                         relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
                                                         ${(!isCheckedIn || isOnBreak)
                                                             ? 'bg-white/5 text-gray-400 cursor-not-allowed border border-white/5' 
-                                                            : 'bg-gradient-to-br from-blue-600 to-blue-800 text-white shadow-md border border-blue-500/30 active:scale-95'}
+                                                            : 'bg-gradient-to-br from-blue-600 to-blue-800 text-white active:scale-95'}
                                                     `}
                                                 >
                                                     <CheckCircle className="h-4 w-4" />
@@ -410,7 +410,7 @@ const ProfilePage: React.FC = () => {
                                                         relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
                                                         ${(!isCheckedIn || !isOnBreak)
                                                             ? 'bg-white/5 text-gray-400 cursor-not-allowed border border-white/5' 
-                                                            : 'bg-gradient-to-br from-amber-600 to-amber-800 text-white shadow-md border border-amber-500/30 active:scale-95'}
+                                                            : 'bg-gradient-to-br from-amber-600 to-amber-800 text-white active:scale-95'}
                                                     `}
                                                 >
                                                     <CheckCircle className="h-4 w-4" />
@@ -429,7 +429,7 @@ const ProfilePage: React.FC = () => {
                         <div className="space-y-4">
                             <button 
                                 onClick={() => navigate('/leaves/dashboard')} 
-                                className="w-full group relative overflow-hidden bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-2xl py-3 px-4 flex items-center justify-between transition-all duration-300 active:scale-[0.98] shadow-lg shadow-emerald-900/20 border border-emerald-500/30"
+                                className="w-full group relative overflow-hidden bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-2xl py-3 px-4 flex items-center justify-between transition-all duration-300 active:scale-[0.98]"
                             >
                                 <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors"></div>
                                 <div className="flex items-center gap-4 relative z-10">
@@ -468,7 +468,7 @@ const ProfilePage: React.FC = () => {
                                         setToast({ message: 'Failed to clear cache. Try again.', type: 'error' });
                                     }
                                 }}
-                                className="w-full group relative overflow-hidden bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-4 flex items-center justify-between transition-all duration-300 active:scale-[0.98] shadow-lg shadow-blue-900/20 border border-blue-500/30"
+                                className="w-full group relative overflow-hidden bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-4 flex items-center justify-between transition-all duration-300 active:scale-[0.98]"
                             >
                                 <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors"></div>
                                 <div className="flex items-center gap-4 relative z-10">
@@ -491,7 +491,7 @@ const ProfilePage: React.FC = () => {
 
                             <button 
                                 onClick={handleLogoutClick} 
-                                className="w-full group relative overflow-hidden bg-gradient-to-br from-rose-600 to-rose-800 rounded-2xl p-4 flex items-center justify-between transition-all duration-300 active:scale-[0.98] shadow-lg shadow-rose-900/20 border border-rose-500/30"
+                                className="w-full group relative overflow-hidden bg-gradient-to-br from-rose-600 to-rose-800 rounded-2xl p-4 flex items-center justify-between transition-all duration-300 active:scale-[0.98]"
                             >
                                 <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors"></div>
                                 <div className="flex items-center gap-4 relative z-10">
