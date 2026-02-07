@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, SubmitHandler, Resolver } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -54,6 +54,12 @@ const ProfilePage: React.FC = () => {
     const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [permissionStatus, setPermissionStatus] = useState<'prompt' | 'granted' | 'denied'>('prompt');
+    
+    // Interactive Hints State
+    const [showPunchHint, setShowPunchHint] = useState(false);
+    const [showBreakHint, setShowBreakHint] = useState(false);
+    const punchHintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const breakHintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const isMobile = useMediaQuery('(max-width: 767px)');
     const isMobileView = isMobile; // Apply mobile view for all users on mobile
@@ -208,6 +214,18 @@ const ProfilePage: React.FC = () => {
         return format(new Date(isoString), 'hh:mm a');
     };
 
+    const handleToggleHint = (type: 'punch' | 'break') => {
+        if (type === 'punch') {
+            if (punchHintTimeoutRef.current) clearTimeout(punchHintTimeoutRef.current);
+            setShowPunchHint(true);
+            punchHintTimeoutRef.current = setTimeout(() => setShowPunchHint(false), 10000);
+        } else {
+            if (breakHintTimeoutRef.current) clearTimeout(breakHintTimeoutRef.current);
+            setShowBreakHint(true);
+            breakHintTimeoutRef.current = setTimeout(() => setShowBreakHint(false), 10000);
+        }
+    };
+
     const canManageTasks = user && (isAdmin(user.role) || permissions[user.role]?.includes('manage_tasks'));
     const tasksLink = canManageTasks ? '/tasks' : '/onboarding/tasks';
     const getRoleName = (role: string) => role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -306,75 +324,99 @@ const ProfilePage: React.FC = () => {
                                 {isAttendanceLoading ? (
                                     <div className="flex items-center justify-center text-emerald-500 h-[60px] bg-black/20 rounded-xl border border-white/5"><Loader2 className="h-6 w-6 animate-spin" /></div>
                                 ) : (
-                                    <div className="space-y-3 relative z-10">
-                                        <div className="flex items-center gap-2 mb-1 px-1">
-                                            <Info className="h-3.5 w-3.5 text-emerald-400" />
-                                            <span className="text-[10px] italic text-emerald-100/70 font-medium leading-tight">Punch in is required when starting the day, and Punch out when the day ends</span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <button
-                                                onClick={() => navigate('/attendance/check-in')}
-                                                disabled={isCheckedIn || isActionInProgress}
-                                                className={`
-                                                    relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-2 transition-all duration-300
-                                                    ${isCheckedIn 
-                                                        ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
-                                                        : 'bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg shadow-emerald-900/50 border border-emerald-500/30 active:scale-95'
-                                                    }
-                                                `}
-                                            >
-                                                <LogIn className={`h-5 w-5 ${!isCheckedIn && 'animate-pulse'}`} />
-                                                <span className="font-bold text-xs uppercase tracking-wider">Punch In</span>
-                                            </button>
+                                        <div className="space-y-4 relative z-10">
+                                            <div className="flex flex-col space-y-3">
+                                                <div className="flex items-center gap-2 px-0.5">
+                                                    <button 
+                                                        onClick={() => handleToggleHint('punch')}
+                                                        className="focus:outline-none hover:scale-110 transition-all active:scale-95 !bg-transparent !border-none !p-0 !shadow-none !ring-0 flex items-center justify-center"
+                                                        title="Click for hint"
+                                                    >
+                                                        <Info className="h-5 w-5 text-emerald-400" />
+                                                    </button>
+                                                    {showPunchHint && (
+                                                        <span className="text-base italic text-emerald-100/70 font-medium leading-tight animate-in fade-in slide-in-from-left-2 duration-300">
+                                                            Punch in is required when starting the day, and Punch out when the day ends
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    onClick={() => navigate('/attendance/check-in')}
+                                                    disabled={isCheckedIn || isActionInProgress}
+                                                    className={`
+                                                        relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
+                                                        ${isCheckedIn 
+                                                            ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
+                                                            : 'bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg shadow-emerald-900/50 border border-emerald-500/30 active:scale-95'
+                                                        }
+                                                    `}
+                                                >
+                                                    <LogIn className={`h-4 w-4 ${!isCheckedIn && 'animate-pulse'}`} />
+                                                    <span className="font-bold text-[10px] uppercase tracking-wider">Punch In</span>
+                                                </button>
 
-                                            <button
-                                                onClick={() => navigate('/attendance/check-out')}
-                                                disabled={!isCheckedIn || isOnBreak || isActionInProgress}
-                                                className={`
-                                                    relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-2 transition-all duration-300
-                                                    ${(!isCheckedIn || isOnBreak)
-                                                        ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
-                                                        : 'bg-gradient-to-br from-rose-600 to-rose-800 text-white shadow-lg shadow-rose-900/50 border border-rose-500/30 active:scale-95'
-                                                    }
-                                                `}
-                                            >
-                                                <LogOut className="h-5 w-5" />
-                                                <span className="font-bold text-xs uppercase tracking-wider">Punch Out</span>
-                                            </button>
+                                                <button
+                                                    onClick={() => navigate('/attendance/check-out')}
+                                                    disabled={!isCheckedIn || isOnBreak || isActionInProgress}
+                                                    className={`
+                                                        relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
+                                                        ${(!isCheckedIn || isOnBreak)
+                                                            ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
+                                                            : 'bg-gradient-to-br from-rose-600 to-rose-800 text-white shadow-lg shadow-rose-900/50 border border-rose-500/30 active:scale-95'
+                                                        }
+                                                    `}
+                                                >
+                                                    <LogOut className="h-4 w-4" />
+                                                    <span className="font-bold text-[10px] uppercase tracking-wider">Punch Out</span>
+                                                </button>
+                                            </div>
                                         </div>
                                         
-                                        <div className="flex items-center gap-2 mb-1 px-1">
-                                            <Info className="h-3.5 w-3.5 text-blue-400" />
-                                            <span className="text-[10px] italic text-blue-100/70 font-medium leading-tight">Break in when user goes for lunch is mandatory, or it will be a violation</span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <button
-                                                onClick={() => navigate('/attendance/break-in')}
-                                                disabled={!isCheckedIn || isOnBreak || isActionInProgress}
-                                                className={`
-                                                    relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
-                                                    ${(!isCheckedIn || isOnBreak)
-                                                        ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
-                                                        : 'bg-gradient-to-br from-blue-600 to-blue-800 text-white shadow-md border border-blue-500/30 active:scale-95'}
-                                                `}
-                                            >
-                                                <CheckCircle className="h-5 w-5" />
-                                                <span className="font-bold text-xs uppercase tracking-wider">Break In</span>
-                                            </button>
+                                            <div className="flex flex-col space-y-3">
+                                                <div className="flex items-center gap-2 px-0.5">
+                                                    <button 
+                                                        onClick={() => handleToggleHint('break')}
+                                                        className="focus:outline-none hover:scale-110 transition-all active:scale-95 !bg-transparent !border-none !p-0 !shadow-none !ring-0 flex items-center justify-center"
+                                                        title="Click for hint"
+                                                    >
+                                                        <Info className="h-5 w-5 text-blue-400" />
+                                                    </button>
+                                                    {showBreakHint && (
+                                                        <span className="text-base italic text-blue-100/70 font-medium leading-tight animate-in fade-in slide-in-from-left-2 duration-300">
+                                                            Break in when user goes for lunch is mandatory, or it will be a violation
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    onClick={() => navigate('/attendance/break-in')}
+                                                    disabled={!isCheckedIn || isOnBreak || isActionInProgress}
+                                                    className={`
+                                                        relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
+                                                        ${(!isCheckedIn || isOnBreak)
+                                                            ? 'bg-white/5 text-gray-400 cursor-not-allowed border border-white/5' 
+                                                            : 'bg-gradient-to-br from-blue-600 to-blue-800 text-white shadow-md border border-blue-500/30 active:scale-95'}
+                                                    `}
+                                                >
+                                                    <CheckCircle className="h-4 w-4" />
+                                                    <span className="font-bold text-[10px] uppercase tracking-wider">Break In</span>
+                                                </button>
 
-                                            <button
-                                                onClick={() => navigate('/attendance/break-out')}
-                                                disabled={!isCheckedIn || !isOnBreak || isActionInProgress}
-                                                className={`
-                                                    relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
-                                                    ${(!isCheckedIn || !isOnBreak)
-                                                        ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
-                                                        : 'bg-gradient-to-br from-amber-600 to-amber-800 text-white shadow-md border border-amber-500/30 active:scale-95'}
-                                                `}
-                                            >
-                                                <CheckCircle className="h-5 w-5" />
-                                                <span className="font-bold text-xs uppercase tracking-wider">Break Out</span>
-                                            </button>
+                                                <button
+                                                    onClick={() => navigate('/attendance/break-out')}
+                                                    disabled={!isCheckedIn || !isOnBreak || isActionInProgress}
+                                                    className={`
+                                                        relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
+                                                        ${(!isCheckedIn || !isOnBreak)
+                                                            ? 'bg-white/5 text-gray-400 cursor-not-allowed border border-white/5' 
+                                                            : 'bg-gradient-to-br from-amber-600 to-amber-800 text-white shadow-md border border-amber-500/30 active:scale-95'}
+                                                    `}
+                                                >
+                                                    <CheckCircle className="h-4 w-4" />
+                                                    <span className="font-bold text-[10px] uppercase tracking-wider">Break Out</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -556,58 +598,83 @@ const ProfilePage: React.FC = () => {
                                 {isAttendanceLoading ? (
                                     <div className="flex items-center justify-center h-[56px] bg-gray-50 rounded-xl"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
                                 ) : (
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-2 mb-1 px-1">
-                                            <Info className="h-3.5 w-3.5 text-emerald-600" />
-                                            <span className="text-xs italic text-emerald-700 font-medium">Punch in is required when starting the day, and Punch out when the day ends</span>
+                                    <div className="space-y-6">
+                                            <div className="flex flex-col space-y-3">
+                                                <div className="flex items-center gap-2 px-0.5">
+                                                    <button 
+                                                        onClick={() => handleToggleHint('punch')}
+                                                        className="focus:outline-none hover:scale-110 transition-all active:scale-95 !bg-transparent !border-none !p-0 !shadow-none !ring-0 flex items-center justify-center"
+                                                        title="Click for hint"
+                                                    >
+                                                        <Info className="h-5 w-5 text-emerald-600" />
+                                                    </button>
+                                                    {showPunchHint && (
+                                                        <span className="text-base italic text-emerald-700 font-medium animate-in fade-in slide-in-from-left-2 duration-300">
+                                                            Punch in is required when starting the day, and Punch out when the day ends
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            <div className="flex gap-4">
+                                                <Button
+                                                    onClick={() => navigate('/attendance/check-in')}
+                                                    variant="primary"
+                                                    className="flex-1 text-sm shadow-emerald-100 hover:shadow-emerald-200 transition-all font-bold uppercase tracking-wider"
+                                                    disabled={isCheckedIn || isActionInProgress}
+                                                >
+                                                    <LogIn className="mr-2 h-4 w-4" /> Punch In
+                                                </Button>
+                                                <Button
+                                                    onClick={() => navigate('/attendance/check-out')}
+                                                    variant="danger"
+                                                    className="flex-1 text-sm shadow-red-100 hover:shadow-red-200 transition-all font-bold uppercase tracking-wider"
+                                                    disabled={!isCheckedIn || isOnBreak || isActionInProgress}
+                                                >
+                                                    <LogOut className="mr-2 h-4 w-4" /> Punch Out
+                                                </Button>
+                                            </div>
                                         </div>
-                                        <div className="flex gap-4">
-                                            <Button
-                                                onClick={() => navigate('/attendance/check-in')}
-                                                variant="primary"
-                                                className="flex-1 text-sm shadow-emerald-100 hover:shadow-emerald-200 transition-all font-bold uppercase tracking-wider"
-                                                disabled={isCheckedIn || isActionInProgress}
-                                            >
-                                                <LogIn className="mr-2 h-4 w-4" /> Punch In
-                                            </Button>
-                                            <Button
-                                                onClick={() => navigate('/attendance/check-out')}
-                                                variant="danger"
-                                                className="flex-1 text-sm shadow-red-100 hover:shadow-red-200 transition-all font-bold uppercase tracking-wider"
-                                                disabled={!isCheckedIn || isOnBreak || isActionInProgress}
-                                            >
-                                                <LogOut className="mr-2 h-4 w-4" /> Punch Out
-                                            </Button>
-                                        </div>
-                                        <div className="flex items-center gap-2 mb-1 px-1">
-                                            <Info className="h-3.5 w-3.5 text-blue-600" />
-                                            <span className="text-xs italic text-blue-700 font-medium">Break in when user goes for lunch is mandatory, or it will be a violation</span>
-                                        </div>
-                                        <div className="flex gap-4">
-                                            <Button
-                                                onClick={() => navigate('/attendance/break-in')}
-                                                disabled={!isCheckedIn || isOnBreak || isActionInProgress}
-                                                className={`
-                                                    flex-1 text-sm font-bold uppercase tracking-wider transition-all
-                                                    ${(!isCheckedIn || isOnBreak)
-                                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
-                                                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100 shadow-lg'}
-                                                `}
-                                            >
-                                                <CheckCircle className="mr-2 h-4 w-4" /> Break In
-                                            </Button>
-                                            <Button
-                                                onClick={() => navigate('/attendance/break-out')}
-                                                disabled={!isCheckedIn || !isOnBreak || isActionInProgress}
-                                                className={`
-                                                    flex-1 text-sm font-bold uppercase tracking-wider transition-all
-                                                    ${(!isCheckedIn || !isOnBreak)
-                                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
-                                                        : 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-100 shadow-lg'}
-                                                `}
-                                            >
-                                                <CheckCircle className="mr-2 h-4 w-4" /> Break Out
-                                            </Button>
+
+                                            <div className="flex flex-col space-y-3">
+                                                <div className="flex items-center gap-2 px-0.5">
+                                                    <button 
+                                                        onClick={() => handleToggleHint('break')}
+                                                        className="focus:outline-none hover:scale-110 transition-all active:scale-95 !bg-transparent !border-none !p-0 !shadow-none !ring-0 flex items-center justify-center"
+                                                        title="Click for hint"
+                                                    >
+                                                        <Info className="h-5 w-5 text-blue-600" />
+                                                    </button>
+                                                    {showBreakHint && (
+                                                        <span className="text-base italic text-blue-700 font-medium animate-in fade-in slide-in-from-left-2 duration-300">
+                                                            Break in when user goes for lunch is mandatory, or it will be a violation
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            <div className="flex gap-4">
+                                                <Button
+                                                    onClick={() => navigate('/attendance/break-in')}
+                                                    disabled={!isCheckedIn || isOnBreak || isActionInProgress}
+                                                    className={`
+                                                        flex-1 text-sm font-bold uppercase tracking-wider transition-all
+                                                        ${(!isCheckedIn || isOnBreak)
+                                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
+                                                            : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100 shadow-lg'}
+                                                    `}
+                                                >
+                                                    <CheckCircle className="mr-2 h-4 w-4" /> Break In
+                                                </Button>
+                                                <Button
+                                                    onClick={() => navigate('/attendance/break-out')}
+                                                    disabled={!isCheckedIn || !isOnBreak || isActionInProgress}
+                                                    className={`
+                                                        flex-1 text-sm font-bold uppercase tracking-wider transition-all
+                                                        ${(!isCheckedIn || !isOnBreak)
+                                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
+                                                            : 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-100 shadow-lg'}
+                                                    `}
+                                                >
+                                                    <CheckCircle className="mr-2 h-4 w-4" /> Break Out
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 )}

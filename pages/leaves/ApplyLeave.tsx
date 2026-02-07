@@ -12,6 +12,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { format, differenceInCalendarDays, isSameDay } from 'date-fns';
 import DatePicker from '../../components/ui/DatePicker';
+import DateRangePicker from '../../components/ui/DateRangePicker';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useSettingsStore } from '../../store/settingsStore';
 import UploadDocument from '../../components/UploadDocument';
@@ -194,14 +195,28 @@ const ApplyLeave: React.FC = () => {
                                 </Select>
                             )} />
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Controller name="startDate" control={control} render={({ field }) => (
-                                    <DatePicker label="Start Date" id="startDate" value={field.value} onChange={field.onChange} error={errors.startDate?.message} />
-                                )} />
-                                <Controller name="endDate" control={control} render={({ field }) => (
-                                    <DatePicker label="End Date" id="endDate" value={field.value} onChange={field.onChange} error={errors.endDate?.message} />
-                                )} />
-                            </div>
+                            {isMobile ? (
+                                <DateRangePicker 
+                                    label="Select Dates"
+                                    id="leaveRange"
+                                    startDate={watchStartDate}
+                                    endDate={watchEndDate}
+                                    onChange={(start, end) => {
+                                        if (start) setValue('startDate', start, { shouldValidate: true });
+                                        if (end) setValue('endDate', end, { shouldValidate: true });
+                                    }}
+                                    error={errors.startDate?.message || errors.endDate?.message}
+                                />
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Controller name="startDate" control={control} render={({ field }) => (
+                                        <DatePicker label="Start Date" id="startDate" value={field.value} onChange={field.onChange} error={errors.startDate?.message} />
+                                    )} />
+                                    <Controller name="endDate" control={control} render={({ field }) => (
+                                        <DatePicker label="End Date" id="endDate" value={field.value} onChange={field.onChange} error={errors.endDate?.message} />
+                                    )} />
+                                </div>
+                            )}
 
                             {showHalfDayOption && (
                                 <Controller name="dayOption" control={control} render={({ field }) => (
