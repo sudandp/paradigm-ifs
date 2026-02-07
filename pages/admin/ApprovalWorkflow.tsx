@@ -9,6 +9,7 @@ import Toast from '../../components/ui/Toast';
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import WorkflowChart2D from '../../components/admin/WorkflowChart2D';
 import OrgWorkflowCard from '../../components/admin/OrgWorkflowCard';
+import Pagination from '../../components/ui/Pagination';
 
 
 type UserWithManager = User & { managerName?: string };
@@ -24,6 +25,8 @@ const ApprovalWorkflow: React.FC = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [activeTab, setActiveTab] = useState<ViewTab>('table');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
@@ -146,11 +149,11 @@ const ApprovalWorkflow: React.FC = () => {
                                             <tr>
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Employee</th>
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Role</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase w-1/2">Reporting Manager</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase w-1/3">Reporting Manager</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-card divide-y divide-border">
-                                            {users.map(user => (
+                                            {users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(user => (
                                                 <tr key={user.id}>
                                                     <td className="px-6 py-4 font-medium text-primary-text">{user.name}</td>
                                                     <td className="px-6 py-4 text-sm text-muted capitalize">{roles.find(r => r.id === user.role)?.displayName || user.role.replace(/_/g, ' ')}</td>
@@ -175,7 +178,7 @@ const ApprovalWorkflow: React.FC = () => {
                                 </div>
 
                                 <div className="space-y-3 md:hidden">
-                                    {users.map(user => (
+                                    {users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(user => (
                                         <div key={user.id} className="bg-card rounded-lg border border-border overflow-hidden">
                                             <div className="p-3">
                                                 <p className="font-semibold text-primary-text">{user.name}</p>
@@ -196,6 +199,17 @@ const ApprovalWorkflow: React.FC = () => {
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+
+                                <div className="mt-4">
+                                    <Pagination
+                                        currentPage={currentPage}
+                                        totalItems={users.length}
+                                        pageSize={itemsPerPage}
+                                        onPageChange={setCurrentPage}
+                                        onPageSizeChange={setItemsPerPage}
+                                        pageSizeOptions={[10, 20, 50, 100]}
+                                    />
                                 </div>
                             </>
                         )}

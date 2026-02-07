@@ -44,7 +44,9 @@ export const getAppUserProfile = async (supabaseUser: SupabaseUser): Promise<App
         }
 
         const roleData = data.role;
-        const roleName = (Array.isArray(roleData) ? roleData[0]?.display_name : (roleData as any)?.display_name) || data.role_id;
+        const rawRoleName = (Array.isArray(roleData) ? roleData[0]?.display_name : (roleData as any)?.display_name) || data.role_id;
+        // Normalize to lowercase for consistent role checks throughout the app
+        const roleName = typeof rawRoleName === 'string' ? rawRoleName.toLowerCase().replace(/\s+/g, '_') : rawRoleName;
 
         return {
             id: data.id,

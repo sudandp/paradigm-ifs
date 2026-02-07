@@ -111,7 +111,7 @@ const MyTeamPage: React.FC = () => {
       let members: User[] = [];
       
       // Fetch members based on user role
-      if (['admin', 'hr'].includes(user.role)) {
+      if (['admin', 'hr', 'management'].includes(user.role)) {
         members = await api.getUsers();
       } else {
         members = await api.getTeamMembers(user.id);

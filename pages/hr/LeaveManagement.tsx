@@ -121,8 +121,8 @@ const LeaveManagement: React.FC = () => {
                 pageSize: pageSize
             };
 
-            // Admin and HR see all requests. Managers see only their team's requests.
-            if (user.role !== 'admin' && user.role !== 'hr') {
+            // Admin, HR, and Management see all requests. Managers see only their team's requests.
+            if (user.role !== 'admin' && user.role !== 'hr' && user.role !== 'management') {
                 // For managers, get their team's requests
                 const teamMembers = await api.getTeamMembers(user.id);
                 const teamIds = teamMembers.map(m => m.id);

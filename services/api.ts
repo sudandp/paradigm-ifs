@@ -677,9 +677,15 @@ export const api = {
   getUsersWithManagers: async (): Promise<(User & { managerName?: string })[]> => {
     const { data: users, error } = await supabase.from('users').select('*, reporting_manager_id, role_id');
     if (error) throw error;
-    const camelUsers = (users || []).map(u => toCamelCase({ ...u, role: u.role_id }));
+    const camelUsers = (users || []).map(u => ({
+      ...toCamelCase({ ...u, role: u.role_id }),
+      reportingManagerId: u.reporting_manager_id
+    }));
     const userMap = new Map(camelUsers.map(u => [u.id, u.name]));
-    return camelUsers.map(u => ({ ...u, managerName: u.reportingManagerId ? userMap.get(u.reportingManagerId) : undefined }));
+    return camelUsers.map(u => ({
+      ...u,
+      managerName: u.reportingManagerId ? userMap.get(u.reportingManagerId) : undefined
+    }));
   },
   getTeamMembers: async (managerId: string): Promise<User[]> => {
     const { data, error } = await supabase
@@ -2349,23 +2355,18 @@ export const api = {
     const { data: approverData, error: nameError } = await supabase.from('users').select('name').eq('id', approverId).single();
     if (nameError) throw nameError;
     
-    // Check if approver is the employee's reporting manager
-    const { data: employeeData } = await supabase.from('users').select('reporting_manager_id').eq('id', request.user_id).single();
-    const isReportingManager = employeeData?.reporting_manager_id === approverId;
-    
     const newHistoryRecord = { approver_id: approverId, approver_name: approverData.name, status: 'approved', timestamp: new Date().toISOString() };
     const updatedHistory = [...((request.approval_history as any[]) || []), newHistoryRecord];
     
-    // If finalConfirmationRole is 'reporting_manager' and the approver IS the reporting manager, approve directly
-    // OR if the leave type is 'Comp Off' (Manager approval is final)
-    if ((finalConfirmationRole === 'reporting_manager' && isReportingManager) || request.leave_type === 'Comp Off') {
-      const { error } = await supabase.from('leave_requests').update({ 
+    // If it's a Comp Off leave, Manager approval is final.
+    if (request.leave_type === 'Comp Off') {
+       const { error } = await supabase.from('leave_requests').update({ 
         status: 'approved', 
         current_approver_id: null, 
         approval_history: updatedHistory 
       }).eq('id', id);
       if (error) throw error;
-
+      
       // Dynamic Rule Dispatch
       dispatchNotificationFromRules('leave_approved', {
         actorName: 'Leave request',
@@ -2373,26 +2374,40 @@ export const api = {
         locString: '',
         actor: { id: approverId, name: approverData.name, role: 'admin' }
       });
-      
-      // If it's a Comp Off leave, mark a log as used/consumed works differently now with dynamic logic
-      // But we still track 'used' status for reporting if manual logs exist
-      if (request.leave_type === 'Comp Off') {
-        // Only update status if there are manual logs available to "consume"
-        // With dynamic accrual, this step is less critical but good for consistency
-        const { data: compOffLogs } = await supabase.from('comp_off_logs').select('id').eq('user_id', request.user_id).eq('status', 'earned').limit(Math.ceil(leaveDays));
-        if (compOffLogs && compOffLogs.length > 0) {
+
+      // Consume comp off logs if applicable
+      const leaveDays = request.day_option === 'half' ? 0.5 : differenceInCalendarDays(new Date(request.end_date), new Date(request.start_date)) + 1;
+      const { data: compOffLogs } = await supabase.from('comp_off_logs').select('id').eq('user_id', request.user_id).eq('status', 'earned').limit(Math.ceil(leaveDays));
+      if (compOffLogs && compOffLogs.length > 0) {
            await supabase.from('comp_off_logs').update({ status: 'used', leave_request_id: id }).in('id', compOffLogs.map(l => l.id));
-        }
       }
+      return;
+    }
+
+    // Workflow Logic: Manager approved -> check finalConfirmationRole
+    if (finalConfirmationRole === 'reporting_manager') {
+         const { error } = await supabase.from('leave_requests').update({ 
+            status: 'approved', 
+            current_approver_id: null, 
+            approval_history: updatedHistory 
+          }).eq('id', id);
+          if (error) throw error;
+          
+          dispatchNotificationFromRules('leave_approved', {
+            actorName: 'Leave request',
+            actionText: 'has been approved',
+            locString: '',
+            actor: { id: approverId, name: approverData.name, role: 'admin' }
+          });
     } else {
-      // Otherwise, send to final approver (HR/Admin) for confirmation
-      const { data: finalApprover } = await supabase.from('users').select('id').eq('role_id', finalConfirmationRole).limit(1).single();
-      const { error } = await supabase.from('leave_requests').update({ 
-        status: 'pending_hr_confirmation', 
-        current_approver_id: finalApprover?.id, 
-        approval_history: updatedHistory 
-      }).eq('id', id);
-      if (error) throw error;
+        // Send to Final Approver (HR/Admin)
+        const { data: finalApprover } = await supabase.from('users').select('id').eq('role_id', finalConfirmationRole).limit(1).single();
+        const { error } = await supabase.from('leave_requests').update({ 
+            status: 'pending_hr_confirmation', 
+            current_approver_id: finalApprover?.id || null,
+            approval_history: updatedHistory 
+        }).eq('id', id);
+        if (error) throw error;
     }
   },
   rejectLeaveRequest: async (id: string, approverId: string, reason = ''): Promise<void> => {
