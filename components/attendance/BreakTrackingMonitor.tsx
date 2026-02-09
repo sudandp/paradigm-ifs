@@ -45,6 +45,57 @@ const BreakTrackingMonitor: React.FC = () => {
     };
 
     useEffect(() => {
+        const PROACTIVE_NOTIFICATION_ID = 1005;
+
+        const scheduleReminder = async () => {
+            if (!Capacitor.isNativePlatform() || !isOnBreak || !lastBreakInTime) return;
+
+            try {
+                // Cancel any existing proactive reminder first to be safe
+                await LocalNotifications.cancel({ notifications: [{ id: PROACTIVE_NOTIFICATION_ID }] });
+
+                const breakStart = new Date(lastBreakInTime);
+                const triggerTime = new Date(breakStart.getTime() + (breakLimit * 60000));
+                
+                // Only schedule if the trigger time is in the future
+                if (triggerTime > new Date()) {
+                    await LocalNotifications.schedule({
+                        notifications: [
+                            {
+                                title: '📍☕ 🏁 Break Warning',
+                                body: `⚠️ Your ${breakLimit} min break is over! Please Break Out and resume work 🏃‍♂️💨`,
+                                id: PROACTIVE_NOTIFICATION_ID,
+                                schedule: { at: triggerTime },
+                                sound: 'beep.wav',
+                                extra: null
+                            }
+                        ]
+                    });
+                    console.log(`Scheduled proactive break reminder for ${triggerTime.toLocaleTimeString()}`);
+                }
+            } catch (err) {
+                console.error('Failed to schedule proactive break reminder:', err);
+            }
+        };
+
+        const cancelReminder = async () => {
+            if (!Capacitor.isNativePlatform()) return;
+            try {
+                await LocalNotifications.cancel({ notifications: [{ id: PROACTIVE_NOTIFICATION_ID }] });
+                console.log('Cancelled proactive break reminder');
+            } catch (err) {
+                console.error('Failed to cancel break reminder:', err);
+            }
+        };
+
+        if (isOnBreak) {
+            scheduleReminder();
+        } else {
+            cancelReminder();
+        }
+    }, [isOnBreak, lastBreakInTime, breakLimit]);
+
+    useEffect(() => {
         let interval: NodeJS.Timeout;
 
         if (isOnBreak && lastBreakInTime) {

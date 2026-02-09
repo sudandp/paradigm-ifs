@@ -271,6 +271,8 @@ const fetchAll = async <T,>(queryBuilder: any, pageSize = 1000): Promise<T[]> =>
 };
 
 export const api = {
+  toSnakeCase,
+  toCamelCase,
   // --- Initial Data Loading ---
   getInitialAppData: async (): Promise<{ settings: any; roles: Role[]; holidays: Holiday[] }> => {
     const { data: settingsData, error: settingsError } = await supabase

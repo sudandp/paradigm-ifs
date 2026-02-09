@@ -237,6 +237,8 @@ const MainLayout: React.FC = () => {
     useEffect(() => {
         if (user) {
             fetchNotifications();
+            const unsubscribe = useNotificationStore.getState().subscribeToNotifications();
+            return () => unsubscribe();
         }
     }, [user, fetchNotifications]);
 
