@@ -262,7 +262,12 @@ const ProfilePage: React.FC = () => {
 
 
                     {user.role !== 'management' && (
-                        <section>
+                        <section className={`relative transition-all duration-500 ${isOnBreak ? 'ring-2 ring-rose-500 ring-offset-2 ring-offset-[#041b0f] rounded-2xl' : ''}`}>
+                            {isOnBreak && (
+                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 bg-rose-600 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-lg shadow-rose-900/50 animate-pulse uppercase tracking-tighter">
+                                    Active Break
+                                </div>
+                            )}
                             <h3 className="fo-section-title mb-4">Work Hours Tracking</h3>
                             <div className="bg-[#0f291e]/80 backdrop-blur-md rounded-2xl border border-white/5 p-5 shadow-xl relative overflow-hidden group">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
@@ -560,7 +565,12 @@ const ProfilePage: React.FC = () => {
                     </div>
 
                     {user.role !== 'management' && (
-                        <div className="md:bg-white md:p-6 md:rounded-2xl md:shadow-lg border border-gray-100">
+                        <div className={`relative transition-all duration-500 md:bg-white md:p-6 md:rounded-2xl md:shadow-lg border ${isOnBreak ? 'border-rose-500 ring-4 ring-rose-100' : 'border-gray-100'}`}>
+                            {isOnBreak && (
+                                <div className="absolute -top-3 left-6 z-20 bg-rose-600 text-white text-xs font-black px-4 py-1 rounded-full shadow-lg shadow-rose-600/30 animate-pulse uppercase tracking-widest">
+                                    On Break
+                                </div>
+                            )}
                             <div className="flex items-center gap-3 mb-5">
                                 <div className="p-1.5 bg-purple-50 rounded-lg">
                                     <ClipboardList className="h-5 w-5 text-purple-600" />

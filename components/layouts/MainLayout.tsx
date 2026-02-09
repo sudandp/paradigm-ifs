@@ -14,6 +14,7 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { isAdmin } from '../../utils/auth';
 import Header from './Header';
 import { NotificationPanel } from '../notifications/NotificationPanel';
+import BreakTrackingMonitor from '../attendance/BreakTrackingMonitor';
 
 export interface NavLinkConfig {
     to: string;
@@ -290,6 +291,7 @@ const MainLayout: React.FC = () => {
 
             <div className={`flex-1 flex flex-col ${isMobile ? 'bg-[#041b0f]' : 'bg-gray-50/50'} ${isMobile && isSidebarCollapsed ? 'ml-16' : ''}`}>
                 <Header />
+                <BreakTrackingMonitor />
 
                 {/* Main Content */}
                 <main ref={mainContentRef} className={`flex-1 overflow-y-auto ${isMobile ? 'bg-[#041b0f]' : 'bg-page'}`}>

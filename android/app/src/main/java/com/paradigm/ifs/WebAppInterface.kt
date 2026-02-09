@@ -5,6 +5,10 @@ import android.content.Intent
 import android.webkit.JavascriptInterface
 import android.widget.Toast
 import android.util.Log
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
+import androidx.core.app.NotificationCompat
 
 class WebAppInterface(private val mContext: Context) {
 
@@ -41,20 +45,20 @@ class WebAppInterface(private val mContext: Context) {
         Log.d("WebAppInterface", "updateNotificationCount called with count: $count")
         
         // Update Status Bar Notification
-        val notificationManager = mContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        val notificationManager = mContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = "notifications_channel"
         
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            val channel = android.app.NotificationChannel(
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
                 channelId,
                 "App Notifications",
-                android.app.NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_DEFAULT
             )
             notificationManager.createNotificationChannel(channel)
         }
 
         if (count > 0) {
-            val notification = androidx.core.app.NotificationCompat.Builder(mContext, channelId)
+            val notification = NotificationCompat.Builder(mContext, channelId)
                 .setContentTitle("New Notifications")
                 .setContentText("You have $count new notifications")
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -65,36 +69,29 @@ class WebAppInterface(private val mContext: Context) {
         } else {
             notificationManager.cancel(1001)
         }
-
-        // Update Launcher Badge
-        try {
-            me.leolin.shortcutbadger.ShortcutBadger.applyCount(mContext, count)
-        } catch (e: Exception) {
-            Log.e("WebAppInterface", "Failed to apply badge count", e)
-        }
     }
 
     @JavascriptInterface
     fun showNotification(title: String, message: String) {
         Log.d("WebAppInterface", "showNotification called: $title")
-        val notificationManager = mContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        val notificationManager = mContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = "notifications_channel"
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            val channel = android.app.NotificationChannel(
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
                 channelId,
                 "App Notifications",
-                android.app.NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_DEFAULT
             )
             notificationManager.createNotificationChannel(channel)
         }
 
-        val notification = androidx.core.app.NotificationCompat.Builder(mContext, channelId)
+        val notification = NotificationCompat.Builder(mContext, channelId)
             .setContentTitle(title)
             .setContentText(message)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setAutoCancel(true)
-            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
 
         notificationManager.notify(System.currentTimeMillis().toInt(), notification)

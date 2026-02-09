@@ -95,6 +95,7 @@ interface AuthState {
     isLoginAnimationPending: boolean;
     setLoginAnimationPending: (pending: boolean) => void;
     geofencingSettings: { enabled: boolean; maxViolationsPerMonth: number } | null;
+    breakLimit: number;
     fetchGeofencingSettings: () => Promise<void>;
 }
 
@@ -123,6 +124,7 @@ export const useAuthStore = create<AuthState>()(
         error: null,
         loading: false,
         geofencingSettings: null,
+        breakLimit: 60,
 
         isLoginAnimationPending: false,
         setLoginAnimationPending: (pending) => set({ isLoginAnimationPending: pending }),
@@ -298,10 +300,13 @@ export const useAuthStore = create<AuthState>()(
                 const fullSettings = await api.getAttendanceSettings();
                 const isOfficeUser = ['admin', 'hr', 'finance', 'developer'].includes(user.role);
                 const rules = isOfficeUser ? fullSettings.office : fullSettings.field;
-                set({ geofencingSettings: {
-                    enabled: rules.geofencingEnabled ?? false,
-                    maxViolationsPerMonth: rules.maxViolationsPerMonth ?? 3
-                }});
+                set({ 
+                    geofencingSettings: {
+                        enabled: rules.geofencingEnabled ?? false,
+                        maxViolationsPerMonth: rules.maxViolationsPerMonth ?? 3
+                    },
+                    breakLimit: rules.lunchBreakDuration ?? 60
+                });
             } catch (error) {
                 console.error('Failed to fetch geofencing settings:', error);
             }

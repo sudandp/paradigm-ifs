@@ -94,7 +94,11 @@ class MainActivity : AppCompatActivity() {
         settings.databaseEnabled = true
         settings.allowFileAccess = true
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-        settings.userAgentString = settings.userAgentString + " ParadigmApp/1.0"
+        
+        // Fix: Use a standard Chrome UserAgent to prevent "disallowed_useragent" error during Google Login
+        // Google blocks WebViews that identify themselves too clearly or incorrectly.
+        val chromeUserAgent = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+        settings.userAgentString = chromeUserAgent + " ParadigmApp/1.0"
         
         // Add JS Interface
         webView.addJavascriptInterface(WebAppInterface(this), "Android")

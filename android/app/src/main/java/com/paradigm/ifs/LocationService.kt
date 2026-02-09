@@ -14,7 +14,6 @@ import android.os.IBinder
 import android.os.Bundle
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import me.leolin.shortcutbadger.ShortcutBadger
 import java.util.Timer
 import java.util.TimerTask
 
@@ -104,9 +103,6 @@ class LocationService : Service(), LocationListener {
                 if (responseCode == 200 || responseCode == 206) {
                     val contentRange = conn.getHeaderField("Content-Range")
                     val count = contentRange?.split("/")?.lastOrNull()?.toIntOrNull() ?: 0
-                    
-                    // Update Badge
-                    ShortcutBadger.applyCount(applicationContext, count)
                     
                     // Update Status Bar Notification if count changed
                     updateStatusNotification(count)
