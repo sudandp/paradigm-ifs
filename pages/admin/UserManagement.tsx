@@ -40,7 +40,11 @@ const UserManagement: React.FC = () => {
     const fetchUsers = useCallback(async () => {
         setIsLoading(true);
         try {
-            const res = await api.getUsers({ page: currentPage, pageSize });
+            const res = await api.getUsers({ 
+                page: currentPage, 
+                pageSize,
+                search: searchTerm 
+            });
             setUsers(res.data);
             setTotalUsers(res.total);
         } catch (error) {
@@ -52,7 +56,7 @@ const UserManagement: React.FC = () => {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [pageSize]);
+    }, [pageSize, searchTerm]);
 
     useEffect(() => {
         fetchUsers();
@@ -84,8 +88,8 @@ const UserManagement: React.FC = () => {
     const handleConfirmApproval = async (userId: string, newRole: string) => {
         setIsSaving(true);
         try {
-            await api.updateUser(userId, { role: newRole });
-            setToast({ message: 'User approved successfully!', type: 'success' });
+            await api.approveUser(userId, newRole);
+            setToast({ message: 'User approved and email confirmed successfully!', type: 'success' });
             setIsApprovalModalOpen(false);
             fetchUsers();
         } catch (error) {
@@ -115,10 +119,7 @@ const UserManagement: React.FC = () => {
         return role ? role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A';
     }
 
-    const filteredUsers = users.filter(u => 
-        u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        u.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredUsers = users;
 
     return (
         <div className="p-4 border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card">

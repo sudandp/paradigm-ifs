@@ -611,9 +611,16 @@ export const api = {
 
 
   // --- Users & Orgs ---
-  getUsers: async (filter?: { page?: number, pageSize?: number }): Promise<any> => {
+  getUsers: async (filter?: { page?: number, pageSize?: number, search?: string }): Promise<any> => {
     let query = supabase.from('users').select('*, role_id', { count: 'exact' });
     
+    if (filter?.search) {
+      query = query.or(`name.ilike.%${filter.search}%,email.ilike.%${filter.search}%`);
+    }
+
+    // Always sort by created_at descending so newest users appear first
+    query = query.order('created_at', { ascending: false });
+
     const isPaginated = filter?.page !== undefined && filter?.pageSize !== undefined;
     if (isPaginated) {
       const from = (filter!.page! - 1) * filter!.pageSize!;
@@ -942,6 +949,14 @@ export const api = {
     const { data, error } = await supabase.from('users').update(dbUpdates).eq('id', id).select().single();
     if (error) throw error;
     return toCamelCase({ ...data, role: data.role_id });
+  },
+
+  approveUser: async (userId: string, newRole: string) => {
+    const { data, error } = await supabase.functions.invoke('admin-approve-user', {
+      body: { userId, role: newRole }
+    });
+    if (error) throw error;
+    return data;
   },
 
   createUser: async (userData: Partial<User>): Promise<User> => {

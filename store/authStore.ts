@@ -227,7 +227,7 @@ export const useAuthStore = create<AuthState>()(
 
         signUp: async (name, email, password) => {
             set({ error: null, loading: true });
-            const { error } = await authService.signUpWithPassword({
+            const { data, error } = await authService.signUpWithPassword({
                 email,
                 password,
                 options: { data: { name } }
@@ -238,6 +238,23 @@ export const useAuthStore = create<AuthState>()(
                 set({ error: friendlyError, loading: false });
                 return { error: { message: friendlyError } };
             }
+
+            // Create profile immediately so they are visible in User Management
+            if (data?.user) {
+                try {
+                    await api.createUser({
+                        id: data.user.id,
+                        name,
+                        email,
+                        role: 'unverified'
+                    });
+                } catch (profileError) {
+                    console.error('Error creating profile during signup:', profileError);
+                    // We don't block signup if profile creation fails, 
+                    // as getAppUserProfile handles it on the first login anyway.
+                }
+            }
+
             set({ loading: false });
             return { error: null };
         },

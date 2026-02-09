@@ -32,17 +32,42 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredPermission, chi
     const roleName = user.role?.toLowerCase() || '';
     const roleNameUnderscore = roleName.replace(/\s+/g, '_');
 
-    return permissions[roleId] || 
+    // Get permissions from store based on various possible keys
+    const foundPermissions = permissions[roleId] || 
            permissions[roleName] || 
            permissions[roleNameUnderscore] || 
            permissions[user.role] || 
            [];
+
+    // ROBUSTNESS FALLBACK: 
+    // If we are authenticated but have no permissions loaded yet, 
+    // provide essential base permissions to avoid premature lockout.
+    if (foundPermissions.length === 0 && user.id && user.role !== 'unverified') {
+        const basePermissions: Permission[] = ['view_profile', 'view_own_attendance', 'view_mobile_nav_home', 'view_mobile_nav_profile'];
+        return basePermissions;
+    }
+
+    return foundPermissions;
   };
 
   const userPermissions = getPermissions();
-  const hasAccess = isAdmin(user.role) || userPermissions.includes(requiredPermission);
+  
+  // Base permissions that are ALWAYS allowed for any verified user
+  const isEssentialPermission = requiredPermission === 'view_profile' || 
+                               requiredPermission === 'view_own_attendance';
+
+  const isUserAdmin = isAdmin(user.role);
+  const hasAccess = isUserAdmin || userPermissions.includes(requiredPermission) || (isEssentialPermission && user.role !== 'unverified');
 
   if (!hasAccess) {
+    // DIAGNOSTIC LOGGING: Helps identify permission issues in production
+    console.warn(`[ProtectedRoute] Access Denied: 
+      User: ${user.email} (${user.id})
+      Role: ${user.role} (ID: ${user.roleId})
+      Required: ${requiredPermission}
+      UserPerms: ${JSON.stringify(userPermissions)}
+    `);
+    
     // User does not have the required permission, redirect to a forbidden page
     return <Navigate to="/forbidden" replace />;
   }
