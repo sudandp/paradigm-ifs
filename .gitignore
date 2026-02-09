@@ -29,9 +29,24 @@ tmp/
 Downloads/
 
 # Android build files
-
 *.apk
 *.aab
+android/app/build/
+android/.gradle/
+android/local.properties
+android/captures/
+android/*.iml
+android/.idea/
+
+# iOS build files
+ios/App/build/
+ios/App/Pods/
+ios/App/App.xcworkspace/
+ios/App/App/*.xcuserdatad/
+
+# Gradle
+.gradle/
+build/
 
 # Build logs
 build_log*.txt
