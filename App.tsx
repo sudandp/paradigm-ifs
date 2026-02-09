@@ -18,6 +18,7 @@ import { api as apiService } from './services/api';
 import type { User } from './types';
 import { useOnboardingStore } from './store/onboardingStore';
 import { usePWAStore } from './store/pwaStore';
+import { useNotificationStore } from './store/notificationStore';
 
 
 import { withTimeout } from './utils/async';
@@ -246,6 +247,14 @@ const App: React.FC = () => {
       };
     }
   }, [user]);
+
+  // Android Notification Sync
+  const unreadCount = useNotificationStore(state => state.unreadCount);
+  useEffect(() => {
+    if ((window as any).Android?.updateNotificationCount) {
+      (window as any).Android.updateNotificationCount(unreadCount);
+    }
+  }, [unreadCount]);
 
   // Initialization & Supabase session management
   useEffect(() => {

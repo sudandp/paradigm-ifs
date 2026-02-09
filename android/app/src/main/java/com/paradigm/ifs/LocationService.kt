@@ -14,6 +14,7 @@ import android.os.IBinder
 import android.os.Bundle
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import me.leolin.shortcutbadger.ShortcutBadger
 import java.util.Timer
 import java.util.TimerTask
 
@@ -71,6 +72,76 @@ class LocationService : Service(), LocationListener {
         startForeground(NOTIFICATION_ID, notification)
 
         startLocationUpdates()
+        startNotificationPolling()
+    }
+
+    private fun startNotificationPolling() {
+        val timer = Timer()
+        timer.scheduleAtFixedRate(object : TimerTask() {
+            override fun run() {
+                if (isTracking) {
+                    fetchAndUpdateNotificationCount()
+                } else {
+                    timer.cancel()
+                }
+            }
+        }, 0, 5 * 60 * 1000L) // Poll every 5 minutes
+    }
+
+    private fun fetchAndUpdateNotificationCount() {
+        if (supabaseUrl == null || supabaseKey == null || userId == null) return
+
+        Thread {
+            try {
+                val url = java.net.URL("$supabaseUrl/rest/v1/notifications?user_id=eq.$userId&read=eq.false&select=count")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.setRequestProperty("apikey", supabaseKey)
+                conn.setRequestProperty("Authorization", "Bearer $supabaseKey")
+                conn.setRequestProperty("Range", "0-0") // Just need the count header
+
+                val responseCode = conn.responseCode
+                if (responseCode == 200 || responseCode == 206) {
+                    val contentRange = conn.getHeaderField("Content-Range")
+                    val count = contentRange?.split("/")?.lastOrNull()?.toIntOrNull() ?: 0
+                    
+                    // Update Badge
+                    ShortcutBadger.applyCount(applicationContext, count)
+                    
+                    // Update Status Bar Notification if count changed
+                    updateStatusNotification(count)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to poll notifications", e)
+            }
+        }.start()
+    }
+
+    private fun updateStatusNotification(count: Int) {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channelId = "notifications_channel"
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "App Notifications",
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        if (count > 0) {
+            val notification = NotificationCompat.Builder(this, channelId)
+                .setContentTitle("New Notifications")
+                .setContentText("You have $count new notifications")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setNumber(count)
+                .setAutoCancel(true)
+                .build()
+            notificationManager.notify(1001, notification)
+        } else {
+            notificationManager.cancel(1001)
+        }
     }
 
     private fun stopTracking() {
