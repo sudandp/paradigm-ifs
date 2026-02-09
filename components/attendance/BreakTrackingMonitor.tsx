@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useAuthStore } from '../../store/authStore';
 import Toast from '../ui/Toast';
 import { differenceInMinutes } from 'date-fns';
 import { LocalNotifications } from '@capacitor/local-notifications';
