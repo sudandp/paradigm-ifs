@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { calculateDistanceMeters, reverseGeocode, getPrecisePosition } from '../utils/locationUtils';
 import { processDailyEvents } from '../utils/attendanceCalculations';
 import { dispatchNotificationFromRules } from '../services/notificationService';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 // Centralized friendly error message handler for Supabase
 // Centralized friendly error message handler for Supabase
@@ -397,8 +398,11 @@ export const useAuthStore = create<AuthState>()(
                     position = await getPrecisePosition(150, 15000);
                 } catch (err: any) {
                     console.warn('Location acquisition failed:', err.message);
-                    // Determine the final failure reason
-                    locationStatus = 'GPS Unavailable';
+                    // Provide a more descriptive fallback than just "GPS Unavailable"
+                    const orgSuffix = user.organizationName ? `Near ${user.organizationName} (Estimated)` : 'GPS Unavailable';
+                    locationStatus = err.message.includes('permission') 
+                        ? 'Location Permission Denied' 
+                        : orgSuffix;
                 }
 
                 const finalizeAttendance = async (lat?: number, lng?: number, locId?: string | null, locName?: string | null) => {
@@ -430,6 +434,27 @@ export const useAuthStore = create<AuthState>()(
                     } catch (e) {
                         console.warn('Failed to send user attendance notification', e);
                     }
+                    
+                    // Native Push Notification for Breaks (Swiggy Style)
+                    if (Capacitor.isNativePlatform() && (newType === 'break-in' || newType === 'break-out')) {
+                        const emoji = newType === 'break-in' ? '☕' : '🏁';
+                        const title = newType === 'break-in' ? `${emoji} Break Started` : `${emoji} Break Ended`;
+                        const timeStr = format(new Date(), 'hh:mm a');
+                        const locationStr = locName || 'Current Location';
+                        
+                        LocalNotifications.schedule({
+                            notifications: [
+                                {
+                                    title,
+                                    body: `You ${newType.replace('-', ' ')} at ${timeStr} near ${locationStr}. Enjoy your time! ✨`,
+                                    id: Date.now(),
+                                    schedule: { at: new Date(Date.now() + 500) },
+                                    sound: 'beep.wav',
+                                    extra: null
+                                }
+                            ]
+                        });
+                    }
 
                     // Send notifications via Dynamic Rules
                     dispatchNotificationFromRules(
@@ -456,9 +481,10 @@ export const useAuthStore = create<AuthState>()(
                     return { success: true, message: `Successfully ${newType === 'check-in' ? 'punch in' : newType === 'check-out' ? 'punch out' : newType.replace('-', ' ')}!` };
                 };
 
-                // If still no valid position, record an attendance event with specific failure reason
                 if (!position || !position.coords) {
-                    return await finalizeAttendance(undefined, undefined, null, locationStatus || 'Location Unavailable');
+                    // One last attempt: If they are near their assigned organization, assume that context
+                    const fallbackName = locationStatus || 'GPS Unavailable';
+                    return await finalizeAttendance(undefined, undefined, null, fallbackName);
                 }
                 const { latitude, longitude, accuracy } = position.coords;
                 // If accuracy is unreasonably large (>1000m), still record the raw coordinates but flag no geofence match

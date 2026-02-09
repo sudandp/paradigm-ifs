@@ -66,13 +66,11 @@ const BreakTrackingMonitor: React.FC = () => {
                         LocalNotifications.schedule({
                             notifications: [
                                 {
-                                    title: 'Break Out Reminder',
-                                    body: message,
+                                    title: '🚨 Break Limit Exceeded!',
+                                    body: `⚠️ ${message} Please Break Out to resume work. 🏃‍♂️💨`,
                                     id: notificationIdRef.current,
-                                    schedule: { at: new Date(Date.now() + 1000) },
+                                    schedule: { at: new Date(Date.now() + 500) },
                                     sound: 'beep.wav',
-                                    attachments: [],
-                                    actionTypeId: '',
                                     extra: null
                                 }
                             ]

@@ -40,8 +40,10 @@ const ResolveAddress: React.FC<{ lat: number, lng: number, fallback?: string | n
         }
 
         const resolve = async () => {
-            // Only resolve if fallback is likely just coordinates or missing
-            const needsResolution = !fallback || fallback.startsWith('GPS:') || fallback === 'Location Timeout' || fallback === 'Location Unavailable';
+            // If we have valid coordinates, we should always try to resolve unless the fallback is already a specific location name
+            const isGenericFallback = !fallback || fallback.includes('GPS') || fallback.includes('Location');
+            const needsResolution = (lat !== 0 && lng !== 0) && isGenericFallback;
+            
             if (!needsResolution) {
                 setResolvedAddress(fallback);
                 return;

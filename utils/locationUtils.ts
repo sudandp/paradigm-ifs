@@ -94,7 +94,7 @@ export async function getPrecisePosition(accuracyThreshold: number = 50, timeout
             });
             resolve(pos as unknown as GeolocationPosition);
           } catch (finalErr) {
-            reject(new Error('Unable to acquire location fix. Please ensure GPS is on.'));
+            reject(new Error('GPS Signal Weak. Please ensure you are outdoors or near a window.'));
           }
         }
       }
