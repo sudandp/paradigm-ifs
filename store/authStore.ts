@@ -58,8 +58,8 @@ const getActionTextForType = (type: string): string => {
     switch (type) {
         case 'check-in': return 'punched in';
         case 'check-out': return 'punched out';
-        case 'break-in': return 'started a break';
-        case 'break-out': return 'ended their break';
+        case 'break-in': return 'started a break ☕';
+        case 'break-out': return 'ended a break 🏁';
         default: return 'updated attendance';
     }
 };
@@ -424,11 +424,15 @@ export const useAuthStore = create<AuthState>()(
                     // Send notification to the USER themselves
                     try {
                         const greeting = getTimeBasedGreeting();
-                        const actionText = newType === 'check-in' ? 'checked in' : 'checked out';
+                        const actionText = 
+                            newType === 'check-in' ? 'checked in' : 
+                            newType === 'check-out' ? 'checked out' : 
+                            newType === 'break-in' ? 'started your break ☕' : 'ended your break 🏁';
+                        const timeStr = format(new Date(), 'hh:mm a');
                         const atText = locName ? ` at ${locName}` : '';
                         await api.createNotification({
                             userId: user.id,
-                            message: `${greeting}, ${user.name || 'there'}! You have ${actionText}${atText}.`,
+                            message: `${greeting}, ${user.name || 'there'}! You have ${actionText}${atText} at ${timeStr}.`,
                             type: 'greeting',
                         });
                     } catch (e) {
@@ -548,7 +552,7 @@ export const useAuthStore = create<AuthState>()(
                             'violation',
                             {
                                 actorName: user.name || 'An employee',
-                                actionText: newType === 'check-in' ? 'punched in' : 'punched out',
+                                actionText: getActionTextForType(newType),
                                 locString: ` outside their assigned geofence at ${locationName}`,
                                 title: '📍 Geofencing Violation',
                                 link: '/hr/field-staff-tracking',

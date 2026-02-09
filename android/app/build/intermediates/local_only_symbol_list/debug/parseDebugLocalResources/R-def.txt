@@ -9,9 +9,14 @@ color teal_700
 color white
 drawable ic_launcher
 drawable ic_launcher_round
+drawable splash
 id progressBar
 id webview
 layout activity_main
+mipmap ic_launcher
+mipmap ic_launcher_background
+mipmap ic_launcher_foreground
+mipmap ic_launcher_round
 string action_settings
 string app_name
 style Theme.Apache
