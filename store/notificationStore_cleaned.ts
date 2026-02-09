@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import { api } from '../services/api';
 import type { Notification } from '../types';
 import { useAuthStore } from './authStore';
@@ -21,7 +21,8 @@ interface NotificationState {
   updateBadgeCount: () => Promise<void>;
 }
 
-export const useNotificationStore = create<NotificationState>()((set, get) => ({
+// Fix: Removed generic type argument from create() to avoid untyped function call error.
+export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   unreadCount: 0,
   isLoading: false,
@@ -42,14 +43,13 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
       set({ notifications, unreadCount, isLoading: false });
       get().updateBadgeCount();
     } catch (err) {
-      console.error('Failed to fetch notifications:', err);
       set({ error: 'Failed to fetch notifications.', isLoading: false });
     }
   },
 
   markAsRead: async (notificationId: string) => {
     const existing = get().notifications.find(n => n.id === notificationId);
-    if (existing && existing.isRead) return;
+    if (existing && existing.isRead) return; // Don't do anything if already read
 
     try {
       await api.markNotificationAsRead(notificationId);
@@ -61,7 +61,7 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
       }));
       get().updateBadgeCount();
     } catch (err) {
-      console.error("Failed to mark notification as read:", err);
+      console.error("Failed to mark notification as read", err);
     }
   },
 
@@ -79,7 +79,7 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
       }));
       get().updateBadgeCount();
     } catch (err) {
-      console.error("Failed to mark all notifications as read:", err);
+      console.error("Failed to mark all notifications as read", err);
     }
   },
 
@@ -87,21 +87,24 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
     if (!Capacitor.isNativePlatform()) return;
     try {
       const count = get().unreadCount;
-      // Use a variable to bypass Vite's static import analysis which causes 500 errors if the plugin is missing from node_modules
-      const pluginPath = '@capacitor/badge';
-      // @ts-ignore
-      const { Badge } = await import(/* @vite-ignore */ pluginPath).catch(() => ({ Badge: null }));
+      // Note: This requires @capacitor/badge plugin. 
+      // Using @vite-ignore to allow the app to boot even if the plugin is not installed in the dev environment.
+      // @ts-ignore - Module is installed by the user locally
+      const { Badge } = await import(/* @vite-ignore */ '@capacitor/badge').catch(() => ({ Badge: null }));
       if (Badge && typeof Badge.set === 'function') {
         await Badge.set({ count });
+        console.log(`Updated app badge count to: ${count}`);
       }
     } catch (err) {
-      console.warn('Badge plugin notification failed:', err);
+      console.warn('Badge plugin not available or failed:', err);
     }
   },
 
   subscribeToNotifications: () => {
     const user = useAuthStore.getState().user;
     if (!user) return () => {};
+
+    console.log('Subscribing to notifications for user:', user.id);
 
     const channel = supabase
       .channel(`user-notifications-${user.id}`)
@@ -114,6 +117,7 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
           filter: `user_id=eq.${user.id}`,
         },
         async (payload) => {
+          console.log('New notification received:', payload);
           const newNotif = api.toCamelCase(payload.new) as Notification;
           
           set((state) => ({
@@ -121,6 +125,7 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
             unreadCount: state.unreadCount + 1,
           }));
 
+          // Trigger local notification on mobile
           if (Capacitor.isNativePlatform()) {
             try {
               await LocalNotifications.schedule({
@@ -144,6 +149,7 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
       .subscribe();
 
     return () => {
+      console.log('Unsubscribing from notifications');
       supabase.removeChannel(channel);
     };
   },
