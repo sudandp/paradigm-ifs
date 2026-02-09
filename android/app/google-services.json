@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "PLACEHOLDER_PROJECT_NUMBER",
+    "project_id": "placeholder-project-id",
+    "storage_bucket": "placeholder-project-id.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1234567890:android:placeholder_id",
+        "android_client_info": {
+          "package_name": "com.paradigm.ifs"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "PLACEHOLDER_API_KEY_REPLACE_ME"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

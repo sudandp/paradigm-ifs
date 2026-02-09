@@ -5,6 +5,13 @@ import 'leaflet/dist/leaflet.css';
 import { formatDistanceToNow, isToday } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
+import { NativeBridge } from '../../utils/nativeBridge';
+
+// ... existing imports
+
+// ... inside component
+
+
 import { useAuthStore } from '../../store/authStore';
 import { useThemeStore } from '../../store/themeStore';
 import { User, AttendanceEvent } from '../../types';
@@ -78,6 +85,8 @@ const MyTeamPage: React.FC = () => {
   const [memberLocations, setMemberLocations] = useState<Record<string, { state: string; city: string }>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
+  const [trackingInterval, setTrackingInterval] = useState<number>(15);
+  const [isUpdatingInterval, setIsUpdatingInterval] = useState(false);
   
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -92,6 +101,7 @@ const MyTeamPage: React.FC = () => {
     document.head.appendChild(styleSheet);
     
     fetchTeamData();
+    fetchSettings(); // Call fetchSettings here
     
     return () => {
       document.head.removeChild(styleSheet);
@@ -101,6 +111,25 @@ const MyTeamPage: React.FC = () => {
       }
     };
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const { settings } = await api.getInitialAppData();
+      if (settings?.office?.trackingIntervalMinutes) {
+        const interval = settings.office.trackingIntervalMinutes;
+        setTrackingInterval(interval);
+        
+        // Start tracking automatically if we have an interval and user is valid
+        // NOTE: Real implementation might check if user is actually checked-in first.
+        // For now, we enforce tracking if the user is a field staff or similar.
+        if (user) {
+             NativeBridge.startTracking(interval);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching settings:', err);
+    }
+  };
 
   const fetchTeamData = async () => {
     if (!user) return;
@@ -156,6 +185,61 @@ const MyTeamPage: React.FC = () => {
     } catch (err) {
       console.error('Error fetching team data:', err);
       setLoading(false);
+    }
+  };
+
+
+
+  const handleUpdateInterval = async () => {
+    if (!user || user.role !== 'admin') return;
+    setIsUpdatingInterval(true);
+    try {
+      // We need to fetch current settings first to not overwrite other things, or just patch.
+      // api.updateAttendanceSettings expects the whole object or we need a specific patch method.
+      // The `updateAttendanceSettings` we added takes `AttendanceSettings`.
+      // So we should fetch, update, and save.
+      const { settings } = await api.getInitialAppData();
+      
+      // Clone settings to avoid mutation
+      const newSettings = { ...settings };
+      
+      // Update office if exists
+      if (newSettings.office) {
+          newSettings.office = {
+              ...newSettings.office,
+              trackingIntervalMinutes: trackingInterval
+          };
+      }
+
+      // Update field if exists (avoids error if column is missing)
+      if (newSettings.field) {
+          newSettings.field = {
+              ...newSettings.field,
+              trackingIntervalMinutes: trackingInterval
+          };
+      }
+
+      // Update site if exists
+      if (newSettings.site) {
+          newSettings.site = {
+              ...newSettings.site,
+              trackingIntervalMinutes: trackingInterval
+          };
+      }
+
+      await api.updateAttendanceSettings(newSettings);
+      
+      // Update local tracking immediately
+      if (user) {
+         NativeBridge.startTracking(trackingInterval, user.id);
+      }
+      
+      alert('Tracking interval updated successfully');
+    } catch (err) {
+      console.error('Failed to update interval:', err);
+      alert('Failed to update tracking interval');
+    } finally {
+      setIsUpdatingInterval(false);
     }
   };
 
@@ -319,6 +403,30 @@ const MyTeamPage: React.FC = () => {
             </div>
           </div>
         </div>
+        
+        {/* Admin Tracking Interval Control */}
+        {user?.role === 'admin' && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 p-2 rounded-lg">
+                <span className="text-xs font-medium text-red-700 whitespace-nowrap">Tracking Interval (mins):</span>
+                <input 
+                    type="number" 
+                    min="1" 
+                    max="60" 
+                    value={trackingInterval} 
+                    onChange={(e) => setTrackingInterval(parseInt(e.target.value) || 15)}
+                    className="w-16 h-8 text-sm border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                />
+                <Button 
+                    size="sm" 
+                    variant="primary" 
+                    onClick={handleUpdateInterval}
+                    disabled={isUpdatingInterval}
+                    className="h-8 text-xs bg-red-600 hover:bg-red-700 border-none"
+                >
+                    {isUpdatingInterval ? 'Saving...' : 'Set'}
+                </Button>
+            </div>
+        )}
       </div>
 
       {/* Map View */}

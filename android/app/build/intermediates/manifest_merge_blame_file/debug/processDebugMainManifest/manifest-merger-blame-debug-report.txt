@@ -1,0 +1,170 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.paradigm.ifs"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="24"
+9        android:targetSdkVersion="33" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:5:5-67
+11-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:5:22-64
+12    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+12-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:6:5-79
+12-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:6:22-76
+13    <uses-permission android:name="android.permission.CAMERA" />
+13-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:7:5-65
+13-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:7:22-62
+14    <uses-permission
+14-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:8:5-107
+15        android:name="android.permission.READ_EXTERNAL_STORAGE"
+15-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:8:22-77
+16        android:maxSdkVersion="32" />
+16-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:8:78-104
+17    <uses-permission
+17-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:9:5-108
+18        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+18-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:9:22-78
+19        android:maxSdkVersion="29" />
+19-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:9:79-105
+20    <!-- Android 13+ permissions -->
+21    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+21-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:11:5-76
+21-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:11:22-73
+22    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+22-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:12:5-75
+22-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:12:22-72
+23    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+23-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:13:5-77
+23-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:13:22-74
+24    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+24-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:15:5-79
+24-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:15:22-76
+25    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+25-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:16:5-81
+25-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:16:22-78
+26    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+26-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:17:5-85
+26-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:17:22-82
+27    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+27-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:18:5-77
+27-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:18:22-74
+28    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+28-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:19:5-86
+28-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:19:22-83
+29    <uses-permission android:name="android.permission.WAKE_LOCK" />
+29-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:20:5-68
+29-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:20:22-65
+30    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+30-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:21:5-81
+30-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:21:22-78
+31
+32    <permission
+32-->[androidx.core:core:1.9.0] C:\Users\sudhan\.gradle\caches\transforms-4\d7c2a5a0e9b2d63685ea121c8dd78161\transformed\core-1.9.0\AndroidManifest.xml:22:5-24:47
+33        android:name="com.paradigm.ifs.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+33-->[androidx.core:core:1.9.0] C:\Users\sudhan\.gradle\caches\transforms-4\d7c2a5a0e9b2d63685ea121c8dd78161\transformed\core-1.9.0\AndroidManifest.xml:23:9-81
+34        android:protectionLevel="signature" />
+34-->[androidx.core:core:1.9.0] C:\Users\sudhan\.gradle\caches\transforms-4\d7c2a5a0e9b2d63685ea121c8dd78161\transformed\core-1.9.0\AndroidManifest.xml:24:9-44
+35
+36    <uses-permission android:name="com.paradigm.ifs.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+36-->[androidx.core:core:1.9.0] C:\Users\sudhan\.gradle\caches\transforms-4\d7c2a5a0e9b2d63685ea121c8dd78161\transformed\core-1.9.0\AndroidManifest.xml:26:5-97
+36-->[androidx.core:core:1.9.0] C:\Users\sudhan\.gradle\caches\transforms-4\d7c2a5a0e9b2d63685ea121c8dd78161\transformed\core-1.9.0\AndroidManifest.xml:26:22-94
+37
+38    <application
+38-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:23:5-61:19
+39        android:allowBackup="true"
+39-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:24:9-35
+40        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+40-->[androidx.core:core:1.9.0] C:\Users\sudhan\.gradle\caches\transforms-4\d7c2a5a0e9b2d63685ea121c8dd78161\transformed\core-1.9.0\AndroidManifest.xml:28:18-86
+41        android:dataExtractionRules="@xml/data_extraction_rules"
+41-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:25:9-65
+42        android:debuggable="true"
+43        android:extractNativeLibs="false"
+44        android:fullBackupContent="@xml/backup_rules"
+44-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:26:9-54
+45        android:icon="@drawable/ic_launcher"
+45-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:27:9-45
+46        android:label="@string/app_name"
+46-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:28:9-41
+47        android:roundIcon="@drawable/ic_launcher_round"
+47-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:29:9-56
+48        android:supportsRtl="true"
+48-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:30:9-35
+49        android:testOnly="true"
+50        android:theme="@style/Theme.ParadigmIFS"
+50-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:31:9-49
+51        android:usesCleartextTraffic="true" >
+51-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:32:9-44
+52        <activity
+52-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:35:9-43:20
+53            android:name="com.paradigm.ifs.MainActivity"
+53-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:36:13-41
+54            android:configChanges="orientation|screenSize|keyboardHidden"
+54-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:38:13-74
+55            android:exported="true" >
+55-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:37:13-36
+56            <intent-filter>
+56-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:39:13-42:29
+57                <action android:name="android.intent.action.MAIN" />
+57-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:40:17-69
+57-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:40:25-66
+58
+59                <category android:name="android.intent.category.LAUNCHER" />
+59-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:41:17-77
+59-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:41:27-74
+60            </intent-filter>
+61        </activity>
+62
+63        <service
+63-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:45:9-49:56
+64            android:name="com.paradigm.ifs.LocationService"
+64-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:46:13-44
+65            android:enabled="true"
+65-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:47:13-35
+66            android:exported="false"
+66-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:48:13-37
+67            android:foregroundServiceType="location" />
+67-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:49:13-53
+68
+69        <provider
+70            android:name="androidx.core.content.FileProvider"
+70-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:52:13-62
+71            android:authorities="com.paradigm.ifs.provider"
+71-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:53:13-60
+72            android:exported="false"
+72-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:54:13-37
+73            android:grantUriPermissions="true" >
+73-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:55:13-47
+74            <meta-data
+74-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:56:13-58:58
+75                android:name="android.support.FILE_PROVIDER_PATHS"
+75-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:57:17-67
+76                android:resource="@xml/provider_paths" />
+76-->E:\onboarding all files\Paradigm Office 2\android\app\src\main\AndroidManifest.xml:58:17-55
+77        </provider>
+78        <provider
+78-->[androidx.emoji2:emoji2:1.2.0] C:\Users\sudhan\.gradle\caches\transforms-4\3e70b9c0103083702ba1ce10ce5764c8\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:24:9-32:20
+79            android:name="androidx.startup.InitializationProvider"
+79-->[androidx.emoji2:emoji2:1.2.0] C:\Users\sudhan\.gradle\caches\transforms-4\3e70b9c0103083702ba1ce10ce5764c8\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:25:13-67
+80            android:authorities="com.paradigm.ifs.androidx-startup"
+80-->[androidx.emoji2:emoji2:1.2.0] C:\Users\sudhan\.gradle\caches\transforms-4\3e70b9c0103083702ba1ce10ce5764c8\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:26:13-68
+81            android:exported="false" >
+81-->[androidx.emoji2:emoji2:1.2.0] C:\Users\sudhan\.gradle\caches\transforms-4\3e70b9c0103083702ba1ce10ce5764c8\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:27:13-37
+82            <meta-data
+82-->[androidx.emoji2:emoji2:1.2.0] C:\Users\sudhan\.gradle\caches\transforms-4\3e70b9c0103083702ba1ce10ce5764c8\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:29:13-31:52
+83                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+83-->[androidx.emoji2:emoji2:1.2.0] C:\Users\sudhan\.gradle\caches\transforms-4\3e70b9c0103083702ba1ce10ce5764c8\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:30:17-75
+84                android:value="androidx.startup" />
+84-->[androidx.emoji2:emoji2:1.2.0] C:\Users\sudhan\.gradle\caches\transforms-4\3e70b9c0103083702ba1ce10ce5764c8\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:31:17-49
+85            <meta-data
+85-->[androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\sudhan\.gradle\caches\transforms-4\7b9100de76557497a0bd0a4c6276bb95\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:31:13-33:52
+86                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+86-->[androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\sudhan\.gradle\caches\transforms-4\7b9100de76557497a0bd0a4c6276bb95\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:32:17-78
+87                android:value="androidx.startup" />
+87-->[androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\sudhan\.gradle\caches\transforms-4\7b9100de76557497a0bd0a4c6276bb95\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:33:17-49
+88        </provider>
+89    </application>
+90
+91</manifest>

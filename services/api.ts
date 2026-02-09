@@ -294,6 +294,18 @@ export const api = {
     };
   },
 
+    // --- Settings ---
+  updateAttendanceSettings: async (settings: AttendanceSettings): Promise<void> => {
+    // Determine the ID to update. Singleton is usually 'singleton' or a specific ID.
+    // Based on getInitialAppData, it fetches where id='singleton'.
+    const { error } = await supabase
+      .from('settings')
+      .update(toSnakeCase(settings))
+      .eq('id', 'singleton');
+
+    if (error) throw error;
+  },
+
   // --- Onboarding & Verification ---
   getVerificationSubmissions: async (status?: string, organizationId?: string): Promise<OnboardingData[]> => {
     let query = supabase.from('onboarding_submissions').select('*');

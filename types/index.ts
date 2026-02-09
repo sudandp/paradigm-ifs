@@ -756,6 +756,8 @@ export interface StaffAttendanceRules {
     android: number; // Number of allowed Android devices
     ios: number; // Number of allowed iOS devices
   };
+  // Admin-configured tracking interval (minutes)
+  trackingIntervalMinutes?: number;
 }
 
 export interface UserHoliday {
