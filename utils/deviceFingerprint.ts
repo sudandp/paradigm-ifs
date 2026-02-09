@@ -485,31 +485,58 @@ export async function generateDeviceName(): Promise<string> {
     let manufacturer = info.manufacturer || '';
 
     // Sanitize manufacturer: if it's bogus or generic, clear it
-    if (manufacturer.includes('Mozilla') || manufacturer.includes('Google Inc') || manufacturer.toLowerCase().includes('unknown')) {
+    // Keep "Google" but remove "Google Inc" or "Mozilla"
+    if (manufacturer.includes('Mozilla') || manufacturer.toLowerCase().includes('unknown')) {
        manufacturer = '';
     }
+    if (manufacturer === 'Google Inc') manufacturer = 'Google';
 
     // Sanitize model: if it's too long or looks like a UA string, clear it
-    if (model.includes('Mozilla') || model.length > 25 || model.toLowerCase().includes('unknown')) {
+    if (model.includes('Mozilla') || model.length > 30 || model.toLowerCase().includes('unknown')) {
        model = '';
     }
 
     // Build friendly name
-    // Prioritize hardwareModel if available, especially for Android
     const hwModel = info.hardwareModel;
     if (deviceType === 'android') {
-      if (hwModel && manufacturer) return `${manufacturer} ${hwModel}`;
-      if (hwModel) return hwModel;
-      if (model && manufacturer) return `${manufacturer} ${model}`; // Fallback to deviceModel
-      if (model) return model;
-      if (manufacturer) return `${manufacturer} Android`;
-      return 'Android Device';
+      let name = '';
+      if (hwModel && manufacturer) {
+        name = manufacturer.toLowerCase().includes(hwModel.toLowerCase()) ? hwModel : `${manufacturer} ${hwModel}`;
+      } else if (hwModel) {
+        name = hwModel;
+      } else if (model && manufacturer) {
+        name = manufacturer.toLowerCase().includes(model.toLowerCase()) ? model : `${manufacturer} ${model}`;
+      } else if (model) {
+        name = model;
+      } else if (manufacturer) {
+        name = `${manufacturer} Android`;
+      } else {
+        name = 'Android Device';
+      }
+
+      // If name is very short (like "K"), try to prepend platform
+      if (name.length <= 2) {
+        return `Android ${name}`;
+      }
+      return name;
     } else { // iOS or other mobile
-      if (model && manufacturer) return `${manufacturer} ${model}`;
-      if (model) return model;
-      if (manufacturer) return `${manufacturer} iOS`;
-      if (hwModel) return `${hwModel} iOS`; // For iOS, hardwareModel is often the same as deviceModel
-      return 'iOS Device';
+      let name = '';
+      if (model && manufacturer) {
+        name = manufacturer.toLowerCase().includes(model.toLowerCase()) ? model : `${manufacturer} ${model}`;
+      } else if (model) {
+        name = model;
+      } else if (manufacturer) {
+        name = `${manufacturer} iOS`;
+      } else if (hwModel) {
+        name = `${hwModel} iOS`;
+      } else {
+        name = 'iOS Device';
+      }
+
+      if (name.length <= 2) {
+        return `iOS ${name}`;
+      }
+      return name;
     }
   }
 }

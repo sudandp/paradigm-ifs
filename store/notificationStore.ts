@@ -88,9 +88,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     try {
       const count = get().unreadCount;
       // Note: This requires @capacitor/badge plugin. 
-      // If it fails to load/install, we gracefully handle it.
-      const { Badge } = await import('@capacitor/badge').catch(() => ({ Badge: null }));
-      if (Badge) {
+      // Using @vite-ignore to allow the app to boot even if the plugin is not installed in the dev environment.
+      // @ts-ignore - Module is installed by the user locally
+      const { Badge } = await import(/* @vite-ignore */ '@capacitor/badge').catch(() => ({ Badge: null }));
+      if (Badge && typeof Badge.set === 'function') {
         await Badge.set({ count });
         console.log(`Updated app badge count to: ${count}`);
       }

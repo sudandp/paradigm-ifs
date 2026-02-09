@@ -139,9 +139,9 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
           <p className="device-warning-description">{message.description}</p>
           
           <div className="device-active-section">
-            <div className="section-header">
+            <div className="dw-section-header">
               <h3>Active {deviceType.charAt(0).toUpperCase() + deviceType.slice(1)} Devices</h3>
-              <span className="limit-indicator">
+              <span className="dw-limit-indicator">
                 {existingDevices.filter(d => d.deviceType === deviceType).length} / {limits[deviceType as keyof typeof limits]}
               </span>
             </div>
@@ -152,26 +152,26 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
                 <span>Syncing devices...</span>
               </div>
             ) : existingDevices.filter(d => d.deviceType === deviceType).length > 0 ? (
-              <div className="device-grid-mini">
+              <div className="dw-device-grid">
                 {existingDevices.filter(d => d.deviceType === deviceType).map(device => (
-                  <div key={device.id} className="device-card-mini">
-                    <div className="device-card-header">
-                      <div className="device-card-icon">
+                  <div key={device.id} className="dw-device-card">
+                    <div className="dw-device-card-header">
+                      <div className="dw-device-card-icon">
                         {deviceType === 'web' ? <Monitor size={20} /> : <Smartphone size={20} />}
                       </div>
-                      <div className="device-card-info">
-                        <span className="device-card-name" title={device.deviceName}>
+                      <div className="dw-device-card-info">
+                        <span className="dw-device-card-name" title={device.deviceName}>
                           {device.deviceName.length > 30 ? `${device.deviceName.substring(0, 27)}...` : device.deviceName}
                         </span>
-                        <div className="device-card-meta">
-                          <span className="device-meta-tag status-active">Active</span>
+                        <div className="dw-device-card-meta">
+                          <span className="dw-meta-tag dw-status-active">Active</span>
                         </div>
                       </div>
                     </div>
-                    <div className="device-card-actions">
+                    <div className="dw-device-card-actions">
                       <button 
                         onClick={() => handleRemoveDevice(device.id)}
-                        className="device-action-btn delete"
+                        className="dw-btn-revoke"
                         title="Remove Device"
                       >
                         <Trash2 size={14} />
