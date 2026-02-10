@@ -105,7 +105,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
     return (
         <div className={`h-full w-full flex flex-col animate-in slide-in-from-right duration-300 ${isMobile ? 'bg-[#0A3D2E]' : 'bg-white'}`}>
             {/* Header */}
-            <div className={`flex items-center justify-between px-6 py-5 border-b ${isMobile ? 'bg-[#0A3D2E] border-white/10' : 'bg-white border-gray-100'}`}>
+            <div className={`flex items-center justify-between px-6 pt-24 pb-5 border-b ${isMobile ? 'bg-[#0A3D2E] border-white/10' : 'bg-white border-gray-100'}`}>
                 <div className="flex items-center gap-3">
                     <h4 className={`font-bold text-xl ${isMobile ? 'text-white' : 'text-gray-900'}`}>Notifications</h4>
                     {unreadCount > 0 && (
