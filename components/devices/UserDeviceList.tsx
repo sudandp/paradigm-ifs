@@ -19,6 +19,7 @@ import Modal from '../ui/Modal';
 import { 
   getUserDevices, 
   revokeDevice, 
+  deleteDevice,
   getCurrentDevice
 } from '../../services/deviceService';
 import { UserDevice, DeviceType } from '../../types';
@@ -84,19 +85,30 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
     }
   };
 
-  const handleRevokeDevice = async (deviceId: string) => {
+  const handleRevokeDevice = async (device: UserDevice) => {
     if (!canManage) return;
     
-    if (!window.confirm('Are you sure you want to remove this device? The user will need to register it again to use it.')) {
+    const isRevoked = device.status === 'revoked';
+    const action = isRevoked ? 'permanently delete' : 'remove';
+    const confirmMessage = isRevoked 
+      ? 'Are you sure you want to permanently delete this device history? This cannot be undone.'
+      : 'Are you sure you want to remove this device? The user will need to register it again to use it.';
+
+    if (!window.confirm(confirmMessage)) {
       return;
     }
     
     try {
-      await revokeDevice(deviceId);
-      setToast({ message: 'Device removed successfully', type: 'success' });
+      if (isRevoked) {
+        await deleteDevice(device.id);
+        setToast({ message: 'Device deleted permanently', type: 'success' });
+      } else {
+        await revokeDevice(device.id);
+        setToast({ message: 'Device removed successfully', type: 'success' });
+      }
       await loadDevices();
     } catch (error) {
-      console.error('Error revoking device:', error);
+      console.error('Error removing/deleting device:', error);
       setToast({ message: 'Failed to remove device', type: 'error' });
     }
   };
@@ -300,7 +312,7 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
                       
                       {canManage && (
                         <button 
-                          onClick={() => handleRevokeDevice(device.id)}
+                          onClick={() => handleRevokeDevice(device)}
                           className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-colors"
                           title="Remove Device"
                         >

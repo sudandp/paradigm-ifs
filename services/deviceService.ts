@@ -648,6 +648,25 @@ export async function revokeDevice(deviceId: string): Promise<{ success: boolean
 }
 
 /**
+ * Permanently delete a device
+ */
+export async function deleteDevice(deviceId: string): Promise<{ success: boolean }> {
+  try {
+    const { error } = await supabase
+      .from('user_devices')
+      .delete()
+      .eq('id', deviceId);
+    
+    if (error) throw error;
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting device:', error);
+    throw error;
+  }
+}
+
+/**
  * Update device last used timestamp
  */
 export async function updateDeviceLastUsed(deviceId: string): Promise<void> {
