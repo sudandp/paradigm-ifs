@@ -108,12 +108,12 @@ const DeviceApprovals: React.FC = () => {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : requests.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-          <div className="bg-green-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Check className="w-8 h-8 text-green-500" />
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-24 text-center mt-4">
+          <div className="bg-green-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Check className="w-10 h-10 text-[#22c55e]" strokeWidth={3} />
           </div>
-          <h3 className="text-lg font-bold text-gray-900">All Caught Up!</h3>
-          <p className="text-gray-500 mt-2">There are no pending device requests requiring approval.</p>
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">All Caught Up!</h3>
+          <p className="text-gray-500 text-lg">There are no pending device requests requiring approval.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-6">

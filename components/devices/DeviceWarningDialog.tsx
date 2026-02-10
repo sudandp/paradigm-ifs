@@ -140,21 +140,29 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
               {deviceType === 'web' ? <Monitor size={24} /> : <Smartphone size={24} />}
             </div>
             <div className="device-info-text">
-              <span className="device-label">Current Device</span>
+              <span className="device-label">CURRENT DEVICE</span>
               <p className="device-name" title={deviceName}>
                 {deviceName.length > 40 ? `${deviceName.substring(0, 37)}...` : deviceName}
               </p>
               <span className="device-type-tag">
-                {deviceType.charAt(0).toUpperCase() + deviceType.slice(1)} Session
+                {deviceType === 'web' ? 'Web Session' : `${deviceType.charAt(0).toUpperCase() + deviceType.slice(1)} Session`}
               </span>
             </div>
           </div>
           
-          <p className="device-warning-description">{message.description}</p>
+          <p className="device-warning-description">
+            {status === 'pending' ? (
+              <>
+                You have a limit of 2 devices only. Use if you need to add one more device then remove one and continue with your limit or wait for management approval.
+                <br /><br />
+                If more devices need to be added, an administrator needs to give permission.
+              </>
+            ) : message.description}
+          </p>
           
           <div className="device-active-section">
             <div className="dw-section-header">
-              <h3>Active {deviceType.charAt(0).toUpperCase() + deviceType.slice(1)} Devices</h3>
+              <h3>Active {deviceType === 'web' ? 'Web' : `${deviceType.charAt(0).toUpperCase() + deviceType.slice(1)}`} Devices</h3>
               <span className="dw-limit-indicator">
                 {existingDevices.filter(d => d.deviceType === deviceType).length} / {limits[deviceType as keyof typeof limits]}
               </span>
@@ -182,7 +190,6 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
                         </div>
                       </div>
                       
-                      {/* Move actions to the right in horizontal mode */}
                       <button 
                          onClick={() => handleRemoveDevice(device.id)}
                          className="dw-btn-remove-compact"
@@ -194,8 +201,6 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
                   </div>
                 ))}
               </div>
-
-
             ) : (
               <div className="empty-state-mini">
                 <p>No other active {deviceType} devices.</p>
@@ -226,7 +231,7 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
           )}
           
           <button
-            className="action-button-secondary"
+            className="action-button-primary action-button-logout"
             onClick={onLogout}
           >
             <LogOut size={18} />
