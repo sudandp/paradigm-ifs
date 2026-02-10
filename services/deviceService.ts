@@ -45,24 +45,50 @@ export async function getDeviceLimits(roleId: string): Promise<DeviceLimitsConfi
     
     // Map role to staff category
     const normalizedRole = (roleId || '').toLowerCase();
-    let staffCategory = 'staff'; 
-    if (normalizedRole === 'admin' || normalizedRole === 'developer') {
-      staffCategory = 'admin';
-    }
     
-    // Explicitly defined limits based on user request:
-    // Admin: 5 Web, 2 Android, 1 iOS
-    // Management, Hr Ops, Finance Manager: 5 Web, 5 Android, 5 iOS
-    // Others: 1 Web, 1 Android, 1 iOS
-    if (staffCategory === 'admin') {
-      return { web: 5, android: 2, ios: 1 };
+    // Check for Admin
+    if (normalizedRole === 'admin' || normalizedRole === 'developer') {
+      const adminRules = attendanceSettings.admin;
+      if (adminRules && adminRules.deviceLimits) {
+        return adminRules.deviceLimits;
+      }
+      // Fallback for admin if not configured yet
+      return { web: 5, android: 5, ios: 5 };
     }
 
-    if (['management', 'hr_ops', 'finance_manager'].includes(normalizedRole)) {
+    // Check for Management
+    if (['management', 'hr_ops', 'finance_manager', 'gm', 'ceo', 'director'].includes(normalizedRole)) {
+      const managementRules = attendanceSettings.management;
+      if (managementRules && managementRules.deviceLimits) {
+        return managementRules.deviceLimits;
+      }
+      // Fallback for management if not configured yet
       return { web: 5, android: 5, ios: 5 };
     }
     
-    // Default for everyone else
+    // Check for Field Staff
+    if (['field_staff', 'field_manager', 'field_executive'].includes(normalizedRole)) {
+       const fieldRules = attendanceSettings.field;
+       if (fieldRules && fieldRules.deviceLimits) {
+         return fieldRules.deviceLimits;
+       }
+    }
+
+    // Check for Site Staff
+    if (['site_staff', 'site_manager', 'security_guard'].includes(normalizedRole)) {
+       const siteRules = attendanceSettings.site;
+       if (siteRules && siteRules.deviceLimits) {
+         return siteRules.deviceLimits;
+       }
+    }
+    
+    // Check for Office Staff
+    const officeRules = attendanceSettings.office;
+    if (officeRules && officeRules.deviceLimits) {
+      return officeRules.deviceLimits;
+    }
+
+    // Default for everyone else if nothing configured
     return { web: 1, android: 1, ios: 1 };
   } catch (error) {
     console.error('Error getting device limits:', error);

@@ -698,7 +698,7 @@ export interface Location {
 
 export interface RecurringHolidayRule {
   id?: string; // Optional for new rules before saving
-  type?: 'office' | 'field' | 'site'; // Optional as it might be inferred
+  type?: 'office' | 'field' | 'site' | 'admin' | 'management'; // Optional as it might be inferred
   day: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
   n: number; // 1 for 1st, 2 for 2nd, 3 for 3rd, 4 for 4th, 5 for 5th
 }
@@ -772,13 +772,17 @@ export interface AttendanceSettings {
   office: StaffAttendanceRules;
   field: StaffAttendanceRules;
   site: StaffAttendanceRules;
+  admin?: StaffAttendanceRules;
+  management?: StaffAttendanceRules;
   missedCheckoutConfig?: {
-    enabledGroups: ('office' | 'field' | 'site')[];
+    enabledGroups: ('office' | 'field' | 'site' | 'admin' | 'management')[];
     enabledRoles?: string[]; // Deprecated in favor of roleMapping
     roleMapping?: {
       office: string[];
       field: string[];
       site: string[];
+      admin?: string[];
+      management?: string[];
     };
   };
 }
@@ -787,7 +791,7 @@ export interface Holiday {
   id: string;
   date: string; // YYYY-MM-DD
   name: string;
-  type: 'office' | 'field' | 'site';
+  type: 'office' | 'field' | 'site' | 'admin' | 'management';
 }
 
 export interface AttendanceViolation {

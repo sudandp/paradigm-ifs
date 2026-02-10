@@ -23,7 +23,7 @@ const AttendanceSettings: React.FC = () => {
     const [isDirty, setIsDirty] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    const [activeTab, setActiveTab] = useState<'office' | 'field' | 'site' | 'selections'>('office');
+    const [activeTab, setActiveTab] = useState<'office' | 'field' | 'site' | 'admin' | 'management' | 'selections'>('office');
     const [newHolidayName, setNewHolidayName] = useState('');
     const [newHolidayDate, setNewHolidayDate] = useState('');
     const [newRecurringN, setNewRecurringN] = useState(3);
@@ -52,7 +52,13 @@ const AttendanceSettings: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        setLocalAttendance(attendance);
+        // Initialize admin and management if missing
+        setLocalAttendance(prev => {
+            const updated = { ...attendance };
+            if (!updated.admin) updated.admin = { ...attendance.office, deviceLimits: { web: 5, android: 5, ios: 5 } };
+            if (!updated.management) updated.management = { ...attendance.office, deviceLimits: { web: 5, android: 5, ios: 5 } };
+            return updated;
+        });
     }, [attendance]);
 
     useEffect(() => {
@@ -62,8 +68,16 @@ const AttendanceSettings: React.FC = () => {
     // Load geofencing settings
     // No extra loading here, it's part of attendance settings
 
-    const currentRules = activeTab === 'selections' ? localAttendance.office : localAttendance[activeTab as 'office' | 'field' | 'site'];
-    const currentHolidaysFromStore = activeTab === 'office' ? officeHolidays : activeTab === 'field' ? fieldHolidays : siteHolidays;
+    const currentRules = activeTab === 'selections' ? localAttendance.office : localAttendance[activeTab as 'office' | 'field' | 'site' | 'admin' | 'management'];
+    const currentHolidaysFromStore = activeTab === 'office' || activeTab === 'admin' || activeTab === 'management' 
+        ? officeHolidays // Admin/Management share office holidays generally, or we could separate them. For now, sharing seems appropriate or they can be configured separately if the backend supported it. Actually the `type` field in holidays supports 'office', 'field', 'site'. Let's stick to 'office' holidays for Admin/Mgmt for now unless we add specific holiday lists. 
+        : activeTab === 'field' ? fieldHolidays : siteHolidays;
+    
+    // NOTE: For simplicity, Admin and Management will view/edit "Office" holidays when in their tabs, 
+    // or we can just hide the holiday section for them and say "Inherits Office Holidays".
+    // Let's hide the holiday section for Admin/Mgmt to avoid confusion, or map them to office.
+    // The previous code mapped `activeTab` directly to holiday type.
+
     const currentYear = new Date().getFullYear();
     
     // Merge fixed holidays with store holidays, ensuring no duplicates by name
@@ -80,6 +94,14 @@ const AttendanceSettings: React.FC = () => {
     const handleAddHoliday = async (e: React.FormEvent) => {
         e.preventDefault();
         if (newHolidayName && newHolidayDate && activeTab !== 'selections') {
+            // For now, only allow adding holidays to core types or map admin/mgmt to office
+            // If activeTab is admin/management, we might want to block adding holidays strictly to them unless backend supports it.
+            // Let's assume for now we only edit holidays for office/field/site.
+            if (activeTab === 'admin' || activeTab === 'management') {
+                setToast({ message: 'Holiday configuration for Admin/Management is inherited from Office rules.', type: 'error' });
+                return;
+            }
+
             const adminAllocated = 5; // Fixed 5 admin holidays
             const nonFixedHolidays = currentHolidays.filter(h => !FIXED_HOLIDAYS.some(fh => fh.name === h.name));
             
@@ -108,6 +130,7 @@ const AttendanceSettings: React.FC = () => {
     const handleRemoveHoliday = async (id: string) => {
         if (id.startsWith('fixed-')) return; // Cannot remove fixed holidays
         if (activeTab !== 'selections') {
+            if (activeTab === 'admin' || activeTab === 'management') return;
             try {
                 await removeHoliday(activeTab as 'office' | 'field' | 'site', id);
                 setToast({ message: 'Holiday removed successfully.', type: 'success' });
@@ -167,7 +190,7 @@ const AttendanceSettings: React.FC = () => {
         setLocalAttendance(prev => ({
             ...prev,
             [activeTab]: {
-                ...prev[activeTab as 'office' | 'field' | 'site'],
+                ...prev[activeTab as 'office' | 'field' | 'site' | 'admin' | 'management'],
                 [setting]: value
             }
         }));
@@ -220,7 +243,7 @@ const AttendanceSettings: React.FC = () => {
 
 
             <div className="mb-6 border-b border-border">
-                <nav className="-mb-px flex space-x-6" aria-label="Tabs">
+                <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
                     <button onClick={() => setActiveTab('office')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'office' ? 'border-accent text-accent-dark' : 'border-transparent text-muted hover:text-accent-dark hover:border-accent'}`}>
                         Office Staff
                     </button>
@@ -230,15 +253,23 @@ const AttendanceSettings: React.FC = () => {
                     <button onClick={() => setActiveTab('site')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'site' ? 'border-accent text-accent-dark' : 'border-transparent text-muted hover:text-accent-dark hover:border-accent'}`}>
                         Site Staff
                     </button>
+                    <button onClick={() => setActiveTab('admin')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'admin' ? 'border-accent text-accent-dark' : 'border-transparent text-muted hover:text-accent-dark hover:border-accent'}`}>
+                        Admin
+                    </button>
+                    <button onClick={() => setActiveTab('management')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'management' ? 'border-accent text-accent-dark' : 'border-transparent text-muted hover:text-accent-dark hover:border-accent'}`}>
+                        Management
+                    </button>
                     <button onClick={() => setActiveTab('selections')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'selections' ? 'border-accent text-accent-dark' : 'border-transparent text-muted hover:text-accent-dark hover:border-accent'}`}>
                         Staff Selections
                     </button>
                 </nav>
             </div>
 
-            {activeTab === 'office' && <p className="text-sm text-muted -mt-4 mb-4">These rules apply to Admin, HR, and Finance roles.</p>}
-            {activeTab === 'field' && <p className="text-sm text-muted -mt-4 mb-4">These rules apply to Field Staff roles.</p>}
+            {activeTab === 'office' && <p className="text-sm text-muted -mt-4 mb-4">These rules apply to Receptionist, Accountant, and general Office Staff.</p>}
+            {activeTab === 'field' && <p className="text-sm text-muted -mt-4 mb-4">These rules apply to Field Staff and Field Managers.</p>}
             {activeTab === 'site' && <p className="text-sm text-muted -mt-4 mb-4">These rules apply to Site Staff (e.g. Site Managers, Security Guards).</p>}
+            {activeTab === 'admin' && <p className="text-sm text-muted -mt-4 mb-4">These rules apply to System Administrators and HR Admins.</p>}
+            {activeTab === 'management' && <p className="text-sm text-muted -mt-4 mb-4">These rules apply to Top Management, CEO, GM, etc.</p>}
             {activeTab === 'selections' && <p className="text-sm text-muted -mt-4 mb-4">Select staff groups to include in automated actions like missed check-out triggers.</p>}
 
 
@@ -670,7 +701,7 @@ const AttendanceSettings: React.FC = () => {
                                         await addRecurringHoliday({
                                             day: newRecurringDay as any,
                                             n: newRecurringN,
-                                            type: activeTab as 'office' | 'field' | 'site'
+                                            type: activeTab as 'office' | 'field' | 'site' | 'admin' | 'management'
                                         });
                                         setToast({ message: 'Recurring holiday added successfully.', type: 'success' });
                                     } catch (error) {
