@@ -1,135 +1,78 @@
-/* Device Warning Dialog - Premium SaaS Redesign - FIXED & CLEANED */
+/* Device Warning Dialog - Premium SaaS Redesign - FINAL MOB FIX v2 */
 
 .device-warning-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: #041b0f !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: radial-gradient(circle at center, #0a2f1a 0%, #041b0f 100%) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     z-index: 9999 !important;
-    padding: 24px;
-    overflow: hidden;
+    padding: 20px !important;
 }
 
-/* Background Blobs for Depth */
-.device-warning-bg-blobs {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    z-index: -1;
-    filter: blur(80px);
-}
-
-.blob {
-    position: absolute;
-    border-radius: 50%;
-    opacity: 0.4;
-    animation: blob-float 20s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.blob-1 {
-    width: 400px;
-    height: 400px;
-    background: #006b3f;
-    top: -100px;
-    left: -100px;
-}
-
-.blob-2 {
-    width: 300px;
-    height: 300px;
-    background: #10b981;
-    bottom: -50px;
-    right: -50px;
-    animation-delay: -5s;
-}
-
-.blob-3 {
-    width: 250px;
-    height: 250px;
-    background: #f59e0b;
-    top: 40%;
-    left: 40%;
-    opacity: 0.2;
-    animation-delay: -10s;
-}
-
-@keyframes blob-float {
-    0% { transform: translate(0, 0) scale(1); }
-    100% { transform: translate(100px, 50px) scale(1.2); }
-}
-
-/* Premium Card */
 .device-warning-card {
     background: #011409 !important;
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(34, 197, 94, 0.1) !important;
-    border-radius: 28px !important;
-    max-width: 480px;
-    width: 100%;
-    overflow: hidden;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-radius: 24px !important;
+    max-width: 440px !important;
+    width: 100% !important;
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.8) !important;
     display: flex !important;
     flex-direction: column !important;
+    overflow: hidden !important;
 }
 
 .device-warning-header {
-    padding: 40px 40px 16px !important;
+    padding: 32px 24px 16px !important;
     text-align: center !important;
 }
 
 .device-warning-icon-wrapper {
-    width: 64px !important;
-    height: 64px !important;
-    border-radius: 20px !important;
+    width: 60px !important;
+    height: 60px !important;
+    border-radius: 18px !important;
     margin: 0 auto 16px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     background: rgba(34, 197, 94, 0.05) !important;
     color: #4ade80 !important;
-    border: 1px solid rgba(255, 255, 255, 0.03) !important;
-}
-
-.device-warning-icon-wrapper.status-limit_reached {
-    color: #ef4444 !important;
+    box-shadow: 0 0 20px rgba(74, 222, 128, 0.1) !important;
 }
 
 .device-warning-title {
-    font-size: 24px !important;
+    font-size: 22px !important;
     font-weight: 700 !important;
     color: #ffffff !important;
     margin: 0 !important;
 }
 
-/* Content */
 .device-warning-content {
-    padding: 24px 32px !important;
+    padding: 0 24px 24px !important;
     display: flex !important;
     flex-direction: column !important;
-    gap: 24px !important;
+    gap: 20px !important;
 }
 
 .device-info-hero {
     background: rgba(255, 255, 255, 0.03) !important;
     border: 1px solid rgba(255, 255, 255, 0.05) !important;
-    border-radius: 24px !important;
-    padding: 24px !important;
+    border-radius: 20px !important;
+    padding: 16px !important;
     display: flex !important;
     align-items: center !important;
-    gap: 20px !important;
+    gap: 16px !important;
 }
 
 .device-type-icon {
-    width: 56px !important;
-    height: 56px !important;
-    border-radius: 16px !important;
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    border-radius: 14px !important;
     background: rgba(34, 197, 94, 0.1) !important;
     color: #4ade80 !important;
     display: flex !important;
@@ -137,89 +80,77 @@
     justify-content: center !important;
 }
 
-.device-info-text {
-    flex: 1 !important;
-}
-
 .device-label {
     display: block !important;
-    font-size: 10px !important;
+    font-size: 9px !important;
     font-weight: 700 !important;
     color: #4ade80 !important;
     text-transform: uppercase !important;
-    margin-bottom: 4px !important;
-    opacity: 0.8 !important;
+    letter-spacing: 0.1em !important;
+    margin-bottom: 2px !important;
+    opacity: 0.7 !important;
 }
 
 .device-name {
-    font-size: 18px !important;
+    font-size: 16px !important;
     font-weight: 600 !important;
     color: #ffffff !important;
     margin: 0 !important;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
 }
 
 .device-type-tag {
-    font-size: 13px !important;
+    font-size: 12px !important;
     color: rgba(255, 255, 255, 0.4) !important;
 }
 
 .device-warning-description {
-    font-size: 14px !important;
+    font-size: 13px !important;
     color: rgba(255, 255, 255, 0.5) !important;
     line-height: 1.5 !important;
-    margin: 0 !important;
     text-align: center !important;
 }
 
-/* Device Lists */
 .device-active-section {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 16px !important;
-}
-
-.dw-section-header h3 {
-    font-size: 15px !important;
-    font-weight: 600 !important;
-    color: #ffffff !important;
-    margin: 0 !important;
-}
-
-.dw-limit-indicator {
-    display: none !important;
-}
-
-.dw-device-grid {
     display: flex !important;
     flex-direction: column !important;
     gap: 12px !important;
 }
 
+.dw-section-header h3 {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: #ffffff !important;
+    margin: 0 !important;
+}
+
+.dw-device-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+}
+
+/* THE FIX: Force horizontal layout with flex and nowrap */
 .dw-device-card {
     background: rgba(255, 255, 255, 0.02) !important;
-    border: 1px solid rgba(255, 255, 255, 0.05) !important;
-    border-radius: 20px !important;
-    padding: 16px 20px !important;
+    border: 1px solid rgba(255, 255, 255, 0.04) !important;
+    border-radius: 16px !important;
+    padding: 12px !important;
     display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
-}
-
-.dw-device-card-header {
-    display: flex !important;
-    align-items: center !important;
-    flex: 1 !important;
-    gap: 16px !important;
-    flex-direction: row !important; /* Force row on mobile too */
+    justify-content: space-between !important;
+    gap: 12px !important;
+    flex-wrap: nowrap !important;
 }
 
 .dw-device-card-icon {
-    width: 48px !important;
-    height: 48px !important;
-    border-radius: 14px !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    border-radius: 12px !important;
     background: rgba(34, 197, 94, 0.1) !important;
     color: #4ade80 !important;
     display: flex !important;
@@ -230,43 +161,53 @@
 .dw-device-card-info {
     flex: 1 !important;
     min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
 .dw-device-card-name {
-    font-size: 16px !important;
+    font-size: 14px !important;
     font-weight: 600 !important;
     color: #ffffff !important;
-    display: block !important;
+    margin-bottom: 2px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
 }
 
 .dw-status-active {
+    font-size: 12px !important;
     color: rgba(255, 255, 255, 0.4) !important;
-    font-size: 13px !important;
 }
 
 .dw-btn-remove-compact {
     background: #1a4d2e !important;
     color: #ffffff !important;
     border: none !important;
-    padding: 10px 18px !important;
-    border-radius: 12px !important;
-    font-size: 14px !important;
+    padding: 8px 16px !important;
+    border-radius: 10px !important;
+    font-size: 13px !important;
     font-weight: 600 !important;
     cursor: pointer !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
 }
 
-/* Footer Actions */
+.dw-btn-remove-compact:hover {
+    background: #22c55e !important;
+}
+
 .device-warning-footer {
-    padding: 16px 32px 32px !important;
+    padding: 8px 24px 32px !important;
     display: flex !important;
     flex-direction: column !important;
     gap: 12px !important;
 }
 
 .action-button-primary {
-    height: 60px !important;
-    border-radius: 18px !important;
-    font-size: 17px !important;
+    height: 52px !important;
+    border-radius: 16px !important;
+    font-size: 16px !important;
     font-weight: 600 !important;
     display: flex !important;
     align-items: center !important;
@@ -276,26 +217,21 @@
     background: #22c55e !important;
     color: #ffffff !important;
     width: 100% !important;
+    cursor: pointer !important;
 }
 
 .action-button-primary:hover {
     background: #16a34a !important;
 }
 
-/* Hide legacy elements */
-.action-button-secondary, .empty-state-mini p:empty {
+/* Hide Limit indicator as per mockup */
+.dw-limit-indicator {
     display: none !important;
 }
 
 /* Base Responsive */
-@media (max-width: 480px) {
-    .device-warning-overlay { padding: 16px; }
-    .device-warning-card { border-radius: 24px; }
-    .device-warning-header { padding: 32px 24px 12px !important; }
-    .device-warning-content { padding: 20px 24px !important; gap: 20px !important; }
-    .device-warning-footer { padding: 12px 24px 24px !important; }
-    .device-info-hero { padding: 16px !important; border-radius: 20px !important; }
-    .device-name { font-size: 16px !important; }
-    .dw-device-card { padding: 12px 16px !important; }
-    .dw-btn-remove-compact { padding: 8px 14px !important; font-size: 13px !important; }
+@media (max-width: 768px) {
+    .dw-device-card { gap: 8px !important; padding: 10px !important; }
+    .dw-device-card-icon { width: 36px !important; height: 36px !important; min-width: 36px !important; }
+    .dw-btn-remove-compact { padding: 6px 12px !important; font-size: 12px !important; }
 }
