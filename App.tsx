@@ -214,21 +214,26 @@ const App: React.FC = () => {
   const location = useLocation();
   const { setDeferredPrompt } = usePWAStore();
 
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: any) => {
-      // Prevent the mini-infobar from appearing on mobile
-      e.preventDefault();
-      // Stash the event so it can be triggered later.
-      console.log('Capture beforeinstallprompt event');
-      setDeferredPrompt(e);
-    };
+    useEffect(() => {
+        const handleBeforeInstallPrompt = (e: any) => {
+            // Prevent the mini-infobar from appearing on mobile
+            e.preventDefault();
+            // Stash the event so it can be triggered later.
+            console.log('Capture beforeinstallprompt event');
+            setDeferredPrompt(e);
+        };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        
+        // Request notification permissions early
+        import('./utils/notificationUtils').then(({ requestNotificationPermissions }) => {
+            requestNotificationPermissions();
+        });
 
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, [setDeferredPrompt]);
+        return () => {
+            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        };
+    }, [setDeferredPrompt]);
 
   useEffect(() => {
     if (user && shouldStorePath(location.pathname + location.search)) {

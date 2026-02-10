@@ -16,6 +16,7 @@ import { calculateDistanceMeters, reverseGeocode, getPrecisePosition } from '../
 import { processDailyEvents } from '../utils/attendanceCalculations';
 import { dispatchNotificationFromRules } from '../services/notificationService';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { scheduleShiftEndReminder, scheduleBreakEndReminder, cancelNotification } from '../utils/notificationUtils';
 
 // Centralized friendly error message handler for Supabase
 // Centralized friendly error message handler for Supabase
@@ -497,6 +498,24 @@ export const useAuthStore = create<AuthState>()(
                     if (user.role === 'field_staff') {
                         const today = format(new Date(), 'yyyy-MM-dd');
                         api.processFieldAttendance(user.id, today).catch(e => console.error('Violation check failed:', e));
+                    }
+
+                    if (newType === 'check-in') {
+                        // Schedule Shift End Reminder (9 hours)
+                        // If user has specific shift duration settings, we could use that. defaulting to 9h.
+                        scheduleShiftEndReminder(new Date(), 9);
+                    } else if (newType === 'check-out') {
+                        // Cancel shift end reminder
+                        cancelNotification('SHIFT_END');
+                        // Also ensure break reminder is cancelled just in case
+                        cancelNotification('BREAK_END');
+                    } else if (newType === 'break-in') {
+                        // Schedule Break End Reminder
+                        // Utilizes the store's breakLimit (e.g. 60 mins)
+                        scheduleBreakEndReminder(new Date(), get().breakLimit);
+                    } else if (newType === 'break-out') {
+                        // Cancel break reminder
+                        cancelNotification('BREAK_END');
                     }
 
                     return { success: true, message: `Successfully ${newType === 'check-in' ? 'punch in' : newType === 'check-out' ? 'punch out' : newType.replace('-', ' ')}!` };
