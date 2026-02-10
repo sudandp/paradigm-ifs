@@ -95,7 +95,13 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
       case 'pending':
         return {
           title: 'Approval Pending',
-          description: customMessage || 'Your request to use this device is pending approval from the administrator.',
+          description: customMessage || (
+            <>
+              You have a limit of 2 devices only. Use if you need to add one more device then remove one and continue with your limit or wait for management approval.
+              <br /><br />
+              If more devices need to be added, an administrator needs to give permission.
+            </>
+          ),
           actionText: 'Waiting for Approval',
           showRequestButton: false,
         };
@@ -150,15 +156,7 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
             </div>
           </div>
           
-          <p className="device-warning-description">
-            {status === 'pending' ? (
-              <>
-                You have a limit of 2 devices only. Use if you need to add one more device then remove one and continue with your limit or wait for management approval.
-                <br /><br />
-                If more devices need to be added, an administrator needs to give permission.
-              </>
-            ) : message.description}
-          </p>
+          <p className="device-warning-description">{message.description}</p>
           
           <div className="device-active-section">
             <div className="dw-section-header">
