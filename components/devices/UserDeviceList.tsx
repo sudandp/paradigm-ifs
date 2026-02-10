@@ -201,17 +201,19 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
                             // 2. Identify Android
                             if (device.deviceType.toLowerCase() === 'android' || os.includes('android')) {
                               const hwModel = info.hardwareModel || info.deviceModel;
-                              const manufacturer = info.manufacturer || '';
+                              const manufacturer = (info.manufacturer || '').replace(/Google Inc\.?/i, 'Google');
                               
                               let makeModel = 'Android Device';
                               if (hwModel && manufacturer) {
-                                // Prevent "Samsung Samsung Fold"
-                                makeModel = hwModel.toLowerCase().includes(manufacturer.toLowerCase()) 
-                                  ? hwModel 
-                                  : `${manufacturer} ${hwModel}`;
+                                // Prevent "Samsung Samsung Fold" or "Google Pixel"
+                                const hasManufInModel = hwModel.toLowerCase().includes(manufacturer.toLowerCase());
+                                makeModel = hasManufInModel ? hwModel : `${manufacturer} ${hwModel}`;
                               } else {
                                 makeModel = hwModel || manufacturer || 'Android Device';
                               }
+                              
+                              // Clean up generic "K" or "Unknown"
+                              if (makeModel.toUpperCase() === 'K' || makeModel.toUpperCase() === 'UNKNOWN') makeModel = 'Android Device';
                               
                               return `${makeModel} (${browser})`;
                             }
@@ -219,13 +221,12 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
                             // 3. Identify PC Make (HP, Dell, etc.)
                             if (info.deviceModel || info.manufacturer) {
                               const model = info.deviceModel || '';
-                              const manufacturer = info.manufacturer || '';
+                              const manufacturer = (info.manufacturer || '').replace(/Google Inc\.?/i, 'Google');
                               
                               let makeModel = '';
                               if (model && manufacturer) {
-                                makeModel = model.toLowerCase().includes(manufacturer.toLowerCase()) 
-                                  ? model 
-                                  : `${manufacturer} ${model}`;
+                                const hasManufInModel = model.toLowerCase().includes(manufacturer.toLowerCase());
+                                makeModel = hasManufInModel ? model : `${manufacturer} ${model}`;
                               } else {
                                 makeModel = model || manufacturer;
                               }
@@ -371,7 +372,15 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
                   </div>
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Operating System</label>
-                    <p className="text-sm font-medium text-gray-700">{viewedDevice.deviceInfo?.os} {viewedDevice.deviceInfo?.osVersion || ''}</p>
+                    <p className="text-sm font-medium text-gray-700">
+                      {(() => {
+                        const os = viewedDevice.deviceInfo?.os || '';
+                        const version = viewedDevice.deviceInfo?.osVersion || '';
+                        const capOS = os.charAt(0).toUpperCase() + os.slice(1);
+                        if (version.toLowerCase().startsWith(os.toLowerCase())) return version;
+                        return `${capOS} ${version}`;
+                      })()}
+                    </p>
                   </div>
                 </div>
               </div>

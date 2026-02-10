@@ -81,9 +81,8 @@ async function getMobileDeviceInfo(): Promise<DeviceInfo> {
       batteryLevel: battery.batteryLevel,
       isCharging: battery.isCharging,
       connectionType: network.connectionType,
-      appVersion: appInfo.version || '1.0.0', // Fallback to 1.0.0 if unknown
-      hardwareModel: info.model, // Native model number
-      // Added high-entropy markers for mobile to prevent incorrect merging
+      appVersion: appInfo.version || '1.0.0',
+      hardwareModel: info.model, 
       screenResolution: `${window.screen.width}x${window.screen.height}`,
       colorDepth: window.screen.colorDepth,
       canvas: getCanvasFingerprint(),
@@ -91,11 +90,16 @@ async function getMobileDeviceInfo(): Promise<DeviceInfo> {
     };
     
     // Check if what we got from Capacitor is generic/placeholder (common in mobile browsers)
+    const normalizedModel = (deviceInfo.deviceModel || '').toUpperCase();
+    const normalizedManuf = (deviceInfo.manufacturer || '').toLowerCase();
+    
     const isGeneric = 
       !deviceInfo.deviceModel || 
-      deviceInfo.deviceModel === 'K' || 
-      deviceInfo.deviceModel === 'unknown' || 
-      deviceInfo.manufacturer?.toLowerCase().includes('google inc');
+      normalizedModel === 'K' || 
+      normalizedModel === 'UNKNOWN' || 
+      normalizedModel.includes('ANDROID') || // e.g. "Android SDK built for x86"
+      normalizedManuf.includes('google inc') ||
+      normalizedManuf === 'unknown';
 
     // Fallback model from UA if native model is generic/empty
     if (isGeneric) {
@@ -104,14 +108,30 @@ async function getMobileDeviceInfo(): Promise<DeviceInfo> {
         deviceInfo.hardwareModel = uaModel;
         deviceInfo.deviceModel = uaModel;
         
-        // If manufacturer is generic, try to infer it from model prefix
-        if (!deviceInfo.manufacturer || deviceInfo.manufacturer.toLowerCase().includes('google inc')) {
-          if (uaModel.startsWith('SM-') || uaModel.startsWith('GT-')) deviceInfo.manufacturer = 'Samsung';
-          else if (uaModel.startsWith('Pixel')) deviceInfo.manufacturer = 'Google';
-          else if (uaModel.startsWith('ONEPLUS')) deviceInfo.manufacturer = 'OnePlus';
+        // If manufacturer is generic, try to infer it from model prefix or UA
+        const lowUA = navigator.userAgent.toLowerCase();
+        if (normalizedManuf.includes('google inc') || normalizedManuf === 'unknown' || !normalizedManuf) {
+          if (uaModel.startsWith('SM-') || uaModel.startsWith('GT-') || lowUA.includes('samsung')) deviceInfo.manufacturer = 'Samsung';
+          else if (uaModel.startsWith('Pixel') || lowUA.includes('pixel')) deviceInfo.manufacturer = 'Google';
+          else if (uaModel.startsWith('ONEPLUS') || lowUA.includes('oneplus')) deviceInfo.manufacturer = 'OnePlus';
+          else if (uaModel.startsWith('CPH') || lowUA.includes('oppo')) deviceInfo.manufacturer = 'Oppo';
+          else if (uaModel.startsWith('M21') || lowUA.includes('xiaomi') || lowUA.includes('redmi')) deviceInfo.manufacturer = 'Xiaomi';
+          else if (lowUA.includes('moto') || lowUA.includes('motorola')) deviceInfo.manufacturer = 'Motorola';
+          else if (lowUA.includes('huawei')) deviceInfo.manufacturer = 'Huawei';
+        }
+      } else {
+        // Final fallback if UA parsing fails too - don't leave it as "K" or "Google Inc"
+        deviceInfo.hardwareModel = 'Android Device';
+        deviceInfo.deviceModel = 'Android Device';
+        if (normalizedManuf.includes('google inc') || normalizedManuf === 'unknown') {
+          deviceInfo.manufacturer = 'Android';
         }
       }
     }
+
+    // Capitalize OS name consistently
+    if (deviceInfo.os === 'android') deviceInfo.os = 'Android';
+    if (deviceInfo.os === 'ios') deviceInfo.os = 'iOS';
 
     // Try to get public IP for mobile too
     try {
@@ -142,6 +162,7 @@ async function getWebDeviceInfo(): Promise<DeviceInfo> {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     screenResolution: `${window.screen.width}x${window.screen.height}`,
     colorDepth: window.screen.colorDepth,
+    appVersion: '1.0.0', // Always provide a version for web too
   };
   
   // Parse user agent for browser/OS info
@@ -458,13 +479,25 @@ function parseAndroidModel(ua: string): string | null {
     const parts = androidMatch[1].split(';');
     // Look for the part that's likely the model (usually at the end, and not 'Linux' or 'Android')
     for (let i = parts.length - 1; i >= 0; i--) {
-      const part = parts[i].trim();
-      if (!part.includes('Linux') && 
-          !part.includes('Android') && 
-          !part.includes('Version') && 
-          !part.includes('build') &&
-          !part.includes('Build') &&
-          !part.toLowerCase().includes('wv') && // Exclude WebView markers
+      let part = parts[i].trim();
+      
+      // Aggressively strip build/version info from the part
+      if (part.includes('Build/')) part = part.split('Build/')[0].trim();
+      if (part.includes('build/')) part = part.split('build/')[0].trim();
+      if (part.includes('Build')) part = part.split('Build')[0].trim();
+      if (part.includes('build')) part = part.split('build')[0].trim();
+
+      const lowPart = part.toLowerCase();
+      
+      // Skip if it's just the OS version part (e.g. "Android 10")
+      if (lowPart.startsWith('android')) {
+        // Only strip if it has a version number, else it might be "Android Device" name
+        if (/\d/.test(part)) continue;
+      }
+      
+      if (!lowPart.includes('linux') && 
+          !lowPart.includes('wv') && // Exclude WebView markers
+          !lowPart.includes('version') &&
           part.length > 2 &&
           part.length < 35) {
         
@@ -479,28 +512,37 @@ function parseAndroidModel(ua: string): string | null {
  * Map common Samsung/Android model numbers to friendly names
  */
 function getFriendlyModelName(model: string): string {
-  if (!model || model === 'K' || model === 'unknown') return 'Android Device';
+  if (!model || model === 'K' || model === 'unknown' || model.includes('Android SDK')) return 'Android Device';
   
   const modelUpper = model.toUpperCase();
   
+  // Clean up model names that might still have extra info
+  const cleanedModel = modelUpper.split(' ').filter(word => 
+    !['WV', 'BUILD', 'VERSION', 'RELEASE'].includes(word)
+  ).join(' ');
+
   // Samsung Fold/Flip Series
-  if (modelUpper.includes('SM-F936') || modelUpper.includes('F936')) return 'Samsung Fold 4';
-  if (modelUpper.includes('SM-F946') || modelUpper.includes('F946')) return 'Samsung Fold 5';
-  if (modelUpper.includes('SM-F721') || modelUpper.includes('F721')) return 'Samsung Flip 4';
-  if (modelUpper.includes('SM-F731') || modelUpper.includes('F731')) return 'Samsung Flip 5';
+  if (cleanedModel.includes('SM-F936') || cleanedModel.includes('F936')) return 'Samsung Fold 4';
+  if (cleanedModel.includes('SM-F946') || cleanedModel.includes('F946')) return 'Samsung Fold 5';
+  if (cleanedModel.includes('SM-F721') || cleanedModel.includes('F721')) return 'Samsung Flip 4';
+  if (cleanedModel.includes('SM-F731') || cleanedModel.includes('F731')) return 'Samsung Flip 5';
   
   // Samsung S Series
-  if (modelUpper.includes('SM-S901')) return 'Samsung S22';
-  if (modelUpper.includes('SM-S911')) return 'Samsung S23';
-  if (modelUpper.includes('SM-S921')) return 'Samsung S24';
-  if (modelUpper.includes('SM-S908')) return 'Samsung S22 Ultra';
-  if (modelUpper.includes('SM-S918')) return 'Samsung S23 Ultra';
-  if (modelUpper.includes('SM-S928')) return 'Samsung S24 Ultra';
+  if (cleanedModel.includes('SM-S901')) return 'Samsung S22';
+  if (cleanedModel.includes('SM-S911')) return 'Samsung S23';
+  if (cleanedModel.includes('SM-S921')) return 'Samsung S24';
+  if (cleanedModel.includes('SM-S908')) return 'Samsung S22 Ultra';
+  if (cleanedModel.includes('SM-S918')) return 'Samsung S23 Ultra';
+  if (cleanedModel.includes('SM-S928')) return 'Samsung S24 Ultra';
+  if (cleanedModel.includes('SM-G98')) return 'Samsung S20';
+  if (cleanedModel.includes('SM-G99')) return 'Samsung S21';
   
   // Pixel Series
-  if (modelUpper.includes('PIXEL 6')) return 'Google Pixel 6';
-  if (modelUpper.includes('PIXEL 7')) return 'Google Pixel 7';
-  if (modelUpper.includes('PIXEL 8')) return 'Google Pixel 8';
+  if (cleanedModel.includes('PIXEL 4')) return 'Google Pixel 4';
+  if (cleanedModel.includes('PIXEL 5')) return 'Google Pixel 5';
+  if (cleanedModel.includes('PIXEL 6')) return 'Google Pixel 6';
+  if (cleanedModel.includes('PIXEL 7')) return 'Google Pixel 7';
+  if (cleanedModel.includes('PIXEL 8')) return 'Google Pixel 8';
 
   return model;
 }
