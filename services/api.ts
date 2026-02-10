@@ -952,11 +952,15 @@ export const api = {
   },
 
   approveUser: async (userId: string, newRole: string) => {
-    const { data, error } = await supabase.functions.invoke('admin-approve-user', {
-      body: { userId, role: newRole }
+    // Replaces the edge function call with a direct database RPC call
+    const { data, error } = await supabase.rpc('approve_user', {
+      user_id: userId,
+      role_text: newRole
     });
+    
     if (error) throw error;
-    return data;
+    // Return a success object to match previous behavior if needed
+    return { message: 'User approved successfully' }; 
   },
 
   createUser: async (userData: Partial<User>): Promise<User> => {
