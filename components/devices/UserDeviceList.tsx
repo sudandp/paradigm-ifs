@@ -298,7 +298,7 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
                         <Info className="w-4 h-4" />
                       </button>
                       
-                      {canManage && device.status !== 'revoked' && (
+                      {canManage && (
                         <button 
                           onClick={() => handleRevokeDevice(device.id)}
                           className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded transition-colors"

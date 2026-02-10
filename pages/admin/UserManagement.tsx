@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { User } from '../../types';
-import { ShieldCheck, Plus, Edit, Trash2, Info, UserCheck, MapPin, Search, FilterX, FileSpreadsheet } from 'lucide-react';
+import { ShieldCheck, Plus, Edit, Trash2, Info, UserCheck, MapPin, Search, FilterX, FileSpreadsheet, X } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Toast from '../../components/ui/Toast';
@@ -27,6 +27,13 @@ const UserManagement: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Column filters
+    const [filterName, setFilterName] = useState('');
+    const [filterEmail, setFilterEmail] = useState('');
+    const [filterRole, setFilterRole] = useState('');
+    const [filterSite, setFilterSite] = useState('');
+    const [filterBiometricId, setFilterBiometricId] = useState('');
+
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
@@ -37,22 +44,31 @@ const UserManagement: React.FC = () => {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const isMobile = useMediaQuery('(max-width: 767px)');
 
+    const hasActiveFilters = filterName || filterEmail || filterRole || filterSite || filterBiometricId;
+
     const fetchUsers = useCallback(async () => {
         setIsLoading(true);
         try {
-            const res = await api.getUsers({ 
-                page: currentPage, 
-                pageSize,
-                search: searchTerm 
-            });
-            setUsers(res.data);
-            setTotalUsers(res.total);
+            if (hasActiveFilters) {
+                // When filters are active, fetch ALL users for client-side filtering
+                const allUsers = await api.getUsers();
+                setUsers(allUsers);
+                setTotalUsers(allUsers.length);
+            } else {
+                const res = await api.getUsers({ 
+                    page: currentPage, 
+                    pageSize,
+                    search: searchTerm 
+                });
+                setUsers(res.data);
+                setTotalUsers(res.total);
+            }
         } catch (error) {
             setToast({ message: 'Failed to fetch users.', type: 'error' });
         } finally {
             setIsLoading(false);
         }
-    }, [currentPage, pageSize]);
+    }, [currentPage, pageSize, hasActiveFilters]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -119,7 +135,40 @@ const UserManagement: React.FC = () => {
         return role ? role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A';
     }
 
-    const filteredUsers = users;
+    const getRoleBadgeClass = (role: string) => {
+        switch (role) {
+            case 'admin': return 'bg-purple-100 text-purple-700';
+            case 'hr': return 'bg-blue-100 text-blue-700';
+            case 'management': return 'bg-emerald-100 text-emerald-700';
+            case 'site_manager': return 'bg-orange-100 text-orange-800';
+            case 'field_staff': return 'bg-sky-100 text-sky-800';
+            case 'finance': return 'bg-teal-100 text-teal-700';
+            case 'developer': return 'bg-indigo-100 text-indigo-700';
+            case 'operation_manager': return 'bg-rose-100 text-rose-700';
+            case 'unverified': return 'bg-yellow-100 text-yellow-800';
+            default: return 'bg-slate-100 text-slate-700';
+        }
+    };
+
+    const clearAllFilters = () => {
+        setFilterName('');
+        setFilterEmail('');
+        setFilterRole('');
+        setFilterSite('');
+        setFilterBiometricId('');
+    };
+
+    // Derive unique roles for dropdown
+    const uniqueRoles = Array.from(new Set(users.map(u => u.role).filter(Boolean))).sort();
+
+    const filteredUsers = users.filter(user => {
+        if (filterName && !user.name?.toLowerCase().includes(filterName.toLowerCase())) return false;
+        if (filterEmail && !user.email?.toLowerCase().includes(filterEmail.toLowerCase())) return false;
+        if (filterRole && user.role !== filterRole) return false;
+        if (filterSite && !(user.organizationName || '').toLowerCase().includes(filterSite.toLowerCase())) return false;
+        if (filterBiometricId && !(user.biometricId || '').toLowerCase().includes(filterBiometricId.toLowerCase())) return false;
+        return true;
+    });
 
     return (
         <div className="p-4 border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card">
@@ -184,19 +233,8 @@ const UserManagement: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex flex-col md:flex-row gap-4 mb-6 items-end">
-                <div className="flex-grow">
-                    <Input 
-                        placeholder="Search users by name or email..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        icon={<Search className="h-4 w-4" />}
-                    />
-                </div>
-                <Button variant="secondary" onClick={() => setSearchTerm('')} disabled={!searchTerm}>
-                    <FilterX className="h-4 w-4 mr-2" /> Clear
-                </Button>
-            </div>
+
+
 
             {/* Content Area */}
             {isLoading ? (
@@ -223,13 +261,7 @@ const UserManagement: React.FC = () => {
                                         <h3 className="font-semibold text-primary-text">{user.name}</h3>
                                         <p className="text-sm text-muted">{user.email}</p>
                                     </div>
-                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                        user.role === 'admin' ? 'bg-purple-100 text-purple-700' :
-                                        user.role === 'hr' ? 'bg-blue-100 text-blue-700' :
-                                        user.role === 'management' ? 'bg-emerald-100 text-emerald-700' :
-                                        user.role === 'unverified' ? 'bg-yellow-100 text-yellow-800' :
-                                        'bg-gray-100 text-gray-700'
-                                    }`}>
+                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${getRoleBadgeClass(user.role)}`}>
                                         {getRoleName(user.role)}
                                     </span>
                                 </div>
@@ -265,7 +297,7 @@ const UserManagement: React.FC = () => {
                         ))}
                         {filteredUsers.length === 0 && (
                             <div className="col-span-full text-center py-8 text-muted">
-                                No users found matching "{searchTerm}"
+                                No users found{hasActiveFilters ? ' matching the current filters' : ''}.
                             </div>
                         )}
                     </div>
@@ -280,7 +312,68 @@ const UserManagement: React.FC = () => {
                                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Role</th>
                                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Site</th>
                                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Biometric ID</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Actions</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">
+                                        <div className="flex items-center gap-2">
+                                            Actions
+                                            {hasActiveFilters && (
+                                                <button onClick={clearAllFilters} className="text-red-500 hover:text-red-700 transition-colors" title="Clear all filters">
+                                                    <FilterX className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </th>
+                                </tr>
+                                {/* Filter Row */}
+                                <tr className="bg-gray-50/50">
+                                    <th className="px-6 py-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Filter..."
+                                            value={filterName}
+                                            onChange={(e) => setFilterName(e.target.value)}
+                                            className="w-full text-sm font-normal px-2 py-1.5 border border-border rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                                        />
+                                    </th>
+                                    <th className="px-6 py-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Filter..."
+                                            value={filterEmail}
+                                            onChange={(e) => setFilterEmail(e.target.value)}
+                                            className="w-full text-sm font-normal px-2 py-1.5 border border-border rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                                        />
+                                    </th>
+                                    <th className="px-6 py-2">
+                                        <select
+                                            value={filterRole}
+                                            onChange={(e) => setFilterRole(e.target.value)}
+                                            className="w-full text-sm font-normal px-2 py-1.5 border border-border rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                                        >
+                                            <option value="">All Roles</option>
+                                            {uniqueRoles.map(role => (
+                                                <option key={role} value={role}>{getRoleName(role)}</option>
+                                            ))}
+                                        </select>
+                                    </th>
+                                    <th className="px-6 py-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Filter..."
+                                            value={filterSite}
+                                            onChange={(e) => setFilterSite(e.target.value)}
+                                            className="w-full text-sm font-normal px-2 py-1.5 border border-border rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                                        />
+                                    </th>
+                                    <th className="px-6 py-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Filter..."
+                                            value={filterBiometricId}
+                                            onChange={(e) => setFilterBiometricId(e.target.value)}
+                                            className="w-full text-sm font-normal px-2 py-1.5 border border-border rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                                        />
+                                    </th>
+                                    <th className="px-6 py-2"></th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border md:bg-card md:divide-y-0">
@@ -289,7 +382,9 @@ const UserManagement: React.FC = () => {
                                         <td data-label="Name" className="px-6 py-4 font-medium">{user.name}</td>
                                         <td data-label="Email" className="px-6 py-4 text-sm text-muted">{user.email}</td>
                                         <td data-label="Role" className="px-6 py-4 text-sm text-muted">
-                                            {getRoleName(user.role)}
+                                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${getRoleBadgeClass(user.role)}`}>
+                                                {getRoleName(user.role)}
+                                            </span>
                                             {user.role === 'unverified' && (
                                                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 ml-2">Pending Approval</span>
                                             )}
@@ -318,14 +413,21 @@ const UserManagement: React.FC = () => {
                 </>
             )}
 
-            <Pagination 
-                currentPage={currentPage}
-                totalItems={totalUsers}
-                pageSize={pageSize}
-                onPageChange={setCurrentPage}
-                onPageSizeChange={setPageSize}
-                className="mt-6"
-            />
+            {!hasActiveFilters && (
+                <Pagination 
+                    currentPage={currentPage}
+                    totalItems={totalUsers}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={setPageSize}
+                    className="mt-6"
+                />
+            )}
+            {hasActiveFilters && filteredUsers.length > 0 && (
+                <div className="mt-4 text-sm text-muted text-center">
+                    Showing {filteredUsers.length} of {users.length} total users
+                </div>
+            )}
         </div>
     );
 };

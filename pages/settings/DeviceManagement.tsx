@@ -73,7 +73,7 @@ const DeviceManagement: React.FC = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 pb-24 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 pb-24">
       {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
       
       <div className="mb-6">
