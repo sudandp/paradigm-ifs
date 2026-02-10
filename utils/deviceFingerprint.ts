@@ -81,7 +81,7 @@ async function getMobileDeviceInfo(): Promise<DeviceInfo> {
       batteryLevel: battery.batteryLevel,
       isCharging: battery.isCharging,
       connectionType: network.connectionType,
-      appVersion: appInfo.version || 'unknown',
+      appVersion: appInfo.version || '1.0.0', // Fallback to 1.0.0 if unknown
       hardwareModel: info.model, // Native model number
       // Added high-entropy markers for mobile to prevent incorrect merging
       screenResolution: `${window.screen.width}x${window.screen.height}`,
@@ -90,12 +90,26 @@ async function getMobileDeviceInfo(): Promise<DeviceInfo> {
       webgl: getWebGLFingerprint(),
     };
     
+    // Check if what we got from Capacitor is generic/placeholder (common in mobile browsers)
+    const isGeneric = 
+      !deviceInfo.deviceModel || 
+      deviceInfo.deviceModel === 'K' || 
+      deviceInfo.deviceModel === 'unknown' || 
+      deviceInfo.manufacturer?.toLowerCase().includes('google inc');
+
     // Fallback model from UA if native model is generic/empty
-    if (!deviceInfo.hardwareModel || deviceInfo.hardwareModel === 'unknown') {
+    if (isGeneric) {
       const uaModel = parseAndroidModel(navigator.userAgent);
       if (uaModel) {
         deviceInfo.hardwareModel = uaModel;
         deviceInfo.deviceModel = uaModel;
+        
+        // If manufacturer is generic, try to infer it from model prefix
+        if (!deviceInfo.manufacturer || deviceInfo.manufacturer.toLowerCase().includes('google inc')) {
+          if (uaModel.startsWith('SM-') || uaModel.startsWith('GT-')) deviceInfo.manufacturer = 'Samsung';
+          else if (uaModel.startsWith('Pixel')) deviceInfo.manufacturer = 'Google';
+          else if (uaModel.startsWith('ONEPLUS')) deviceInfo.manufacturer = 'OnePlus';
+        }
       }
     }
 
@@ -449,10 +463,11 @@ function parseAndroidModel(ua: string): string | null {
           !part.includes('Android') && 
           !part.includes('Version') && 
           !part.includes('build') &&
-          part.length > 3 &&
-          part.length < 30) {
+          !part.includes('Build') &&
+          !part.toLowerCase().includes('wv') && // Exclude WebView markers
+          part.length > 2 &&
+          part.length < 35) {
         
-        // Clean up common model prefixes/suffixes if needed
         return part;
       }
     }
@@ -464,6 +479,8 @@ function parseAndroidModel(ua: string): string | null {
  * Map common Samsung/Android model numbers to friendly names
  */
 function getFriendlyModelName(model: string): string {
+  if (!model || model === 'K' || model === 'unknown') return 'Android Device';
+  
   const modelUpper = model.toUpperCase();
   
   // Samsung Fold/Flip Series
@@ -480,6 +497,11 @@ function getFriendlyModelName(model: string): string {
   if (modelUpper.includes('SM-S918')) return 'Samsung S23 Ultra';
   if (modelUpper.includes('SM-S928')) return 'Samsung S24 Ultra';
   
+  // Pixel Series
+  if (modelUpper.includes('PIXEL 6')) return 'Google Pixel 6';
+  if (modelUpper.includes('PIXEL 7')) return 'Google Pixel 7';
+  if (modelUpper.includes('PIXEL 8')) return 'Google Pixel 8';
+
   return model;
 }
 

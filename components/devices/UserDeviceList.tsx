@@ -201,17 +201,35 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
                             // 2. Identify Android
                             if (device.deviceType.toLowerCase() === 'android' || os.includes('android')) {
                               const hwModel = info.hardwareModel || info.deviceModel;
-                              const makeModel = info.manufacturer && hwModel 
-                                ? `${info.manufacturer} ${hwModel}`
-                                : hwModel || info.manufacturer || 'Android Device';
+                              const manufacturer = info.manufacturer || '';
+                              
+                              let makeModel = 'Android Device';
+                              if (hwModel && manufacturer) {
+                                // Prevent "Samsung Samsung Fold"
+                                makeModel = hwModel.toLowerCase().includes(manufacturer.toLowerCase()) 
+                                  ? hwModel 
+                                  : `${manufacturer} ${hwModel}`;
+                              } else {
+                                makeModel = hwModel || manufacturer || 'Android Device';
+                              }
+                              
                               return `${makeModel} (${browser})`;
                             }
                             
                             // 3. Identify PC Make (HP, Dell, etc.)
                             if (info.deviceModel || info.manufacturer) {
-                              const makeModel = info.manufacturer && info.deviceModel 
-                                ? `${info.manufacturer} ${info.deviceModel}`
-                                : info.deviceModel || info.manufacturer;
+                              const model = info.deviceModel || '';
+                              const manufacturer = info.manufacturer || '';
+                              
+                              let makeModel = '';
+                              if (model && manufacturer) {
+                                makeModel = model.toLowerCase().includes(manufacturer.toLowerCase()) 
+                                  ? model 
+                                  : `${manufacturer} ${model}`;
+                              } else {
+                                makeModel = model || manufacturer;
+                              }
+                              
                               return `${makeModel} Laptop/PC (${browser})`;
                             }
 
