@@ -88,7 +88,7 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
     try {
       const count = get().unreadCount;
       // Use a variable to bypass Vite's static import analysis which causes 500 errors if the plugin is missing from node_modules
-      const pluginPath = '@capacitor/badge';
+      const pluginPath = '@capawesome/capacitor-badge';
       // @ts-ignore
       const { Badge } = await import(/* @vite-ignore */ pluginPath).catch(() => ({ Badge: null }));
       if (Badge && typeof Badge.set === 'function') {
