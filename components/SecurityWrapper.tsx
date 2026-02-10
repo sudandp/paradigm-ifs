@@ -86,28 +86,30 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
                     lastCheckedUserId.current = user.id;
                 } else {
                     // Registration failed or pending approval
-                    if (result.requiresApproval) {
-                        setDeviceStatus('pending');
-                        setDeviceInfo({ 
-                            id: result.request?.id || '', 
-                            name: deviceName, 
-                            type: deviceType as DeviceType 
-                        });
-                        setDeviceMessage(result.message);
-                    } else if (result.message.includes('revoked')) {
+                    // Order matters: check for specific errors before the generic requiresApproval flag
+                    if (result.message.includes('revoked')) {
                         setDeviceStatus('revoked');
                         setDeviceInfo({ 
                            id: '', 
                            name: deviceName, 
                            type: deviceType as DeviceType 
-                       });
+                        });
+                        setDeviceMessage(result.message);
                     } else if (result.message.includes('limit of')) {
                         setDeviceStatus('limit_reached');
                         setDeviceInfo({ 
                            id: '', 
                            name: deviceName, 
                            type: deviceType as DeviceType 
-                       });
+                        });
+                        setDeviceMessage(result.message);
+                    } else if (result.requiresApproval) {
+                        setDeviceStatus('pending');
+                        setDeviceInfo({ 
+                            id: result.request?.id || '', 
+                            name: deviceName, 
+                            type: deviceType as DeviceType 
+                        });
                         setDeviceMessage(result.message);
                     } else {
                         // Other error
@@ -145,6 +147,7 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
                 deviceName={deviceInfo?.name || 'Unknown Device'}
                 deviceType={deviceInfo?.type || 'web'}
                 limits={limits}
+                customMessage={deviceMessage}
                 onLogout={() => useAuthStore.getState().logout()}
                 onRequestAccess={() => {
                      // Reload to check status again

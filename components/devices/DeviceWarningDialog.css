@@ -445,6 +445,30 @@
 }
 
 /* Mobile Responsive */
+/* Horizontal Layout for Device Cards */
+.dw-device-card.horizontal {
+    padding: 12px 16px !important;
+    gap: 8px !important;
+}
+
+.dw-btn-remove-compact {
+    background: rgba(34, 197, 94, 0.1) !important;
+    color: #4ade80 !important;
+    border: 1px solid rgba(34, 197, 94, 0.2) !important;
+    padding: 6px 16px !important;
+    border-radius: 10px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
+}
+
+.dw-btn-remove-compact:hover {
+    background: #006b3f !important;
+    color: white !important;
+    border-color: #006b3f !important;
+}
+
 @media (max-width: 640px) {
     .device-warning-overlay {
         padding: 16px;

@@ -20,6 +20,7 @@ interface DeviceWarningDialogProps {
   onLogout: () => void;
   isRequestingAccess?: boolean;
   limits?: { web: number; android: number; ios: number };
+  customMessage?: string;
 }
 
 const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
@@ -31,6 +32,7 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
   onLogout,
   isRequestingAccess = false,
   limits = { web: 1, android: 1, ios: 1 },
+  customMessage,
 }) => {
   const [existingDevices, setExistingDevices] = useState<UserDevice[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
@@ -45,7 +47,19 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
     try {
       setLoadingDevices(true);
       const devices = await getUserDevices(userId);
-      setExistingDevices(devices.filter(d => d.status === 'active'));
+      // Filter unique by deviceIdentifier to prevent multiple slots/buttons for same device
+      const activeDevices = devices.filter(d => d.status === 'active');
+      const uniqueDevices: UserDevice[] = [];
+      const seenIds = new Set();
+      
+      activeDevices.forEach(d => {
+        if (!seenIds.has(d.deviceIdentifier)) {
+          uniqueDevices.push(d);
+          seenIds.add(d.deviceIdentifier);
+        }
+      });
+
+      setExistingDevices(uniqueDevices);
     } catch (e) {
       console.error('Error loading devices in dialog:', e);
     } finally {
@@ -67,35 +81,35 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
       case 'not_found':
         return {
           title: 'Device Not Registered',
-          description: 'This device is not registered for your account. Please check your registered devices or request access.',
+          description: customMessage || 'This device is not registered for your account. Please check your registered devices or request access.',
           actionText: 'Request Access',
           showRequestButton: true,
         };
       case 'limit_reached':
         return {
           title: 'Device Limit Reached',
-          description: `You have reached your limit for ${deviceType} devices. You must remove an old device below to register this one.`,
+          description: customMessage || `You have reached your limit for ${deviceType} devices. You must remove an old device below to register this one.`,
           actionText: 'Try Again',
           showRequestButton: true,
         };
       case 'pending':
         return {
           title: 'Approval Pending',
-          description: 'Your request to use this device is pending approval from the administrator.',
+          description: customMessage || 'Your request to use this device is pending approval from the administrator.',
           actionText: 'Waiting for Approval',
           showRequestButton: false,
         };
       case 'revoked':
         return {
           title: 'Device Access Revoked',
-          description: 'Access from this device has been revoked. You can request access again if this was a mistake.',
+          description: customMessage || 'Access from this device has been revoked. You can request access again if this was a mistake.',
           actionText: 'Request Access',
           showRequestButton: true,
         };
       default:
         return {
           title: 'Unauthorized Device',
-          description: 'You cannot access the application from this device.',
+          description: customMessage || 'You cannot access the application from this device.',
           actionText: '',
           showRequestButton: false,
         };
@@ -154,7 +168,7 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
             ) : existingDevices.filter(d => d.deviceType === deviceType).length > 0 ? (
               <div className="dw-device-grid">
                 {existingDevices.filter(d => d.deviceType === deviceType).map(device => (
-                  <div key={device.id} className="dw-device-card">
+                  <div key={device.id} className="dw-device-card horizontal">
                     <div className="dw-device-card-header">
                       <div className="dw-device-card-icon">
                         {deviceType === 'web' ? <Monitor size={20} /> : <Smartphone size={20} />}
@@ -167,15 +181,14 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
                           <span className="dw-meta-tag dw-status-active">Active</span>
                         </div>
                       </div>
-                    </div>
-                    <div className="dw-device-card-actions">
+                      
+                      {/* Move actions to the right in horizontal mode */}
                       <button 
-                        onClick={() => handleRemoveDevice(device.id)}
-                        className="dw-btn-revoke"
-                        title="Remove Device"
+                         onClick={() => handleRemoveDevice(device.id)}
+                         className="dw-btn-remove-compact"
+                         title="Remove Device"
                       >
-                        <Trash2 size={14} />
-                        <span>Remove</span>
+                         <span>Remove</span>
                       </button>
                     </div>
                   </div>

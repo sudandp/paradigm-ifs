@@ -451,11 +451,36 @@ function parseAndroidModel(ua: string): string | null {
           !part.includes('build') &&
           part.length > 3 &&
           part.length < 30) {
+        
+        // Clean up common model prefixes/suffixes if needed
         return part;
       }
     }
   }
   return null;
+}
+
+/**
+ * Map common Samsung/Android model numbers to friendly names
+ */
+function getFriendlyModelName(model: string): string {
+  const modelUpper = model.toUpperCase();
+  
+  // Samsung Fold/Flip Series
+  if (modelUpper.includes('SM-F936') || modelUpper.includes('F936')) return 'Samsung Fold 4';
+  if (modelUpper.includes('SM-F946') || modelUpper.includes('F946')) return 'Samsung Fold 5';
+  if (modelUpper.includes('SM-F721') || modelUpper.includes('F721')) return 'Samsung Flip 4';
+  if (modelUpper.includes('SM-F731') || modelUpper.includes('F731')) return 'Samsung Flip 5';
+  
+  // Samsung S Series
+  if (modelUpper.includes('SM-S901')) return 'Samsung S22';
+  if (modelUpper.includes('SM-S911')) return 'Samsung S23';
+  if (modelUpper.includes('SM-S921')) return 'Samsung S24';
+  if (modelUpper.includes('SM-S908')) return 'Samsung S22 Ultra';
+  if (modelUpper.includes('SM-S918')) return 'Samsung S23 Ultra';
+  if (modelUpper.includes('SM-S928')) return 'Samsung S24 Ultra';
+  
+  return model;
 }
 
 /**
@@ -471,7 +496,7 @@ export async function generateDeviceName(): Promise<string> {
     const hwModel = info.hardwareModel || info.deviceModel;
     
     if (os === 'Android' && hwModel) {
-      return `${hwModel} (${browser})`;
+      return `${getFriendlyModelName(hwModel)} (${browser})`;
     }
     
     if (os === 'iOS' && hwModel) {
@@ -484,14 +509,13 @@ export async function generateDeviceName(): Promise<string> {
     let model = info.deviceModel || '';
     let manufacturer = info.manufacturer || '';
 
-    // Sanitize manufacturer: if it's bogus or generic, clear it
-    // Keep "Google" but remove "Google Inc" or "Mozilla"
+    // Sanitize manufacturer
     if (manufacturer.includes('Mozilla') || manufacturer.toLowerCase().includes('unknown')) {
        manufacturer = '';
     }
     if (manufacturer === 'Google Inc') manufacturer = 'Google';
 
-    // Sanitize model: if it's too long or looks like a UA string, clear it
+    // Sanitize model
     if (model.includes('Mozilla') || model.length > 30 || model.toLowerCase().includes('unknown')) {
        model = '';
     }
@@ -500,21 +524,22 @@ export async function generateDeviceName(): Promise<string> {
     const hwModel = info.hardwareModel;
     if (deviceType === 'android') {
       let name = '';
-      if (hwModel && manufacturer) {
-        name = manufacturer.toLowerCase().includes(hwModel.toLowerCase()) ? hwModel : `${manufacturer} ${hwModel}`;
-      } else if (hwModel) {
-        name = hwModel;
-      } else if (model && manufacturer) {
-        name = manufacturer.toLowerCase().includes(model.toLowerCase()) ? model : `${manufacturer} ${model}`;
-      } else if (model) {
-        name = model;
+      const workingModel = hwModel || model;
+      
+      if (workingModel) {
+        const friendly = getFriendlyModelName(workingModel);
+        if (manufacturer && !friendly.toLowerCase().includes(manufacturer.toLowerCase())) {
+          name = `${manufacturer} ${friendly}`;
+        } else {
+          name = friendly;
+        }
       } else if (manufacturer) {
         name = `${manufacturer} Android`;
       } else {
         name = 'Android Device';
       }
 
-      // If name is very short (like "K"), try to prepend platform
+      // Final fallback if name is still too short or "K"
       if (name.length <= 2) {
         return `Android ${name}`;
       }
