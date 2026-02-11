@@ -799,6 +799,7 @@ const AttendanceDashboard: React.FC = () => {
     
     // Manual Entry State
     const [isManualEntryModalOpen, setIsManualEntryModalOpen] = useState(false);
+    const [previewMode, setPreviewMode] = useState<'summary' | 'full'>('summary');
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
     const [selectedRecordType, setSelectedRecordType] = useState<string>('all');
     const [reportType, setReportType] = useState<'basic' | 'log' | 'monthly' | 'audit' | 'workHours'>('basic');
@@ -2028,16 +2029,106 @@ const AttendanceDashboard: React.FC = () => {
         );
     }
 
+    const ReportSummaryView = () => {
+        let rows: any[] = [];
+        if (reportType === 'basic') rows = basicReportData || [];
+        else if (reportType === 'log') rows = attendanceLogData || [];
+        else if (reportType === 'monthly') rows = monthlyReportData || [];
+        else if (reportType === 'audit') rows = auditLogs || [];
+
+        if (!rows || rows.length === 0) return <div className="text-center py-10 text-gray-400">No report data available</div>;
+
+        return (
+            <div className="space-y-4 pt-4">
+                {rows.slice(0, 5).map((row, i) => (
+                    <div key={i} className="bg-[#041b0f] p-4 rounded-xl border border-[#1a3d2c]">
+                        <div className="flex justify-between items-start mb-3">
+                             <div className="font-bold text-white">{row.userName || 'Unknown'}</div>
+                             <div className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                 row.status === 'P' || row.type === 'check-in' ? 'bg-green-500/20 text-green-400' : 
+                                 row.status === 'A' || row.type === 'check-out' ? 'bg-red-500/20 text-red-400' : 
+                                 'bg-blue-500/20 text-blue-400'
+                             }`}>
+                                 {row.status || (row.type === 'check-in' ? 'In' : row.type === 'check-out' ? 'Out' : 'Log')}
+                             </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                             <div>
+                                 <span className="text-gray-500 block mb-0.5">Date:</span>
+                                 <div className="text-gray-300 font-medium">
+                                     {row.date ? format(new Date(String(row.date).replace(/-/g, '/')), 'dd MMM yyyy') : '-'}
+                                 </div>
+                             </div>
+                             {reportType === 'monthly' ? (
+                                 <>
+                                     <div>
+                                         <span className="text-gray-500 block mb-0.5">Present:</span>
+                                         <div className="text-gray-300 font-medium">{row.presentDays || 0}d</div>
+                                     </div>
+                                     <div>
+                                         <span className="text-gray-500 block mb-0.5">Absent:</span>
+                                         <div className="text-gray-300 font-medium">{row.absentDays || 0}d</div>
+                                     </div>
+                                     <div>
+                                         <span className="text-gray-500 block mb-0.5">Payable:</span>
+                                         <div className="text-gray-300 font-medium">{row.totalPayableDays || 0}d</div>
+                                     </div>
+                                 </>
+                             ) : (
+                                 <>
+                                     <div>
+                                         <span className="text-gray-500 block mb-0.5">Time/Hours:</span>
+                                         <div className="text-gray-300 font-medium">{row.duration || row.time || row.checkIn || '-'}</div>
+                                     </div>
+                                     {row.checkOut && (
+                                         <div>
+                                             <span className="text-gray-500 block mb-0.5">Punch Out:</span>
+                                             <div className="text-gray-300 font-medium">{row.checkOut}</div>
+                                         </div>
+                                     )}
+                                     {row.locationName && (
+                                         <div className="col-span-2">
+                                             <span className="text-gray-500 block mb-0.5">Location:</span>
+                                             <div className="text-gray-300 font-medium truncate">{row.locationName}</div>
+                                         </div>
+                                     )}
+                                 </>
+                             )}
+                        </div>
+                    </div>
+                ))}
+                {rows.length > 5 && (
+                    <div className="text-center text-xs text-gray-500 italic py-2">
+                        Showing first 5 rows in summary. Download CSV for full data.
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     return (
-        <div className="p-4 space-y-6">
+        <div className="min-h-screen p-4 space-y-6 md:bg-transparent bg-[#041b0f]">
+            {/* Mobile Header with Logo */}
+            <div className="flex md:hidden flex-col items-center gap-4 mb-2">
+                <div className="flex justify-center w-full relative">
+                    <img src={pdfLogoLocalPath} alt="Logo" className="h-12 border border-yellow-500 p-1" />
+                    <div className="absolute right-0 top-0">
+                         <div className="relative">
+                            <svg className="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                            <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">7</span>
+                         </div>
+                    </div>
+                </div>
+            </div>
+
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                <h2 className="text-2xl font-bold text-primary-text">Attendance Dashboard</h2>
+                <h2 className="text-2xl font-bold text-primary-text md:text-gray-900">Attendance Dashboard</h2>
                 {['admin', 'hr', 'super_admin'].includes(currentUserRole || '') && (
                     <Button 
                         onClick={() => setIsManualEntryModalOpen(true)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg flex items-center gap-2"
+                        className="w-full md:w-auto bg-[#22c55e] hover:bg-[#16a34a] text-white shadow-lg flex items-center justify-center gap-2 py-3 rounded-xl font-semibold"
                     >
-                        <UserCheck className="w-4 h-4" />
+                        <UserCheck className="w-5 h-5" />
                         Add Manual Entry
                     </Button>
                 )}
@@ -2061,75 +2152,45 @@ const AttendanceDashboard: React.FC = () => {
                 currentUserId={user?.id || ''}
             />
 
-            {/* Filters */}
-            <div className="flex bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex-wrap items-end gap-4">
-                {/* Date Filters Group */}
-                <div className="flex flex-wrap items-center gap-2">
+            {/* Filters Section */}
+            <div className="bg-transparent md:bg-white p-0 md:p-4 rounded-xl shadow-none md:shadow-sm border-none md:border md:border-gray-100 flex flex-col gap-6">
+                
+                {/* Date Pills - Scrollable on mobile */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none no-scrollbar">
                     {['Today', 'Last 7 Days', 'This Month'].map(filter => (
                         <Button
                             key={filter}
                             type="button"
                             onClick={() => handleSetDateFilter(filter)}
-                            className={activeDateFilter === filter
-                                ? "text-white shadow-md border"
-                                : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-                            }
-                            style={activeDateFilter === filter ? { backgroundColor: '#006B3F', borderColor: '#005632' } : {}}
+                            className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all ${
+                                activeDateFilter === filter
+                                    ? "bg-[#22c55e] text-white shadow-md border-none"
+                                    : "bg-[#0b291a] md:bg-white text-gray-300 md:text-gray-700 border border-[#1a3d2c] md:border-gray-300 hover:opacity-80"
+                            }`}
                         >
                             {filter}
                         </Button>
                     ))}
-                    <div className="relative" ref={datePickerRef}>
-                        <Button type="button" variant="outline" onClick={() => setIsDatePickerOpen(!isDatePickerOpen)} className="hover:bg-gray-100">
-                            <Calendar className="mr-2 h-4 w-4" />
-                            <span>
-                                {activeDateFilter === 'Custom'
-                                    ? `${format(dateRange.startDate!, 'dd MMM, yyyy')} - ${format(dateRange.endDate!, 'dd MMM, yyyy')}`
-                                    : 'Custom Range'}
-                            </span>
+                    <div className="relative flex-shrink-0" ref={datePickerRef}>
+                         <Button
+                            type="button"
+                            onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+                            className={`whitespace-nowrap flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all ${
+                                activeDateFilter === 'Custom'
+                                    ? "bg-[#22c55e] text-white shadow-md border-none"
+                                    : "bg-[#0b291a] md:bg-white text-gray-300 md:text-gray-700 border border-[#1a3d2c] md:border-gray-300 hover:opacity-80"
+                            }`}
+                        >
+                            <Calendar className="h-4 w-4" />
+                            {activeDateFilter === 'Custom'
+                                ? `${format(dateRange.startDate!, 'dd MMM')} - ${format(dateRange.endDate!, 'dd MMM')}`
+                                : 'Custom Range'}
                         </Button>
                         {isDatePickerOpen && (
-                            <div className="absolute top-full left-0 mt-2 z-10 bg-card border rounded-lg shadow-lg">
-                                <div className="flex items-center gap-2 p-3">
-                                    <input
-                                        id={startDateId}
-                                        name="startDate"
-                                        type="date"
-                                        className="border rounded px-2 py-1 text-sm"
-                                        value={format(dateRange.startDate!, 'yyyy-MM-dd')}
-                                        max={format(new Date(), 'yyyy-MM-dd')}
-                                        onChange={e => {
-                                            const newStart = new Date(e.target.value);
-                                            let endDate = dateRange.endDate!;
-                                            if (newStart > endDate) {
-                                                endDate = newStart;
-                                            }
-                                            setDateRange({ startDate: newStart, endDate, key: 'selection' });
-                                            setActiveDateFilter('Custom');
-                                        }}
-                                    />
-                                    <span className="text-sm">to</span>
-                                    <input
-                                        id={endDateId}
-                                        name="endDate"
-                                        type="date"
-                                        className="border rounded px-2 py-1 text-sm"
-                                        value={format(dateRange.endDate!, 'yyyy-MM-dd')}
-                                        max={format(new Date(), 'yyyy-MM-dd')}
-                                        onChange={e => {
-                                            const newEnd = new Date(e.target.value);
-                                            let startDate = dateRange.startDate!;
-                                            if (newEnd < startDate) {
-                                                startDate = newEnd;
-                                            }
-                                            setDateRange({ startDate, endDate: newEnd, key: 'selection' });
-                                            setActiveDateFilter('Custom');
-                                        }}
-                                    />
-                                </div>
+                            <div className="absolute top-full left-0 mt-2 z-50 bg-[#0b291a] md:bg-card border border-[#1a3d2c] md:border-border rounded-xl shadow-xl p-2 min-w-[300px]">
                                 <DateRangePicker
                                     onChange={handleCustomDateChange}
-                                    months={isSmallScreen ? 1 : 2}
+                                    months={1}
                                     ranges={dateRangeArray}
                                     direction="horizontal"
                                     maxDate={new Date()}
@@ -2139,14 +2200,14 @@ const AttendanceDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Report Type & Employee Selectors Group */}
-                <div className="flex flex-wrap items-center gap-4">
-                    <div>
-                        <label htmlFor={reportTypeId} className="block text-xs font-medium text-gray-500 mb-1">Report Type</label>
+                {/* Dropdowns Grid */}
+                <div className="grid grid-cols-2 md:flex md:flex-wrap items-end gap-x-3 gap-y-4">
+                    <div className="col-span-1">
+                        <label htmlFor={reportTypeId} className="block text-xs font-medium text-gray-400 md:text-gray-500 mb-1">Report Type</label>
                         <select
                             id={reportTypeId}
                             name="reportType"
-                            className="border rounded-md px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-green-500 outline-none"
+                            className="w-full md:w-auto border border-[#1a3d2c] md:border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#041b0f] md:bg-white text-white md:text-gray-900 focus:ring-2 focus:ring-[#22c55e] outline-none appearance-none"
                             value={reportType}
                             onChange={(e) => setReportType(e.target.value as any)}
                         >
@@ -2158,16 +2219,16 @@ const AttendanceDashboard: React.FC = () => {
                         </select>
                     </div>
 
-                    <div>
-                        <label htmlFor={roleId} className="block text-xs font-medium text-gray-500 mb-1">Role</label>
+                    <div className="col-span-1">
+                        <label htmlFor={roleId} className="block text-xs font-medium text-gray-400 md:text-gray-500 mb-1">Role</label>
                         <select
                             id={roleId}
                             name="role"
-                            className="border rounded-md px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-green-500 outline-none max-w-[200px]"
+                            className="w-full md:w-auto border border-[#1a3d2c] md:border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#041b0f] md:bg-white text-white md:text-gray-900 focus:ring-2 focus:ring-[#22c55e] outline-none appearance-none"
                             value={selectedRole}
                             onChange={(e) => {
                                 setSelectedRole(e.target.value);
-                                setSelectedUser('all'); // Reset user selection when role changes
+                                setSelectedUser('all');
                             }}
                         >
                             <option value="all">All Roles</option>
@@ -2179,12 +2240,12 @@ const AttendanceDashboard: React.FC = () => {
                         </select>
                     </div>
 
-                    <div>
-                        <label htmlFor={employeeId} className="block text-xs font-medium text-gray-500 mb-1">Employee</label>
+                    <div className="col-span-1">
+                        <label htmlFor={employeeId} className="block text-xs font-medium text-gray-400 md:text-gray-500 mb-1">Employee</label>
                         <select
                             id={employeeId}
                             name="employee"
-                            className="border rounded-md px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-green-500 outline-none max-w-[200px]"
+                            className="w-full md:w-auto border border-[#1a3d2c] md:border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#041b0f] md:bg-white text-white md:text-gray-900 focus:ring-2 focus:ring-[#22c55e] outline-none appearance-none"
                             value={selectedUser}
                             onChange={(e) => setSelectedUser(e.target.value)}
                         >
@@ -2198,12 +2259,12 @@ const AttendanceDashboard: React.FC = () => {
                         </select>
                     </div>
 
-                    <div>
-                        <label htmlFor={statusId} className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+                    <div className="col-span-1">
+                        <label htmlFor={statusId} className="block text-xs font-medium text-gray-400 md:text-gray-500 mb-1">Status</label>
                         <select
                             id={statusId}
                             name="status"
-                            className="border rounded-md px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-green-500 outline-none max-w-[200px]"
+                            className="w-full md:w-auto border border-[#1a3d2c] md:border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#041b0f] md:bg-white text-white md:text-gray-900 focus:ring-2 focus:ring-[#22c55e] outline-none appearance-none"
                             value={selectedStatus}
                             onChange={(e) => setSelectedStatus(e.target.value)}
                         >
@@ -2224,12 +2285,12 @@ const AttendanceDashboard: React.FC = () => {
                         </select>
                     </div>
 
-                    <div>
-                        <label htmlFor={recordTypeId} className="block text-xs font-medium text-gray-500 mb-1">Record Type</label>
+                    <div className="col-span-2 md:col-span-1">
+                        <label htmlFor={recordTypeId} className="block text-xs font-medium text-gray-400 md:text-gray-500 mb-1">Record Type</label>
                         <select
                             id={recordTypeId}
                             name="recordType"
-                            className="border rounded-md px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-green-500 outline-none max-w-[200px]"
+                            className="w-full md:w-auto border border-[#1a3d2c] md:border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#041b0f] md:bg-white text-white md:text-gray-900 focus:ring-2 focus:ring-[#22c55e] outline-none appearance-none"
                             value={selectedRecordType}
                             onChange={(e) => setSelectedRecordType(e.target.value)}
                         >
@@ -2243,20 +2304,46 @@ const AttendanceDashboard: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard title="Total Employees" value={dashboardData?.totalEmployees || 0} icon={Users} />
-                <StatCard title={`Present ${statDateLabel}`} value={dashboardData?.presentToday || 0} icon={UserCheck} />
-                <StatCard title={`Absent ${statDateLabel}`} value={dashboardData?.absentToday || 0} icon={UserX} />
-                <StatCard title={`On Leave ${statDateLabel}`} value={dashboardData?.onLeaveToday || 0} icon={Clock} />
+            {/* Stats Summary */}
+            <div className="flex flex-col gap-8 md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-6 bg-transparent md:bg-white p-0 md:p-4 rounded-xl">
+                {[
+                    { title: "Total Employees", value: dashboardData?.totalEmployees || 0, icon: Users, color: "bg-emerald-500" },
+                    { title: `Present ${statDateLabel}`, value: dashboardData?.presentToday || 0, icon: UserCheck, color: "bg-[#0eb161]" },
+                    { title: `Absent ${statDateLabel}`, value: dashboardData?.absentToday || 0, icon: UserX, color: "bg-[#df0637]" },
+                    { title: `On Leave ${statDateLabel}`, value: dashboardData?.onLeaveToday || 0, icon: Clock, color: "bg-[#1d63ff]" }
+                ].map((stat, i) => (
+                    <div key={i} className="flex items-center gap-6 md:bg-card md:p-6 md:rounded-2xl md:border md:border-[#1a3d2c] md:md:border-gray-100 md:shadow-sm">
+                        <div className={`p-4 md:p-3 rounded-full ${stat.color} text-white shadow-xl md:shadow-none`}>
+                            <stat.icon className="h-8 w-8 md:h-6 md:w-6" />
+                        </div>
+                        <div className="flex flex-col">
+                            <p className="text-sm md:text-xs font-medium text-gray-400 md:text-gray-500 mb-1">{stat.title}</p>
+                            <p className="text-4xl md:text-2xl font-bold text-white md:text-gray-900 leading-none">{stat.value}</p>
+                        </div>
+                    </div>
+                ))}
             </div>
 
-            <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-6">
-                <ChartContainer title="Attendance Trend" icon={BarChart3}>
-                    {dashboardData ? <AttendanceTrendChart data={dashboardData.attendanceTrend} /> : <Loader2 className="h-6 w-6 animate-spin text-muted mx-auto mt-20" />}
-                </ChartContainer>
-                <ChartContainer title="Productivity Trend (Avg. Hours)" icon={TrendingUp}>
-                    {dashboardData ? <ProductivityChart data={dashboardData.productivityTrend} /> : <Loader2 className="h-6 w-6 animate-spin text-muted mx-auto mt-20" />}
-                </ChartContainer>
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-[#0b291a] md:bg-card p-4 md:p-6 rounded-2xl border border-[#1a3d2c] md:border-border shadow-sm">
+                    <div className="flex items-center mb-6">
+                        <BarChart3 className="h-5 w-5 mr-3 text-[#22c55e] md:text-muted" />
+                        <h3 className="font-semibold text-white md:text-primary-text">Attendance Trend</h3>
+                    </div>
+                    <div className="h-64 md:h-80 relative">
+                        {dashboardData ? <AttendanceTrendChart data={dashboardData.attendanceTrend} /> : <Loader2 className="h-6 w-6 animate-spin text-muted mx-auto mt-20" />}
+                    </div>
+                </div>
+                <div className="bg-[#0b291a] md:bg-card p-4 md:p-6 rounded-2xl border border-[#1a3d2c] md:border-border shadow-sm">
+                    <div className="flex items-center mb-6">
+                        <TrendingUp className="h-5 w-5 mr-3 text-[#22c55e] md:text-muted" />
+                        <h3 className="font-semibold text-white md:text-primary-text">Productivity Trend</h3>
+                    </div>
+                    <div className="h-64 md:h-80 relative">
+                        {dashboardData ? <ProductivityChart data={dashboardData.productivityTrend} /> : <Loader2 className="h-6 w-6 animate-spin text-muted mx-auto mt-20" />}
+                    </div>
+                </div>
             </div>
 
             {/* Off-screen PDF Container for generation */}
@@ -2277,38 +2364,60 @@ const AttendanceDashboard: React.FC = () => {
                 </div>
             )}
 
-            {/* Visible Preview (Optional - for user to see what they are downloading) */}
+            {/* Report Preview */}
             {reportType !== 'workHours' && (
-                <div className="hidden md:block bg-white p-6 rounded-xl shadow-sm border border-gray-100 overflow-auto max-h-[600px]">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-semibold">Report Preview</h2>
-                    {canDownloadReport && (
-                        <Button
-                            type="button"
-                            onClick={handleDownloadCsv}
-                            disabled={isDownloading}
-                            style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }}
-                            className="border hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-                        >
-                            {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                            {isDownloading ? 'Generating...' : 'Download CSV'}
-                        </Button>
-                    )}
-                </div>
-                <div className="border p-4 rounded bg-gray-50 flex justify-center min-h-[400px] relative">
-                    {isLoading && (
-                        <div className="absolute inset-0 z-10 bg-white/50 backdrop-blur-sm flex flex-col items-center justify-center">
-                            <Loader2 className="h-8 w-8 animate-spin text-accent mb-2" />
-                            <p className="text-sm font-medium text-gray-600">Updating report data...</p>
+                <div className="hidden md:block bg-[#0b291a] md:bg-white p-4 md:p-6 rounded-2xl border border-[#1a3d2c] md:border-gray-100 shadow-sm overflow-hidden">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                        <div className="flex flex-col gap-1">
+                            <h2 className="text-lg font-bold text-white md:text-gray-900">Report Preview</h2>
+                            <div className="md:hidden flex bg-[#041b0f] p-1 rounded-lg border border-[#1a3d2c]">
+                                <button 
+                                    onClick={() => setPreviewMode('summary')}
+                                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${previewMode === 'summary' ? 'bg-[#22c55e] text-white' : 'text-gray-400'}`}
+                                >
+                                    Summary
+                                </button>
+                                <button 
+                                    onClick={() => setPreviewMode('full')}
+                                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${previewMode === 'full' ? 'bg-[#22c55e] text-white' : 'text-gray-400'}`}
+                                >
+                                    Full Layout
+                                </button>
+                            </div>
                         </div>
-                    )}
-                    <div className="w-full max-w-full overflow-x-auto">
-                        <div className={`origin-top ${reportType === 'basic' ? 'w-full' : 'min-w-[1123px] transform scale-[0.6] sm:scale-[0.7] md:scale-[0.8] lg:scale-100'}`}>
-                           {previewContent}
+                        {canDownloadReport && (
+                            <Button
+                                type="button"
+                                onClick={handleDownloadCsv}
+                                disabled={isDownloading}
+                                className="w-full sm:w-auto bg-[#22c55e] hover:bg-[#16a34a] text-white shadow-lg rounded-xl flex items-center justify-center gap-2 py-2.5 px-6 font-medium"
+                            >
+                                {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                                {isDownloading ? 'Generating...' : 'Download CSV'}
+                            </Button>
+                        )}
+                    </div>
+
+                    {previewMode === 'summary' ? (
+                        <div className="md:hidden">
+                            <ReportSummaryView />
+                        </div>
+                    ) : null}
+
+                    <div className={`border border-[#1a3d2c] md:border-gray-200 rounded-xl bg-[#041b0f] md:bg-gray-50 flex justify-center min-h-[300px] md:min-h-[400px] relative overflow-hidden ${previewMode === 'summary' ? 'hidden md:flex' : 'flex'}`}>
+                        {isLoading && (
+                            <div className="absolute inset-0 z-10 bg-[#041b0f]/50 md:bg-white/50 backdrop-blur-sm flex flex-col items-center justify-center">
+                                <Loader2 className="h-8 w-8 animate-spin text-[#22c55e] mb-2" />
+                                <p className="text-sm font-medium text-gray-300 md:text-gray-600">Updating report data...</p>
+                            </div>
+                        )}
+                        <div className="w-full max-w-full overflow-x-auto p-4 custom-scrollbar">
+                            <div className={`origin-top-left sm:origin-top ${reportType === 'basic' ? 'w-full' : 'min-w-[800px] md:min-w-[1123px] transform scale-[0.6] xs:scale-[0.7] sm:scale-[0.85] md:scale-[0.9] lg:scale-100'}`}>
+                               {previewContent}
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
             )}
 
             {toast && (
