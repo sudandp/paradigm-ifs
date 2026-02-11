@@ -7,9 +7,10 @@ import Toast from '../../components/ui/Toast';
 import { useSettingsStore } from '../../store/settingsStore';
 import Checkbox from '../../components/ui/Checkbox';
 import PageInterfaceSettingsModal from '../../components/developer/PageInterfaceSettingsModal';
+import { useDevice } from '../../hooks/useDevice';
 
 const SettingsCard: React.FC<{ title: string; icon: React.ElementType, children: React.ReactNode, className?: string }> = ({ title, icon: Icon, children, className }) => (
-    <div className={`border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card ${className || ''}`}>
+    <div className={`border-0 shadow-none lg:bg-card lg:p-6 lg:rounded-xl lg:shadow-card ${className || ''}`}>
         <div className="flex items-center mb-6">
             <div className="p-3 rounded-full bg-accent-light mr-4">
                 <Icon className="h-6 w-6 text-accent-dark" />
@@ -26,6 +27,7 @@ const SettingsCard: React.FC<{ title: string; icon: React.ElementType, children:
 
 
 export const ApiSettings: React.FC = () => {
+    const { isMobile } = useDevice();
     const store = useSettingsStore();
 
     const [isExporting, setIsExporting] = useState(false);
@@ -116,7 +118,7 @@ export const ApiSettings: React.FC = () => {
                         <p className="text-sm text-muted -mt-2">Configure third-party services for employee verification.</p>
                         <div className="space-y-6 pt-4">
                             {/* Gemini API */}
-                            <div className="p-4 border border-border rounded-lg api-setting-item-bg">
+                            <div className={`p-4 border rounded-lg ${isMobile ? 'border-[#1f3d2b] bg-[#041b0f]' : 'border-border bg-gray-50'}`}>
                                 <Checkbox
                                     id="gemini-enabled"
                                     label="Enable Gemini API OCR Verification"
@@ -126,7 +128,7 @@ export const ApiSettings: React.FC = () => {
                                 />
                             </div>
                             {/* Offline OCR (Tesseract.js) */}
-                            <div className="p-4 border border-border rounded-lg api-setting-item-bg">
+                            <div className={`p-4 border rounded-lg ${isMobile ? 'border-[#1f3d2b] bg-[#041b0f]' : 'border-border bg-gray-50'}`}>
                                 <Checkbox
                                     id="offline-ocr-enabled"
                                     label="Enable Offline OCR (Tesseract.js)"
@@ -136,7 +138,7 @@ export const ApiSettings: React.FC = () => {
                                 />
                             </div>
                             {/* Perfios API */}
-                            <div className="p-4 border border-border rounded-lg api-setting-item-bg">
+                            <div className={`p-4 border rounded-lg ${isMobile ? 'border-[#1f3d2b] bg-[#041b0f]' : 'border-border bg-gray-50'}`}>
                                 <Checkbox
                                     id="perfios-enabled"
                                     label="Enable Perfios API Verification"
@@ -145,8 +147,19 @@ export const ApiSettings: React.FC = () => {
                                     onChange={e => store.updatePerfiosApiSettings({ enabled: e.target.checked })}
                                 />
                                 <div className={`mt-4 space-y-4 transition-opacity ${store.perfiosApi.enabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-                                    <Input label="Perfios Client ID" value={store.perfiosApi.clientId} onChange={e => store.updatePerfiosApiSettings({ clientId: e.target.value })} />
-                                    <Input label="Perfios Client Secret" type="password" value={store.perfiosApi.clientSecret} onChange={e => store.updatePerfiosApiSettings({ clientSecret: e.target.value })} />
+                                    <Input 
+                                        label="Perfios Client ID" 
+                                        className="w-full" 
+                                        value={store.perfiosApi.clientId} 
+                                        onChange={e => store.updatePerfiosApiSettings({ clientId: e.target.value })} 
+                                    />
+                                    <Input 
+                                        label="Perfios Client Secret" 
+                                        type="password" 
+                                        className="w-full"
+                                        value={store.perfiosApi.clientSecret} 
+                                        onChange={e => store.updatePerfiosApiSettings({ clientSecret: e.target.value })} 
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -184,7 +197,7 @@ export const ApiSettings: React.FC = () => {
                         <p className="text-sm text-muted -mt-2">Manage core system settings and data operations.</p>
                         <div className="space-y-6 pt-4">
                             <Checkbox id="pincode-verification" label="Enable Pincode API Verification" description="Auto-fill City/State from pincode during onboarding." checked={store.address.enablePincodeVerification} onChange={e => store.updateAddressSettings({ enablePincodeVerification: e.target.checked })} />
-                                                       <div className="p-4 border border-border rounded-lg api-setting-item-bg">
+                            <div className={`p-4 border rounded-lg ${isMobile ? 'border-[#1f3d2b] bg-[#041b0f]' : 'border-border bg-gray-50'}`}>
                                 <Checkbox 
                                     id="auto-backup" 
                                     label="Enable Automated Backups" 
@@ -194,11 +207,11 @@ export const ApiSettings: React.FC = () => {
                                 />
                                 
                                 {store.apiSettings.autoBackupEnabled && (
-                                    <div className="mt-4 pt-4 border-t border-border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <div className={`mt-4 pt-4 border-t ${isMobile ? 'border-white/10' : 'border-border'} grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4`}>
                                         <div>
-                                            <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Frequency</label>
+                                            <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Frequency</label>
                                             <select 
-                                                className="w-full h-10 px-3 rounded-lg border border-border bg-page text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
+                                                className={`w-full h-10 px-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-accent/40 ${isMobile ? 'border-white/10 bg-[#062b1a] text-white' : 'border-border bg-white text-primary-text'}`}
                                                 value={store.apiSettings.backupSchedule?.frequency || 'daily'}
                                                 onChange={e => store.updateApiSettings({ 
                                                     backupSchedule: { 
@@ -217,9 +230,9 @@ export const ApiSettings: React.FC = () => {
                                         {/* Frequency Specific Fields */}
                                         {store.apiSettings.backupSchedule?.frequency === 'weekly' && (
                                             <div>
-                                                <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Day of Week</label>
+                                                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Day of Week</label>
                                                 <select 
-                                                    className="w-full h-10 px-3 rounded-lg border border-border bg-page text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
+                                                    className={`w-full h-10 px-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-accent/40 ${isMobile ? 'border-white/10 bg-[#062b1a] text-white' : 'border-border bg-white text-primary-text'}`}
                                                     value={store.apiSettings.backupSchedule?.dayOfWeek ?? 0}
                                                     onChange={e => store.updateApiSettings({ 
                                                         backupSchedule: { 
@@ -242,9 +255,9 @@ export const ApiSettings: React.FC = () => {
                                         {store.apiSettings.backupSchedule?.frequency === 'monthly' && (
                                             <>
                                                 <div>
-                                                    <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Interval</label>
+                                                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Interval</label>
                                                     <select 
-                                                        className="w-full h-10 px-3 rounded-lg border border-border bg-page text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
+                                                        className={`w-full h-10 px-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-accent/40 ${isMobile ? 'border-white/10 bg-[#062b1a] text-white' : 'border-border bg-white text-primary-text'}`}
                                                         value={store.apiSettings.backupSchedule?.interval ?? 1}
                                                         onChange={e => store.updateApiSettings({ 
                                                             backupSchedule: { 
@@ -259,11 +272,12 @@ export const ApiSettings: React.FC = () => {
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Day of Month</label>
+                                                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Day of Month</label>
                                                     <Input 
                                                         type="number"
                                                         min={1}
                                                         max={31}
+                                                        className="w-full"
                                                         value={store.apiSettings.backupSchedule?.dayOfMonth ?? 1}
                                                         onChange={e => store.updateApiSettings({ 
                                                             backupSchedule: { 
@@ -279,9 +293,9 @@ export const ApiSettings: React.FC = () => {
                                         {store.apiSettings.backupSchedule?.frequency === 'yearly' && (
                                             <>
                                                 <div>
-                                                    <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Month</label>
+                                                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Month</label>
                                                     <select 
-                                                        className="w-full h-10 px-3 rounded-lg border border-border bg-page text-sm focus:outline-none focus:ring-2 focus:ring-accent/20"
+                                                        className={`w-full h-10 px-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-accent/40 ${isMobile ? 'border-white/10 bg-[#062b1a] text-white' : 'border-border bg-white text-primary-text'}`}
                                                         value={store.apiSettings.backupSchedule?.monthOfYear ?? 1}
                                                         onChange={e => store.updateApiSettings({ 
                                                             backupSchedule: { 
@@ -305,11 +319,12 @@ export const ApiSettings: React.FC = () => {
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Day</label>
+                                                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Day</label>
                                                     <Input 
                                                         type="number"
                                                         min={1}
                                                         max={31}
+                                                        className="w-full"
                                                         value={store.apiSettings.backupSchedule?.dayOfMonth ?? 1}
                                                         onChange={e => store.updateApiSettings({ 
                                                             backupSchedule: { 
@@ -323,9 +338,10 @@ export const ApiSettings: React.FC = () => {
                                         )}
 
                                         <div>
-                                            <label className="block text-xs font-bold text-muted uppercase tracking-wider mb-2">Start Time</label>
+                                            <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Start Time</label>
                                             <Input 
                                                 type="time"
+                                                className="w-full"
                                                 value={store.apiSettings.backupSchedule?.startTime || '00:00'}
                                                 onChange={e => store.updateApiSettings({ 
                                                     backupSchedule: { 
@@ -336,7 +352,7 @@ export const ApiSettings: React.FC = () => {
                                             />
                                         </div>
                                         <div className="flex items-end col-span-1 sm:col-span-2 lg:col-span-3">
-                                            <div className="text-xs text-muted mb-2 italic p-2 bg-muted/20 rounded-lg w-full">
+                                            <div className={`text-xs italic p-2 rounded-lg w-full ${isMobile ? 'text-white/60 bg-white/5' : 'text-muted bg-gray-100'}`}>
                                                 Next run: {store.apiSettings.backupSchedule?.nextRun ? new Date(store.apiSettings.backupSchedule.nextRun).toLocaleString() : 'Saving will calculate the next run based on this schedule'}
                                             </div>
                                         </div>

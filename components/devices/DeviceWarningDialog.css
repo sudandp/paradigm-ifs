@@ -240,7 +240,7 @@
 }
 
 /* Base Responsive */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     .dw-device-card {
         gap: 8px !important;
         padding: 10px !important;

@@ -5,12 +5,12 @@ interface CheckboxProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
   description?: string;
   labelClassName?: string;
-  inputClassName?: string;
+  descriptionClassName?: string;
 }
 
 // Use forwardRef to allow react-hook-form to attach a ref
 const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ id, label, description, className, labelClassName, inputClassName, ...props }, ref) => {
+  ({ id, label, description, className, labelClassName, inputClassName, descriptionClassName, ...props }, ref) => {
     const generatedId = useId();
     const inputId = id || props.name || generatedId;
 
@@ -32,7 +32,7 @@ const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
             {label}
           </label>
           {description && (
-            <p id={`${inputId}-description`} className="text-muted">
+            <p id={`${inputId}-description`} className={`text-muted ${descriptionClassName || ''}`}>
               {description}
             </p>
           )}

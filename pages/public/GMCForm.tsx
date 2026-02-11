@@ -17,7 +17,7 @@ import Checkbox from '../../components/ui/Checkbox';
 import Logo from '../../components/ui/Logo';
 import SearchableSelect from '../../components/ui/SearchableSelect';
 import { api } from '../../services/api';
-import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useDevice } from '../../hooks/useDevice';
 import html2pdf from 'html2pdf.js';
 
 
@@ -83,7 +83,7 @@ const GMCForm: React.FC = () => {
     const [sites, setSites] = useState<any[]>([]);
     const [companies, setCompanies] = useState<any[]>([]);
     const [isLoadingData, setIsLoadingData] = useState(true);
-    const isMobile = useMediaQuery('(max-width: 768px)');
+    const { isMobile } = useDevice();
 
     useEffect(() => {
         const fetchData = async () => {

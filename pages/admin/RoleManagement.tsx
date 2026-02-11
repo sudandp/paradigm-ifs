@@ -10,7 +10,7 @@ import RoleNameModal from '../../components/admin/RoleNameModal';
 import Modal from '../../components/ui/Modal';
 import Toast from '../../components/ui/Toast';
 import TableSkeleton from '../../components/skeletons/TableSkeleton';
-import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useDevice } from '../../hooks/useDevice';
 import { isAdmin } from '../../utils/auth';
 
 export const allPermissions: { key: Permission; name: string; description: string }[] = [...[
@@ -67,7 +67,7 @@ const RoleManagement: React.FC = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const isMobile = useMediaQuery('(max-width: 767px)');
+    const { isMobile, isTablet } = useDevice();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -200,10 +200,10 @@ const RoleManagement: React.FC = () => {
 
     const renderPermissionRow = (permInfo: { key: Permission; name: string; description: string; }) => (
         <tr key={permInfo.key}>
-            <td data-label="Permission" className="px-4 py-4">
+            <td data-label="Permission" className={`px-4 py-4 ${!isMobile ? `sticky left-0 bg-page z-20 border-r border-border shadow-[2px_0_5px_rgba(0,0,0,0.05)] ${isTablet ? 'min-w-[160px]' : ''}` : ''}`}>
                 <div className="flex flex-col items-end text-right md:items-start md:text-left">
-                    <div className="font-semibold text-primary-text">{permInfo.name}</div>
-                    <div className="text-xs text-muted">{permInfo.description}</div>
+                    <div className={`font-semibold text-primary-text break-words leading-tight ${isTablet ? 'text-xs' : 'text-sm'}`}>{permInfo.name}</div>
+                    {!isTablet && <div className="text-xs text-muted">{permInfo.description}</div>}
                 </div>
             </td>
             {roles.map(role => {
@@ -230,7 +230,7 @@ const RoleManagement: React.FC = () => {
                         ? "You cannot disable your own access to Role Management." 
                         : "";
                 return (
-                    <td key={role.id} data-label={role.displayName} className="px-4 py-4 text-center align-middle">
+                    <td key={role.id} data-label={role.displayName} className={`${isTablet ? 'px-2 py-3 min-w-[96px]' : 'px-4 py-4'} text-center align-middle`}>
                         <div className="flex justify-center">
                             <label className={`relative flex items-center justify-center w-5 h-5 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                 <input type="checkbox" className="sr-only peer" checked={isChecked} onChange={(e) => handlePermissionChange(role.id, permInfo.key, e.target.checked)} disabled={isDisabled} title={title} />
@@ -246,7 +246,7 @@ const RoleManagement: React.FC = () => {
     );
 
     return (
-        <div className="p-4 border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card">
+        <div className={`${isTablet ? 'p-2' : 'p-4'} border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card`}>
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             <RoleNameModal
                 isOpen={isNameModalOpen}
@@ -273,34 +273,36 @@ const RoleManagement: React.FC = () => {
                 Assign permissions to user roles. Changes are saved automatically.
             </p>
 
-            <div className="mb-6 p-4 bg-accent/5 dark:bg-accent/10 border border-accent/20 rounded-xl">
-                <div className="flex gap-3 items-center">
-                    <ShieldCheck className="h-5 w-5 text-accent flex-shrink-0" />
+            <div className={`mb-6 p-4 bg-accent/5 dark:bg-accent/10 border border-accent/20 rounded-xl ${isTablet ? 'p-2' : ''}`}>
+                <div className="flex gap-3 items-start md:items-center">
+                    <ShieldCheck className={`h-5 w-5 text-accent flex-shrink-0 ${isTablet ? 'h-4 w-4' : ''} mt-0.5 md:mt-0`} />
                     <div className="text-sm">
-                        <p className="font-semibold text-primary-text">Full Admin Access Enabled</p>
-                        <p className="text-muted">
-                            Users with the <strong>Admin</strong> or <strong>Super Admin</strong> role automatically have access to all features and pages in the system. These permissions are locked for security and cannot be disabled.
-                        </p>
+                        <p className={`font-semibold text-primary-text ${isTablet ? 'text-xs' : ''}`}>Full Admin Access Enabled</p>
+                        {!isTablet && (
+                            <p className="text-muted leading-relaxed">
+                                Users with the <strong>Admin</strong> or <strong>Super Admin</strong> role automatically have access to all features and pages in the system. These permissions are locked for security and cannot be disabled.
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full text-sm responsive-table">
+            <div className={`overflow-x-auto ${isTablet ? 'hide-scrollbar' : ''}`}>
+                <table className="min-w-full text-sm responsive-table border-separate border-spacing-0">
                     <thead className="bg-page">
                         <tr>
-                            <th scope="col" className="px-4 py-3 text-left font-bold text-primary-text">Permission</th>
+                            <th scope="col" className={`px-4 py-3 text-left font-bold text-primary-text ${!isMobile ? `sticky left-0 bg-page z-30 border-r border-border shadow-[2px_0_5px_rgba(0,0,0,0.05)] ${isTablet ? 'min-w-[160px]' : ''}` : ''}`}>Permission</th>
                             {roles.map(role => (
-                                <th key={role.id} scope="col" className="px-4 py-3 text-center font-bold text-primary-text w-40">
-                                    <div className="flex items-center justify-center gap-1">
-                                        <span>{role.displayName}</span>
+                                <th key={role.id} scope="col" className={`py-3 text-center font-bold text-primary-text ${isTablet ? 'px-2 w-24 min-w-[96px] text-[10px]' : 'px-4 w-40 text-sm'}`}>
+                                    <div className="flex flex-col items-center justify-center gap-1">
+                                        <span className="leading-tight break-words whitespace-normal max-w-full">{role.displayName}</span>
                                          {!isAdmin(role.id) && (
                                             <div className="relative">
                                                 <button onClick={() => setActiveDropdown(role.id === activeDropdown ? null : role.id)}>
                                                     <MoreVertical className="h-4 w-4 text-muted" />
                                                 </button>
                                                 {activeDropdown === role.id && (
-                                                    <div ref={dropdownRef} className="absolute right-0 mt-2 w-32 bg-card border rounded-md shadow-lg z-10">
+                                                     <div ref={dropdownRef} className="absolute right-0 mt-2 w-32 bg-card border rounded-md shadow-lg z-30">
                                                         <button onClick={() => { navigate(`/admin/roles/edit/${role.id}`); setActiveDropdown(null); }} className="w-full text-left px-3 py-2 text-sm hover:bg-page flex items-center"><Edit className="mr-2 h-4 w-4" />Edit</button>
                                                         <button onClick={() => { setCurrentRole(role); setIsDeleteModalOpen(true); setActiveDropdown(null); }} className="w-full text-left px-3 py-2 text-sm hover:bg-page flex items-center text-red-600"><Trash2 className="mr-2 h-4 w-4" />Delete</button>
                                                     </div>
@@ -324,7 +326,7 @@ const RoleManagement: React.FC = () => {
                             {modules.map(module => (
                                 <tbody key={module.id} className="divide-y divide-border">
                                     <tr className="bg-page/50">
-                                        <td colSpan={roles.length + 1} className="p-2 font-bold text-primary-text">{module.name}</td>
+                                        <td colSpan={roles.length + 1} className={`p-2 font-bold text-primary-text border-b border-border ${!isMobile ? 'sticky left-0 bg-page/80 backdrop-blur-sm z-10' : ''}`}>{module.name}</td>
                                     </tr>
                                     {module.permissions.map(permKey => {
                                         const permInfo = allPermissionDetailsMap.get(permKey);
@@ -335,7 +337,7 @@ const RoleManagement: React.FC = () => {
                             {unassignedPermissions.length > 0 && (
                                 <tbody className="divide-y divide-border">
                                     <tr className="bg-page/50">
-                                        <td colSpan={roles.length + 1} className="p-2 font-bold text-primary-text">Uncategorized</td>
+                                        <td colSpan={roles.length + 1} className={`p-2 font-bold text-primary-text border-b border-border ${!isMobile ? 'sticky left-0 bg-page/80 backdrop-blur-sm z-10' : ''}`}>Uncategorized</td>
                                     </tr>
                                     {unassignedPermissions.map(renderPermissionRow)}
                                 </tbody>

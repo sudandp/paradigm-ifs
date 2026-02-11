@@ -8,6 +8,7 @@ import NotificationBell from '../notifications/NotificationBell';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useDevice } from '../../hooks/useDevice';
 import { ProfilePlaceholder } from '../ui/ProfilePlaceholder';
 import { isAdmin } from '../../utils/auth';
 
@@ -21,7 +22,7 @@ const Header: React.FC<HeaderProps> = ({ setIsMobileMenuOpen }) => {
     const navigate = useNavigate();
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const userMenuRef = useRef<HTMLDivElement>(null);
-    const isMobile = useMediaQuery('(max-width: 767px)');
+    const { isMobile } = useDevice();
     const location = useLocation();
 
     useEffect(() => {
@@ -51,12 +52,14 @@ const Header: React.FC<HeaderProps> = ({ setIsMobileMenuOpen }) => {
     return (
         <>
             <header
-                className="sticky top-0 z-40 bg-[#041b0f] md:bg-gray-50/50 backdrop-blur-md border-b border-[#1f3d2b] md:border-gray-200/50 transition-all duration-200"
+                className={`sticky top-0 z-40 transition-all duration-200 ${isMobile ? 'bg-[#041b0f] shadow-md' : 'bg-transparent shadow-none'}`}
                 style={{ paddingTop: 'env(safe-area-inset-top)' }}
             >
                 <div className="px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center h-16">
                         <div className="flex-1 flex justify-center md:justify-start min-w-0 px-2">
+                             {/* Logo is now only shown here on mobile, or if we want it on desktop header too? 
+                                 Original code showed it only on isMobile. Keeping that logic. */}
                             {isMobile && (
                                 <div className="flex items-center justify-center bg-transparent p-2 border-0">
                                     <Logo className="border-0 h-[52px]" />
@@ -71,16 +74,16 @@ const Header: React.FC<HeaderProps> = ({ setIsMobileMenuOpen }) => {
                                     <div className="relative" ref={userMenuRef}>
                                         <button
                                             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                                            className="flex items-center space-x-2 p-2 rounded-lg hover:bg-page transition-colors"
+                                            className="flex items-center space-x-2 p-2 rounded-lg hover:bg-white/10 transition-colors"
                                             aria-expanded={isUserMenuOpen}
                                             aria-haspopup="true"
                                         >
                                             <ProfilePlaceholder photoUrl={user.photoUrl} seed={user.id} className="h-8 w-8 rounded-lg" />
                                             <div className="text-left hidden sm:block">
-                                                <span className="text-sm font-semibold">{user.name}</span>
-                                                <span className="text-xs text-muted block">{getRoleName(user.role)}</span>
+                                                <span className={`text-sm font-semibold ${isMobile ? 'text-white' : 'text-primary-text'}`}>{user.name}</span>
+                                                <span className={`text-xs block ${isMobile ? 'text-white/70' : 'text-muted'}`}>{getRoleName(user.role)}</span>
                                             </div>
-                                            <ChevronDown className="h-4 w-4 text-muted" />
+                                            <ChevronDown className={`h-4 w-4 ${isMobile ? 'text-white/70' : 'text-muted'}`} />
                                         </button>
 
                                         {isUserMenuOpen && (

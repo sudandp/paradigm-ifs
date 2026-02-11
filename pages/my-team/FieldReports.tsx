@@ -9,6 +9,7 @@ import Button from '../../components/ui/Button';
 import Pagination from '../../components/ui/Pagination';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
+import { useDevice } from '../../hooks/useDevice';
 
 // --- PDF Preview Component ---
 const PdfPreviewModal: React.FC<{
@@ -259,6 +260,7 @@ const FieldReports: React.FC = () => {
     const [allSites, setAllSites] = useState<{ id: string, name: string }[]>([]);
     const [selectedUserId, setSelectedUserId] = useState('all');
     const [selectedSiteName, setSelectedSiteName] = useState('all');
+    const { isMobile, isTablet } = useDevice();
     const [teamMemberIds, setTeamMemberIds] = useState<string[] | undefined>(undefined);
 
     // Visibility logic: admins and hr see everything. Others (managers) see only their team.
@@ -365,8 +367,8 @@ const FieldReports: React.FC = () => {
         <div className="p-4 md:p-6 space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-primary-text">Field Reports</h1>
-                    <p className="text-muted mt-1">Review detailed work summaries and verified checklists from field staff.</p>
+                    <h1 className={`${isTablet ? 'text-lg' : 'text-2xl'} font-bold text-primary-text`}>Field Reports</h1>
+                    {!isTablet && <p className="text-muted mt-1">Review detailed work summaries and verified checklists from field staff.</p>}
                 </div>
             </div>
 
@@ -455,15 +457,15 @@ const FieldReports: React.FC = () => {
                             <div key={report.id} className={`bg-card rounded-xl border border-border shadow-sm hover:shadow-md transition-all overflow-hidden ${isExpanded ? 'ring-2 ring-accent/20' : ''}`}>
                                 {/* Header / Summary Row */}
                                 <div 
-                                    className={`p-5 flex flex-col md:flex-row justify-between md:items-center gap-4 cursor-pointer hover:bg-muted/50 transition-colors ${isExpanded ? 'bg-muted/30 border-b border-border' : ''}`}
+                                    className={`${isTablet ? 'p-3' : 'p-5'} flex flex-col md:flex-row justify-between md:items-center gap-4 cursor-pointer hover:bg-muted/50 transition-colors ${isExpanded ? 'bg-muted/30 border-b border-border' : ''}`}
                                     onClick={() => toggleReportDetails(report.id)}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent font-bold">
+                                        <div className={`rounded-xl bg-accent/10 flex items-center justify-center text-accent font-bold ${isTablet ? 'w-8 h-8 text-sm' : 'w-10 h-10'}`}>
                                             {report.userName.charAt(0)}
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-primary-text">{report.userName}</h3>
+                                            <h3 className={`font-bold text-primary-text ${isTablet ? 'text-sm' : ''}`}>{report.userName}</h3>
                                             <div className="flex items-center gap-2 text-xs text-muted">
                                                 <span className="px-2 py-0.5 rounded-full bg-accent/10 text-accent capitalize">{report.userRole.replace(/_/g, ' ')}</span>
                                                 <span>•</span>
@@ -487,7 +489,7 @@ const FieldReports: React.FC = () => {
                                 
                                 {/* Detailed View */}
                                 {isExpanded && (
-                                    <div className="p-6 bg-card space-y-8 animate-in fade-in slide-in-from-top-4 duration-300">
+                                    <div className={`${isTablet ? 'p-4' : 'p-6'} bg-card space-y-8 animate-in fade-in slide-in-from-top-4 duration-300`}>
                                         {/* Action Bar */}
                                         <div className="flex justify-between items-center bg-muted/20 p-4 rounded-xl border border-border">
                                             <div className="flex items-center gap-2 text-sm font-medium text-primary-text">
@@ -499,16 +501,16 @@ const FieldReports: React.FC = () => {
                                                     e.stopPropagation();
                                                     setPreviewReport(report);
                                                 }}
-                                                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors border border-primary/20 shadow-sm"
+                                                className={`flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors border border-primary/20 shadow-sm ${isMobile ? 'w-full justify-center' : ''}`}
                                             >
                                                 <Download className="h-4 w-4" />
                                                 Preview & Download PDF
                                             </button>
                                         </div>
 
-                                        <div className="grid lg:grid-cols-3 gap-8">
+                                        <div className={`grid grid-cols-1 md:grid-cols-2 ${isTablet ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-8`}>
                                             {/* Left Column: Response Values */}
-                                            <div className="lg:col-span-2 space-y-6">
+                                            <div className="md:col-span-2 space-y-6">
                                                 <div className="bg-muted/10 rounded-2xl border border-border/50 overflow-hidden">
                                                     <div className="bg-muted/30 px-4 py-3 border-b border-border/50 flex items-center gap-2">
                                                         <ClipboardCheck className="h-4 w-4 text-accent" />

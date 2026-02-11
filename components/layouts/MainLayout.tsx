@@ -1,6 +1,6 @@
 
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Outlet, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { Bell, ChevronsLeft, ChevronsRight, ChevronDown, ChevronUp, ShieldCheck, LayoutDashboard, ClipboardCheck, Map as MapIcon, ClipboardList, User, Briefcase, ListTodo, Building, Users, Shirt, Settings, GitBranch, Calendar, CalendarCheck2, ShieldHalf, FileDigit, GitPullRequest, Home, BriefcaseBusiness, UserPlus, IndianRupee, PackagePlus, LifeBuoy, MapPin, ArrowLeft, Navigation, Cpu, FileText, Smartphone } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
@@ -11,6 +11,7 @@ import Button from '../ui/Button';
 import { useUiSettingsStore } from '../../store/uiSettingsStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useDevice } from '../../hooks/useDevice';
 import { isAdmin } from '../../utils/auth';
 import Header from './Header';
 import { NotificationPanel } from '../notifications/NotificationPanel';
@@ -62,10 +63,11 @@ export const allNavLinks: NavLinkConfig[] = [
 ];
 
 
-const SidebarContent: React.FC<{ isCollapsed: boolean, onLinkClick?: () => void, onExpand?: () => void, hideHeader?: boolean, mode?: 'light' | 'dark', isMobile?: boolean }> = ({ isCollapsed, onLinkClick, onExpand, hideHeader = false, mode = 'light', isMobile = false }) => {
+const SidebarContent: React.FC<{ isCollapsed: boolean, onLinkClick?: () => void, onExpand?: () => void, hideHeader?: boolean, mode?: 'light' | 'dark', isMobile?: boolean }> = React.memo(({ isCollapsed, onLinkClick, onExpand, hideHeader = false, mode = 'light', isMobile = false }) => {
     const { user } = useAuthStore();
     const { permissions } = usePermissionsStore();
-    const getPermissions = () => {
+
+    const userPermissions = useMemo(() => {
         if (!user || !permissions) return [];
         const roleId = user.roleId?.toLowerCase() || '';
         const roleName = user.role?.toLowerCase() || '';
@@ -76,28 +78,25 @@ const SidebarContent: React.FC<{ isCollapsed: boolean, onLinkClick?: () => void,
                permissions[roleNameUnderscore] || 
                permissions[user.role] || 
                [];
-    };
+    }, [user, permissions]);
 
-    const userPermissions = getPermissions();
+    const availableNavLinks = useMemo(() => {
+        if (!user) return [];
+        return allNavLinks
+            .filter(link => isAdmin(user.role) || userPermissions.includes(link.permission))
+            .sort((a, b) => a.label.localeCompare(b.label));
+    }, [user, userPermissions]);
 
-    const availableNavLinks = user ? allNavLinks
-        .filter(link => isAdmin(user.role) || userPermissions.includes(link.permission))
-        .sort((a, b) => a.label.localeCompare(b.label))
-        : [];
-
-    const handleLinkClick = (e: React.MouseEvent) => {
-        // On mobile, if collapsed, clicking an icon should expand the sidebar instead of navigating
-        if (isMobile && isCollapsed && onExpand) {
+    const handleLinkClick = useCallback((e: React.MouseEvent) => {
+        // If collapsed, clicking an icon should expand the sidebar instead of navigating (on all platforms)
+        if (isCollapsed && onExpand) {
             e.preventDefault();
             onExpand();
             return;
         }
 
-        // Otherwise (expanded or desktop), proceed with navigation and trigger onLinkClick (which collapses on mobile)
-        if (onLinkClick) {
-            onLinkClick();
-        }
-    };
+        // Otherwise (expanded), proceed with navigation and trigger onLinkClick (which collapses)
+    }, [isCollapsed, onExpand, onLinkClick]);
 
     return (
         <div className="flex flex-col">
@@ -115,7 +114,7 @@ const SidebarContent: React.FC<{ isCollapsed: boolean, onLinkClick?: () => void,
                 </div>
             )}
             {!hideHeader && (
-                <div className="p-4 border-b border-gray-200 bg-white flex justify-center h-16 items-center transition-all duration-300 flex-shrink-0">
+                <div className={`p-4 border-b flex justify-center h-16 items-center transition-all duration-300 flex-shrink-0 ${mode === 'dark' ? 'bg-[#041b0f] border-[#1f3d2b]' : 'bg-white border-gray-200'}`}>
                     {isCollapsed ? (
                         <div className="h-8 w-8 overflow-hidden">
                             <Logo className="h-8 max-w-none object-left object-cover" />
@@ -165,7 +164,7 @@ const SidebarContent: React.FC<{ isCollapsed: boolean, onLinkClick?: () => void,
             </nav>
         </div>
     );
-};
+});
 
 
 const MainLayout: React.FC = () => {
@@ -174,20 +173,36 @@ const MainLayout: React.FC = () => {
     const { permissions } = usePermissionsStore();
     const { autoScrollOnHover } = useUiSettingsStore();
     const location = useLocation();
-    const isMobile = useMediaQuery('(max-width: 767px)');
+    const { isMobile, isTablet, isDesktop } = useDevice();
 
     const mainContentRef = useRef<HTMLDivElement>(null);
     const pageScrollIntervalRef = useRef<number | null>(null);
 
     // Initialize sidebar state based on device type. 
-    // On mobile, start collapsed (true). On desktop, start expanded (false).
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true); // Default to true to prevent flash
+    // On mobile/tablet, start collapsed (true). On desktop, start expanded (false).
+    const [isSidebarExpanded, setIsSidebarExpanded] = useState(isDesktop);
     const [scrollPosition, setScrollPosition] = useState(0);
     const [showScrollButtons, setShowScrollButtons] = useState(false);
+    const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Update sidebar state when switching between mobile/desktop
+    // Update sidebar state when switching between mobile/desktop/tablet
     useEffect(() => {
-        setIsSidebarCollapsed(isMobile);
+        // Collapse sidebar if mobile
+        setIsSidebarExpanded(isDesktop);
+    }, [isDesktop]);
+
+    const handleMouseEnter = useCallback(() => {
+        if (isMobile) return;
+        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = setTimeout(() => {
+            setIsSidebarExpanded(true);
+        }, 50); // Small 50ms debounce for smoother feel
+    }, [isMobile]);
+
+    const handleMouseLeave = useCallback(() => {
+        if (isMobile) return;
+        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+        setIsSidebarExpanded(false);
     }, [isMobile]);
 
     const stopPageScrolling = useCallback(() => {
@@ -251,17 +266,17 @@ const MainLayout: React.FC = () => {
         // `p-8 gap-8`, which caused the sidebar and main content to squeeze on narrow viewports. Now we apply
         // progressively larger spacing on wider screens while keeping things compact on mobile. The `min-h-screen`
         // ensures the container grows as needed instead of forcing a fixed height.
-        <div className={`flex min-h-screen overflow-hidden ${isMobile ? 'bg-[#041b0f]' : 'bg-page'} ${!isMobile ? 'p-4 md:p-6 lg:p-8 gap-4 md:gap-6 lg:gap-8' : ''}`}>
+        <div className={`flex min-h-screen overflow-hidden ${isMobile ? 'bg-[#041b0f]' : 'bg-page'} ${!isMobile ? 'p-4 md:p-4 lg:p-8 gap-4 md:gap-4 lg:gap-8' : ''}`}>
 
-            {isMobile && !isSidebarCollapsed && (
+            {isMobile && !isSidebarExpanded && (
                 <div
                     className="fixed inset-0 bg-black/50 z-[45] transition-opacity duration-300"
-                    onClick={() => setIsSidebarCollapsed(true)}
+                    onClick={() => setIsSidebarExpanded(true)}
                 />
             )}
 
-            {/* Backdrop for notifications on mobile */}
-            {isMobile && isPanelOpen && (
+            {/* Backdrop for notifications on mobile/tablet */}
+            {(isMobile || isTablet) && isPanelOpen && (
                 <div
                     className="fixed inset-0 bg-black/50 z-[95] transition-opacity duration-300"
                     onClick={() => setIsPanelOpen(false)}
@@ -269,35 +284,39 @@ const MainLayout: React.FC = () => {
             )}
 
             {/* Sidebar - Overlay on mobile, fixed on desktop */}
-            <aside className={`flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out ${isMobile ? (isSidebarCollapsed ? 'w-16' : 'w-64') : (isSidebarCollapsed ? 'w-20' : 'w-72')} ${isMobile ? 'bg-[#041b0f] border-r border-[#1f3d2b]' : 'bg-white border-r border-gray-200/60'} ${isMobile ? 'fixed left-0 top-0 bottom-0 z-50' : ''}`}>
+            <aside 
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+                className={`flex flex-col flex-shrink-0 transition-[width] duration-300 cubic-bezier(0.4,0,0.2,1) will-change-[width] ${isMobile ? (!isSidebarExpanded ? 'w-16' : 'w-64') : (isTablet ? (!isSidebarExpanded ? 'w-16' : 'w-64') : (!isSidebarExpanded ? 'w-16' : 'w-72'))} ${isMobile ? 'bg-[#041b0f]' : 'bg-white border-r border-gray-200/60'} ${isMobile ? 'fixed left-0 top-0 bottom-0 z-50' : ''}`}
+            >
                 <div className="flex-1 overflow-y-auto overflow-x-hidden">
                     <SidebarContent
-                        isCollapsed={isSidebarCollapsed}
+                        isCollapsed={!isSidebarExpanded}
                         mode={isMobile ? "dark" : "light"}
-                        onLinkClick={isMobile ? () => setIsSidebarCollapsed(true) : undefined}
-                        onExpand={() => setIsSidebarCollapsed(false)}
+                        onLinkClick={() => setIsSidebarExpanded(false)}
+                        onExpand={() => setIsSidebarExpanded(true)}
                         hideHeader={isMobile}
                         isMobile={isMobile}
                     />
                 </div>
-                <div className={`flex-shrink-0 px-2 pt-2 mt-auto flex items-center ${isMobile ? 'border-t border-[#1f3d2b]' : 'border-t border-border'}`}>
+                <div className={`flex-shrink-0 px-2 pt-2 mt-auto flex items-center ${isMobile ? 'border-t border-transparent' : 'border-t border-border'}`}>
                     <button
-                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                        onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
                         className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-colors ${isMobile ? 'text-white/70 hover:bg-white/10' : 'text-muted hover:bg-page'}`}
-                        title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                        title={!isSidebarExpanded ? 'Expand sidebar' : 'Collapse sidebar'}
                     >
-                        {isSidebarCollapsed ? <ChevronsRight className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
+                        {!isSidebarExpanded ? <ChevronsRight className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
                     </button>
                 </div>
             </aside>
 
-            <div className={`flex-1 flex flex-col ${isMobile ? 'bg-[#041b0f]' : 'bg-gray-50/50'} ${isMobile && isSidebarCollapsed ? 'ml-16' : ''}`}>
+            <div className={`flex-1 flex flex-col ${isMobile ? 'bg-[#041b0f]' : 'bg-gray-50/50'} ${isMobile && !isSidebarExpanded ? 'ml-16' : ''}`}>
                 <Header />
                 <BreakTrackingMonitor />
 
                 {/* Main Content */}
                 <main ref={mainContentRef} className={`flex-1 overflow-y-auto ${isMobile ? 'bg-[#041b0f]' : 'bg-page'}`}>
-                    <div className="p-4">
+                    <div className={`${isTablet ? 'p-1' : 'p-4'}`}>
                         {/* Bordered Card Container removed to fix white screen issue */}
                         <Outlet />
                     </div>
@@ -305,17 +324,17 @@ const MainLayout: React.FC = () => {
 
             </div>
 
-            {/* Notification Sidebar - Desktop */}
-            {!isMobile && isPanelOpen && (
+            {/* Notification Sidebar - Desktop (> 1024px) */}
+            {isDesktop && isPanelOpen && (
                 <aside className="w-[400px] flex-shrink-0 bg-white border-l border-gray-200/60 rounded-3xl overflow-hidden shadow-sm animate-in slide-in-from-right duration-300">
                     <NotificationPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} isMobile={false} />
                 </aside>
             )}
 
-            {/* Notification Overlay - Mobile */}
-            {isMobile && isPanelOpen && (
-                <div className="fixed inset-y-0 right-0 w-full z-[100] animate-in slide-in-from-right duration-300">
-                    <NotificationPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} isMobile={true} />
+            {/* Notification Overlay - Mobile & Tablet */}
+            {(isMobile || isTablet) && isPanelOpen && (
+                <div className={`fixed inset-y-0 right-0 z-[100] animate-in slide-in-from-right duration-300 ${isMobile ? 'w-full' : 'w-[400px]'}`}>
+                    <NotificationPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} isMobile={isMobile} />
                 </div>
             )}
             {/* Scroll-to-top/bottom buttons */}

@@ -54,7 +54,7 @@ const LocationManagement: React.FC = () => {
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Track when editing an existing location.  If set, the form will

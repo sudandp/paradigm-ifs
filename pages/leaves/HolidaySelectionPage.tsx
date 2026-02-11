@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { api } from '../../services/api';
 import { FIXED_HOLIDAYS, HOLIDAY_SELECTION_POOL } from '../../utils/constants';
-import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useDevice } from '../../hooks/useDevice';
 import Button from '../../components/ui/Button';
 import { Calendar as CalendarIcon, Check, ChevronLeft, Info, Loader2, Save } from 'lucide-react';
 import Toast from '../../components/ui/Toast';
@@ -15,7 +15,7 @@ const HolidaySelectionPage: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuthStore();
     const { attendance } = useSettingsStore();
-    const isMobile = useMediaQuery('(max-width: 768px)');
+    const { isMobile } = useDevice();
     
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);

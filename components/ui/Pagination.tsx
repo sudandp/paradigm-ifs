@@ -19,7 +19,7 @@ const Pagination: React.FC<PaginationProps> = ({
   onPageChange,
   onPageSizeChange,
   className = '',
-  pageSizeOptions = [20, 50, 100],
+  pageSizeOptions = [10, 20, 50, 100],
 }) => {
   const totalPages = Math.ceil(totalItems / pageSize);
 

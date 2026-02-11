@@ -6,6 +6,7 @@ import { formatDistanceToNow, isToday } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { NativeBridge } from '../../utils/nativeBridge';
+import { useDevice } from '../../hooks/useDevice';
 
 // ... existing imports
 
@@ -76,6 +77,7 @@ const markerStyles = `
 const MyTeamPage: React.FC = () => {
   const { user } = useAuthStore();
   const { theme } = useThemeStore();
+  const { isMobile, isTablet } = useDevice();
   const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const [latestLocations, setLatestLocations] = useState<Record<string, { latitude: number; longitude: number; timestamp: string }>>({});
   const [loading, setLoading] = useState(true);
@@ -123,7 +125,7 @@ const MyTeamPage: React.FC = () => {
         // NOTE: Real implementation might check if user is actually checked-in first.
         // For now, we enforce tracking if the user is a field staff or similar.
         if (user) {
-             NativeBridge.startTracking(interval);
+             NativeBridge.startTracking(interval, user.id);
         }
       }
     } catch (err) {
@@ -356,87 +358,93 @@ const MyTeamPage: React.FC = () => {
   }, [filteredMembers, latestLocations]);
 
   return (
-    <div className="flex flex-col h-full bg-background overflow-hidden p-6 md:p-8 space-y-6">
+    <div className={`flex flex-col h-full bg-background overflow-hidden ${isTablet ? 'p-2' : 'p-6 md:p-8'} space-y-6`}>
       {/* Header & Search */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-primary-text">My Team</h1>
-          <p className="text-sm text-muted">Real-time status and locations of your field personnel.</p>
-        </div>
-        
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          {['admin', 'developer'].includes(user?.role || '') && (
-            <Link to="/my-team/reporting">
-              <Button variant="outline" size="sm" className="whitespace-nowrap">
-                <Users className="w-4 h-4 mr-2" />
-                Manage Structure
-              </Button>
-            </Link>
-          )}
+      <div className={`flex flex-col ${isMobile ? 'gap-4' : 'gap-6'}`}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className={`${isTablet ? 'text-lg' : 'text-2xl'} font-bold text-primary-text`}>My Team</h1>
+            {!isTablet && <p className="text-sm text-muted">Real-time status and locations of your field personnel.</p>}
+          </div>
           
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-            <select
-              value={selectedLocation}
-              onChange={(e) => setSelectedLocation(e.target.value)}
-              className="w-full sm:w-56 px-3 py-2 bg-card border border-border rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-sm appearance-none cursor-pointer"
-            >
-              <option value="All">All Locations</option>
-              {Object.entries(availableLocations).map(([state, cities]) => (
-                <optgroup key={state} label={state}>
-                  <option value={`state:${state}`}>All {state}</option>
-                  {cities.map(city => (
-                    <option key={`${state}-${city}`} value={`city:${state}:${city}`}>{city}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            {['admin', 'developer'].includes(user?.role || '') && (
+              <Link to="/my-team/reporting" className="w-full sm:w-auto">
+                <Button variant="outline" size="sm" className="w-full whitespace-nowrap">
+                  <Users className="w-4 h-4 mr-2" />
+                  Manage Structure
+                </Button>
+              </Link>
+            )}
+            
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+              <select
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                className="w-full sm:w-48 px-3 py-2 bg-card border border-border rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-sm appearance-none cursor-pointer"
+              >
+                <option value="All">All Locations</option>
+                {Object.entries(availableLocations).map(([state, cities]) => (
+                  <optgroup key={state} label={state}>
+                    <option value={`state:${state}`}>All {state}</option>
+                    {cities.map(city => (
+                      <option key={`${state}-${city}`} value={`city:${state}:${city}`}>{city}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
 
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search team member..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full !pl-10 pr-4 py-2 bg-card border border-border rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-sm"
-              />
+              <div className="relative w-full md:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search team member..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full !pl-10 pr-4 py-2 bg-card border border-border rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-sm"
+                />
+              </div>
             </div>
           </div>
         </div>
         
         {/* Admin Tracking Interval Control */}
         {user?.role === 'admin' && (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 p-2 rounded-lg">
-                <span className="text-xs font-medium text-red-700 whitespace-nowrap">Tracking Interval (mins):</span>
-                <input 
-                    type="number" 
-                    min="1" 
-                    max="60" 
-                    value={trackingInterval} 
-                    onChange={(e) => setTrackingInterval(parseInt(e.target.value) || 15)}
-                    className="w-16 h-8 text-sm border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
-                />
-                <Button 
-                    size="sm" 
-                    variant="primary" 
-                    onClick={handleUpdateInterval}
-                    disabled={isUpdatingInterval}
-                    className="h-8 text-xs bg-red-600 hover:bg-red-700 border-none"
-                >
-                    {isUpdatingInterval ? 'Saving...' : 'Set'}
-                </Button>
+            <div className={`flex items-center gap-3 p-3 rounded-xl border ${isMobile ? 'flex-col items-stretch bg-red-50/50' : 'bg-red-50 border-red-200 w-fit'}`}>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-red-600" />
+                  <span className="text-sm font-medium text-red-700 whitespace-nowrap">Tracking Interval (mins):</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input 
+                      type="number" 
+                      min="1" 
+                      max="60" 
+                      value={trackingInterval} 
+                      onChange={(e) => setTrackingInterval(parseInt(e.target.value) || 15)}
+                      className="w-20 h-9 text-sm border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 bg-white !text-gray-900"
+                  />
+                  <Button 
+                      size="sm" 
+                      variant="primary" 
+                      onClick={handleUpdateInterval}
+                      disabled={isUpdatingInterval}
+                      className="h-9 px-4 text-xs bg-red-600 hover:bg-red-700 border-none rounded-lg"
+                  >
+                      {isUpdatingInterval ? 'Saving...' : 'Set'}
+                  </Button>
+                </div>
             </div>
         )}
       </div>
-
       {/* Map View */}
-      <div className="relative rounded-2xl overflow-hidden border border-border shadow-sm bg-card" style={{ height: '400px' }}>
+      <div className={`relative rounded-2xl overflow-hidden border border-border shadow-sm bg-card transition-all duration-300 ${isMobile ? 'h-72' : 'h-[400px]'}`}>
         <div ref={mapContainerRef} className="w-full h-full z-0" />
       </div>
 
       {/* Team List Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-primary-text flex items-center gap-2">
+      <div className={`${isTablet ? 'mt-4 px-2' : 'flex items-center justify-between mt-4 px-2'}`}>
+        <h2 className={`${isTablet ? 'text-sm' : 'text-lg'} font-bold text-primary-text flex items-center gap-2`}>
           Team Members
           <span className="bg-accent/10 text-accent text-xs px-2 py-0.5 rounded-full">
             {filteredMembers.length}
@@ -457,8 +465,8 @@ const MyTeamPage: React.FC = () => {
           <p>No team members found.</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-6 pb-20">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className={`flex flex-col ${isTablet ? 'gap-3' : 'gap-6'} pb-24`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredMembers
               .slice((currentPage - 1) * pageSize, currentPage * pageSize)
               .map((member) => {

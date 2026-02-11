@@ -262,7 +262,7 @@ export const SiteManagement: React.FC = () => {
     };
 
     return (
-        <div className="p-4 md:p-8">
+        <div className="p-4 md:p-6">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
 
             <input type="file" ref={importRef} className="hidden" accept=".csv" onChange={handleImport} />

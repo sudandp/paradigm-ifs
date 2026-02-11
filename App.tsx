@@ -10,6 +10,7 @@ import { useEnrollmentRulesStore } from './store/enrollmentRulesStore';
 import { usePermissionsStore } from './store/permissionsStore';
 import { useSettingsStore } from './store/settingsStore';
 import { useMediaQuery } from './hooks/useMediaQuery';
+import { useDevice } from './hooks/useDevice';
 import { supabase } from './services/supabase';
 import { authService } from './services/authService';
 // Import the API client under an alias to avoid name collisions.  Renaming
@@ -134,8 +135,7 @@ import ScrollToTop from './components/ScrollToTop';
 // Theme Manager
 const ThemeManager: React.FC = () => {
   const { theme, isAutomatic, _setThemeInternal } = useThemeStore();
-  const isMobile = useMediaQuery('(max-width: 767px)');
-
+  const { isMobile } = useDevice();
   useEffect(() => {
     const body = document.body;
     let newTheme = 'light';
@@ -177,7 +177,7 @@ const MainLayoutWrapper: React.FC = () => {
   const { user, isInitialized } = useAuthStore();
   const location = useLocation();
   // IMPORTANT: All hooks must be called before any conditional returns
-  const isMobile = useMediaQuery('(max-width: 767px)');
+  const { isMobile } = useDevice();
 
   if (!isInitialized) {
     // Wait for the session check to complete.

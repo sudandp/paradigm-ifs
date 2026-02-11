@@ -68,7 +68,7 @@ const ModuleManagement: React.FC = () => {
   };
 
   return (
-    <div className="p-4 border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card">
+    <div className="p-4 border-0 shadow-none lg:bg-card lg:p-6 lg:rounded-xl lg:shadow-card">
       {toast && <Toast {...toast} onDismiss={() => setToast(null)} />}
       <ModuleFormModal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} onSave={handleSave} initialData={currentModule} />
       <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={handleDelete} title="Confirm Deletion">
@@ -82,7 +82,7 @@ const ModuleManagement: React.FC = () => {
       {isLoading ? (
         <GridSkeleton count={6} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {modules.map(module => (
             <div key={module.id} className="bg-page p-4 rounded-lg border border-border flex flex-col">
               <div className="flex-grow">

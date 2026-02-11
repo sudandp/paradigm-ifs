@@ -4,11 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { FileText, ArrowLeft, ChevronRight } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Logo from '../../components/ui/Logo';
-import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useDevice } from '../../hooks/useDevice';
 
 const FormsSelection: React.FC = () => {
     const navigate = useNavigate();
-    const isMobile = useMediaQuery('(max-width: 768px)');
+    const { isMobile } = useDevice();
 
     const forms = [
         {
