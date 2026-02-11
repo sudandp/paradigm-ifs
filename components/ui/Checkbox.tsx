@@ -5,6 +5,7 @@ interface CheckboxProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
   description?: string;
   labelClassName?: string;
+  inputClassName?: string;
   descriptionClassName?: string;
 }
 
