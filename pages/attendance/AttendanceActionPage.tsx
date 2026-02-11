@@ -62,6 +62,8 @@ const AttendanceActionPage: React.FC = () => {
 
             // Determine forced type
             let forcedType: string | undefined = undefined;
+            if (isCheckIn) forcedType = 'check-in';
+            if (!isCheckIn && !isBreakIn && !isBreakOut) forcedType = 'check-out';
             if (isBreakIn) forcedType = 'break-in';
             if (isBreakOut) forcedType = 'break-out';
 

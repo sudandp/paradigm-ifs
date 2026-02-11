@@ -510,10 +510,29 @@ const App: React.FC = () => {
       location.pathname === '/splash'
     )) {
       const lastPath = localStorage.getItem(LAST_PATH_KEY);
-      // Only use lastPath if it exists AND is not the root path itself
+      
+      // Validation check: Is this path restricted/administrative?
+      const isRestrictedPath = lastPath && (
+        lastPath.startsWith('/admin') || 
+        lastPath.startsWith('/hr') || 
+        lastPath.startsWith('/developer') ||
+        lastPath.startsWith('/billing')
+      );
+
+      // Check for administrative roles that are allowed to access restricted paths
+      // We include management, hr, and developer as they have broad access in this app.
+      const isAdminRole = ['admin', 'hr', 'super_admin', 'developer', 'management', 'hr_ops'].includes(user.role);
+
       if (lastPath && shouldStorePath(lastPath) && lastPath !== '/' && lastPath !== '/#') {
-        localStorage.removeItem(LAST_PATH_KEY); // Clear after use
-        navigate(lastPath, { replace: true });
+        // If it's a restricted path and the user is NOT an admin, clear it and go to profile
+        if (isRestrictedPath && !isAdminRole) {
+          console.warn('[App] Guarding against unauthorized lastPath redirect:', lastPath);
+          localStorage.removeItem(LAST_PATH_KEY);
+          navigate('/profile', { replace: true });
+        } else {
+          localStorage.removeItem(LAST_PATH_KEY); // Clear after use
+          navigate(lastPath, { replace: true });
+        }
       } else {
         if (user.role === 'unverified') {
           navigate('/pending-approval', { replace: true });

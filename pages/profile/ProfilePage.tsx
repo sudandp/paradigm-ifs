@@ -345,39 +345,33 @@ const ProfilePage: React.FC = () => {
                                                         </span>
                                                     )}
                                                 </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <button
-                                                    onClick={() => navigate('/attendance/check-in')}
-                                                    disabled={isCheckedIn || isActionInProgress}
-                                                    className={`
-                                                        relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
-                                                        ${isCheckedIn 
-                                                            ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
-                                                            : 'bg-gradient-to-br from-emerald-600 to-emerald-800 text-white active:scale-95'
-                                                        }
-                                                    `}
-                                                >
-                                                    <LogIn className={`h-4 w-4 ${!isCheckedIn && 'animate-pulse'}`} />
-                                                    <span className="font-bold text-[10px] uppercase tracking-wider">Punch In</span>
-                                                </button>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <button
+                                                        onClick={() => navigate('/attendance/check-in')}
+                                                        disabled={isCheckedIn || isActionInProgress}
+                                                        className={`relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300 ${isCheckedIn ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' : 'bg-gradient-to-br from-emerald-600 to-emerald-800 text-white active:scale-95'}`}
+                                                    >
+                                                        <LogIn className={`h-4 w-4 ${!isCheckedIn ? 'animate-pulse' : ''}`} />
+                                                        <span className="font-bold text-[10px] uppercase tracking-wider">Punch In</span>
+                                                    </button>
 
-                                                <button
-                                                    onClick={() => navigate('/attendance/check-out')}
-                                                    disabled={!isCheckedIn || isOnBreak || isActionInProgress}
-                                                    className={`
-                                                        relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
-                                                        ${(!isCheckedIn || isOnBreak)
-                                                            ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
-                                                            : 'bg-gradient-to-br from-rose-600 to-rose-800 text-white active:scale-95'
-                                                        }
-                                                    `}
-                                                >
-                                                    <LogOut className="h-4 w-4" />
-                                                    <span className="font-bold text-[10px] uppercase tracking-wider">Punch Out</span>
-                                                </button>
+                                                    <button
+                                                        onClick={() => navigate('/attendance/check-out')}
+                                                        disabled={!isCheckedIn || isOnBreak || isActionInProgress}
+                                                        className={`
+                                                            relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
+                                                            ${(!isCheckedIn || isOnBreak)
+                                                                ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
+                                                                : 'bg-gradient-to-br from-rose-600 to-rose-800 text-white active:scale-95'
+                                                            }
+                                                        `}
+                                                    >
+                                                        <LogOut className="h-4 w-4" />
+                                                        <span className="font-bold text-[10px] uppercase tracking-wider">Punch Out</span>
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                        
+                                            
                                             <div className="flex flex-col space-y-3">
                                                 <div className="flex items-center gap-2 px-0.5">
                                                     <button 
@@ -393,41 +387,31 @@ const ProfilePage: React.FC = () => {
                                                         </span>
                                                     )}
                                                 </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <button
-                                                    onClick={() => navigate('/attendance/break-in')}
-                                                    disabled={!isCheckedIn || isOnBreak || isActionInProgress}
-                                                    className={`
-                                                        relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
-                                                        ${(!isCheckedIn || isOnBreak)
-                                                            ? 'bg-white/5 text-gray-400 cursor-not-allowed border border-white/5' 
-                                                            : 'bg-gradient-to-br from-blue-600 to-blue-800 text-white active:scale-95'}
-                                                    `}
-                                                >
-                                                    <CheckCircle className="h-4 w-4" />
-                                                    <span className="font-bold text-[10px] uppercase tracking-wider">Break In</span>
-                                                </button>
-
-                                                <button
-                                                    onClick={() => navigate('/attendance/break-out')}
-                                                    disabled={!isCheckedIn || !isOnBreak || isActionInProgress}
-                                                    className={`
-                                                        relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
-                                                        ${(!isCheckedIn || !isOnBreak)
-                                                            ? 'bg-white/5 text-gray-400 cursor-not-allowed border border-white/5' 
-                                                            : 'bg-gradient-to-br from-amber-600 to-amber-800 text-white active:scale-95'}
-                                                    `}
-                                                >
-                                                    <CheckCircle className="h-4 w-4" />
-                                                    <span className="font-bold text-[10px] uppercase tracking-wider">Break Out</span>
-                                                </button>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <button
+                                                        onClick={() => navigate('/attendance/break-in')}
+                                                        disabled={!isCheckedIn || isOnBreak || isActionInProgress}
+                                                        className={`relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300 ${(!isCheckedIn || isOnBreak) ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' : 'bg-gradient-to-br from-blue-600 to-blue-800 text-white active:scale-95'}`}
+                                                    >
+                                                        <CheckCircle className="h-4 w-4" />
+                                                        <span className="font-bold text-[10px] uppercase tracking-wider">Break In</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => navigate('/attendance/break-out')}
+                                                        disabled={!isCheckedIn || !isOnBreak || isActionInProgress}
+                                                        className={`relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300 ${(!isCheckedIn || !isOnBreak) ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' : 'bg-gradient-to-br from-amber-600 to-amber-800 text-white active:scale-95'}`}
+                                                    >
+                                                        <CheckCircle className="h-4 w-4" />
+                                                        <span className="font-bold text-[10px] uppercase tracking-wider">Break Out</span>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
-                            </div>
-                        </section>
-                    )}
+                                    )}
+                                </div>
+                            </section>
+                        )}
+
 
                     <section>
                         <h3 className="fo-section-title mb-4">Account Actions</h3>
@@ -631,7 +615,7 @@ const ProfilePage: React.FC = () => {
                                                     className="flex-1 text-sm shadow-emerald-100 hover:shadow-emerald-200 transition-all font-bold uppercase tracking-wider"
                                                     disabled={isCheckedIn || isActionInProgress}
                                                 >
-                                                    <LogIn className="mr-2 h-4 w-4" /> Punch In
+                                                    <LogIn className={`mr-2 h-4 w-4 ${!isCheckedIn ? 'animate-pulse' : ''}`} /> Punch In
                                                 </Button>
                                                 <Button
                                                     onClick={() => navigate('/attendance/check-out')}
@@ -644,43 +628,34 @@ const ProfilePage: React.FC = () => {
                                             </div>
                                         </div>
 
-                                            <div className="flex flex-col space-y-3">
-                                                <div className="flex items-center gap-2 px-0.5">
-                                                    <button 
-                                                        onClick={() => handleToggleHint('break')}
-                                                        className="focus:outline-none hover:scale-110 transition-all active:scale-95 !bg-transparent !border-none !p-0 !shadow-none !ring-0 flex items-center justify-center"
-                                                        title="Click for hint"
-                                                    >
-                                                        <Info className="h-5 w-5 text-blue-600" />
-                                                    </button>
-                                                    {showBreakHint && (
-                                                        <span className="text-base italic text-blue-700 font-medium animate-in fade-in slide-in-from-left-2 duration-300">
-                                                            Break in when user goes for lunch is mandatory, or it will be a violation
-                                                        </span>
-                                                    )}
-                                                </div>
+
+                                        <div className="flex flex-col space-y-3">
+                                            <div className="flex items-center gap-2 px-0.5">
+                                                <button 
+                                                    onClick={() => handleToggleHint('break')}
+                                                    className="focus:outline-none hover:scale-110 transition-all active:scale-95 !bg-transparent !border-none !p-0 !shadow-none !ring-0 flex items-center justify-center"
+                                                    title="Click for hint"
+                                                >
+                                                    <Info className="h-5 w-5 text-blue-600" />
+                                                </button>
+                                                {showBreakHint && (
+                                                    <span className="text-base italic text-blue-700 font-medium animate-in fade-in slide-in-from-left-2 duration-300">
+                                                        Break in when user goes for lunch is mandatory, or it will be a violation
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="flex gap-4">
                                                 <Button
                                                     onClick={() => navigate('/attendance/break-in')}
+                                                    className="flex-1 text-sm font-bold uppercase tracking-wider transition-all bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100 shadow-lg"
                                                     disabled={!isCheckedIn || isOnBreak || isActionInProgress}
-                                                    className={`
-                                                        flex-1 text-sm font-bold uppercase tracking-wider transition-all
-                                                        ${(!isCheckedIn || isOnBreak)
-                                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
-                                                            : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100 shadow-lg'}
-                                                    `}
                                                 >
                                                     <CheckCircle className="mr-2 h-4 w-4" /> Break In
                                                 </Button>
                                                 <Button
                                                     onClick={() => navigate('/attendance/break-out')}
+                                                    className="flex-1 text-sm font-bold uppercase tracking-wider transition-all bg-amber-600 hover:bg-amber-700 text-white shadow-amber-100 shadow-lg"
                                                     disabled={!isCheckedIn || !isOnBreak || isActionInProgress}
-                                                    className={`
-                                                        flex-1 text-sm font-bold uppercase tracking-wider transition-all
-                                                        ${(!isCheckedIn || !isOnBreak)
-                                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
-                                                            : 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-100 shadow-lg'}
-                                                    `}
                                                 >
                                                     <CheckCircle className="mr-2 h-4 w-4" /> Break Out
                                                 </Button>

@@ -358,8 +358,13 @@ export const useAuthStore = create<AuthState>()(
                 const { checkIn, checkOut, firstBreakIn, lastBreakIn, breakOut, breakHours, workingHours } = processDailyEvents(events);
                 const lastEvent = events[events.length - 1];
                 
+                // Explicitly check for check-in type to set isCheckedIn
+                // Types: 'check-in', 'check-out', 'break-in', 'break-out'
+                // A user is considered checked in if the last event is NOT a checkout.
+                const currentlyCheckedIn = lastEvent ? (lastEvent.type !== 'check-out') : false;
+                
                 set({
-                    isCheckedIn: lastEvent?.type !== 'check-out',
+                    isCheckedIn: currentlyCheckedIn,
                     isOnBreak: lastEvent?.type === 'break-in',
                     lastCheckInTime: checkIn,
                     lastCheckOutTime: lastEvent?.type === 'check-out' ? checkOut : null,
@@ -382,6 +387,8 @@ export const useAuthStore = create<AuthState>()(
         toggleCheckInStatus: async (note?: string, attachmentUrl?: string | null, workType?: 'office' | 'field', fieldReportId?: string, forcedType?: string) => {
             const { user, isCheckedIn, geofencingSettings } = get();
             if (!user) return { success: false, message: 'User not found' };
+            
+            // Explicitly determine the type. If forcedType is missing, use toggle logic.
             const newType = (forcedType || (isCheckedIn ? 'check-out' : 'check-in')) as 'check-in' | 'check-out' | 'break-in' | 'break-out';
 
             // Ensure we have settings
