@@ -851,6 +851,7 @@ export interface FieldAttendanceViolation {
   travelHours: number;
   sitePercentage: number;
   travelPercentage: number;
+  siteVisits: number;
   
   // Violation details
   violationType: 'site_time_low' | 'insufficient_hours';

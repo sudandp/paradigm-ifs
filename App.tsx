@@ -216,6 +216,12 @@ const App: React.FC = () => {
   const location = useLocation();
   const { setDeferredPrompt } = usePWAStore();
 
+  // Expose API for testing
+  useEffect(() => {
+    (window as any).api = apiService;
+  }, []);
+
+
     useEffect(() => {
         const handleBeforeInstallPrompt = (e: any) => {
             // Prevent the mini-infobar from appearing on mobile

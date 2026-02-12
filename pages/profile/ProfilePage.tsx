@@ -65,50 +65,66 @@ const ProfilePage: React.FC = () => {
     // Unlock Request State
     const [unlockRequestStatus, setUnlockRequestStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
 
-    // Punch Restriction: 1 punch-in per day, max 2 unlock requests (1st=duty, 2nd=OT)
+    // Punch Restriction: 1 punch-in per day, unlimited unlock requests (1st=duty, 2nd+=OT)
     const hasPunchedToday = (dailyPunchCount || 0) >= 1;
     const isPunchUnlocked = useAuthStore(s => s.isPunchUnlocked);
     const dailyUnlockRequestCount = useAuthStore(s => s.dailyUnlockRequestCount);
     const approvedUnlockCount = useAuthStore(s => s.approvedUnlockCount);
-    // Max 2 unlock requests per day. After that, permanently blocked.
-    const isMaxRequestsReached = dailyUnlockRequestCount >= 2;
-    // Blocked if: Punched Today AND Not Currently Checked In AND (Not Unlocked OR max reached)
-    const isPunchBlocked = hasPunchedToday && !isCheckedIn && (!isPunchUnlocked || isMaxRequestsReached);
-    // Is the next unlock request for OT? (1st request = duty, 2nd = OT)
+    
+    // Blocked if: Punched Today AND Not Currently Checked In (office or field) AND Not Unlocked
+    const isPunchBlocked = hasPunchedToday && !isCheckedIn && !isFieldCheckedIn && !isPunchUnlocked;
+    // Combined check-in state: true if user is checked in via either office or field
+    const effectivelyCheckedIn = isCheckedIn || isFieldCheckedIn;
+    // Is the next unlock request for OT? (1st request = duty, 2nd+ = OT)
     const isNextRequestOT = dailyUnlockRequestCount >= 1;
 
     const punchHintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const breakHintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Check for existing unlock request
+    // Check for existing unlock request on mount/update
     useEffect(() => {
         if (hasPunchedToday && !isPunchUnlocked) {
             api.getMyUnlockRequest().then(req => {
                 if (req) {
                     setUnlockRequestStatus(req.status);
+                    // Sync store if approved
+                    if (req.status === 'approved') {
+                        checkAttendanceStatus();
+                    }
                 }
             });
         }
-    }, [hasPunchedToday, isPunchUnlocked]);
+    }, [hasPunchedToday, isPunchUnlocked, checkAttendanceStatus]);
+
+    // Poll for status update if pending (Real-time update)
+    useEffect(() => {
+        if (unlockRequestStatus === 'pending') {
+            const interval = setInterval(() => {
+                 api.getMyUnlockRequest().then(req => {
+                    if (req) {
+                        setUnlockRequestStatus(req.status);
+                        if (req.status === 'approved') {
+                            checkAttendanceStatus();
+                        }
+                    }
+                });
+            }, 5000); // Check every 5 seconds for faster feedback
+            return () => clearInterval(interval);
+        }
+    }, [unlockRequestStatus, checkAttendanceStatus]);
 
     // Show warning toast for blocked punch
     useEffect(() => {
         if (isPunchBlocked && unlockRequestStatus !== 'pending') {
-            if (isMaxRequestsReached && !isCheckedIn) {
-                setToast({ 
-                    message: 'Maximum 2 punch cycles reached for today.', 
-                    type: 'warning' 
-                });
-            } else {
-                setToast({ 
-                    message: isNextRequestOT
-                        ? 'Request manager approval for overtime (OT) punch.'
-                        : 'One punch-in allowed per day. Request approval for emergency punch.', 
-                    type: 'warning' 
-                });
-            }
+            setToast({ 
+                message: isNextRequestOT
+                    ? 'Request manager approval for overtime (OT) punch.'
+                    : 'One punch-in allowed per day. Request approval for emergency punch.', 
+                type: 'warning' 
+            });
         }
-    }, [isPunchBlocked, unlockRequestStatus, isMaxRequestsReached]);
+    }, [isPunchBlocked, unlockRequestStatus, isNextRequestOT]);
 
     const isMobile = useMediaQuery('(max-width: 767px)');
     const isMobileView = isMobile; // Apply mobile view for all users on mobile
@@ -394,45 +410,72 @@ const ProfilePage: React.FC = () => {
                                                         </span>
                                                     )}
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <Button
+                                            <div className="grid grid-cols-2 gap-3 relative z-10">
+                                                {/* Punch In / Request Unlock Button */}
+                                                 <button
                                                     onClick={() => {
                                                         if (isPunchBlocked) {
-                                                            if (unlockRequestStatus === 'pending' || isMaxRequestsReached) return;
+                                                            if (unlockRequestStatus === 'pending') return;
                                                             navigate('/attendance/request-unlock');
                                                             return;
                                                         }
-                                                        navigate('/attendance/check-in');
+                                                        // Always use 'office' for the main day punch, even for field staff.
+                                                        // This separates the Daily Punch (Day Start) from Site Visits.
+                                                        navigate('/attendance/check-in?workType=office');
                                                     }}
-                                                    disabled={isCheckedIn || isActionInProgress || unlockRequestStatus === 'pending' || (isPunchBlocked && isMaxRequestsReached)}
-                                                    variant={isPunchBlocked ? 'secondary' : 'primary'}
-                                                    className={`attendance-action-btn ${isPunchBlocked ? '!bg-amber-600 !border-amber-600 !text-white' : ''} ${isPunchBlocked && isMaxRequestsReached ? '!opacity-50' : ''}`}
+                                                    disabled={isCheckedIn || isOnBreak || isActionInProgress || (isPunchBlocked && unlockRequestStatus === 'pending')}
+                                                    className={`
+                                                        relative overflow-hidden rounded-xl border p-0 transition-all duration-300 active:scale-[0.98] shadow-lg
+                                                        flex flex-col items-center justify-center gap-1 h-[72px]
+                                                        ${isPunchBlocked 
+                                                            ? 'bg-gradient-to-br from-amber-500 to-orange-600 border-amber-400/30 shadow-amber-500/20' 
+                                                            : 'bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-400/30 shadow-emerald-500/20'
+                                                        }
+                                                        ${(effectivelyCheckedIn || isOnBreak || isActionInProgress || (isPunchBlocked && unlockRequestStatus === 'pending')) ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:brightness-110'}
+                                                    `}
                                                 >
+                                                    {/* Shine Effect */}
+                                                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/20 to-transparent pointer-events-none"></div>
+                                                    
                                                     {isPunchBlocked ? (
-                                                        unlockRequestStatus === 'pending' 
-                                                            ? <Clock className="mr-2 h-4 w-4" />
-                                                            : <Lock className="mr-2 h-4 w-4" />
-                                                    ) : <LogIn className={`mr-2 h-4 w-4 ${!isCheckedIn ? 'animate-pulse' : ''}`} />}
-                                                    {isPunchBlocked 
-                                                        ? (unlockRequestStatus === 'pending' 
-                                                            ? 'Pending' 
-                                                            : isMaxRequestsReached 
-                                                                ? 'Max Reached' 
-                                                                : isNextRequestOT 
-                                                                    ? 'Request OT' 
-                                                                    : 'Request Unlock') 
-                                                        : 'Punch In'}
-                                                </Button>
+                                                        <>
+                                                            {unlockRequestStatus === 'pending' 
+                                                                ? <Clock className="h-6 w-6 text-white drop-shadow-sm" />
+                                                                : <Lock className="h-6 w-6 text-white drop-shadow-sm" />
+                                                            }
+                                                            <span className="text-white font-bold text-sm tracking-wide drop-shadow-sm">
+                                                                {unlockRequestStatus === 'pending' ? 'PENDING' : 'REQUEST PUNCH IN'}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <LogIn className={`h-6 w-6 text-white drop-shadow-sm ${!isCheckedIn ? 'animate-pulse' : ''}`} />
+                                                            <span className="text-white font-bold text-sm tracking-wide drop-shadow-sm">PUNCH IN</span>
+                                                        </>
+                                                    )}
+                                                </button>
 
-                                                <Button
-                                                    onClick={() => navigate('/attendance/check-out')}
-                                                    disabled={!isCheckedIn || isOnBreak || isFieldCheckedIn || isActionInProgress || isPunchBlocked}
-                                                    variant="danger"
-                                                    className={`attendance-action-btn ${isPunchBlocked ? 'pointer-events-none opacity-50' : ''} ${(!isCheckedIn || isOnBreak || isFieldCheckedIn || isActionInProgress || isPunchBlocked) ? '' : '!bg-red-600 !border-red-700 !text-white'}`}
+                                                {/* Punch Out Button */}
+                                                 <button
+                                                    onClick={() => navigate('/attendance/check-out?workType=office')}
+                                                    disabled={!isCheckedIn || isFieldCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked}
+                                                    className={`
+                                                        relative overflow-hidden rounded-xl border p-0 transition-all duration-300 active:scale-[0.98] shadow-lg
+                                                        flex flex-col items-center justify-center gap-1 h-[72px]
+                                                        ${(!isCheckedIn || isFieldCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked)
+                                                            ? 'bg-white/5 border-white/10 text-white/30 cursor-not-allowed' // Disabled Glass State
+                                                            : 'bg-gradient-to-br from-rose-500 to-pink-600 border-rose-400/30 shadow-rose-500/20 hover:brightness-110'
+                                                        }
+                                                    `}
                                                 >
-                                                    <LogOut className="mr-2 h-4 w-4" />
-                                                    Punch Out
-                                                </Button>
+                                                    {(!(!effectivelyCheckedIn || isFieldCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked)) && (
+                                                        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/20 to-transparent pointer-events-none"></div>
+                                                    )}
+                                                    <LogOut className={`h-6 w-6 ${(!effectivelyCheckedIn || isFieldCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked) ? 'text-white/30' : 'text-white drop-shadow-sm'}`} />
+                                                    <span className={`font-bold text-sm tracking-wide ${(!effectivelyCheckedIn || isFieldCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked) ? 'text-white/30' : 'text-white drop-shadow-sm'}`}>
+                                                        PUNCH OUT
+                                                    </span>
+                                                </button>
                                             </div>
 
                                                 {/* Field Staff Buttons - Only show once session is active */}
@@ -442,7 +485,7 @@ const ProfilePage: React.FC = () => {
                                                              onClick={() => navigate("/attendance/check-in?workType=field")}
                                                              disabled={isFieldCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked}
                                                              variant="primary"
-                                                             className={`attendance-action-btn !bg-blue-600 !border-blue-700 ${isPunchBlocked ? 'pointer-events-none opacity-50' : ''}`}
+                                                             className={`attendance-action-btn !bg-blue-600 !border-blue-700 ${isPunchBlocked || isOnBreak ? 'pointer-events-none opacity-50' : ''}`}
                                                          >
                                                              <MapPin className="mr-2 h-4 w-4" />
                                                              Check In
@@ -452,7 +495,7 @@ const ProfilePage: React.FC = () => {
                                                              onClick={() => navigate("/attendance/check-out?workType=field")}
                                                              disabled={!isFieldCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked}
                                                              variant="secondary"
-                                                             className={`attendance-action-btn !bg-amber-600 !border-amber-700 !text-white ${isPunchBlocked ? 'pointer-events-none opacity-50' : ''}`}
+                                                             className={`attendance-action-btn !bg-amber-600 !border-amber-700 !text-white ${isPunchBlocked || isOnBreak ? 'pointer-events-none opacity-50' : ''}`}
                                                          >
                                                              <MapPin className="mr-2 h-4 w-4" />
                                                              Check Out
@@ -460,8 +503,9 @@ const ProfilePage: React.FC = () => {
                                                     </div>
                                                 )}
                                             </div>
+
                                             
-                                             {isCheckedIn && (
+                                              {isCheckedIn && (
                                                 <div className="flex flex-col space-y-3 pt-2 border-t border-white/5">
                                                     <div className="flex items-center gap-2 px-0.5">
                                                         <button 
@@ -706,18 +750,22 @@ const ProfilePage: React.FC = () => {
                                                        <Button
                                                            onClick={() => {
                                                                if (isPunchBlocked) {
-                                                                   if (unlockRequestStatus === 'pending' || isMaxRequestsReached) return;
+                                                                   if (unlockRequestStatus === 'pending') return;
                                                                    navigate('/attendance/request-unlock');
                                                                    
                                                                    return;
                                                                }
-                                                               navigate('/attendance/check-in');
+                                                               if (user?.role === 'field_staff' || user?.role === 'operation_manager') {
+                                                                   navigate('/attendance/check-in?workType=field');
+                                                               } else {
+                                                                   navigate('/attendance/check-in');
+                                                               }
                                                            }}
                                                            variant={isPunchBlocked ? 'secondary' : 'primary'}
                                                            className={`attendance-action-btn shadow-lg transition-all ${
                                                                isPunchBlocked ? '!bg-amber-600 !border-amber-600 !text-white shadow-amber-100/20' : 'shadow-emerald-100/20'
-                                                           } ${isPunchBlocked && isMaxRequestsReached ? '!opacity-50' : ''}`}
-                                                           disabled={isCheckedIn || isActionInProgress || unlockRequestStatus === 'pending' || (isPunchBlocked && isMaxRequestsReached)}
+                                                           }`}
+                                                           disabled={isCheckedIn || isActionInProgress || unlockRequestStatus === 'pending'}
                                                        >
                                                           {isPunchBlocked ? (
                                                               unlockRequestStatus === 'pending' 
@@ -727,11 +775,7 @@ const ProfilePage: React.FC = () => {
                                                           {isPunchBlocked 
                                                               ? (unlockRequestStatus === 'pending' 
                                                                   ? 'Pending' 
-                                                                  : isMaxRequestsReached 
-                                                                      ? 'Max Reached' 
-                                                                      : isNextRequestOT 
-                                                                          ? 'Request OT' 
-                                                                          : 'Request Unlock') 
+                                                                  : 'Request Punch In') 
                                                               : 'Punch In'}
                                                        </Button>
                                                 </div>

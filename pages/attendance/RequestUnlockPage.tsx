@@ -15,7 +15,6 @@ const RequestUnlockPage: React.FC = () => {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const dailyUnlockRequestCount = useAuthStore(s => s.dailyUnlockRequestCount);
     const isOTRequest = dailyUnlockRequestCount >= 1;
-    const isMaxReached = dailyUnlockRequestCount >= 2;
 
     const handleUnlockRequest = async () => {
         if (!unlockReason.trim()) {
@@ -23,10 +22,6 @@ const RequestUnlockPage: React.FC = () => {
             return;
         }
 
-        if (isMaxReached) {
-            setToast({ message: 'Maximum 2 punch requests per day reached.', type: 'error' });
-            return;
-        }
         
         setIsSubmitting(true);
         try {
@@ -131,7 +126,7 @@ const RequestUnlockPage: React.FC = () => {
                                 variant="primary" 
                                 onClick={handleUnlockRequest}
                                 isLoading={isSubmitting}
-                                disabled={!unlockReason.trim() || isMaxReached}
+                                disabled={!unlockReason.trim()}
                                 className={`w-full md:flex-1 !py-4 !rounded-2xl !text-lg shadow-lg transition-all active:scale-[0.98] ${
                                     isOTRequest 
                                         ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/20' 

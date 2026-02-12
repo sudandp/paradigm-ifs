@@ -130,24 +130,26 @@ const AddUserPage: React.FC = () => {
   const onSubmit: SubmitHandler<Partial<User> & { password?: string; noSiteAssignment?: boolean }> = async (data) => {
     setIsSubmitting(true);
     
-    // Convert empty strings to null for database compatibility
-    const processedData = { ...data };
-    if (processedData.biometricId === '') processedData.biometricId = undefined; // Let Yup or API handle null
-    if (processedData.organizationId === '') processedData.organizationId = undefined;
+    // Final surgical cleanup: converting empty strings and undefined to null for database compatibility.
+    // This prevents errors with non-text columns (like DATE or UUID) when optional fields are left empty.
+    const cleanPayload = (payload: any) => {
+      const cleaned = { ...payload };
+      Object.keys(cleaned).forEach(key => {
+        if (cleaned[key] === '' || cleaned[key] === undefined) {
+          cleaned[key] = null;
+        }
+      });
+      return cleaned;
+    };
 
     try {
       if (isEditing && id) {
-        const { password, noSiteAssignment, ...rest } = processedData;
-        
-        // Final surgical cleanup: ensuring biometricId is null if absolutely empty
-        const payload: any = { ...rest };
-        if (payload.biometricId === '' || payload.biometricId === undefined) payload.biometricId = null;
-        if (payload.organizationId === '' || payload.organizationId === undefined) payload.organizationId = null;
-
+        const { password, noSiteAssignment, ...rest } = data;
+        const payload = cleanPayload(rest);
         await api.updateUser(id, payload);
         setToast({ message: 'User updated successfully!', type: 'success' });
       } else {
-        const { name, email, password, role, noSiteAssignment, ...rest } = processedData;
+        const { name, email, password, role, noSiteAssignment, ...rest } = data;
         if (!password) {
           throw new Error('Password is required when creating a new user');
         }
@@ -156,9 +158,7 @@ const AddUserPage: React.FC = () => {
         const newUser = await api.createAuthUser({ name, email, password, role });
         
         // 2. Hydrate additional profile data
-        const payload: any = { ...rest };
-        if (payload.biometricId === '' || payload.biometricId === undefined) payload.biometricId = null;
-        if (payload.organizationId === '' || payload.organizationId === undefined) payload.organizationId = null;
+        const payload = cleanPayload(rest);
 
         if (Object.keys(payload).length > 0) {
           try {

@@ -363,12 +363,21 @@ export const useAuthStore = create<AuthState>()(
 
                 const events = await api.getAttendanceEvents(user.id, startOfDay, endOfDay);
 
+                // Always check unlock status, even with zero events (fresh start scenario)
+                const approvedUnlockCount = await api.checkUnlockStatus();
+                const dailyUnlockRequestCount = await api.getDailyUnlockRequestCount();
+
                 if (events.length === 0) {
                     set({
                         isCheckedIn: false,
                         lastCheckInTime: null,
                         lastCheckOutTime: null,
-                        isAttendanceLoading: false
+                        isAttendanceLoading: false,
+                        dailyPunchCount: 0,
+                        approvedUnlockCount,
+                        dailyUnlockRequestCount,
+                        isPunchUnlocked: approvedUnlockCount > 0,
+                        isFieldCheckedIn: false
                     });
                     return;
                 }
@@ -376,29 +385,29 @@ export const useAuthStore = create<AuthState>()(
                 const { checkIn, checkOut, firstBreakIn, lastBreakIn, breakOut, breakHours, workingHours } = processDailyEvents(events);
                 const lastEvent = events[events.length - 1];
                 
-                // Explicitly check for check-in type to set isCheckedIn
-                // Types: 'check-in', 'check-out', 'break-in', 'break-out'
-                // A user is considered punched in unless the last NON-FIELD event
-                // is a check-out.  Field check-outs only end the field visit,
-                // they do NOT end the overall punch-in session.
-                const nonFieldEvents = events.filter(e => e.workType !== 'field');
-                const lastNonFieldEvent = nonFieldEvents.length > 0 ? nonFieldEvents[nonFieldEvents.length - 1] : null;
-                const currentlyCheckedIn = lastNonFieldEvent ? (lastNonFieldEvent.type !== 'check-out') : false;
+                // --- INDEPENDENT FLOW LOGIC ---
+                // 1. Daily Punch Session (Office/General)
+                // A user is punched in for the day if their last 'office' check-in/out event was a check-in.
+                const officeEvents = events.filter(e => !e.workType || e.workType === 'office');
+                const lastOfficePunchEvent = officeEvents.filter(e => e.type === 'check-in' || e.type === 'check-out').pop();
+                const currentlyCheckedIn = lastOfficePunchEvent ? (lastOfficePunchEvent.type === 'check-in') : false;
                 
-                // Count daily punches (any check-in regardless of type)
-                const dailyPunchCount = events.filter(e => e.type === 'check-in').length;
+                // 2. Site/Work Session (Field)
+                // A user is on a site visit if their last 'field' check-in/out event was a check-in.
+                const fieldEvents = events.filter(e => e.workType === 'field');
+                const lastFieldPunchEvent = fieldEvents.filter(e => e.type === 'check-in' || e.type === 'check-out').pop();
+                const isFieldCheckedIn = lastFieldPunchEvent ? (lastFieldPunchEvent.type === 'check-in') : false;
 
-                // Determine if user has an active field check-in session.
-                // Look at the most recent field-type event — if it's a check-in, the user
-                // is currently field-checked-in and should only be able to check out or break.
-                const fieldEvents = events.filter(e => e.workType === 'field' && (e.type === 'check-in' || e.type === 'check-out'));
-                const lastFieldEvent = fieldEvents.length > 0 ? fieldEvents[fieldEvents.length - 1] : null;
-                const isFieldCheckedIn = lastFieldEvent?.type === 'check-in';
+                // 3. Break Session
+                // A user is on break if their last break event was a break-in.
+                const breakEvents = events.filter(e => e.type === 'break-in' || e.type === 'break-out');
+                const lastBreakEvent = breakEvents.length > 0 ? breakEvents[breakEvents.length - 1] : null;
+                const isOnBreak = lastBreakEvent ? (lastBreakEvent.type === 'break-in') : false;
 
-                // Check for unlock status for field staff punch override
-                // checkUnlockStatus now returns the COUNT of approved unlocks today
-                const approvedUnlockCount = await api.checkUnlockStatus();
-                const dailyUnlockRequestCount = await api.getDailyUnlockRequestCount();
+                // Count daily primary punches (only office/general sessions)
+                const dailyPunchCount = events.filter(e => e.type === 'check-in' && (!e.workType || e.workType === 'office')).length;
+
+                // approvedUnlockCount & dailyUnlockRequestCount already fetched above
 
                 // A user has an unused unlock if the number of approved unlocks
                 // exceeds the number of extra punch cycles already used.
@@ -408,7 +417,7 @@ export const useAuthStore = create<AuthState>()(
 
                 set({
                     isCheckedIn: currentlyCheckedIn,
-                    isOnBreak: lastEvent?.type === 'break-in',
+                    isOnBreak: isOnBreak,
                     lastCheckInTime: checkIn,
                     lastCheckOutTime: lastEvent?.type === 'check-out' ? checkOut : null,
                     firstBreakInTime: firstBreakIn,

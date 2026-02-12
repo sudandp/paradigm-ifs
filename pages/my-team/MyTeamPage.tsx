@@ -195,8 +195,9 @@ const MyTeamPage: React.FC = () => {
   const fetchUnlockRequests = async () => {
     if (!user || user.role === 'field_staff') return;
     try {
-      const requests = await api.getAttendanceUnlockRequests();
-      setUnlockRequests(requests);
+      const isPrivileged = ['admin', 'hr', 'management'].includes(user.role);
+      const requests = await api.getAttendanceUnlockRequests(isPrivileged ? undefined : user.id);
+      setUnlockRequests(requests.filter(r => r.userId !== user.id));
     } catch (err) {
       console.error('Error fetching unlock requests:', err);
     }

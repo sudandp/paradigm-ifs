@@ -1221,16 +1221,22 @@ export const api = {
     if (error) throw error;
   },
 
-  getAttendanceUnlockRequests: async (): Promise<AttendanceUnlockRequest[]> => {
-    const { data, error } = await supabase
+  getAttendanceUnlockRequests: async (managerId?: string): Promise<AttendanceUnlockRequest[]> => {
+    let query = supabase
       .from('attendance_unlock_requests')
-      .select('*, user:user_id(name, photo_url)')
+      .select('*, user:user_id(name, photo_url, reporting_manager_id)')
       .eq('status', 'pending')
       .order('requested_at', { ascending: false });
       
+    const { data, error } = await query;
     if (error) throw error;
     
-    return data.map((row: any) => ({
+    let filteredData = data;
+    if (managerId) {
+        filteredData = data.filter((row: any) => row.user?.reporting_manager_id === managerId);
+    }
+    
+    return filteredData.map((row: any) => ({
       id: row.id,
       userId: row.user_id,
       userName: row.user?.name || 'Unknown',
@@ -1276,8 +1282,8 @@ export const api = {
       .select('id')
       .eq('user_id', session.user.id)
       .eq('status', 'approved')
-      .gte('requested_at', `${today}T00:00:00`)
-      .lte('requested_at', `${today}T23:59:59`);
+      .gte('requested_at', startOfDay(new Date()).toISOString())
+      .lte('requested_at', endOfDay(new Date()).toISOString());
 
     if (error) return 0;
     return data?.length || 0;
@@ -1294,8 +1300,8 @@ export const api = {
       .select('id')
       .eq('user_id', session.user.id)
       .in('status', ['pending', 'approved'])
-      .gte('requested_at', `${today}T00:00:00`)
-      .lte('requested_at', `${today}T23:59:59`);
+      .gte('requested_at', startOfDay(new Date()).toISOString())
+      .lte('requested_at', endOfDay(new Date()).toISOString());
 
     if (error) return 0;
     return data?.length || 0;
@@ -1310,7 +1316,7 @@ export const api = {
       .from('attendance_unlock_requests')
       .select('*')
       .eq('user_id', session.user.id)
-      .gte('requested_at', `${today}T00:00:00`)
+      .gte('requested_at', startOfDay(new Date()).toISOString())
       .order('requested_at', { ascending: false })
       .limit(1)
       .maybeSingle();

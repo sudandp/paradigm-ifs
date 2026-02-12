@@ -100,16 +100,17 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                 });
             }
 
+            const isPrivileged = ['admin', 'hr', 'management', 'operation_manager', 'site_manager'].includes(user.role);
             const [unlocks, leaves, claims] = await Promise.all([
-                api.getAttendanceUnlockRequests(),
+                api.getAttendanceUnlockRequests(isPrivileged ? undefined : user.id),
                 leavesPromise,
                 ['admin', 'hr', 'operation_manager', 'site_manager'].includes(user.role) 
                     ? api.getExtraWorkLogs({ status: 'Pending' }) 
                     : Promise.resolve({ data: [], total: 0 })
             ]);
-            setUnlockRequests(unlocks);
-            setLeaveRequests(leaves.data);
-            setExtraWorkClaims(claims.data);
+            setUnlockRequests(unlocks.filter(r => r.userId !== user.id));
+            setLeaveRequests(leaves.data.filter(r => r.userId !== user.id));
+            setExtraWorkClaims(claims.data.filter(c => c.userId !== user.id));
         } catch (err) {
             console.error('Error fetching pending approvals:', err);
         }
