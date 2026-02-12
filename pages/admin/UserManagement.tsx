@@ -13,7 +13,6 @@ import TableSkeleton from '../../components/skeletons/TableSkeleton';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import ApprovalModal from '../../components/admin/ApprovalModal';
 import LocationAssignmentModal from '../../components/admin/LocationAssignmentModal';
-import BulkEarnedLeaveModal from '../../components/admin/BulkEarnedLeaveModal';
 import Pagination from '../../components/ui/Pagination';
 import Input from '../../components/ui/Input';
 
@@ -37,7 +36,6 @@ const UserManagement: React.FC = () => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
-    const [isBulkLeaveModalOpen, setIsBulkLeaveModalOpen] = useState(false);
 
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [currentUserForLocation, setCurrentUserForLocation] = useState<User | null>(null);
@@ -199,18 +197,9 @@ const UserManagement: React.FC = () => {
                 userName={currentUserForLocation?.name || ''}
             />
 
-            <BulkEarnedLeaveModal 
-                isOpen={isBulkLeaveModalOpen}
-                onClose={() => setIsBulkLeaveModalOpen(false)}
-                onSuccess={() => {
-                    setToast({ message: 'Bulk leave update successful!', type: 'success' });
-                    fetchUsers();
-                }}
-            />
-
             <AdminPageHeader title="User Management">
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setIsBulkLeaveModalOpen(true)}>
+                    <Button variant="outline" onClick={() => navigate('/admin/users/bulk-update-leaves')}>
                         <FileSpreadsheet className="h-4 w-4 mr-2" />
                         Bulk Update Leaves
                     </Button>

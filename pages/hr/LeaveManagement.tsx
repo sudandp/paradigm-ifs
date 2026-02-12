@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
-import type { LeaveRequest, LeaveRequestStatus, ExtraWorkLog, UserHoliday } from '../../types';
-import { Loader2, Check, X, Plus, XCircle, User, Calendar, FilterX, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { LeaveRequest, LeaveRequestStatus, ExtraWorkLog, UserHoliday, LeaveType } from '../../types';
+import { Loader2, Check, X, Plus, XCircle, User, Calendar, FilterX, ChevronLeft, ChevronRight, Info, Pencil, Download } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { format } from 'date-fns';
@@ -14,6 +14,8 @@ import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import RejectClaimModal from '../../components/hr/RejectClaimModal';
 import { isAdmin } from '../../utils/auth';
 import LoadingScreen from '../../components/ui/LoadingScreen';
+import EditLeaveTypeModal from '../../components/hr/EditLeaveTypeModal';
+import { exportGenericReportToExcel, GenericReportColumn } from '../../utils/excelExport';
 
 const StatusChip: React.FC<{ status: LeaveRequestStatus; approverName?: string | null; approvalHistory?: any[] }> = ({ status, approverName, approvalHistory }) => {
     const styles: Record<LeaveRequestStatus, string> = {
@@ -74,6 +76,8 @@ const LeaveManagement: React.FC = () => {
     const [claimToReject, setClaimToReject] = useState<ExtraWorkLog | null>(null);
     const [requestToCancel, setRequestToCancel] = useState<LeaveRequest | null>(null);
     const [finalConfirmationRole, setFinalConfirmationRole] = useState<string>('hr');
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [requestToEdit, setRequestToEdit] = useState<LeaveRequest | null>(null);
 
     useEffect(() => {
         const checkFeature = async () => {
@@ -160,8 +164,6 @@ const LeaveManagement: React.FC = () => {
         } catch (error) {
             setToast({ message: 'Failed to load approval data.', type: 'error' });
         } finally {
-            // Minimum 10 second loading time
-            await new Promise(resolve => setTimeout(resolve, 10000));
             setIsLoading(false);
         }
     }, [user, filter, currentPage, pageSize, selectedUserId, selectedDate]);
@@ -229,19 +231,81 @@ const LeaveManagement: React.FC = () => {
     };
 
 
+    const handleUpdateLeaveType = async (newType: LeaveType) => {
+        if (!user || !requestToEdit) return;
+        setActioningId(requestToEdit.id);
+        try {
+            await api.updateLeaveType(requestToEdit.id, newType);
+            setToast({ message: 'Leave type updated successfully.', type: 'success' });
+            fetchData();
+        } catch (error) {
+            setToast({ message: 'Failed to update leave type.', type: 'error' });
+        } finally {
+            setActioningId(null);
+            setIsEditModalOpen(false);
+            setRequestToEdit(null);
+        }
+    };
+
     const handleCancelLeave = async (reason: string) => {
         if (!user || !requestToCancel) return;
         setActioningId(requestToCancel.id);
         try {
             await api.cancelApprovedLeave(requestToCancel.id, user.id, reason);
-            setToast({ message: 'Leave request cancelled successfully.', type: 'success' });
+            setToast({ message: 'Leave cancelled successfully.', type: 'success' });
             fetchData();
         } catch (error) {
-            setToast({ message: 'Failed to cancel leave request.', type: 'error' });
+            setToast({ message: 'Failed to cancel leave.', type: 'error' });
         } finally {
             setActioningId(null);
             setIsCancelModalOpen(false);
             setRequestToCancel(null);
+        }
+    };
+
+    const handleExportReport = async () => {
+        if (requests.length === 0) {
+            setToast({ message: 'No data available to export.', type: 'error' });
+            return;
+        }
+
+        const columns: GenericReportColumn[] = [
+            { header: 'Employee', key: 'userName', width: 25 },
+            { header: 'Leave Type', key: 'leaveType', width: 15 },
+            { header: 'Start Date', key: 'startDate', width: 15 },
+            { header: 'End Date', key: 'endDate', width: 15 },
+            { header: 'Option', key: 'dayOption', width: 10 },
+            { header: 'Reason', key: 'reason', width: 40 },
+            { header: 'Status', key: 'status', width: 20 },
+            { header: 'Applied On', key: 'createdAt', width: 20 },
+        ];
+
+        const reportData = requests.map(req => ({
+            ...req,
+            startDate: format(new Date(req.startDate.replace(/-/g, '/')), 'dd MMM yyyy'),
+            endDate: format(new Date(req.endDate.replace(/-/g, '/')), 'dd MMM yyyy'),
+            createdAt: (req as any).createdAt ? format(new Date((req as any).createdAt), 'dd MMM yyyy HH:mm') : 'N/A',
+            status: req.status.replace(/_/g, ' ').toUpperCase(),
+            dayOption: req.dayOption || 'N/A'
+        }));
+
+        try {
+            await exportGenericReportToExcel(
+                reportData,
+                columns,
+                'Leave Requests Report',
+                { 
+                    startDate: selectedDate ? new Date(selectedDate) : new Date(new Date().getFullYear(), 0, 1), 
+                    endDate: selectedDate ? new Date(selectedDate) : new Date() 
+                },
+                'Leave_Requests',
+                undefined,
+                user?.name
+            );
+            setToast({ message: 'Report exported successfully.', type: 'success' });
+        } catch (error) {
+            console.error('Export failed:', error);
+            setToast({ message: 'Failed to export report.', type: 'error' });
         }
     };
 
@@ -256,50 +320,63 @@ const LeaveManagement: React.FC = () => {
 
     const ActionButtons: React.FC<{ request: LeaveRequest }> = ({ request }) => {
         if (!user) return null;
-        if (user.role === 'hr' && request.status !== 'pending_hr_confirmation') return null; // HR is mostly read-only
 
-        // Allow cancellation of approved leaves by manager/admin
-        if (request.status === 'approved') {
-            const canCancel = (['admin', 'operation_manager', 'hr'].includes(user.role)) || (request.currentApproverId === user.id);
-            if (canCancel) {
-                return (
-                    <Button 
-                        size="sm" 
-                        variant="icon" 
-                        onClick={() => { setRequestToCancel(request); setIsCancelModalOpen(true); }} 
-                        disabled={actioningId === request.id} 
-                        title="Cancel Approved Leave" 
-                        aria-label="Cancel approved leave"
-                    >
-                        <XCircle className="h-4 w-4 text-orange-600" />
-                    </Button>
-                );
-            }
-            return null;
-        }
-
-        if (request.status === 'rejected' || request.status === 'cancelled' || request.status === 'withdrawn') return null;
-
+        // HR/Admin can edit leave type for any request that is not rejected/withdrawn/cancelled
+        const isHRAdmin = ['hr', 'admin'].includes(user.role);
         const isMyTurn = request.currentApproverId === user.id || user.role === 'admin';
 
-        if (isMyTurn) {
-            if (request.status === 'pending_manager_approval') {
-                return (
-                    <div className="flex gap-2">
-                        <Button size="sm" variant="icon" onClick={() => handleAction(request.id, 'approve')} disabled={actioningId === request.id} title="Approve" aria-label="Approve request"><Check className="h-4 w-4 text-green-600" /></Button>
-                        <Button size="sm" variant="icon" onClick={() => handleAction(request.id, 'reject')} disabled={actioningId === request.id} title="Reject" aria-label="Reject request"><X className="h-4 w-4 text-red-600" /></Button>
-                    </div>
-                );
-            }
-            if (request.status === 'pending_hr_confirmation') {
-                return (
-                    <div className="flex gap-2">
-                        <Button size="sm" variant="icon" onClick={() => handleAction(request.id, 'confirm')} disabled={actioningId === request.id} title="Confirm & Finalize" aria-label="Confirm and finalize request"><Check className="h-4 w-4 text-blue-600" /></Button>
-                        <Button size="sm" variant="icon" onClick={() => handleAction(request.id, 'reject')} disabled={actioningId === request.id} title="Reject" aria-label="Reject request"><X className="h-4 w-4 text-red-600" /></Button>
-                    </div>
-                );
-            }
+        if (isHRAdmin || isMyTurn) {
+            return (
+                <div className="flex gap-2">
+                    {/* Approval Actions */}
+                    {isMyTurn && (
+                        <>
+                            {request.status === 'pending_manager_approval' && (
+                                <div className="flex gap-2">
+                                    <Button size="sm" variant="icon" onClick={() => handleAction(request.id, 'approve')} disabled={actioningId === request.id} title="Approve" aria-label="Approve request"><Check className="h-4 w-4 text-green-600" /></Button>
+                                    <Button size="sm" variant="icon" onClick={() => handleAction(request.id, 'reject')} disabled={actioningId === request.id} title="Reject" aria-label="Reject request"><X className="h-4 w-4 text-red-600" /></Button>
+                                </div>
+                            )}
+                            {request.status === 'pending_hr_confirmation' && (
+                                <div className="flex gap-2">
+                                    <Button size="sm" variant="icon" onClick={() => handleAction(request.id, 'confirm')} disabled={actioningId === request.id} title="Confirm & Finalize" aria-label="Confirm and finalize request"><Check className="h-4 w-4 text-blue-600" /></Button>
+                                    <Button size="sm" variant="icon" onClick={() => handleAction(request.id, 'reject')} disabled={actioningId === request.id} title="Reject" aria-label="Reject request"><X className="h-4 w-4 text-red-600" /></Button>
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {/* Edit Action */}
+                    {isHRAdmin && !['rejected', 'cancelled', 'withdrawn'].includes(request.status) && (
+                        <Button 
+                            size="sm" 
+                            variant="icon" 
+                            onClick={() => { setRequestToEdit(request); setIsEditModalOpen(true); }} 
+                            disabled={actioningId === request.id}
+                            title="Edit Leave Type"
+                            aria-label="Edit leave type"
+                        >
+                            <Pencil className="h-4 w-4 text-primary" />
+                        </Button>
+                    )}
+
+                    {/* Cancel Action */}
+                    {request.status === 'approved' && (isHRAdmin || request.currentApproverId === user.id) && (
+                        <Button 
+                            size="sm" 
+                            variant="icon" 
+                            onClick={() => { setRequestToCancel(request); setIsCancelModalOpen(true); }} 
+                            disabled={actioningId === request.id} 
+                            title="Cancel Approved Leave" 
+                            aria-label="Cancel approved leave"
+                        >
+                            <XCircle className="h-4 w-4 text-orange-600" />
+                        </Button>
+                    )}
+                </div>
+            );
         }
+
         return null;
     };
 
@@ -328,19 +405,39 @@ const LeaveManagement: React.FC = () => {
                 label="Reason for cancellation"
             />
 
+            {requestToEdit && (
+                <EditLeaveTypeModal
+                    isOpen={isEditModalOpen}
+                    onClose={() => { setIsEditModalOpen(false); setRequestToEdit(null); }}
+                    onConfirm={handleUpdateLeaveType}
+                    currentType={requestToEdit.leaveType}
+                    isUpdating={actioningId === requestToEdit.id}
+                />
+            )}
+
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-primary-text">Leave Approval Inbox</h2>
-                {!isMobile && (
+                <div className="flex gap-2">
                     <Button
-                        onClick={() => navigate('/hr/leave-management/grant-comp-off')}
-                        disabled={!isCompOffFeatureEnabled}
-                        title={!isCompOffFeatureEnabled ? "Feature disabled: 'comp_off_logs' table missing in database." : "Grant a compensatory off day"}
-                        style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }}
-                        className="border hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                        variant="secondary"
+                        onClick={handleExportReport}
+                        className="border border-border hover:bg-page transition-colors"
+                        disabled={requests.length === 0}
                     >
-                        <Plus className="mr-2 h-4 w-4" /> Grant Comp Off
+                        <Download className="mr-2 h-4 w-4" /> Export Report
                     </Button>
-                )}
+                    {!isMobile && (
+                        <Button
+                            onClick={() => navigate('/hr/leave-management/grant-comp-off')}
+                            disabled={!isCompOffFeatureEnabled}
+                            title={!isCompOffFeatureEnabled ? "Feature disabled: 'comp_off_logs' table missing in database." : "Grant a compensatory off day"}
+                            style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }}
+                            className="border hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                        >
+                            <Plus className="mr-2 h-4 w-4" /> Grant Comp Off
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {isMobile && (

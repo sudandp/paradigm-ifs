@@ -21,9 +21,9 @@ const Button: React.FC<ButtonProps> = ({
 
   return (
     <button
+      {...props}
       className={`${baseStyles} ${variantStyles} ${sizeStyles} ${className}`}
       disabled={isLoading || props.disabled}
-      {...props}
     >
       {isLoading ? (
         <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

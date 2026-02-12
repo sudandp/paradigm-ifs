@@ -26,7 +26,7 @@ export const dispatchNotificationFromRules = async (eventType: string, data: Not
         // Fetch rules directly instead of using api.getNotificationRules
         const { data: rulesData, error: rulesError } = await supabase
             .from('notification_rules')
-            .select('*')
+            .select('*, send_alert')
             .order('created_at', { ascending: false });
             
         if (rulesError) throw rulesError;
@@ -35,49 +35,53 @@ export const dispatchNotificationFromRules = async (eventType: string, data: Not
             eventType: r.event_type,
             recipientRole: r.recipient_role,
             recipientUserId: r.recipient_user_id,
-            isEnabled: r.is_enabled
+            isEnabled: r.is_enabled,
+            sendAlert: r.send_alert
         }));
 
         const activeRules = rules.filter(r => r.eventType === eventType && r.isEnabled);
         
-        const recipients: Set<string> = new Set();
+        // userId -> shouldSendAlert
+        const recipients: Map<string, boolean> = new Map();
         
         for (const rule of activeRules) {
+            const runner = async (userId: string) => {
+                const existing = recipients.get(userId);
+                recipients.set(userId, existing || rule.sendAlert || false);
+            };
+
             if (rule.recipientUserId) {
                 if (rule.recipientUserId === 'all') {
-                    // Fetch all active users
                     const { data: allUsers, error } = await supabase.from('users').select('id');
                     if (!error && allUsers) {
-                        allUsers.forEach(u => recipients.add(u.id));
+                        for (const u of allUsers) await runner(u.id);
                     }
                 } else {
-                    recipients.add(rule.recipientUserId);
+                    await runner(rule.recipientUserId);
                 }
             } else if (rule.recipientRole) {
                 if (rule.recipientRole === 'direct_manager') {
                     if (data.actor.reportingManagerId) {
-                        recipients.add(data.actor.reportingManagerId);
+                        await runner(data.actor.reportingManagerId);
                     }
                 } else {
-                    // Fetch users with this specific role
                     const { data: users, error } = await supabase.from('users').select('id').eq('role', rule.recipientRole);
                     if (!error && users) {
-                        users.forEach(u => recipients.add(u.id));
+                        for (const u of users) await runner(u.id);
                     }
                 }
             }
         }
 
-        // Remove the actor themselves from the recipient list if they are in it
+        // Remove the actor themselves
         recipients.delete(data.actor.id);
 
         if (recipients.size > 0) {
             const message = `${data.actorName} ${data.actionText}${data.locString}`;
-            const notifications = Array.from(recipients).map(userId => ({
+            const notifications = Array.from(recipients.entries()).map(([userId, sendAlert]) => ({
                 user_id: userId,
                 message,
-                title: data.title || 'System Alert',
-                type: getNotificationTypeForEvent(eventType),
+                type: sendAlert ? 'security' : getNotificationTypeForEvent(eventType),
                 link_to: data.link
             }));
             
@@ -97,6 +101,12 @@ const getNotificationTypeForEvent = (eventType: string): any => {
     }
     if (eventType.includes('task')) {
         return 'task_assigned';
+    }
+    if (eventType.includes('request')) {
+        return 'approval_request';
+    }
+    if (eventType === 'greeting') {
+        return 'greeting';
     }
     return 'info';
 };

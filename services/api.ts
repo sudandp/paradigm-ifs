@@ -10,7 +10,7 @@ import type {
   ExtraWorkLog, PerfiosVerificationData, HolidayListItem, UniformRequestItem, IssuedTool, RecurringHolidayRule,
   BiometricDevice, ChecklistTemplate, FieldReport, FieldAttendanceViolation,
   NotificationRule, NotificationType, Company, GmcPolicySettings, StaffAttendanceRules,
-  GmcSubmission, UserHoliday
+  GmcSubmission, UserHoliday, AttendanceUnlockRequest, LeaveType
 } from '../types';
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { 
@@ -595,15 +595,12 @@ export const api = {
     return { url: data.publicUrl, path: filePath };
   },
 
-  bulkUpdateUserLeaves: async (updates: { id: string; earned_leave_opening_balance: number; earned_leave_opening_date: string }[]): Promise<void> => {
+  bulkUpdateUserLeaves: async (updates: any[]): Promise<void> => {
     // Use individual updates to avoid not-null constraint errors on other columns
     for (const update of updates) {
       const { error } = await supabase
         .from('users')
-        .update({
-          earned_leave_opening_balance: update.earned_leave_opening_balance,
-          earned_leave_opening_date: update.earned_leave_opening_date
-        })
+        .update(toSnakeCase(update))
         .eq('id', update.id);
       if (error) throw error;
     }
@@ -1207,6 +1204,119 @@ export const api = {
       .from('attendance_events')
       .insert(toSnakeCase(event));
     if (error) throw error;
+  },
+
+  requestAttendanceUnlock: async (reason: string): Promise<void> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error('Not authenticated');
+
+    const { error } = await supabase
+      .from('attendance_unlock_requests')
+      .insert({
+        user_id: session.user.id,
+        reason,
+        status: 'pending',
+        requested_at: new Date().toISOString()
+      });
+    if (error) throw error;
+  },
+
+  getAttendanceUnlockRequests: async (): Promise<AttendanceUnlockRequest[]> => {
+    const { data, error } = await supabase
+      .from('attendance_unlock_requests')
+      .select('*, user:user_id(name, photo_url)')
+      .eq('status', 'pending')
+      .order('requested_at', { ascending: false });
+      
+    if (error) throw error;
+    
+    return data.map((row: any) => ({
+      id: row.id,
+      userId: row.user_id,
+      userName: row.user?.name || 'Unknown',
+      userPhoto: row.user?.photo_url,
+      reason: row.reason,
+      status: row.status,
+      requestedAt: row.requested_at,
+      managerId: row.manager_id,
+      respondedAt: row.responded_at,
+      rejectionReason: row.rejection_reason
+    }));
+  },
+
+  respondToUnlockRequest: async (requestId: string, status: 'approved' | 'rejected', rejectionReason?: string): Promise<void> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error('Not authenticated');
+
+    const updates: any = {
+      status,
+      manager_id: session.user.id,
+      responded_at: new Date().toISOString()
+    };
+    
+    if (status === 'rejected' && rejectionReason) {
+      updates.rejection_reason = rejectionReason;
+    }
+
+    const { error } = await supabase
+      .from('attendance_unlock_requests')
+      .update(updates)
+      .eq('id', requestId);
+      
+    if (error) throw error;
+  },
+  
+  checkUnlockStatus: async (): Promise<number> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return 0;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('attendance_unlock_requests')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .eq('status', 'approved')
+      .gte('requested_at', `${today}T00:00:00`)
+      .lte('requested_at', `${today}T23:59:59`);
+
+    if (error) return 0;
+    return data?.length || 0;
+  },
+
+  /** Count total unlock requests (pending + approved) made today — used to enforce daily max. */
+  getDailyUnlockRequestCount: async (): Promise<number> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return 0;
+
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('attendance_unlock_requests')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .in('status', ['pending', 'approved'])
+      .gte('requested_at', `${today}T00:00:00`)
+      .lte('requested_at', `${today}T23:59:59`);
+
+    if (error) return 0;
+    return data?.length || 0;
+  },
+
+  getMyUnlockRequest: async (): Promise<AttendanceUnlockRequest | null> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return null;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('attendance_unlock_requests')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .gte('requested_at', `${today}T00:00:00`)
+      .order('requested_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) return null;
+    return data ? toCamelCase(data) : null;
   },
 
   /**
@@ -1922,12 +2032,7 @@ export const api = {
           }
         });
 
-        await api.createNotification({
-          userId: userProfile.reporting_manager_id,
-          message: `${data.userName || 'An employee'} has submitted a new ${data.leaveType} leave request.`,
-          type: 'info',
-          linkTo: '/hr/leave-management'
-        });
+        // Explicit notification removed in favor of rule-based dispatching above
       } catch (notifError) {
         console.error('Failed to trigger leave notification:', notifError);
       }
@@ -1942,6 +2047,54 @@ export const api = {
     const { data, error } = await supabase.from('leave_requests').update(dbData).eq('id', id).select().single();
     if (error) throw error;
     return toCamelCase(data);
+  },
+  updateLeaveType: async (requestId: string, newType: LeaveType): Promise<void> => {
+    // 1. Fetch current request data
+    const { data: request, error: fetchError } = await supabase
+      .from('leave_requests')
+      .select('user_id, leave_type, status, start_date, end_date, day_option')
+      .eq('id', requestId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    const oldType = request.leave_type;
+
+    // 2. If already approved, manage comp off logs
+    if (request.status === 'approved') {
+      // Case A: Old type was Comp Off -> Restore logs to 'earned'
+      if (oldType === 'Comp Off' && newType !== 'Comp Off') {
+        await supabase
+          .from('comp_off_logs')
+          .update({ status: 'earned', leave_request_id: null })
+          .eq('leave_request_id', requestId);
+      }
+      
+      // Case B: New type is Comp Off -> Consume available 'earned' logs
+      if (newType === 'Comp Off' && oldType !== 'Comp Off') {
+        const leaveDays = request.day_option === 'half' ? 0.5 : differenceInCalendarDays(new Date(request.end_date.replace(/-/g, '/')), new Date(request.start_date.replace(/-/g, '/'))) + 1;
+        const { data: availableLogs } = await supabase
+          .from('comp_off_logs')
+          .select('id')
+          .eq('user_id', request.user_id)
+          .eq('status', 'earned')
+          .limit(Math.ceil(leaveDays));
+        
+        if (availableLogs && availableLogs.length > 0) {
+          await supabase
+            .from('comp_off_logs')
+            .update({ status: 'used', leave_request_id: requestId })
+            .in('id', availableLogs.map(l => l.id));
+        }
+      }
+    }
+
+    // 3. Update the leave request type
+    const { error: updateError } = await supabase
+      .from('leave_requests')
+      .update({ leave_type: newType })
+      .eq('id', requestId);
+    
+    if (updateError) throw updateError;
   },
   cancelLeaveRequest: async (id: string): Promise<void> => {
     const { error } = await supabase.from('leave_requests').delete().eq('id', id);
@@ -2073,7 +2226,10 @@ export const api = {
     return (data || []).map(toCamelCase);
   },
   createNotification: async (data: Omit<Notification, 'id' | 'createdAt' | 'isRead'>): Promise<Notification> => {
-    const { data: inserted, error } = await supabase.from('notifications').insert(toSnakeCase(data)).select().single();
+    // Filter out 'title' if present, as the table does not support it
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { title, ...validData } = data;
+    const { data: inserted, error } = await supabase.from('notifications').insert(toSnakeCase(validData)).select().single();
     if (error) throw error;
     return toCamelCase(inserted);
   },
@@ -2128,7 +2284,7 @@ export const api = {
     const notifications = finalUserIds.map(userId => toSnakeCase({
       userId,
       message: data.message,
-      title: data.title || 'System Broadcast',
+      // title: data.title, // Table does not support title
       type: data.type || 'info',
     }));
 
@@ -3609,10 +3765,14 @@ export const api = {
     }));
   },
 
-  async createFieldViolation(violationData: Partial<FieldAttendanceViolation>): Promise<FieldAttendanceViolation> {
+  async createFieldViolation(violationData: Partial<FieldAttendanceViolation & { siteVisits?: number }>): Promise<FieldAttendanceViolation> {
+    // Filter out siteVisits if present in the breakdown, as it's not a column in the table
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { siteVisits, ...validData } = violationData;
+    
     const { data, error } = await supabase
       .from('field_attendance_violations')
-      .insert(toSnakeCase(violationData))
+      .insert(toSnakeCase(validData))
       .select()
       .maybeSingle();
     if (error) throw error;
@@ -3750,12 +3910,18 @@ export const api = {
             affectsPerformance: true,
           });
 
-          // Send notification to manager
+          // Send notification via rules
           if (user.reportingManagerId) {
-            await this.createNotification({
-              userId: user.reportingManagerId,
-              message: `Field staff ${user.name} has a site time violation for ${format(new Date(date), 'MMM dd')}. Site percentage: ${breakdown.sitePercentage.toFixed(1)}%`,
-              type: 'security',
+            await dispatchNotificationFromRules('violation', {
+              actorName: user.name,
+              actionText: `has a site time violation for ${format(new Date(date), 'MMM dd')}. Site percentage: ${breakdown.sitePercentage.toFixed(1)}%`,
+              locString: '',
+              actor: {
+                id: user.id,
+                name: user.name,
+                reportingManagerId: user.reportingManagerId,
+                role: user.role
+              }
             });
           }
         }

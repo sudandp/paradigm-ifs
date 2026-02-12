@@ -382,8 +382,7 @@ const LeaveDashboard: React.FC = () => {
                 <CompOffCalendar logs={compOffLogs} leaveRequests={requests} userHolidays={userHolidays} isLoading={isLoading} />
                 <HolidayCalendar adminHolidays={adminHolidays} userSelectedHolidays={userHolidays} isLoading={isLoading} />
                 <YearlyAttendanceChart />
-                {/* Show OT Calendar only for field staff */}
-                {user?.role === 'field_staff' && <OTCalendar />}
+                <OTCalendar />
             </div>
 
             {isMobile && (

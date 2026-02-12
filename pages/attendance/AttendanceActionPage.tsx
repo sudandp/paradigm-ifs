@@ -27,11 +27,13 @@ const AttendanceActionPage: React.FC = () => {
     }, [geofencingSettings, fetchGeofencingSettings]);
 
     // Determine action from URL
+    const query = new URLSearchParams(location.search);
+    const workType = query.get('workType') as 'office' | 'field' || 'office';
     const isCheckIn = location.pathname.includes('check-in');
     const isBreakIn = location.pathname.includes('break-in');
-    const isBreakOut = location.pathname.includes('break-out'); // Kept original as 'type' is not defined in this context
+    const isBreakOut = location.pathname.includes('break-out');
     
-    let action = isCheckIn ? 'Punch In' : 'Punch Out';
+    let action = isCheckIn ? (workType === 'field' ? 'Check In' : 'Punch In') : (workType === 'field' ? 'Check Out' : 'Punch Out');
     if (isBreakIn) action = 'Break In';
     if (isBreakOut) action = 'Break Out';
 
@@ -53,7 +55,7 @@ const AttendanceActionPage: React.FC = () => {
             // Use cached geofencing settings for immediate response
             const settings = geofencingSettings || { enabled: false };
             
-            if (!isCheckIn && settings.enabled) {
+            if (!isCheckIn && !isBreakIn && !isBreakOut && settings.enabled) {
                 // If checking out and geofencing is enabled, open the report modal first
                 setIsReportModalOpen(true);
                 setIsSubmitting(false);
@@ -68,7 +70,7 @@ const AttendanceActionPage: React.FC = () => {
             if (isBreakOut) forcedType = 'break-out';
 
             // Direct check-in OR direct check-out (if geofencing is disabled)
-            const { success, message } = await toggleCheckInStatus(undefined, null, 'office', undefined, forcedType);
+            const { success, message } = await toggleCheckInStatus(undefined, null, workType, undefined, forcedType);
             setToast({ message, type: success ? 'success' : 'error' });
             
             if (success) {

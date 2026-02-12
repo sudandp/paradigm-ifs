@@ -14,11 +14,16 @@ import {
     Clock,
     X,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react';
-import { formatDistanceToNow, isToday, isYesterday, parseISO } from 'date-fns';
-import type { Notification, NotificationType } from '../../types';
+import { format, formatDistanceToNow, isToday, isYesterday, parseISO } from 'date-fns';
+import type { Notification, NotificationType, AttendanceUnlockRequest, LeaveRequest, ExtraWorkLog } from '../../types';
 import Button from '../ui/Button';
+import { api } from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
+import { CheckCircle, XCircle, Calendar, FileText, MapPin } from 'lucide-react';
 
 const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({ type, size = "h-5 w-5" }) => {
     const iconMap: Record<NotificationType, React.ElementType> = {
@@ -29,6 +34,7 @@ const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({
         info: Info,
         warning: AlertTriangle,
         greeting: Sun,
+        approval_request: ClipboardCheck,
     };
 
     const bgMap: Record<NotificationType, string> = {
@@ -39,6 +45,7 @@ const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({
         info: 'bg-sky-50 text-sky-600 border-sky-100',
         warning: 'bg-amber-50 text-amber-600 border-amber-100',
         greeting: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+        approval_request: 'bg-orange-50 text-orange-600 border-orange-100 shadow-[0_0_10px_rgba(249,115,22,0.1)]',
     };
 
     const Icon = iconMap[type] || Bell;
@@ -52,11 +59,106 @@ const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({
 };
 
 export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void; isMobile?: boolean }> = ({ isOpen, onClose, isMobile = false }) => {
+    const { user } = useAuthStore();
     const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationStore();
     const navigate = useNavigate();
     const [currentPage, setCurrentPage] = React.useState(1);
     const [pageSize, setPageSize] = React.useState(5);
+    const [unlockRequests, setUnlockRequests] = React.useState<AttendanceUnlockRequest[]>([]);
+    const [leaveRequests, setLeaveRequests] = React.useState<LeaveRequest[]>([]);
+    const [extraWorkClaims, setExtraWorkClaims] = React.useState<ExtraWorkLog[]>([]);
+    
+    // State for expandable sections
+    const [expandedSections, setExpandedSections] = React.useState({
+        unlocks: false,
+        leaves: false,
+        claims: false
+    });
+
+    const toggleSection = (section: 'unlocks' | 'leaves' | 'claims') => {
+        setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+    };
+
+    const [isActionLoading, setIsActionLoading] = React.useState<string | null>(null);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+    const fetchPendingApprovals = React.useCallback(async () => {
+        if (!user || user.role === 'field_staff') return;
+        try {
+            let leavesPromise;
+            // Admin/HR sees ALL pending requests (both Manager and HR stages)
+            if (user.role === 'admin' || user.role === 'hr') {
+                leavesPromise = Promise.all([
+                    api.getLeaveRequests({ status: 'pending_manager_approval' }),
+                    api.getLeaveRequests({ status: 'pending_hr_confirmation' })
+                ]).then(([res1, res2]) => ({ data: [...res1.data, ...res2.data] }));
+            } else {
+                // Regular Manager: sees requests assigned to them
+                leavesPromise = api.getLeaveRequests({ 
+                    status: 'pending_manager_approval',
+                    forApproverId: user.id 
+                });
+            }
+
+            const [unlocks, leaves, claims] = await Promise.all([
+                api.getAttendanceUnlockRequests(),
+                leavesPromise,
+                ['admin', 'hr', 'operation_manager', 'site_manager'].includes(user.role) 
+                    ? api.getExtraWorkLogs({ status: 'Pending' }) 
+                    : Promise.resolve({ data: [], total: 0 })
+            ]);
+            setUnlockRequests(unlocks);
+            setLeaveRequests(leaves.data);
+            setExtraWorkClaims(claims.data);
+        } catch (err) {
+            console.error('Error fetching pending approvals:', err);
+        }
+    }, [user]);
+
+    React.useEffect(() => {
+        if (isOpen) {
+            fetchPendingApprovals();
+        }
+    }, [isOpen, fetchPendingApprovals]);
+
+    const handleRespondToUnlock = async (requestId: string, status: 'approved' | 'rejected') => {
+        setIsActionLoading(requestId);
+        try {
+            await api.respondToUnlockRequest(requestId, status);
+            setUnlockRequests(prev => prev.filter(r => r.id !== requestId));
+        } catch (err) {
+            console.error('Error responding to request:', err);
+        } finally {
+            setIsActionLoading(null);
+        }
+    };
+
+    const handleRespondToLeave = async (requestId: string, action: 'approve' | 'reject' | 'confirm') => {
+        setIsActionLoading(requestId);
+        try {
+            if (action === 'approve') await api.approveLeaveRequest(requestId, user!.id);
+            else if (action === 'reject') await api.rejectLeaveRequest(requestId, user!.id);
+            else if (action === 'confirm') await api.confirmLeaveByHR(requestId, user!.id);
+            setLeaveRequests(prev => prev.filter(r => r.id !== requestId));
+        } catch (err) {
+            console.error('Error responding to leave request:', err);
+        } finally {
+            setIsActionLoading(null);
+        }
+    };
+
+    const handleRespondToClaim = async (claimId: string, action: 'approve' | 'reject') => {
+        setIsActionLoading(claimId);
+        try {
+            if (action === 'approve') await api.approveExtraWorkClaim(claimId, user!.id);
+            else if (action === 'reject') await api.rejectExtraWorkClaim(claimId, user!.id, 'Rejected from notifications');
+            setExtraWorkClaims(prev => prev.filter(c => c.id !== claimId));
+        } catch (err) {
+            console.error('Error responding to claim:', err);
+        } finally {
+            setIsActionLoading(null);
+        }
+    };
 
     React.useEffect(() => {
         if (scrollContainerRef.current) {
@@ -141,6 +243,240 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                 ref={scrollContainerRef}
                 className={`flex-1 overflow-y-auto custom-scrollbar ${isMobile ? 'bg-[#0A3D2E]' : 'bg-white'}`}
             >
+                {/* Pending Approvals Section */}
+                {(unlockRequests.length > 0 || leaveRequests.length > 0 || extraWorkClaims.length > 0) && (
+                    <div className={`border-b ${isMobile ? 'border-white/10 bg-gradient-to-b from-white/5 to-transparent' : 'border-gray-100 bg-amber-50/30'}`}>
+                        <div className="px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className={`p-1.5 rounded-lg ${isMobile ? 'bg-amber-500/20 text-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.2)]' : 'bg-amber-100 text-amber-700'}`}>
+                                    <Clock className="w-3.5 h-3.5" />
+                                </div>
+                                <h5 className={`text-[11px] font-black uppercase tracking-widest ${isMobile ? 'text-white/90' : 'text-amber-900'}`}>
+                                    Pending Approvals
+                                </h5>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${isMobile ? 'bg-white/10 text-white border border-white/5' : 'bg-amber-100 text-amber-700'}`}>
+                                {unlockRequests.length + leaveRequests.length + extraWorkClaims.length}
+                            </span>
+                        </div>
+                        
+                        <div className="px-4 pb-4 space-y-3">
+                            {/* Attendance Unlock Requests */}
+                            {unlockRequests.length > 0 && (
+                                <div className={`group rounded-2xl overflow-hidden transition-all duration-300 border ${isMobile ? 'border-white/10 bg-transparent' : 'border-emerald-100 bg-white hover:shadow-md'}`}>
+                                    <button 
+                                        onClick={() => toggleSection('unlocks')}
+                                        className="w-full p-3 flex items-center justify-between bg-transparent"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-xl flex items-center justify-center ${isMobile ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'}`}>
+                                                <MapPin className="w-4 h-4" />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className={`text-xs font-bold ${isMobile ? 'text-white' : 'text-gray-900'}`}>Punch In Requests</p>
+                                                <p className={`text-[10px] ${isMobile ? 'text-white/50' : 'text-gray-500'}`}>Approvals needed</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full text-[10px] font-bold ${isMobile ? 'bg-emerald-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                {unlockRequests.length}
+                                            </span>
+                                            {expandedSections.unlocks ? <ChevronUp className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} /> : <ChevronDown className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} />}
+                                        </div>
+                                    </button>
+                                    
+                                    {expandedSections.unlocks && (
+                                        <div className={`p-3 space-y-3 border-t ${isMobile ? 'border-white/5' : 'border-emerald-100/50'}`}>
+                                            {unlockRequests.map(req => (
+                                                <div key={req.id} className={`rounded-xl p-3 border ${isMobile ? 'bg-black/20 border-white/5' : 'bg-emerald-50/30 border-emerald-100'}`}>
+                                                    <div className="flex items-center gap-3 mb-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center font-bold text-emerald-700 overflow-hidden relative text-xs">
+                                                            {req.userName.charAt(0)}
+                                                            {req.userPhoto && <img src={req.userPhoto} alt={req.userName} className="absolute inset-0 w-full h-full object-cover" />}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between">
+                                                                <p className={`text-xs font-bold truncate ${isMobile ? 'text-white' : 'text-gray-900'}`}>{req.userName}</p>
+                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20`}>Unlock</span>
+                                                            </div>
+                                                            <p className={`text-[9px] ${isMobile ? 'text-white/50' : 'text-emerald-700/60'}`}>{formatDistanceToNow(parseISO(req.requestedAt), { addSuffix: true })}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`rounded-lg p-2.5 border mb-3 ${isMobile ? 'bg-black/20 border-white/5' : 'bg-white border-emerald-100/50'}`}>
+                                                        <p className={`text-[11px] italic leading-relaxed ${isMobile ? 'text-white/70' : 'text-gray-700'}`}>"{req.reason}"</p>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <Button 
+                                                            size="sm" 
+                                                            disabled={isActionLoading === req.id}
+                                                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 border-none text-[9px] uppercase font-bold h-8 shadow-lg shadow-emerald-900/20"
+                                                            onClick={() => handleRespondToUnlock(req.id, 'approved')}
+                                                        >
+                                                            <CheckCircle className="w-3 h-3 mr-1" /> Approve
+                                                        </Button>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="outline"
+                                                            disabled={isActionLoading === req.id}
+                                                            className={`flex-1 text-[9px] uppercase font-bold h-8 ${isMobile ? 'border-white/10 text-white hover:bg-white/5' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
+                                                            onClick={() => handleRespondToUnlock(req.id, 'rejected')}
+                                                        >
+                                                            <XCircle className="w-3 h-3 mr-1" /> Reject
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Leave Requests */}
+                            {leaveRequests.length > 0 && (
+                                <div className={`group rounded-2xl overflow-hidden transition-all duration-300 border ${isMobile ? 'border-white/10 bg-transparent' : 'border-orange-100 bg-white hover:shadow-md'}`}>
+                                    <button 
+                                        onClick={() => toggleSection('leaves')}
+                                        className="w-full p-3 flex items-center justify-between bg-transparent"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-xl flex items-center justify-center ${isMobile ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-600'}`}>
+                                                <Calendar className="w-4 h-4" />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className={`text-xs font-bold ${isMobile ? 'text-white' : 'text-gray-900'}`}>Leave Requests</p>
+                                                <p className={`text-[10px] ${isMobile ? 'text-white/50' : 'text-gray-500'}`}>Approvals needed</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full text-[10px] font-bold ${isMobile ? 'bg-orange-500 text-black shadow-[0_0_10px_rgba(249,115,22,0.4)]' : 'bg-orange-100 text-orange-700'}`}>
+                                                {leaveRequests.length}
+                                            </span>
+                                            {expandedSections.leaves ? <ChevronUp className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} /> : <ChevronDown className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} />}
+                                        </div>
+                                    </button>
+                                    
+                                    {expandedSections.leaves && (
+                                        <div className={`p-3 space-y-3 border-t ${isMobile ? 'border-white/5' : 'border-orange-100/50'}`}>
+                                            {leaveRequests.map(req => (
+                                                <div key={req.id} className={`rounded-xl p-3 border ${isMobile ? 'bg-black/20 border-white/5' : 'bg-orange-50/30 border-orange-100'}`}>
+                                                    <div className="flex items-center gap-3 mb-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center font-bold text-orange-700 overflow-hidden relative text-xs">
+                                                            {req.userName.charAt(0)}
+                                                            <Calendar className="w-4 h-4" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between">
+                                                                <p className={`text-xs font-bold truncate ${isMobile ? 'text-white' : 'text-gray-900'}`}>{req.userName}</p>
+                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-500 border border-orange-500/20`}>{req.leaveType}</span>
+                                                            </div>
+                                                            <p className={`text-[9px] ${isMobile ? 'text-white/50' : 'text-orange-700/60'}`}>
+                                                                {format(parseISO(req.startDate), 'dd MMM')} - {format(parseISO(req.endDate), 'dd MMM')}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`rounded-lg p-2.5 border mb-3 ${isMobile ? 'bg-black/20 border-white/5' : 'bg-white border-orange-100/50'}`}>
+                                                        <p className={`text-[11px] italic leading-relaxed ${isMobile ? 'text-white/70' : 'text-gray-700'}`}>"{req.reason}"</p>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <Button 
+                                                            size="sm" 
+                                                            disabled={isActionLoading === req.id}
+                                                            className="flex-1 bg-orange-600 hover:bg-orange-700 border-none text-[9px] uppercase font-bold h-8 shadow-lg shadow-orange-900/20"
+                                                            onClick={() => handleRespondToLeave(req.id, req.status === 'pending_hr_confirmation' ? 'confirm' : 'approve')}
+                                                        >
+                                                            <CheckCircle className="w-3 h-3 mr-1" /> {req.status === 'pending_hr_confirmation' ? 'Confirm' : 'Approve'}
+                                                        </Button>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="outline"
+                                                            disabled={isActionLoading === req.id}
+                                                            className={`flex-1 text-[9px] uppercase font-bold h-8 ${isMobile ? 'border-white/10 text-white hover:bg-white/5' : 'border-orange-200 text-orange-700 hover:bg-orange-50'}`}
+                                                            onClick={() => handleRespondToLeave(req.id, 'reject')}
+                                                        >
+                                                            <XCircle className="w-3 h-3 mr-1" /> Reject
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Extra Work Claims */}
+                            {extraWorkClaims.length > 0 && (
+                                <div className={`group rounded-2xl overflow-hidden transition-all duration-300 border ${isMobile ? 'border-white/10 bg-transparent' : 'border-blue-100 bg-white hover:shadow-md'}`}>
+                                    <button 
+                                        onClick={() => toggleSection('claims')}
+                                        className="w-full p-3 flex items-center justify-between bg-transparent"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-xl flex items-center justify-center ${isMobile ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
+                                                <FileText className="w-4 h-4" />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className={`text-xs font-bold ${isMobile ? 'text-white' : 'text-gray-900'}`}>Extra Work Claims</p>
+                                                <p className={`text-[10px] ${isMobile ? 'text-white/50' : 'text-gray-500'}`}>Review claims</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full text-[10px] font-bold ${isMobile ? 'bg-blue-500 text-black shadow-[0_0_10px_rgba(59,130,246,0.4)]' : 'bg-blue-100 text-blue-700'}`}>
+                                                {extraWorkClaims.length}
+                                            </span>
+                                            {expandedSections.claims ? <ChevronUp className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} /> : <ChevronDown className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} />}
+                                        </div>
+                                    </button>
+                                    
+                                    {expandedSections.claims && (
+                                        <div className={`p-3 space-y-3 border-t ${isMobile ? 'border-white/5' : 'border-blue-100/50'}`}>
+                                            {extraWorkClaims.map(claim => (
+                                                <div key={claim.id} className={`rounded-xl p-3 border ${isMobile ? 'bg-black/20 border-white/5' : 'bg-blue-50/30 border-blue-100'}`}>
+                                                    <div className="flex items-center gap-3 mb-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center font-bold text-blue-700 overflow-hidden relative text-xs">
+                                                            {claim.userName.charAt(0)}
+                                                            <FileText className="w-4 h-4" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between">
+                                                                <p className={`text-xs font-bold truncate ${isMobile ? 'text-white' : 'text-gray-900'}`}>{claim.userName}</p>
+                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 border border-blue-500/20`}>{claim.claimType}</span>
+                                                            </div>
+                                                            <p className={`text-[9px] ${isMobile ? 'text-white/50' : 'text-blue-700/60'}`}>{format(parseISO(claim.workDate), 'dd MMM yyyy')}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`rounded-lg p-2.5 border mb-3 ${isMobile ? 'bg-black/20 border-white/5' : 'bg-white border-blue-100/50'}`}>
+                                                        <p className={`text-[11px] italic leading-relaxed ${isMobile ? 'text-white/70' : 'text-gray-700'}`}>"{claim.reason}"</p>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <Button 
+                                                            size="sm" 
+                                                            disabled={isActionLoading === claim.id}
+                                                            className="flex-1 bg-blue-600 hover:bg-blue-700 border-none text-[9px] uppercase font-bold h-8 shadow-lg shadow-blue-900/20"
+                                                            onClick={() => handleRespondToClaim(claim.id, 'approve')}
+                                                        >
+                                                            <CheckCircle className="w-3 h-3 mr-1" /> Approve
+                                                        </Button>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="outline"
+                                                            disabled={isActionLoading === claim.id}
+                                                            className={`flex-1 text-[9px] uppercase font-bold h-8 ${isMobile ? 'border-white/10 text-white hover:bg-white/5' : 'border-blue-200 text-blue-700 hover:bg-blue-50'}`}
+                                                            onClick={() => handleRespondToClaim(claim.id, 'reject')}
+                                                        >
+                                                            <XCircle className="w-3 h-3 mr-1" /> Reject
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                        </div>
+                    </div>
+                )}
+
                 {groupedNotifications.length > 0 ? (
                     <div className={`divide-y pt-2 ${isMobile ? 'divide-white/5' : 'divide-gray-50'}`}>
                         {groupedNotifications.map((group) => (

@@ -47,6 +47,7 @@ const SelectOrganization = lazyWithRetry(() => import('./pages/onboarding/Select
 const AddEmployee = lazyWithRetry(() => import('./pages/onboarding/AddEmployee'));
 const VerificationDashboard = lazyWithRetry(() => import('./pages/verification/VerificationDashboard'));
 const UserManagement = lazyWithRetry(() => import('./pages/admin/UserManagement'));
+const BulkEarnedLeavePage = lazyWithRetry(() => import('./pages/admin/BulkEarnedLeavePage'));
 const SiteManagement = lazyWithRetry(() => import('./pages/admin/OrganizationManagement').then(m => ({ default: m.SiteManagement })));
 const RoleManagement = lazyWithRetry(() => import('./pages/admin/RoleManagement'));
 const ModuleManagement = lazyWithRetry(() => import('./pages/admin/ModuleManagement'));
@@ -61,6 +62,7 @@ const AttendanceDashboard = lazyWithRetry(() => import('./pages/attendance/Atten
 const DeviceManagement = lazyWithRetry(() => import('./pages/settings/DeviceManagement'));
 const MyLocations = lazyWithRetry(() => import('./pages/attendance/MyLocations'));
 const AttendanceActionPage = lazyWithRetry(() => import('./pages/attendance/AttendanceActionPage'));
+const RequestUnlockPage = lazyWithRetry(() => import('./pages/attendance/RequestUnlockPage'));
 const AttendanceSettings = lazyWithRetry(() => import('./pages/hr/AttendanceSettings'));
 const NotificationsControl = lazyWithRetry(() => import('./pages/hr/NotificationsControl'));
 const LeaveDashboard = lazyWithRetry(() => import('./pages/leaves/LeaveDashboard'));
@@ -632,6 +634,7 @@ const App: React.FC = () => {
             <Route path="admin/users" element={<UserManagement />} />
             <Route path="admin/users/add" element={<AddUserPage />} />
             <Route path="admin/users/edit/:id" element={<AddUserPage />} />
+            <Route path="admin/users/bulk-update-leaves" element={<BulkEarnedLeavePage />} />
           </Route>
           <Route element={<ProtectedRoute requiredPermission="manage_biometric_devices" />}>
             <Route path="admin/devices" element={<ManageDevices />} />
@@ -685,6 +688,7 @@ const App: React.FC = () => {
             <Route path="attendance/check-out" element={<AttendanceActionPage />} />
             <Route path="attendance/break-in" element={<AttendanceActionPage />} />
             <Route path="attendance/break-out" element={<AttendanceActionPage />} />
+            <Route path="attendance/request-unlock" element={<RequestUnlockPage />} />
           </Route>
           <Route element={<ProtectedRoute requiredPermission="view_my_locations" />}>
             {/* New page for users to manage their own geofenced locations */}

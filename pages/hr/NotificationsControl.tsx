@@ -57,6 +57,8 @@ const EVENT_TYPES = [
     { value: 'support_ticket', label: 'New Support Ticket', icon: MessageSquare },
     { value: 'support_response', label: 'Support Response Received', icon: Bell },
     { value: 'billing_invoice', label: 'Invoice Generated', icon: FileText },
+    { value: 'punch_unlock_request', label: 'Punch Unlock Request', icon: Shield },
+    { value: 'ot_punch', label: 'Overtime (OT) Punch', icon: Clock },
     { value: 'security_alert', label: 'Emergency / Security Alert', icon: Shield }
 ];
 
@@ -89,7 +91,8 @@ const NotificationsControl: React.FC = () => {
     const [newRule, setNewRule] = useState<Partial<NotificationRule>>({
         eventType: 'check_in',
         recipientRole: 'direct_manager',
-        isEnabled: true
+        isEnabled: true,
+        sendAlert: false
     });
 
     // Broadcast Form State
@@ -156,7 +159,7 @@ const NotificationsControl: React.FC = () => {
     };
 
     const cancelEdit = () => {
-        setNewRule({ eventType: 'check_in', recipientRole: 'direct_manager', isEnabled: true });
+        setNewRule({ eventType: 'check_in', recipientRole: 'direct_manager', isEnabled: true, sendAlert: false });
         setIsEditing(false);
     };
 
@@ -275,7 +278,13 @@ const NotificationsControl: React.FC = () => {
                                     </Select>
                                 </div>
 
-                                <div className="space-y-2 pt-2">
+                                <div className="space-y-4 pt-2">
+                                    <Checkbox 
+                                        id="newRuleSendAlert"
+                                        label="Trigger standard Alert / Warning UI"
+                                        checked={newRule.sendAlert}
+                                        onChange={(e) => setNewRule({ ...newRule, sendAlert: e.target.checked })}
+                                    />
                                     <Button className="w-full" onClick={handleAddRule} isLoading={isSaving}>
                                         {isEditing ? 'Update Rule' : 'Create Rule'}
                                     </Button>
@@ -330,7 +339,7 @@ const NotificationsControl: React.FC = () => {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <div className="flex items-center gap-4 pr-4 border-r border-border">
+                                            <div className="flex items-center gap-4 border-r border-border px-4">
                                                 <Button 
                                                     variant="icon" 
                                                     onClick={() => handleEditRule(rule)} 
@@ -339,6 +348,22 @@ const NotificationsControl: React.FC = () => {
                                                 >
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] text-muted uppercase font-bold tracking-wider">Alert</span>
+                                                    <Checkbox 
+                                                        id={`alert-${rule.id}`} 
+                                                        label=""
+                                                        checked={rule.sendAlert} 
+                                                        onChange={async () => {
+                                                            try {
+                                                                const updated = await api.saveNotificationRule({ ...rule, sendAlert: !rule.sendAlert });
+                                                                setRules(rules.map(r => r.id === rule.id ? updated : r));
+                                                            } catch (err) {
+                                                                setToast({ message: 'Failed to update alert setting.', type: 'error' });
+                                                            }
+                                                        }} 
+                                                    />
+                                                </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[10px] text-muted uppercase font-bold tracking-wider">Active</span>
                                                     <Checkbox 

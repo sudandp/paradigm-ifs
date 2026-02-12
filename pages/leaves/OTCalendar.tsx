@@ -38,39 +38,37 @@ const OTCalendar: React.FC = () => {
         });
     }, [currentDate]);
 
+    /** Calculate hours-based OT (working > 8h in a day) */
     const getDailyOT = (date: Date) => {
         const dayEvents = events.filter(e => isSameDay(new Date(e.timestamp), date));
 
-        if (dayEvents.length === 0) return 0;
+        if (dayEvents.length === 0) return { hoursOT: 0, hasOtPunch: false };
 
-        // Sort events by time
         const sortedEvents = [...dayEvents].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
         let totalMinutes = 0;
         let checkInTime: Date | null = null;
+        let hasOtPunch = false;
 
         sortedEvents.forEach(event => {
             const eventTime = new Date(event.timestamp);
             if (event.type === 'check-in') {
                 checkInTime = eventTime;
+                if (event.isOt) hasOtPunch = true;
             } else if (event.type === 'check-out' && checkInTime) {
                 totalMinutes += differenceInMinutes(eventTime, checkInTime);
                 checkInTime = null;
             }
         });
 
-        // If still checked in (no check-out), ignore for now or calculate till now? 
-        // Usually for past days we ignore incomplete pairs or assume end of day?
-        // For simplicity, we only count completed pairs.
-
         const totalHours = totalMinutes / 60;
         const otHours = Math.max(0, totalHours - 8);
 
-        return parseFloat(otHours.toFixed(1));
+        return { hoursOT: parseFloat(otHours.toFixed(1)), hasOtPunch };
     };
 
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const startDay = getDay(startOfMonth(currentDate)); // 0-6
+    const startDay = getDay(startOfMonth(currentDate));
 
     return (
         <div className="bg-card p-5 rounded-xl shadow-card border border-border w-full md:max-w-[350px] flex flex-col min-h-[460px]">
@@ -94,13 +92,22 @@ const OTCalendar: React.FC = () => {
                         <div key={`empty-${i}`} className="aspect-square" />
                     ))}
                     {daysInMonth.map(date => {
-                        const ot = getDailyOT(date);
-                        const hasOT = ot > 0;
+                        const { hoursOT, hasOtPunch } = getDailyOT(date);
+                        const hasHoursOT = hoursOT > 0;
+                        const hasAnyOT = hasHoursOT || hasOtPunch;
+
+                        // Color: orange for OT punch cycles, blue for hours-based OT, both = orange
+                        const bgClass = hasOtPunch 
+                            ? 'bg-orange-600 text-white border-orange-700 shadow-sm'
+                            : hasHoursOT 
+                                ? 'bg-blue-600 text-white border-blue-700 shadow-sm'
+                                : 'bg-gray-50 text-gray-400 border-gray-100';
 
                         return (
-                            <div key={date.toISOString()} className={`aspect-square rounded border flex flex-col items-center justify-center transition-colors ${hasOT ? 'bg-blue-600 text-white border-blue-700 shadow-sm' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
+                            <div key={date.toISOString()} className={`aspect-square rounded border flex flex-col items-center justify-center transition-colors ${bgClass}`}>
                                 <span className="text-xs font-bold">{format(date, 'd')}</span>
-                                {hasOT && <span className="text-[9px] font-bold">+{ot}h</span>}
+                                {hasHoursOT && <span className="text-[9px] font-bold">+{hoursOT}h</span>}
+                                {hasOtPunch && !hasHoursOT && <span className="text-[9px] font-bold">OT</span>}
                             </div>
                         );
                     })}
@@ -109,6 +116,7 @@ const OTCalendar: React.FC = () => {
             
             <div className="mt-4 pt-4 border-t border-border/50 flex flex-wrap gap-2 text-[11px] text-muted-foreground uppercase font-bold tracking-tight">
                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"></div> Overtime (&gt;8h)</div>
+                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-orange-600 rounded-full flex-shrink-0"></div> OT Punch</div>
             </div>
         </div>
     );

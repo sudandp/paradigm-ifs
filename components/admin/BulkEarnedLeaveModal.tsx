@@ -24,13 +24,19 @@ const BulkEarnedLeaveModal: React.FC<BulkEarnedLeaveModalProps> = ({ isOpen, onC
         try {
             const users = await api.getUsers(); // Get all users
             const workbook = new ExcelJS.Workbook();
-            const worksheet = workbook.addWorksheet('Earned Leaves');
+            const worksheet = workbook.addWorksheet('Leave Balances');
 
             worksheet.columns = [
                 { header: 'User ID', key: 'id', width: 40 },
                 { header: 'Employee Name', key: 'name', width: 30 },
-                { header: 'Earned Leave Balance', key: 'balance', width: 20 },
-                { header: 'Opening Date (YYYY-MM-DD)', key: 'openingDate', width: 25 },
+                { header: 'Earned Leave Balance', key: 'elBalance', width: 20 },
+                { header: 'EL Opening Date (YYYY-MM-DD)', key: 'elDate', width: 25 },
+                { header: 'Sick Leave Balance', key: 'slBalance', width: 20 },
+                { header: 'SL Opening Date (YYYY-MM-DD)', key: 'slDate', width: 25 },
+                { header: 'Comp Off Balance', key: 'coBalance', width: 20 },
+                { header: 'CO Opening Date (YYYY-MM-DD)', key: 'coDate', width: 25 },
+                { header: 'Floating Leave Balance', key: 'flBalance', width: 20 },
+                { header: 'FL Opening Date (YYYY-MM-DD)', key: 'flDate', width: 25 },
             ];
 
             // Add sample instructions or styling
@@ -42,11 +48,18 @@ const BulkEarnedLeaveModal: React.FC<BulkEarnedLeaveModalProps> = ({ isOpen, onC
             };
 
             users.forEach((u: any) => {
+                const today = format(new Date(), 'yyyy-MM-dd');
                 worksheet.addRow({
                     id: u.id,
                     name: u.name,
-                    balance: u.earnedLeaveOpeningBalance || 0,
-                    openingDate: u.earnedLeaveOpeningDate || format(new Date(), 'yyyy-MM-dd')
+                    elBalance: u.earnedLeaveOpeningBalance || 0,
+                    elDate: u.earnedLeaveOpeningDate || today,
+                    slBalance: u.sickLeaveOpeningBalance || 0,
+                    slDate: u.sickLeaveOpeningDate || today,
+                    coBalance: u.compOffOpeningBalance || 0,
+                    coDate: u.compOffOpeningDate || today,
+                    flBalance: u.floatingLeaveOpeningBalance || 0,
+                    flDate: u.floatingLeaveOpeningDate || today
                 });
             });
 
@@ -81,15 +94,31 @@ const BulkEarnedLeaveModal: React.FC<BulkEarnedLeaveModalProps> = ({ isOpen, onC
 
                 const id = row.getCell(1).value?.toString();
                 const name = row.getCell(2).value?.toString();
-                const balance = parseFloat(row.getCell(3).value?.toString() || '0');
-                const openingDate = row.getCell(4).value?.toString();
+                
+                const elBalance = parseFloat(row.getCell(3).value?.toString() || '0');
+                const elDate = row.getCell(4).value?.toString();
+                
+                const slBalance = parseFloat(row.getCell(5).value?.toString() || '0');
+                const slDate = row.getCell(6).value?.toString();
+                
+                const coBalance = parseFloat(row.getCell(7).value?.toString() || '0');
+                const coDate = row.getCell(8).value?.toString();
+                
+                const flBalance = parseFloat(row.getCell(9).value?.toString() || '0');
+                const flDate = row.getCell(10).value?.toString();
 
-                if (id && !isNaN(balance)) {
+                if (id) {
                     updates.push({ 
                         id, 
                         name,
-                        earned_leave_opening_balance: balance, 
-                        earned_leave_opening_date: openingDate || format(new Date(), 'yyyy-MM-dd') 
+                        earnedLeaveOpeningBalance: elBalance, 
+                        earnedLeaveOpeningDate: elDate,
+                        sickLeaveOpeningBalance: slBalance,
+                        sickLeaveOpeningDate: slDate,
+                        compOffOpeningBalance: coBalance,
+                        compOffOpeningDate: coDate,
+                        floatingLeaveOpeningBalance: flBalance,
+                        floatingLeaveOpeningDate: flDate
                     });
                 }
             });
@@ -113,8 +142,14 @@ const BulkEarnedLeaveModal: React.FC<BulkEarnedLeaveModalProps> = ({ isOpen, onC
         try {
             const formattedUpdates = previewData.map(u => ({
                 id: u.id,
-                earned_leave_opening_balance: u.earned_leave_opening_balance,
-                earned_leave_opening_date: u.earned_leave_opening_date
+                earnedLeaveOpeningBalance: u.earnedLeaveOpeningBalance,
+                earnedLeaveOpeningDate: u.earnedLeaveOpeningDate,
+                sickLeaveOpeningBalance: u.sickLeaveOpeningBalance,
+                sickLeaveOpeningDate: u.sickLeaveOpeningDate,
+                compOffOpeningBalance: u.compOffOpeningBalance,
+                compOffOpeningDate: u.compOffOpeningDate,
+                floatingLeaveOpeningBalance: u.floatingLeaveOpeningBalance,
+                floatingLeaveOpeningDate: u.floatingLeaveOpeningDate
             }));
 
             await api.bulkUpdateUserLeaves(formattedUpdates);
@@ -132,8 +167,8 @@ const BulkEarnedLeaveModal: React.FC<BulkEarnedLeaveModalProps> = ({ isOpen, onC
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title="Bulk Update Earned Leaves"
-            size="xl"
+            title="Bulk Update Leave Balances"
+            maxWidth="md:max-w-4xl"
             hideFooter
         >
             <div className="space-y-6 p-1">
@@ -194,21 +229,29 @@ const BulkEarnedLeaveModal: React.FC<BulkEarnedLeaveModalProps> = ({ isOpen, onC
                             </div>
                         </div>
                         
-                        <div className="max-h-[300px] overflow-y-auto rounded-lg border border-border">
-                            <table className="min-w-full text-sm">
+                        <div className="max-h-[400px] overflow-auto rounded-lg border border-border">
+                            <table className="min-w-full text-[11px]">
                                 <thead className="bg-muted/30 sticky top-0">
-                                    <tr>
-                                        <th className="px-4 py-2 text-left font-semibold">Employee</th>
-                                        <th className="px-4 py-2 text-center font-semibold">New Balance</th>
-                                        <th className="px-4 py-2 text-right font-semibold">Opening Date</th>
+                                    <tr className="divide-x divide-border">
+                                        <th className="px-3 py-2 text-left font-bold bg-muted/50">Employee</th>
+                                        <th className="px-3 py-2 text-center font-bold bg-emerald-50 text-emerald-800" title="Earned Leave">EL Bal</th>
+                                        <th className="px-3 py-2 text-center font-bold bg-blue-50 text-blue-800" title="Sick Leave">SL Bal</th>
+                                        <th className="px-3 py-2 text-center font-bold bg-amber-50 text-amber-800" title="Comp Off">CO Bal</th>
+                                        <th className="px-3 py-2 text-center font-bold bg-purple-50 text-purple-800" title="Floating Holiday">FH Bal</th>
+                                        <th className="px-3 py-2 text-right font-bold text-muted">Updates</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {previewData.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-muted/10 transition-colors">
-                                            <td className="px-4 py-2 font-medium">{row.name}</td>
-                                            <td className="px-4 py-2 text-center text-emerald-700 font-bold">{row.earned_leave_opening_balance}</td>
-                                            <td className="px-4 py-2 text-right text-muted">{row.earned_leave_opening_date}</td>
+                                        <tr key={idx} className="hover:bg-muted/5 transition-colors divide-x divide-border">
+                                            <td className="px-3 py-2 font-medium truncate max-w-[150px]">{row.name}</td>
+                                            <td className="px-3 py-2 text-center font-bold bg-emerald-50/30 text-emerald-700">{row.earnedLeaveOpeningBalance}</td>
+                                            <td className="px-3 py-2 text-center font-bold bg-blue-50/30 text-blue-700">{row.sickLeaveOpeningBalance}</td>
+                                            <td className="px-3 py-2 text-center font-bold bg-amber-50/30 text-amber-700">{row.compOffOpeningBalance}</td>
+                                            <td className="px-3 py-2 text-center font-bold bg-purple-50/30 text-purple-700">{row.floatingLeaveOpeningBalance}</td>
+                                            <td className="px-3 py-2 text-right text-[10px] text-muted italic">
+                                                All types
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>

@@ -10,7 +10,8 @@ import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { api } from '../../services/api';
-import { User as UserIcon, Loader2, ClipboardList, LogOut, LogIn, Crosshair, CheckCircle, Info } from 'lucide-react';
+import { dispatchNotificationFromRules } from '../../services/notificationService';
+import { User as UserIcon, Loader2, ClipboardList, LogOut, LogIn, Crosshair, CheckCircle, Info, MapPin, AlertTriangle, Clock, Lock } from 'lucide-react';
 import { AvatarUpload } from '../../components/onboarding/AvatarUpload';
 import { format } from 'date-fns';
 import Modal from '../../components/ui/Modal';
@@ -45,21 +46,69 @@ const ProfilePage: React.FC = () => {
         lastBreakOutTime,
         totalBreakDurationToday,
         totalWorkingDurationToday,
-        checkAttendanceStatus 
+        checkAttendanceStatus,
+        dailyPunchCount,
+        isFieldCheckedIn 
     } = useAuthStore();
     const { permissions } = usePermissionsStore();
     const navigate = useNavigate();
 
     const [isSaving, setIsSaving] = useState(false);
     const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
-    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' | 'warning' } | null>(null);
     const [permissionStatus, setPermissionStatus] = useState<'prompt' | 'granted' | 'denied'>('prompt');
     
     // Interactive Hints State
     const [showPunchHint, setShowPunchHint] = useState(false);
     const [showBreakHint, setShowBreakHint] = useState(false);
+    
+    // Unlock Request State
+    const [unlockRequestStatus, setUnlockRequestStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+
+    // Punch Restriction: 1 punch-in per day, max 2 unlock requests (1st=duty, 2nd=OT)
+    const hasPunchedToday = (dailyPunchCount || 0) >= 1;
+    const isPunchUnlocked = useAuthStore(s => s.isPunchUnlocked);
+    const dailyUnlockRequestCount = useAuthStore(s => s.dailyUnlockRequestCount);
+    const approvedUnlockCount = useAuthStore(s => s.approvedUnlockCount);
+    // Max 2 unlock requests per day. After that, permanently blocked.
+    const isMaxRequestsReached = dailyUnlockRequestCount >= 2;
+    // Blocked if: Punched Today AND Not Currently Checked In AND (Not Unlocked OR max reached)
+    const isPunchBlocked = hasPunchedToday && !isCheckedIn && (!isPunchUnlocked || isMaxRequestsReached);
+    // Is the next unlock request for OT? (1st request = duty, 2nd = OT)
+    const isNextRequestOT = dailyUnlockRequestCount >= 1;
+
     const punchHintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const breakHintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Check for existing unlock request
+    useEffect(() => {
+        if (hasPunchedToday && !isPunchUnlocked) {
+            api.getMyUnlockRequest().then(req => {
+                if (req) {
+                    setUnlockRequestStatus(req.status);
+                }
+            });
+        }
+    }, [hasPunchedToday, isPunchUnlocked]);
+
+    // Show warning toast for blocked punch
+    useEffect(() => {
+        if (isPunchBlocked && unlockRequestStatus !== 'pending') {
+            if (isMaxRequestsReached && !isCheckedIn) {
+                setToast({ 
+                    message: 'Maximum 2 punch cycles reached for today.', 
+                    type: 'warning' 
+                });
+            } else {
+                setToast({ 
+                    message: isNextRequestOT
+                        ? 'Request manager approval for overtime (OT) punch.'
+                        : 'One punch-in allowed per day. Request approval for emergency punch.', 
+                    type: 'warning' 
+                });
+            }
+        }
+    }, [isPunchBlocked, unlockRequestStatus, isMaxRequestsReached]);
 
     const isMobile = useMediaQuery('(max-width: 767px)');
     const isMobileView = isMobile; // Apply mobile view for all users on mobile
@@ -344,68 +393,112 @@ const ProfilePage: React.FC = () => {
                                                             Punch in is required when starting the day, and Punch out when the day ends
                                                         </span>
                                                     )}
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <button
-                                                        onClick={() => navigate('/attendance/check-in')}
-                                                        disabled={isCheckedIn || isActionInProgress}
-                                                        className={`relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300 ${isCheckedIn ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' : 'bg-gradient-to-br from-emerald-600 to-emerald-800 text-white active:scale-95'}`}
-                                                    >
-                                                        <LogIn className={`h-4 w-4 ${!isCheckedIn ? 'animate-pulse' : ''}`} />
-                                                        <span className="font-bold text-[10px] uppercase tracking-wider">Punch In</span>
-                                                    </button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <Button
+                                                    onClick={() => {
+                                                        if (isPunchBlocked) {
+                                                            if (unlockRequestStatus === 'pending' || isMaxRequestsReached) return;
+                                                            navigate('/attendance/request-unlock');
+                                                            return;
+                                                        }
+                                                        navigate('/attendance/check-in');
+                                                    }}
+                                                    disabled={isCheckedIn || isActionInProgress || unlockRequestStatus === 'pending' || (isPunchBlocked && isMaxRequestsReached)}
+                                                    variant={isPunchBlocked ? 'secondary' : 'primary'}
+                                                    className={`attendance-action-btn ${isPunchBlocked ? '!bg-amber-600 !border-amber-600 !text-white' : ''} ${isPunchBlocked && isMaxRequestsReached ? '!opacity-50' : ''}`}
+                                                >
+                                                    {isPunchBlocked ? (
+                                                        unlockRequestStatus === 'pending' 
+                                                            ? <Clock className="mr-2 h-4 w-4" />
+                                                            : <Lock className="mr-2 h-4 w-4" />
+                                                    ) : <LogIn className={`mr-2 h-4 w-4 ${!isCheckedIn ? 'animate-pulse' : ''}`} />}
+                                                    {isPunchBlocked 
+                                                        ? (unlockRequestStatus === 'pending' 
+                                                            ? 'Pending' 
+                                                            : isMaxRequestsReached 
+                                                                ? 'Max Reached' 
+                                                                : isNextRequestOT 
+                                                                    ? 'Request OT' 
+                                                                    : 'Request Unlock') 
+                                                        : 'Punch In'}
+                                                </Button>
 
-                                                    <button
-                                                        onClick={() => navigate('/attendance/check-out')}
-                                                        disabled={!isCheckedIn || isOnBreak || isActionInProgress}
-                                                        className={`
-                                                            relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300
-                                                            ${(!isCheckedIn || isOnBreak)
-                                                                ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' 
-                                                                : 'bg-gradient-to-br from-rose-600 to-rose-800 text-white active:scale-95'
-                                                            }
-                                                        `}
-                                                    >
-                                                        <LogOut className="h-4 w-4" />
-                                                        <span className="font-bold text-[10px] uppercase tracking-wider">Punch Out</span>
-                                                    </button>
-                                                </div>
+                                                <Button
+                                                    onClick={() => navigate('/attendance/check-out')}
+                                                    disabled={!isCheckedIn || isOnBreak || isFieldCheckedIn || isActionInProgress || isPunchBlocked}
+                                                    variant="danger"
+                                                    className={`attendance-action-btn ${isPunchBlocked ? 'pointer-events-none opacity-50' : ''} ${(!isCheckedIn || isOnBreak || isFieldCheckedIn || isActionInProgress || isPunchBlocked) ? '' : '!bg-red-600 !border-red-700 !text-white'}`}
+                                                >
+                                                    <LogOut className="mr-2 h-4 w-4" />
+                                                    Punch Out
+                                                </Button>
+                                            </div>
+
+                                                {/* Field Staff Buttons - Only show once session is active */}
+                                                {(user?.role === 'field_staff' || user?.role === 'operation_manager') && isCheckedIn && !isPunchBlocked && (
+                                                    <div className="grid grid-cols-2 gap-3 pb-2 border-b border-white/5">
+                                                         <Button
+                                                             onClick={() => navigate("/attendance/check-in?workType=field")}
+                                                             disabled={isFieldCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked}
+                                                             variant="primary"
+                                                             className={`attendance-action-btn !bg-blue-600 !border-blue-700 ${isPunchBlocked ? 'pointer-events-none opacity-50' : ''}`}
+                                                         >
+                                                             <MapPin className="mr-2 h-4 w-4" />
+                                                             Check In
+                                                         </Button>
+ 
+                                                         <Button
+                                                             onClick={() => navigate("/attendance/check-out?workType=field")}
+                                                             disabled={!isFieldCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked}
+                                                             variant="secondary"
+                                                             className={`attendance-action-btn !bg-amber-600 !border-amber-700 !text-white ${isPunchBlocked ? 'pointer-events-none opacity-50' : ''}`}
+                                                         >
+                                                             <MapPin className="mr-2 h-4 w-4" />
+                                                             Check Out
+                                                         </Button>
+                                                    </div>
+                                                )}
                                             </div>
                                             
-                                            <div className="flex flex-col space-y-3">
-                                                <div className="flex items-center gap-2 px-0.5">
-                                                    <button 
-                                                        onClick={() => handleToggleHint('break')}
-                                                        className="focus:outline-none hover:scale-110 transition-all active:scale-95 !bg-transparent !border-none !p-0 !shadow-none !ring-0 flex items-center justify-center"
-                                                        title="Click for hint"
-                                                    >
-                                                        <Info className="h-5 w-5 text-blue-400" />
-                                                    </button>
-                                                    {showBreakHint && (
-                                                        <span className="text-base italic text-blue-100/70 font-medium leading-tight animate-in fade-in slide-in-from-left-2 duration-300">
-                                                            Break in when user goes for lunch is mandatory, or it will be a violation
-                                                        </span>
-                                                    )}
+                                             {isCheckedIn && (
+                                                <div className="flex flex-col space-y-3 pt-2 border-t border-white/5">
+                                                    <div className="flex items-center gap-2 px-0.5">
+                                                        <button 
+                                                            onClick={() => handleToggleHint('break')}
+                                                            className="focus:outline-none hover:scale-110 transition-all active:scale-95 !bg-transparent !border-none !p-0 !shadow-none !ring-0 flex items-center justify-center"
+                                                            title="Click for hint"
+                                                        >
+                                                            <Info className="h-5 w-5 text-blue-400" />
+                                                        </button>
+                                                        {showBreakHint && (
+                                                            <span className="text-base italic text-blue-100/70 font-medium leading-tight animate-in fade-in slide-in-from-left-2 duration-300">
+                                                                Break in when user goes for lunch is mandatory, or it will be a violation
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <Button
+                                                            onClick={() => navigate('/attendance/break-in')}
+                                                            disabled={!isCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked}
+                                                            variant="primary"
+                                                            className={`attendance-action-btn !bg-emerald-600 !border-emerald-700 ${isPunchBlocked ? 'pointer-events-none opacity-50' : ''}`}
+                                                        >
+                                                            <CheckCircle className="mr-2 h-4 w-4" />
+                                                            Break In
+                                                        </Button>
+                                                        <Button
+                                                            onClick={() => navigate('/attendance/break-out')}
+                                                            disabled={!isCheckedIn || !isOnBreak || isActionInProgress || isPunchBlocked}
+                                                            variant="primary"
+                                                            className={`attendance-action-btn !bg-emerald-600 !border-emerald-700 ${isPunchBlocked ? 'pointer-events-none opacity-50' : ''}`}
+                                                        >
+                                                            <CheckCircle className="mr-2 h-4 w-4" />
+                                                            Break Out
+                                                        </Button>
+                                                    </div>
                                                 </div>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <button
-                                                        onClick={() => navigate('/attendance/break-in')}
-                                                        disabled={!isCheckedIn || isOnBreak || isActionInProgress}
-                                                        className={`relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300 ${(!isCheckedIn || isOnBreak) ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' : 'bg-gradient-to-br from-blue-600 to-blue-800 text-white active:scale-95'}`}
-                                                    >
-                                                        <CheckCircle className="h-4 w-4" />
-                                                        <span className="font-bold text-[10px] uppercase tracking-wider">Break In</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => navigate('/attendance/break-out')}
-                                                        disabled={!isCheckedIn || !isOnBreak || isActionInProgress}
-                                                        className={`relative overflow-hidden rounded-xl py-3 px-4 flex flex-col items-center justify-center gap-1 transition-all duration-300 ${(!isCheckedIn || !isOnBreak) ? 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5' : 'bg-gradient-to-br from-amber-600 to-amber-800 text-white active:scale-95'}`}
-                                                    >
-                                                        <CheckCircle className="h-4 w-4" />
-                                                        <span className="font-bold text-[10px] uppercase tracking-wider">Break Out</span>
-                                                    </button>
-                                                </div>
-                                            </div>
+                                             )}
                                         </div>
                                     )}
                                 </div>
@@ -608,24 +701,71 @@ const ProfilePage: React.FC = () => {
                                                         </span>
                                                     )}
                                                 </div>
-                                            <div className="flex gap-4">
-                                                <Button
-                                                    onClick={() => navigate('/attendance/check-in')}
-                                                    variant="primary"
-                                                    className="flex-1 text-sm shadow-emerald-100 hover:shadow-emerald-200 transition-all font-bold uppercase tracking-wider"
-                                                    disabled={isCheckedIn || isActionInProgress}
-                                                >
-                                                    <LogIn className={`mr-2 h-4 w-4 ${!isCheckedIn ? 'animate-pulse' : ''}`} /> Punch In
-                                                </Button>
-                                                <Button
-                                                    onClick={() => navigate('/attendance/check-out')}
-                                                    variant="danger"
-                                                    className="flex-1 text-sm shadow-red-100 hover:shadow-red-200 transition-all font-bold uppercase tracking-wider"
-                                                    disabled={!isCheckedIn || isOnBreak || isActionInProgress}
-                                                >
-                                                    <LogOut className="mr-2 h-4 w-4" /> Punch Out
-                                                </Button>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="relative group">
+                                                       <Button
+                                                           onClick={() => {
+                                                               if (isPunchBlocked) {
+                                                                   if (unlockRequestStatus === 'pending' || isMaxRequestsReached) return;
+                                                                   navigate('/attendance/request-unlock');
+                                                                   
+                                                                   return;
+                                                               }
+                                                               navigate('/attendance/check-in');
+                                                           }}
+                                                           variant={isPunchBlocked ? 'secondary' : 'primary'}
+                                                           className={`attendance-action-btn shadow-lg transition-all ${
+                                                               isPunchBlocked ? '!bg-amber-600 !border-amber-600 !text-white shadow-amber-100/20' : 'shadow-emerald-100/20'
+                                                           } ${isPunchBlocked && isMaxRequestsReached ? '!opacity-50' : ''}`}
+                                                           disabled={isCheckedIn || isActionInProgress || unlockRequestStatus === 'pending' || (isPunchBlocked && isMaxRequestsReached)}
+                                                       >
+                                                          {isPunchBlocked ? (
+                                                              unlockRequestStatus === 'pending' 
+                                                                ? <Clock className="mr-2 h-4 w-4" /> 
+                                                                : <Lock className="mr-2 h-4 w-4" />
+                                                          ) : <LogIn className={`mr-2 h-4 w-4 ${!isCheckedIn ? 'animate-pulse' : ''}`} />}
+                                                          {isPunchBlocked 
+                                                              ? (unlockRequestStatus === 'pending' 
+                                                                  ? 'Pending' 
+                                                                  : isMaxRequestsReached 
+                                                                      ? 'Max Reached' 
+                                                                      : isNextRequestOT 
+                                                                          ? 'Request OT' 
+                                                                          : 'Request Unlock') 
+                                                              : 'Punch In'}
+                                                       </Button>
+                                                </div>
+                                                 <Button
+                                                     onClick={() => navigate('/attendance/check-out')}
+                                                     variant="danger"
+                                                     className={`attendance-action-btn shadow-lg shadow-red-100/20 transition-all ${isPunchBlocked ? 'pointer-events-none opacity-50' : ''}`}
+                                                     disabled={!isCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked}
+                                                 >
+                                                     <LogOut className="mr-2 h-4 w-4" /> Punch Out
+                                                 </Button>
                                             </div>
+
+                                            {/* Field Staff Buttons */}
+                                            {user?.role === 'field_staff' && (
+                                                <div className="grid grid-cols-2 gap-4 mt-4">
+                                                     <Button
+                                                         onClick={() => navigate('/attendance/check-in?workType=field')}
+                                                         variant="primary"
+                                                         className={`attendance-action-btn !bg-blue-600 hover:!bg-blue-700 !border-blue-600 shadow-lg shadow-blue-100/20 transition-all ${isPunchBlocked ? 'pointer-events-none opacity-50' : ''}`}
+                                                         disabled={isCheckedIn || isActionInProgress || isPunchBlocked}
+                                                     >
+                                                         <MapPin className="mr-2 h-4 w-4" /> Check In
+                                                     </Button>
+                                                     <Button
+                                                         onClick={() => navigate('/attendance/check-out?workType=field')}
+                                                         variant="secondary"
+                                                         className={`attendance-action-btn !bg-amber-600 hover:!bg-amber-700 !border-amber-600 !text-white shadow-lg shadow-amber-100/20 transition-all ${isPunchBlocked ? 'pointer-events-none opacity-50' : ''}`}
+                                                         disabled={!isCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked}
+                                                     >
+                                                         <MapPin className="mr-2 h-4 w-4" /> Check Out
+                                                     </Button>
+                                                </div>
+                                            )}
                                         </div>
 
 
@@ -644,21 +784,23 @@ const ProfilePage: React.FC = () => {
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="flex gap-4">
-                                                <Button
-                                                    onClick={() => navigate('/attendance/break-in')}
-                                                    className="flex-1 text-sm font-bold uppercase tracking-wider transition-all bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100 shadow-lg"
-                                                    disabled={!isCheckedIn || isOnBreak || isActionInProgress}
-                                                >
-                                                    <CheckCircle className="mr-2 h-4 w-4" /> Break In
-                                                </Button>
-                                                <Button
-                                                    onClick={() => navigate('/attendance/break-out')}
-                                                    className="flex-1 text-sm font-bold uppercase tracking-wider transition-all bg-amber-600 hover:bg-amber-700 text-white shadow-amber-100 shadow-lg"
-                                                    disabled={!isCheckedIn || !isOnBreak || isActionInProgress}
-                                                >
-                                                    <CheckCircle className="mr-2 h-4 w-4" /> Break Out
-                                                </Button>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                 <Button
+                                                     onClick={() => navigate('/attendance/break-in')}
+                                                     variant="primary"
+                                                     className={`attendance-action-btn !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 shadow-lg shadow-emerald-100/20 transition-all ${isPunchBlocked ? 'pointer-events-none opacity-50' : ''}`}
+                                                     disabled={!isCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked}
+                                                 >
+                                                     <CheckCircle className="mr-2 h-4 w-4" /> Break In
+                                                 </Button>
+                                                 <Button
+                                                     onClick={() => navigate('/attendance/break-out')}
+                                                     variant="primary"
+                                                     className={`attendance-action-btn !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 shadow-lg shadow-emerald-100/20 transition-all ${isPunchBlocked ? 'pointer-events-none opacity-50' : ''}`}
+                                                     disabled={!isCheckedIn || !isOnBreak || isActionInProgress || isPunchBlocked}
+                                                 >
+                                                     <CheckCircle className="mr-2 h-4 w-4" /> Break Out
+                                                 </Button>
                                             </div>
                                         </div>
                                     </div>
@@ -678,6 +820,7 @@ const ProfilePage: React.FC = () => {
                     </div>
                 </div>
             </div>
+
         </div>
     );
 };

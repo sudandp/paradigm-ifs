@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Search, MapPin, Clock, ChevronRight, User as UserIcon, Navigation, Users } from 'lucide-react';
+import { Search, MapPin, Clock, ChevronRight, User as UserIcon, Navigation, Users, CheckCircle, XCircle } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { formatDistanceToNow, isToday } from 'date-fns';
@@ -15,7 +15,7 @@ import { useDevice } from '../../hooks/useDevice';
 
 import { useAuthStore } from '../../store/authStore';
 import { useThemeStore } from '../../store/themeStore';
-import { User, AttendanceEvent } from '../../types';
+import { User, AttendanceEvent, AttendanceUnlockRequest } from '../../types';
 import Button from '../../components/ui/Button';
 import Pagination from '../../components/ui/Pagination';
 
@@ -89,6 +89,7 @@ const MyTeamPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(12);
   const [trackingInterval, setTrackingInterval] = useState<number>(15);
   const [isUpdatingInterval, setIsUpdatingInterval] = useState(false);
+  const [unlockRequests, setUnlockRequests] = useState<AttendanceUnlockRequest[]>([]);
   
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -103,6 +104,7 @@ const MyTeamPage: React.FC = () => {
     document.head.appendChild(styleSheet);
     
     fetchTeamData();
+    fetchUnlockRequests();
     fetchSettings(); // Call fetchSettings here
     
     return () => {
@@ -187,6 +189,25 @@ const MyTeamPage: React.FC = () => {
     } catch (err) {
       console.error('Error fetching team data:', err);
       setLoading(false);
+    }
+  };
+
+  const fetchUnlockRequests = async () => {
+    if (!user || user.role === 'field_staff') return;
+    try {
+      const requests = await api.getAttendanceUnlockRequests();
+      setUnlockRequests(requests);
+    } catch (err) {
+      console.error('Error fetching unlock requests:', err);
+    }
+  };
+
+  const handleRespondToUnlock = async (requestId: string, status: 'approved' | 'rejected') => {
+    try {
+      await api.respondToUnlockRequest(requestId, status);
+      setUnlockRequests(prev => prev.filter(r => r.id !== requestId));
+    } catch (err) {
+      console.error('Error responding to request:', err);
     }
   };
 
@@ -435,6 +456,52 @@ const MyTeamPage: React.FC = () => {
                   </Button>
                 </div>
             </div>
+        )}
+
+        {/* Pending Unlock Requests */}
+        {unlockRequests.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-bold text-amber-600 flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Pending Unlock Requests ({unlockRequests.length})
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {unlockRequests.map(req => (
+                <div key={req.id} className="bg-amber-50 border border-amber-100 rounded-2xl p-4 shadow-sm space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center font-bold text-amber-700 overflow-hidden relative">
+                      {req.userName.charAt(0)}
+                      {req.userPhoto && <img src={req.userPhoto} alt={req.userName} className="absolute inset-0 w-full h-full object-cover" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-gray-900 truncate">{req.userName}</p>
+                      <p className="text-[10px] text-amber-700">{formatDistanceToNow(new Date(req.requestedAt))} ago</p>
+                    </div>
+                  </div>
+                  <div className="bg-white/50 rounded-xl p-3 border border-amber-100/50">
+                    <p className="text-xs text-gray-700 italic">"{req.reason}"</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 border-none text-[10px] uppercase font-bold"
+                      onClick={() => handleRespondToUnlock(req.id, 'approved')}
+                    >
+                      <CheckCircle className="w-3 h-3 mr-1" /> Approve
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="flex-1 border-amber-200 text-amber-700 hover:bg-amber-100 text-[10px] uppercase font-bold"
+                      onClick={() => handleRespondToUnlock(req.id, 'rejected')}
+                    >
+                      <XCircle className="w-3 h-3 mr-1" /> Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
       {/* Map View */}

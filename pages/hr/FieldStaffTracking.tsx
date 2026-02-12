@@ -12,6 +12,29 @@ import { useThemeStore } from '../../store/themeStore';
 import { reverseGeocode } from '../../utils/locationUtils';
 import Pagination from '../../components/ui/Pagination';
 
+// Maps raw event type strings to user-friendly display labels.
+// Uses the workType field to distinguish office ("Punch In/Out") from
+// field ("Check In/Out") events. Break events are labelled uniformly.
+const getEventLabel = (type: string, workType?: 'office' | 'field'): string => {
+    if (workType === 'field') {
+        const fieldLabels: Record<string, string> = {
+            'check-in': 'Check In',
+            'check-out': 'Check Out',
+            'break-in': 'Break In',
+            'break-out': 'Break Out',
+        };
+        return fieldLabels[type] || type.replace('-', ' ');
+    }
+    // Default (office / undefined workType) → "Punch In" / "Punch Out"
+    const officeLabels: Record<string, string> = {
+        'check-in': 'Punch In',
+        'check-out': 'Punch Out',
+        'break-in': 'Break In',
+        'break-out': 'Break Out',
+    };
+    return officeLabels[type] || type.replace('-', ' ');
+};
+
 // Helper component to resolve GPS coordinates into a text address
 const ResolveAddress: React.FC<{ lat: number, lng: number, fallback?: string | null, knownLocations: Location[] }> = ({ lat, lng, fallback, knownLocations }) => {
     const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
@@ -283,7 +306,7 @@ const MobileActivityCard: React.FC<{ event: (AttendanceEvent & { userName: strin
         <div className="p-3 space-y-3 text-sm">
             <div className="flex justify-between items-center">
                 <span className="text-muted font-medium">Event</span>
-                <span className="font-semibold capitalize text-primary-text">{event.type.replace('-', ' ')}</span>
+                <span className="font-semibold text-primary-text">{getEventLabel(event.type, event.workType)}</span>
             </div>
             <div className="flex justify-between items-center">
                 <span className="text-muted font-medium">Timestamp</span>
@@ -437,7 +460,7 @@ const FieldStaffTracking: React.FC = () => {
                             paginatedEvents.map((event) => (
                                 <tr key={event.id}>
                                     <td data-label="User" className="px-6 py-4 font-medium" style={{width: '15%'}}>{event.userName}</td>
-                                    <td data-label="Event" className="px-6 py-4 capitalize" style={{width: '12%'}}>{event.type.replace('-', ' ')}</td>
+                                    <td data-label="Event" className="px-6 py-4" style={{width: '12%'}}>{getEventLabel(event.type, event.workType)}</td>
                                     <td data-label="Timestamp" className="px-6 py-4 text-sm text-muted" style={{width: '18%'}}>{format(new Date(event.timestamp), 'dd MMM, yyyy - hh:mm a')}</td>
                                     <td data-label="Location" className="px-6 py-4 text-sm text-muted" style={{width: '55%', maxWidth: '400px'}}>
                                         <div className="flex flex-col gap-1 break-words">

@@ -95,6 +95,10 @@ export interface User {
   earnedLeaveOpeningDate?: string; // YYYY-MM-DD
   sickLeaveOpeningBalance?: number;
   sickLeaveOpeningDate?: string; // YYYY-MM-DD
+  compOffOpeningBalance?: number;
+  compOffOpeningDate?: string; // YYYY-MM-DD
+  floatingLeaveOpeningBalance?: number;
+  floatingLeaveOpeningDate?: string; // YYYY-MM-DD
 }
 
 export interface BiometricDevice {
@@ -666,6 +670,8 @@ export interface AttendanceEvent {
   isManual?: boolean;
   createdBy?: string;
   reason?: string;
+  /** True when this event belongs to an overtime (2nd+) punch cycle. */
+  isOt?: boolean;
 }
 
 // -----------------------------------------------------------------------------
@@ -798,6 +804,8 @@ export interface AttendanceViolation {
   id: string;
   userId: string;
   violationDate: string; // ISO String
+  type: string;
+  reason?: string;
   locationName?: string | null;
   attemptedLatitude?: number | null;
   attemptedLongitude?: number | null;
@@ -806,6 +814,19 @@ export interface AttendanceViolation {
   violationMonth: string; // 'YYYY-MM'
   adminNote?: string | null;
   createdAt: string; // ISO String
+}
+
+export interface AttendanceUnlockRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userPhoto?: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: string; // ISO String
+  managerId?: string;
+  respondedAt?: string; // ISO String
+  rejectionReason?: string;
 }
 
 export interface ViolationReset {
@@ -1113,7 +1134,8 @@ export type NotificationType =
   | 'security'
   | 'info'
   | 'warning'
-  | 'greeting';
+  | 'greeting'
+  | 'approval_request';
 
 export interface Notification {
   id: string;
@@ -1133,6 +1155,7 @@ export interface NotificationRule {
   recipientRole?: string;
   recipientUserId?: string;
   isEnabled: boolean;
+  sendAlert: boolean;
   createdAt: string;
   updatedAt: string;
 }

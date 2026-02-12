@@ -34,6 +34,12 @@ const createUserSchema = yup.object({
   biometricId: yup.string().optional().nullable(),
   earnedLeaveOpeningBalance: yup.number().optional().nullable().transform((value) => (isNaN(value) ? 0 : value)).default(0),
   earnedLeaveOpeningDate: yup.string().optional().nullable(),
+  sickLeaveOpeningBalance: yup.number().optional().nullable().transform((value) => (isNaN(value) ? 0 : value)).default(0),
+  sickLeaveOpeningDate: yup.string().optional().nullable(),
+  compOffOpeningBalance: yup.number().optional().nullable().transform((value) => (isNaN(value) ? 0 : value)).default(0),
+  compOffOpeningDate: yup.string().optional().nullable(),
+  floatingLeaveOpeningBalance: yup.number().optional().nullable().transform((value) => (isNaN(value) ? 0 : value)).default(0),
+  floatingLeaveOpeningDate: yup.string().optional().nullable(),
 }).defined();
 
 const editUserSchema = yup.object({
@@ -54,6 +60,12 @@ const editUserSchema = yup.object({
   biometricId: yup.string().optional().nullable(),
   earnedLeaveOpeningBalance: yup.number().optional().nullable().transform((value) => (isNaN(value) ? 0 : value)).default(0),
   earnedLeaveOpeningDate: yup.string().optional().nullable(),
+  sickLeaveOpeningBalance: yup.number().optional().nullable().transform((value) => (isNaN(value) ? 0 : value)).default(0),
+  sickLeaveOpeningDate: yup.string().optional().nullable(),
+  compOffOpeningBalance: yup.number().optional().nullable().transform((value) => (isNaN(value) ? 0 : value)).default(0),
+  compOffOpeningDate: yup.string().optional().nullable(),
+  floatingLeaveOpeningBalance: yup.number().optional().nullable().transform((value) => (isNaN(value) ? 0 : value)).default(0),
+  floatingLeaveOpeningDate: yup.string().optional().nullable(),
 }).defined();
 
 const AddUserPage: React.FC = () => {
@@ -259,24 +271,81 @@ const AddUserPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="pt-4 border-t border-gray-100">
-                <h3 className="text-sm font-semibold text-primary-text mb-4">Earned Leave Initial Balance</h3>
-                <div className="space-y-4">
-                  <Input 
-                    label="Opening Balance (Days)" 
-                    type="number" 
-                    step="0.5" 
-                    registration={register('earnedLeaveOpeningBalance')} 
-                    error={errors.earnedLeaveOpeningBalance?.message}
-                    description="The number of earned leaves the employee has as of the opening date."
-                  />
-                  <Input 
-                    label="Opening Date" 
-                    type="date" 
-                    registration={register('earnedLeaveOpeningDate')} 
-                    error={errors.earnedLeaveOpeningDate?.message}
-                    description="The date from which dynamic accrual will start calculating (or when the opening balance was valid)."
-                  />
+              <div className="pt-4 border-t border-gray-100 space-y-6">
+                <div>
+                  <h3 className="text-sm font-semibold text-primary-text mb-4">Earned Leave Initial Balance</h3>
+                  <div className="space-y-4">
+                    <Input 
+                      label="Opening Balance (Days)" 
+                      type="number" 
+                      step="0.5" 
+                      registration={register('earnedLeaveOpeningBalance')} 
+                      error={errors.earnedLeaveOpeningBalance?.message}
+                    />
+                    <Input 
+                      label="Opening Date" 
+                      type="date" 
+                      registration={register('earnedLeaveOpeningDate')} 
+                      error={errors.earnedLeaveOpeningDate?.message}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-primary-text mb-4">Sick Leave Initial Balance</h3>
+                  <div className="space-y-4">
+                    <Input 
+                      label="Opening Balance (Days)" 
+                      type="number" 
+                      step="0.5" 
+                      registration={register('sickLeaveOpeningBalance')} 
+                      error={errors.sickLeaveOpeningBalance?.message}
+                    />
+                    <Input 
+                      label="Opening Date" 
+                      type="date" 
+                      registration={register('sickLeaveOpeningDate')} 
+                      error={errors.sickLeaveOpeningDate?.message}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-primary-text mb-4">Comp Off Initial Balance</h3>
+                  <div className="space-y-4">
+                    <Input 
+                      label="Opening Balance (Days)" 
+                      type="number" 
+                      step="0.5" 
+                      registration={register('compOffOpeningBalance')} 
+                      error={errors.compOffOpeningBalance?.message}
+                    />
+                    <Input 
+                      label="Opening Date" 
+                      type="date" 
+                      registration={register('compOffOpeningDate')} 
+                      error={errors.compOffOpeningDate?.message}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-primary-text mb-4">Floating Leave Initial Balance</h3>
+                  <div className="space-y-4">
+                    <Input 
+                      label="Opening Balance (Days)" 
+                      type="number" 
+                      step="0.5" 
+                      registration={register('floatingLeaveOpeningBalance')} 
+                      error={errors.floatingLeaveOpeningBalance?.message}
+                    />
+                    <Input 
+                      label="Opening Date" 
+                      type="date" 
+                      registration={register('floatingLeaveOpeningDate')} 
+                      error={errors.floatingLeaveOpeningDate?.message}
+                    />
+                  </div>
                 </div>
               </div>
             </form>
@@ -385,27 +454,100 @@ const AddUserPage: React.FC = () => {
             </div>
           )}
 
-          <div className="pt-6 border-t border-gray-100">
-            <h3 className="text-lg font-semibold text-primary-text mb-4 flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-accent" />
-              Earned Leave Initial Balance
+          <div className="pt-6 border-t border-gray-100 space-y-8">
+            <h3 className="text-xl font-bold text-primary-text flex items-center gap-2 mb-2">
+              <Calendar className="h-6 w-6 text-accent" />
+              Leave Balance Initialization
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <Input 
-                label="Opening Balance (Days)" 
-                type="number" 
-                step="0.5" 
-                registration={register('earnedLeaveOpeningBalance')} 
-                error={errors.earnedLeaveOpeningBalance?.message}
-                description="Initial earned leave balance."
-              />
-              <Input 
-                label="Opening Date" 
-                type="date" 
-                registration={register('earnedLeaveOpeningDate')} 
-                error={errors.earnedLeaveOpeningDate?.message}
-                description="Accrual start date."
-              />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+              {/* Earned Leave */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg inline-block text-sm">Earned Leave</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input 
+                    label="Opening Balance (Days)" 
+                    type="number" 
+                    step="0.5" 
+                    registration={register('earnedLeaveOpeningBalance')} 
+                    error={errors.earnedLeaveOpeningBalance?.message}
+                    description="Initial balance."
+                  />
+                  <Input 
+                    label="Opening Date" 
+                    type="date" 
+                    registration={register('earnedLeaveOpeningDate')} 
+                    error={errors.earnedLeaveOpeningDate?.message}
+                    description="Start date."
+                  />
+                </div>
+              </div>
+
+              {/* Sick Leave */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg inline-block text-sm">Sick Leave</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input 
+                    label="Opening Balance (Days)" 
+                    type="number" 
+                    step="0.5" 
+                    registration={register('sickLeaveOpeningBalance')} 
+                    error={errors.sickLeaveOpeningBalance?.message}
+                    description="Initial balance."
+                  />
+                  <Input 
+                    label="Opening Date" 
+                    type="date" 
+                    registration={register('sickLeaveOpeningDate')} 
+                    error={errors.sickLeaveOpeningDate?.message}
+                    description="Start date."
+                  />
+                </div>
+              </div>
+
+              {/* Comp Off */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg inline-block text-sm">Comp Off</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input 
+                    label="Opening Balance (Days)" 
+                    type="number" 
+                    step="0.5" 
+                    registration={register('compOffOpeningBalance')} 
+                    error={errors.compOffOpeningBalance?.message}
+                    description="Initial balance."
+                  />
+                  <Input 
+                    label="Opening Date" 
+                    type="date" 
+                    registration={register('compOffOpeningDate')} 
+                    error={errors.compOffOpeningDate?.message}
+                    description="Start date."
+                  />
+                </div>
+              </div>
+
+              {/* Floating Leave */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-purple-700 bg-purple-50 px-3 py-1.5 rounded-lg inline-block text-sm">Floating Leave</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input 
+                    label="Opening Balance (Days)" 
+                    type="number" 
+                    step="0.5" 
+                    registration={register('floatingLeaveOpeningBalance')} 
+                    error={errors.floatingLeaveOpeningBalance?.message}
+                    description="Initial balance."
+                  />
+                  <Input 
+                    label="Opening Date" 
+                    type="date" 
+                    registration={register('floatingLeaveOpeningDate')} 
+                    error={errors.floatingLeaveOpeningDate?.message}
+                    description="Start date."
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

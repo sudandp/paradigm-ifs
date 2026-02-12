@@ -343,8 +343,8 @@ const AttendanceSettings: React.FC = () => {
                     </div>
                 </section>
 
-                    {/* Fixed Office Hours - Not applicable for Field Staff */}
-                    {activeTab !== 'field' && (
+                    {/* Fixed Office Hours - Applicable for Office AND Field Staff now */}
+                    {(activeTab === 'office' || activeTab === 'field' || activeTab === 'admin' || activeTab === 'management') && (
                     <section className="pt-6 border-t border-border">
                         <h3 className="text-lg font-semibold text-primary-text mb-4 flex items-center"><Clock className="mr-2 h-5 w-5 text-muted" />Fixed Office Hours</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
