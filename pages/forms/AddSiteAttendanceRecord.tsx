@@ -168,6 +168,7 @@ const AddSiteAttendanceRecord: React.FC = () => {
                             type="number"
                             value={record.contractAmount ?? ''}
                             onChange={(e) => handleInputChange('contractAmount', e.target.value)}
+                            onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
                             placeholder="Enter contract amount"
                             icon={<IndianRupee className="h-4 w-4" />}
                         />
@@ -178,7 +179,9 @@ const AddSiteAttendanceRecord: React.FC = () => {
                             type="number"
                             value={record.contractManagementFee ?? ''}
                             onChange={(e) => handleInputChange('contractManagementFee', e.target.value)}
+                            onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
                             placeholder="Enter management fee"
+                            icon={<IndianRupee className="h-4 w-4" />}
                         />
                     </div>
                 </div>
@@ -197,6 +200,7 @@ const AddSiteAttendanceRecord: React.FC = () => {
                             type="number"
                             value={record.billedAmount ?? ''}
                             onChange={(e) => handleInputChange('billedAmount', e.target.value)}
+                            onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
                             placeholder="Enter billed amount"
                             icon={<IndianRupee className="h-4 w-4" />}
                         />
@@ -207,7 +211,9 @@ const AddSiteAttendanceRecord: React.FC = () => {
                             type="number"
                             value={record.billedManagementFee ?? ''}
                             onChange={(e) => handleInputChange('billedManagementFee', e.target.value)}
+                            onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
                             placeholder="Enter management fee"
+                            icon={<IndianRupee className="h-4 w-4" />}
                         />
                     </div>
                 </div>

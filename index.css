@@ -683,6 +683,10 @@ body {
     input::placeholder, textarea::placeholder {
         color: rgba(255, 255, 255, 0.5) !important;
     }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+        cursor: pointer;
+    }
     .bg-white, .md\:bg-white, .bg-card, [class*="card"] {
         background-color: #041b0f !important;
         background-image: none !important;
@@ -723,6 +727,10 @@ body {
     body {
         font-size: 15px !important;
     }
+
+.pro-dark-theme input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+}
     h1 {
         font-size: 1.75rem !important;
         font-weight: 700 !important;
