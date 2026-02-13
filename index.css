@@ -1666,11 +1666,11 @@ body.pro-dark-theme, body.pro-dark-theme #root, .pro-dark-theme .bg-page {
 
 @media (max-width: 767px) {
     .glass-mobile {
-        background: rgba(0, 0, 0, 0.25) !important;
-        backdrop-filter: blur(35px) !important;
-        -webkit-backdrop-filter: blur(35px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.15) !important;
-        box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.85) !important;
+        background: rgba(0, 0, 0, 0.5) !important;
+        backdrop-filter: blur(50px) !important;
+        -webkit-backdrop-filter: blur(50px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        box-shadow: 0 15px 50px 0 rgba(0, 0, 0, 0.9) !important;
     }
 }
 
