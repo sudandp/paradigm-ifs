@@ -52,8 +52,10 @@ const MobileLayout: React.FC = () => {
             {/* Hide global header for specific standalone pages like Apply for Leave or Site Attendance Tracker */}
             {!location.pathname.startsWith('/leaves/apply') && 
              !location.pathname.startsWith('/onboarding/aadhaar-scan') && 
-             !location.pathname.startsWith('/billing/site-attendance-tracker/add') && 
-             !location.pathname.startsWith('/billing/site-attendance-tracker/edit') && (
+             !location.pathname.startsWith('/finance/attendance/add') && 
+             !location.pathname.startsWith('/finance/attendance/edit') && 
+             !location.pathname.startsWith('/finance/site-tracker/add') && 
+             !location.pathname.startsWith('/finance/site-tracker/edit') && (
                 <div
                     className={`sticky top-0 z-50 transition-transform duration-200 ${isHeaderVisible ? 'translate-y-0' : '-translate-y-full'
                         }`}
@@ -67,7 +69,7 @@ const MobileLayout: React.FC = () => {
             <main
                 className="flex-1 overflow-y-auto px-4 pt-2"
                 style={{ 
-                    paddingBottom: (location.pathname.startsWith('/billing/site-attendance-tracker/add') || location.pathname.startsWith('/billing/site-attendance-tracker/edit'))
+                    paddingBottom: (location.pathname.includes('/add') || location.pathname.includes('/edit'))
                         ? 'env(safe-area-inset-bottom)' 
                         : 'calc(9.1rem + env(safe-area-inset-bottom))' 
                 }}
@@ -76,8 +78,8 @@ const MobileLayout: React.FC = () => {
             </main>
 
             {/* Bottom Navigation */}
-            {!location.pathname.startsWith('/billing/site-attendance-tracker/add') && 
-             !location.pathname.startsWith('/billing/site-attendance-tracker/edit') && (
+            {!location.pathname.includes('/add') && 
+             !location.pathname.includes('/edit') && (
                 <BottomNav />
             )}
 

@@ -10,7 +10,7 @@ import type {
   ExtraWorkLog, PerfiosVerificationData, HolidayListItem, UniformRequestItem, IssuedTool, RecurringHolidayRule,
   BiometricDevice, ChecklistTemplate, FieldReport, FieldAttendanceViolation,
   NotificationRule, NotificationType, Company, GmcPolicySettings, StaffAttendanceRules,
-  GmcSubmission, UserHoliday, AttendanceUnlockRequest, LeaveType, SiteAttendanceRecord
+  GmcSubmission, UserHoliday, AttendanceUnlockRequest, LeaveType, SiteAttendanceRecord, SiteInvoiceRecord, SiteInvoiceDefault, SiteFinanceRecord
 } from '../types';
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { 
@@ -322,6 +322,76 @@ export const api = {
 
   deleteSiteAttendanceRecord: async (id: string): Promise<void> => {
     const { error } = await supabase.from('site_attendance_tracker').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  getSiteInvoiceRecords: async (): Promise<SiteInvoiceRecord[]> => {
+    const { data, error } = await supabase
+      .from('site_invoice_tracker')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
+
+  saveSiteInvoiceRecord: async (record: Partial<SiteInvoiceRecord>): Promise<SiteInvoiceRecord> => {
+    const { id, sNo, createdAt, updatedAt, ...rest } = record;
+    const dbData = toSnakeCase(rest);
+    let query;
+    if (id) {
+      query = supabase.from('site_invoice_tracker').update(dbData).eq('id', id);
+    } else {
+      query = supabase.from('site_invoice_tracker').insert(dbData);
+    }
+    const { data, error } = await query.select().single();
+    if (error) throw error;
+    return toCamelCase(data);
+  },
+
+  deleteSiteInvoiceRecord: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('site_invoice_tracker').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // --- Site Invoice Defaults (Auto-fill templates) ---
+  getSiteInvoiceDefaults: async (): Promise<SiteInvoiceDefault[]> => {
+    const { data, error } = await supabase
+      .from('site_invoice_defaults')
+      .select('*')
+      .order('site_name');
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
+
+  saveSiteInvoiceDefault: async (record: Partial<SiteInvoiceDefault>): Promise<SiteInvoiceDefault> => {
+    const { id, createdAt, updatedAt, ...rest } = record;
+    const dbData = toSnakeCase(rest);
+    let query;
+    if (id) {
+      query = supabase.from('site_invoice_defaults').update(dbData).eq('id', id);
+    } else {
+      query = supabase.from('site_invoice_defaults').upsert(dbData, { onConflict: 'site_id' });
+    }
+    const { data, error } = await query.select().single();
+    if (error) throw error;
+    return toCamelCase(data);
+  },
+
+  bulkSaveSiteInvoiceDefaults: async (records: Partial<SiteInvoiceDefault>[]): Promise<void> => {
+    const dbRecords = records.map(r => {
+      const { id, createdAt, updatedAt, ...rest } = r;
+      return toSnakeCase(rest);
+    });
+    const { error } = await supabase.from('site_invoice_defaults').upsert(dbRecords, { onConflict: 'site_id' });
+    if (error) throw error;
+  },
+
+  bulkSaveSiteInvoiceRecords: async (records: Partial<SiteInvoiceRecord>[]): Promise<void> => {
+    const dbRecords = records.map(r => {
+      const { id, sNo, createdAt, updatedAt, ...rest } = r;
+      return toSnakeCase(rest);
+    });
+    const { error } = await supabase.from('site_invoice_tracker').insert(dbRecords);
     if (error) throw error;
   },
 
@@ -3999,5 +4069,38 @@ export const api = {
     } catch (error) {
       console.error('Error processing field attendance violations:', error);
     }
+  }
+,
+  // Site Finance
+  async getSiteFinanceRecords(billingMonth: string): Promise<SiteFinanceRecord[]> {
+    const { data, error } = await supabase
+      .from('site_finance_tracker')
+      .select('*')
+      .eq('billing_month', billingMonth)
+      .order('site_name');
+
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
+
+  async saveSiteFinanceRecord(record: Partial<SiteFinanceRecord>): Promise<SiteFinanceRecord> {
+    const dbRecord = toSnakeCase(record);
+    const { data, error } = await supabase
+      .from('site_finance_tracker')
+      .upsert(dbRecord)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return toCamelCase(data);
+  },
+
+  async bulkSaveSiteFinanceRecords(records: Partial<SiteFinanceRecord>[]): Promise<void> {
+    const dbRecords = records.map(r => {
+      const { id, createdAt, updatedAt, ...rest } = r;
+      return toSnakeCase(rest);
+    });
+    const { error } = await supabase.from('site_finance_tracker').upsert(dbRecords);
+    if (error) throw error;
   }
 };

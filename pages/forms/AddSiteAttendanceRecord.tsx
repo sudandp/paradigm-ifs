@@ -1,13 +1,13 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../services/api';
-import type { SiteAttendanceRecord, Organization } from '../../types';
+import type { SiteInvoiceRecord, SiteInvoiceDefault, Organization } from '../../types';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
-import { Save, ArrowLeft, ClipboardList, IndianRupee, TrendingUp, TrendingDown, Building, Calendar } from 'lucide-react';
+import { Save, ArrowLeft, ClipboardList, TrendingUp, Building, Calendar, Users, Briefcase, FileText, Clock } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
-import { format } from 'date-fns';
+import { format, getDate, getMonth, getYear, set, parseISO } from 'date-fns';
 
 const AddSiteAttendanceRecord: React.FC = () => {
     const navigate = useNavigate();
@@ -15,38 +15,59 @@ const AddSiteAttendanceRecord: React.FC = () => {
     const isEditing = !!id;
     const isMobile = useMediaQuery('(max-width: 767px)');
 
-    const [isLoading, setIsLoading] = useState(true);
+     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [sites, setSites] = useState<Organization[]>([]);
-    const [record, setRecord] = useState<Partial<SiteAttendanceRecord>>({
+    const [record, setRecord] = useState<Partial<SiteInvoiceRecord>>({
         siteId: '',
         siteName: '',
-        billingDate: format(new Date(), 'yyyy-MM-dd'),
-        contractAmount: undefined,
-        contractManagementFee: undefined,
-        billedAmount: undefined,
-        billedManagementFee: undefined,
-        billingDifference: 0,
-        managementFeeDifference: 0,
-        variationStatus: 'Profit'
+        companyName: '',
+        billingCycle: '',
+        opsRemarks: '',
+        hrRemarks: '',
+        financeRemarks: '',
+        opsIncharge: '',
+        hrIncharge: '',
+        invoiceIncharge: '',
+        managerTentativeDate: '',
+        managerReceivedDate: '',
+        hrTentativeDate: '',
+        hrReceivedDate: '',
+        attendanceReceivedTime: '',
+        invoiceSharingTentativeDate: '',
+        invoicePreparedDate: '',
+        invoiceSentDate: '',
+        invoiceSentTime: '',
+        invoiceSentMethodRemarks: ''
     });
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+    const BILLING_CYCLES = ['1st Billing Cycle', '2nd Billing Cycle', '3rd Billing Cycle'];
+    const OPS_INCHARGE_OPTIONS = ['Sandeep', 'Shilpa', 'Isaac', 'Venkat'];
+    const HR_INCHARGE_OPTIONS = ['Chandana', 'Pooja', 'Kavya'];
+    const INVOICE_INCHARGE_OPTIONS = ['Arpitha', 'Sinchana'];
+
+    const [siteDefaults, setSiteDefaults] = useState<SiteInvoiceDefault[]>([]);
 
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                const fetchedSites = await api.getOrganizations();
+                const [fetchedSites, fetchedDefaults] = await Promise.all([
+                    api.getOrganizations(),
+                    api.getSiteInvoiceDefaults()
+                ]);
                 setSites(fetchedSites);
+                setSiteDefaults(fetchedDefaults);
 
                 if (isEditing && id) {
-                    const records = await api.getSiteAttendanceRecords();
+                    const records = await api.getSiteInvoiceRecords();
                     const existingRecord = records.find(r => r.id === id);
                     if (existingRecord) {
                         setRecord(existingRecord);
                     } else {
                         setToast({ message: 'Record not found', type: 'error' });
-                        setTimeout(() => navigate('/billing/site-attendance-tracker'), 2000);
+                        setTimeout(() => navigate('/finance?tab=attendance'), 2000);
                     }
                 }
             } catch (error) {
@@ -59,26 +80,45 @@ const AddSiteAttendanceRecord: React.FC = () => {
         fetchData();
     }, [id, isEditing, navigate]);
 
-    const handleInputChange = (field: keyof SiteAttendanceRecord, value: any) => {
+    const handleInputChange = (field: keyof SiteInvoiceRecord, value: any) => {
         setRecord(prev => {
             const updated = { ...prev, [field]: value };
-
-            // Auto-calculate differences
-            if (['contractAmount', 'billedAmount', 'contractManagementFee', 'billedManagementFee'].includes(field as string)) {
-                const billedAmount = field === 'billedAmount' ? (value === '' ? 0 : Number(value)) : Number(updated.billedAmount || 0);
-                const contractAmount = field === 'contractAmount' ? (value === '' ? 0 : Number(value)) : Number(updated.contractAmount || 0);
-                const billedFee = field === 'billedManagementFee' ? (value === '' ? 0 : Number(value)) : Number(updated.billedManagementFee || 0);
-                const contractFee = field === 'contractManagementFee' ? (value === '' ? 0 : Number(value)) : Number(updated.contractManagementFee || 0);
-
-                updated.billingDifference = billedAmount - contractAmount;
-                updated.managementFeeDifference = billedFee - contractFee;
-                updated.variationStatus = updated.billingDifference >= 0 ? 'Profit' : 'Loss';
-            }
 
             if (field === 'siteId') {
                 const site = sites.find(s => s.id === value);
                 if (site) {
                     updated.siteName = site.shortName;
+                }
+                // Auto-fill from defaults
+                const defaults = siteDefaults.find(d => d.siteId === value);
+                if (defaults) {
+                    updated.companyName = defaults.companyName || updated.companyName;
+                    updated.billingCycle = defaults.billingCycle || updated.billingCycle;
+                    updated.opsIncharge = defaults.opsIncharge || updated.opsIncharge;
+                    updated.hrIncharge = defaults.hrIncharge || updated.hrIncharge;
+                    updated.invoiceIncharge = defaults.invoiceIncharge || updated.invoiceIncharge;
+
+                    // Dynamic Date Adjustment: Use the day from defaults, but current Year & Month
+                    const adjustDateToCurrentPeriod = (dateStr: string | undefined): string => {
+                        if (!dateStr) return '';
+                        try {
+                            const defaultDate = parseISO(dateStr);
+                            const today = new Date();
+                            const adjustedDate = set(today, { 
+                                date: getDate(defaultDate),
+                                month: getMonth(today), 
+                                year: getYear(today) 
+                            });
+                            return format(adjustedDate, 'yyyy-MM-dd');
+                        } catch (e) {
+                            console.error('Date adjustment error:', e);
+                            return '';
+                        }
+                    };
+
+                    updated.managerTentativeDate = adjustDateToCurrentPeriod(defaults.managerTentativeDate) || updated.managerTentativeDate;
+                    updated.hrTentativeDate = adjustDateToCurrentPeriod(defaults.hrTentativeDate) || updated.hrTentativeDate;
+                    updated.invoiceSharingTentativeDate = adjustDateToCurrentPeriod(defaults.invoiceSharingTentativeDate) || updated.invoiceSharingTentativeDate;
                 }
             }
 
@@ -88,24 +128,16 @@ const AddSiteAttendanceRecord: React.FC = () => {
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!record.siteId || !record.billingDate) {
-            setToast({ message: 'Please select a site and date', type: 'error' });
+        if (!record.siteId || !record.siteName) {
+            setToast({ message: 'Please select a site', type: 'error' });
             return;
         }
 
         setIsSaving(true);
         try {
-            // Ensure numeric fields are numbers before saving
-            const recordToSave = {
-                ...record,
-                contractAmount: Number(record.contractAmount || 0),
-                contractManagementFee: Number(record.contractManagementFee || 0),
-                billedAmount: Number(record.billedAmount || 0),
-                billedManagementFee: Number(record.billedManagementFee || 0),
-            };
-            await api.saveSiteAttendanceRecord(recordToSave);
+            await api.saveSiteInvoiceRecord(record);
             setToast({ message: `Record ${isEditing ? 'updated' : 'created'} successfully!`, type: 'success' });
-            setTimeout(() => navigate('/billing/site-attendance-tracker'), 1500);
+            setTimeout(() => navigate('/finance?tab=attendance'), 1500);
         } catch (error) {
             console.error('Save error:', error);
             setToast({ message: 'Failed to save record', type: 'error' });
@@ -123,130 +155,268 @@ const AddSiteAttendanceRecord: React.FC = () => {
         );
     }
 
+    const SectionHeader = ({ icon: Icon, title, bgColor }: { icon: any, title: string, bgColor: string }) => (
+        <h4 className={`text-sm font-bold uppercase tracking-wider border-b ${isMobile ? 'border-[#1f3d2b]' : 'border-border/60'} pb-3 mb-6 flex items-center ${bgColor}`}>
+            <Icon className="w-5 h-5 mr-2" />
+            {title}
+        </h4>
+    );
+
+    const labelClass = isMobile ? "text-xs font-bold text-gray-400 uppercase tracking-tight ml-1" : "text-xs font-bold text-muted uppercase tracking-tight ml-1";
+    const inputClass = isMobile ? "rounded-xl bg-[#0c2e1f] border-[#1f3d2b] text-white placeholder:text-gray-500" : "rounded-xl";
+
+    const selectClass = isMobile 
+        ? "w-full flex h-11 rounded-xl border border-[#1f3d2b] bg-[#0c2e1f] px-3 py-2 text-sm text-white focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
+        : "w-full flex h-11 rounded-xl border border-border bg-white px-3 py-2 text-sm text-primary-text focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm";
+
+    const sectionContainerClass = isMobile 
+        ? "bg-card/50 p-4 rounded-xl border border-border space-y-4"
+        : "bg-white/40 p-6 rounded-3xl border border-border/50 shadow-sm transition-all hover:shadow-md";
+
     const FormContent = (
-        <form onSubmit={handleSave} className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-card/50 md:bg-white/40 rounded-2xl border border-border/50">
-                <div className="space-y-1">
-                    <label htmlFor="siteId" className="text-sm font-semibold text-primary/80 dark:text-emerald-400">Select Site</label>
-                    <select
-                        id="siteId"
-                        name="siteId"
-                        className="w-full flex h-11 rounded-lg border border-border bg-card md:bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm text-primary-text"
-                        value={record.siteId}
-                        onChange={(e) => handleInputChange('siteId', e.target.value)}
-                        required
-                    >
-                        <option value="">Select a site...</option>
-                        {sites.map(site => (
-                            <option key={site.id} value={site.id}>{site.shortName}</option>
-                        ))}
-                    </select>
+        <form onSubmit={handleSave} className="space-y-12">
+            {/* Description Section */}
+            <div className={sectionContainerClass}>
+                <SectionHeader icon={Briefcase} title="Description" bgColor="text-orange-600" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="space-y-1 group">
+                        <label htmlFor="siteId" className={labelClass}>Select Site</label>
+                        <select
+                            id="siteId"
+                            name="siteId"
+                            className={selectClass}
+                            value={record.siteId}
+                            onChange={(e) => handleInputChange('siteId', e.target.value)}
+                            required
+                        >
+                            <option value="">Select a site...</option>
+                            {sites.map(site => (
+                                <option key={site.id} value={site.id}>{site.shortName}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <Input
+                        id="companyName"
+                        name="companyName"
+                        label="Company Name"
+                        placeholder="e.g. IFS, IBM"
+                        value={record.companyName || ''}
+                        onChange={(e) => handleInputChange('companyName', e.target.value)}
+                        className={inputClass}
+                    />
+                    <div className="space-y-1 group">
+                        <label htmlFor="billingCycle" className={labelClass}>Billing Cycle</label>
+                        <select
+                            id="billingCycle"
+                            name="billingCycle"
+                            className={selectClass}
+                            value={record.billingCycle || ''}
+                            onChange={(e) => handleInputChange('billingCycle', e.target.value)}
+                        >
+                            <option value="">Select cycle...</option>
+                            {BILLING_CYCLES.map(cycle => (
+                                <option key={cycle} value={cycle}>{cycle}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="space-y-1 group">
+                        <label htmlFor="opsIncharge" className={labelClass}>Ops Incharge</label>
+                        <select
+                            id="opsIncharge"
+                            name="opsIncharge"
+                            className={selectClass}
+                            value={record.opsIncharge || ''}
+                            onChange={(e) => handleInputChange('opsIncharge', e.target.value)}
+                        >
+                            <option value="">Select...</option>
+                            {OPS_INCHARGE_OPTIONS.map(name => (
+                                <option key={name} value={name}>{name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="space-y-1 group">
+                        <label htmlFor="hrIncharge" className={labelClass}>HR Incharge</label>
+                        <select
+                            id="hrIncharge"
+                            name="hrIncharge"
+                            className={selectClass}
+                            value={record.hrIncharge || ''}
+                            onChange={(e) => handleInputChange('hrIncharge', e.target.value)}
+                        >
+                            <option value="">Select...</option>
+                            {HR_INCHARGE_OPTIONS.map(name => (
+                                <option key={name} value={name}>{name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="space-y-1 group">
+                        <label htmlFor="invoiceIncharge" className={labelClass}>Invoice Incharge</label>
+                        <select
+                            id="invoiceIncharge"
+                            name="invoiceIncharge"
+                            className={selectClass}
+                            value={record.invoiceIncharge || ''}
+                            onChange={(e) => handleInputChange('invoiceIncharge', e.target.value)}
+                        >
+                            <option value="">Select...</option>
+                            {INVOICE_INCHARGE_OPTIONS.map(name => (
+                                <option key={name} value={name}>{name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <Input
+                        id="opsRemarks"
+                        name="opsRemarks"
+                        label="Ops Remarks"
+                        placeholder="Operational notes"
+                        value={record.opsRemarks || ''}
+                        onChange={(e) => handleInputChange('opsRemarks', e.target.value)}
+                        className={inputClass}
+                    />
+                    <Input
+                        id="hrRemarks"
+                        name="hrRemarks"
+                        label="HR Remarks"
+                        placeholder="HR notes"
+                        value={record.hrRemarks || ''}
+                        onChange={(e) => handleInputChange('hrRemarks', e.target.value)}
+                        className={inputClass}
+                    />
+                    <Input
+                        id="financeRemarks"
+                        name="financeRemarks"
+                        label="Finance Remarks"
+                        placeholder="Finance notes"
+                        value={record.financeRemarks || ''}
+                        onChange={(e) => handleInputChange('financeRemarks', e.target.value)}
+                        className={inputClass}
+                    />
                 </div>
-                <Input
-                    id="billingDate"
-                    name="billingDate"
-                    label="Billing Date"
-                    type="date"
-                    value={record.billingDate}
-                    onChange={(e) => handleInputChange('billingDate', e.target.value)}
-                    required
-                />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Contract Details Section */}
-                <div className="space-y-4 bg-card/50 md:bg-white/40 p-6 rounded-2xl border border-border/50 shadow-sm">
-                    <h4 className="text-sm font-bold uppercase text-primary dark:text-emerald-400 tracking-wider border-b border-border/60 pb-3 flex items-center">
-                        <Building className="w-4 h-4 mr-2" />
-                        Contract Details
-                    </h4>
-                    <div className="space-y-4">
+                {/* Manager Status Section */}
+                <div className={`${sectionContainerClass} border-l-4 border-l-yellow-400`}>
+                    <SectionHeader icon={Users} title="Attendance Status (Managers)" bgColor="text-yellow-700" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <Input
-                            id="contractAmount"
-                            name="contractAmount"
-                            label="Contract Amount"
-                            type="number"
-                            value={record.contractAmount ?? ''}
-                            onChange={(e) => handleInputChange('contractAmount', e.target.value)}
-                            onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
-                            placeholder="Enter contract amount"
-                            icon={<IndianRupee className="h-4 w-4" />}
+                            id="managerTentativeDate"
+                            name="managerTentativeDate"
+                            label="Tentative Submission Date"
+                            type="date"
+                            value={record.managerTentativeDate || ''}
+                            onChange={(e) => handleInputChange('managerTentativeDate', e.target.value)}
+                            className={inputClass}
                         />
                         <Input
-                            id="contractManagementFee"
-                            name="contractManagementFee"
-                            label="Management Fee"
-                            type="number"
-                            value={record.contractManagementFee ?? ''}
-                            onChange={(e) => handleInputChange('contractManagementFee', e.target.value)}
-                            onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
-                            placeholder="Enter management fee"
-                            icon={<IndianRupee className="h-4 w-4" />}
+                            id="managerReceivedDate"
+                            name="managerReceivedDate"
+                            label="Attendance Received Date"
+                            type="date"
+                            value={record.managerReceivedDate || ''}
+                            onChange={(e) => handleInputChange('managerReceivedDate', e.target.value)}
+                            className={inputClass}
                         />
                     </div>
                 </div>
 
-                {/* Billing Details Section */}
-                <div className="space-y-4 bg-card/50 md:bg-white/40 p-6 rounded-2xl border border-border/50 shadow-sm">
-                    <h4 className="text-sm font-bold uppercase text-accent-dark dark:text-orange-400 tracking-wider border-b border-border/60 pb-3 flex items-center">
-                        <Calendar className="w-4 h-4 mr-2" />
-                        Billing Details
-                    </h4>
-                    <div className="space-y-4">
+                {/* HR Status Section */}
+                <div className={`${sectionContainerClass} border-l-4 border-l-blue-400`}>
+                    <SectionHeader icon={ClipboardList} title="Attendance Status (HR)" bgColor="text-blue-700" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <Input
-                            id="billedAmount"
-                            name="billedAmount"
-                            label="Billed Amount"
-                            type="number"
-                            value={record.billedAmount ?? ''}
-                            onChange={(e) => handleInputChange('billedAmount', e.target.value)}
-                            onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
-                            placeholder="Enter billed amount"
-                            icon={<IndianRupee className="h-4 w-4" />}
+                            id="hrTentativeDate"
+                            name="hrTentativeDate"
+                            label="Tentative Submission Date"
+                            type="date"
+                            value={record.hrTentativeDate || ''}
+                            onChange={(e) => handleInputChange('hrTentativeDate', e.target.value)}
+                            className={inputClass}
                         />
                         <Input
-                            id="billedManagementFee"
-                            name="billedManagementFee"
-                            label="Management Fee"
-                            type="number"
-                            value={record.billedManagementFee ?? ''}
-                            onChange={(e) => handleInputChange('billedManagementFee', e.target.value)}
-                            onKeyDown={(e) => ['e', 'E', '+', '-'].includes(e.key) && e.preventDefault()}
-                            placeholder="Enter management fee"
-                            icon={<IndianRupee className="h-4 w-4" />}
+                            id="hrReceivedDate"
+                            name="hrReceivedDate"
+                            label="Received from HR Date"
+                            type="date"
+                            value={record.hrReceivedDate || ''}
+                            onChange={(e) => handleInputChange('hrReceivedDate', e.target.value)}
+                            className={inputClass}
+                        />
+                        <Input
+                            id="attendanceReceivedTime"
+                            name="attendanceReceivedTime"
+                            label="Attendance Received Time"
+                            placeholder="e.g. 5:00 AM"
+                            value={record.attendanceReceivedTime || ''}
+                            onChange={(e) => handleInputChange('attendanceReceivedTime', e.target.value)}
+                            icon={<Clock className="h-4 w-4" />}
+                            className={inputClass.replace('rounded-xl', '')} // Input handles rounded internally sometimes, or override here if needed, keeping simple. Actually Input assumes className appends.
                         />
                     </div>
                 </div>
             </div>
 
-            <div className="bg-primary/5 p-6 rounded-2xl border border-primary/20 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-inner">
-                <div className="text-center sm:text-left">
-                    <p className="text-xs text-muted uppercase tracking-wider font-bold mb-1">Calculated Variation</p>
-                    <p className={`text-4xl font-black ${(record.billingDifference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {(record.billingDifference || 0) >= 0 ? '+' : ''}₹{(record.billingDifference || 0).toLocaleString()}
-                    </p>
-                </div>
-                <div className="text-center sm:text-right">
-                    <p className="text-xs text-muted uppercase tracking-wider font-bold mb-2">Variation Status</p>
-                    <span className={`inline-flex items-center px-5 py-2 rounded-full text-base font-black border-2 ${
-                        record.variationStatus === 'Profit' 
-                        ? 'bg-green-100 text-green-700 border-green-200' 
-                        : 'bg-red-100 text-red-700 border-red-200'
-                    }`}>
-                        {record.variationStatus === 'Profit' ? <TrendingUp className="w-5 h-5 mr-2" /> : <TrendingDown className="w-5 h-5 mr-2" />}
-                        {record.variationStatus?.toUpperCase()}
-                    </span>
+            {/* Invoice Status Section */}
+                <div className={`${sectionContainerClass} border-t-4 border-t-green-400`}>
+                <SectionHeader icon={FileText} title="Invoice Status" bgColor="text-green-700" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <Input
+                        id="invoiceSharingTentativeDate"
+                        name="invoiceSharingTentativeDate"
+                        label="Tentative Sharing Date"
+                        type="date"
+                        value={record.invoiceSharingTentativeDate || ''}
+                        onChange={(e) => handleInputChange('invoiceSharingTentativeDate', e.target.value)}
+                        className={inputClass}
+                    />
+                    <Input
+                        id="invoicePreparedDate"
+                        name="invoicePreparedDate"
+                        label="Invoice Prepared Date"
+                        type="date"
+                        value={record.invoicePreparedDate || ''}
+                        onChange={(e) => handleInputChange('invoicePreparedDate', e.target.value)}
+                        className={inputClass}
+                    />
+                    <Input
+                        id="invoiceSentDate"
+                        name="invoiceSentDate"
+                        label="Invoice Sent Date"
+                        type="date"
+                        value={record.invoiceSentDate || ''}
+                        onChange={(e) => handleInputChange('invoiceSentDate', e.target.value)}
+                        className={inputClass}
+                    />
+                    <Input
+                        id="invoiceSentTime"
+                        name="invoiceSentTime"
+                        label="Sent Timing"
+                        placeholder="e.g. 12:35 PM"
+                        value={record.invoiceSentTime || ''}
+                        onChange={(e) => handleInputChange('invoiceSentTime', e.target.value)}
+                        icon={<Clock className="h-4 w-4" />}
+                        className={inputClass}
+                    />
+                    <Input
+                        id="invoiceSentMethodRemarks"
+                        name="invoiceSentMethodRemarks"
+                        label="Sent Through/Remarks"
+                        placeholder="e.g. Mail & Whatsapp"
+                        value={record.invoiceSentMethodRemarks || ''}
+                        onChange={(e) => handleInputChange('invoiceSentMethodRemarks', e.target.value)}
+                        className={`lg:col-span-2 ${inputClass}`}
+                    />
                 </div>
             </div>
 
             {!isMobile && (
-                <div className="flex justify-end space-x-3 pt-6 border-t border-border">
-                    <Button type="button" variant="secondary" onClick={() => navigate('/billing/site-attendance-tracker')}>
+                <div className="flex justify-end space-x-4 pt-8 border-t border-border">
+                    <Button type="button" variant="secondary" onClick={() => navigate('/finance?tab=attendance')} className="px-6 rounded-xl border-2">
                         Cancel
                     </Button>
-                    <Button type="submit" isLoading={isSaving} className="px-8">
+                    <Button type="submit" isLoading={isSaving} className="px-10 rounded-xl shadow-lg shadow-primary/20">
                         <Save className="h-4 w-4 mr-2" />
-                        {isEditing ? 'Update Record' : 'Save Record'}
+                        {isEditing ? 'Update Entry' : 'Create Entry'}
                     </Button>
                 </div>
             )}
@@ -255,26 +425,27 @@ const AddSiteAttendanceRecord: React.FC = () => {
 
     if (isMobile) {
         return (
-            <div className="h-full flex flex-col bg-[#041b0f]">
-                <header className="p-4 flex-shrink-0 bg-[#062414] border-b border-[#1f3d2b] flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => navigate('/billing/site-attendance-tracker')} className="p-1 hover:bg-white/5 rounded-full text-white">
-                            <ArrowLeft className="h-6 w-6" />
-                        </button>
-                        <h1 className="text-xl font-bold text-white">{isEditing ? 'Edit Record' : 'Add Record'}</h1>
-                    </div>
+            <div className="min-h-screen bg-[#041b0f] pb-20">
+                <header 
+                    className="fixed top-0 left-0 right-0 z-50 bg-[#041b0f] border-b border-[#1f3d2b] p-4 flex items-center gap-4"
+                    style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}
+                >
+                    <button onClick={() => navigate('/finance?tab=attendance')} className="p-2 hover:bg-white/5 rounded-full text-white">
+                        <ArrowLeft className="h-6 w-6" />
+                    </button>
+                    <h1 className="text-xl font-bold text-white tracking-tight">{isEditing ? 'Edit Entry' : 'New Entry'}</h1>
                 </header>
-                <main className="flex-1 overflow-y-auto p-4 pb-28">
-                    <div className="space-y-6">
-                        {FormContent}
-                    </div>
+
+                <main className="p-4" style={{ paddingTop: 'calc(5rem + env(safe-area-inset-top))' }}>
+                    {FormContent}
                 </main>
-                <footer className="fixed bottom-0 left-0 right-0 p-4 bg-[#062414] border-t border-[#1f3d2b] flex gap-4 z-[60] shadow-[0_-4px_20px_rgba(0,0,0,0.4)]">
-                    <Button type="button" variant="secondary" onClick={() => navigate('/billing/site-attendance-tracker')} className="flex-1 bg-white/5 border-white/10 text-white hover:bg-white/10">
+
+                <footer className="fixed bottom-0 left-0 right-0 p-4 bg-[#041b0f] border-t border-[#1f3d2b] flex gap-4 z-[60]">
+                    <Button type="button" variant="secondary" onClick={() => navigate('/finance?tab=attendance')} className="flex-1 rounded-xl border border-[#1f3d2b] text-white hover:bg-white/5">
                         Cancel
                     </Button>
-                    <Button type="button" onClick={handleSave} isLoading={isSaving} className="flex-1 !bg-emerald-500 hover:!bg-emerald-600 text-white font-bold">
-                        {isEditing ? 'Save' : 'Create'}
+                    <Button type="button" onClick={handleSave} isLoading={isSaving} className="flex-1 rounded-xl font-bold bg-primary text-white shadow-lg shadow-primary/20">
+                        {isEditing ? 'Update' : 'Create'}
                     </Button>
                 </footer>
                 {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
@@ -283,28 +454,23 @@ const AddSiteAttendanceRecord: React.FC = () => {
     }
 
     return (
-        <div className="p-4 md:p-6 lg:p-8">
+        <div className="p-6 lg:p-10">
             <button 
-                onClick={() => navigate('/billing/site-attendance-tracker')}
-                className="flex items-center text-sm font-medium text-muted hover:text-primary transition-colors mb-6 group"
+                onClick={() => navigate('/finance?tab=attendance')}
+                className="flex items-center text-sm font-bold text-muted hover:text-primary transition-all mb-8 group"
             >
-                <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-                Back to Tracker
+                <ArrowLeft className="h-5 w-5 mr-2 group-hover:-translate-x-1 transition-transform" />
+                Back to Finance
             </button>
 
-            <div className="bg-card p-8 rounded-xl shadow-xl border border-border premium-glass w-full">
-                <div className="flex items-center mb-8">
-                    <div className="bg-primary/10 p-4 rounded-2xl mr-5">
-                        <ClipboardList className="h-8 w-8 text-primary" />
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-bold text-primary-text">{isEditing ? 'Edit Attendance Record' : 'Add New Record'}</h2>
-                        <p className="text-muted">Fill in the site billing details below to calculate variations.</p>
-                    </div>
+            <div className="flex items-start mb-8">
+                <div>
+                    <h2 className="text-3xl font-black text-primary-text tracking-tight leading-tight">{isEditing ? 'Edit Tracker Record' : 'Create Tracker Record'}</h2>
+                    <p className="text-muted text-lg">Input attendance and invoicing status for site monitoring.</p>
                 </div>
-
-                {FormContent}
             </div>
+
+            {FormContent}
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
         </div>
     );

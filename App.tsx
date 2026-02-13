@@ -81,6 +81,9 @@ const CostAnalysis = lazyWithRetry(() => import('./pages/billing/CostAnalysis'))
 const InvoiceSummary = lazyWithRetry(() => import('./pages/billing/InvoiceSummary'));
 const SiteAttendanceTracker = lazyWithRetry(() => import('./pages/billing/SiteAttendanceTracker'));
 const AddSiteAttendanceRecord = lazyWithRetry(() => import('./pages/forms/AddSiteAttendanceRecord'));
+const SiteFinanceTracker = lazyWithRetry(() => import('./pages/finance/SiteFinanceTracker'));
+const FinanceModule = lazyWithRetry(() => import('./pages/finance/FinanceModule'));
+const AddSiteFinanceRecord = lazyWithRetry(() => import('./pages/finance/AddSiteFinanceRecord'));
 const FieldStaffTracking = lazyWithRetry(() => import('./pages/hr/FieldStaffTracking'));
 const LocationManagement = lazyWithRetry(() => import('./pages/hr/LocationManagement'));
 const PreUpload = lazyWithRetry(() => import('./pages/onboarding/PreUpload'));
@@ -751,9 +754,11 @@ const App: React.FC = () => {
             <Route path="billing/cost-analysis" element={<CostAnalysis />} />
           </Route>
           <Route element={<ProtectedRoute requiredPermission="view_attendance_tracker" />}>
-            <Route path="billing/site-attendance-tracker" element={<SiteAttendanceTracker />} />
-            <Route path="billing/site-attendance-tracker/add" element={<AddSiteAttendanceRecord />} />
-            <Route path="billing/site-attendance-tracker/edit/:id" element={<AddSiteAttendanceRecord />} />
+            <Route path="finance" element={<FinanceModule />} />
+            <Route path="finance/attendance/add" element={<AddSiteAttendanceRecord />} />
+            <Route path="finance/attendance/edit/:id" element={<AddSiteAttendanceRecord />} />
+            <Route path="finance/site-tracker/add" element={<AddSiteFinanceRecord />} />
+            <Route path="finance/site-tracker/edit/:id" element={<AddSiteFinanceRecord />} />
           </Route>
           <Route element={<ProtectedRoute requiredPermission="view_invoice_summary" />}>
             <Route path="billing/summary" element={<InvoiceSummary />} />

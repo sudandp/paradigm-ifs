@@ -1708,3 +1708,75 @@ export interface SiteAttendanceRecord {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export interface SiteInvoiceRecord {
+  id: string;
+  sNo: number;
+  siteId: string;
+  siteName: string;
+  companyName: string;
+  billingCycle: string;
+  opsRemarks: string;
+  hrRemarks: string;
+  financeRemarks: string;
+  opsIncharge: string;
+  hrIncharge: string;
+  invoiceIncharge: string;
+
+  // Attendance Status of Managers
+  managerTentativeDate: string;
+  managerReceivedDate: string;
+
+  // Attendance Status of HR
+  hrTentativeDate: string;
+  hrReceivedDate: string;
+  attendanceReceivedTime: string;
+
+  // Invoice Status
+  invoiceSharingTentativeDate: string;
+  invoicePreparedDate: string;
+  invoiceSentDate: string;
+  invoiceSentTime: string;
+  invoiceSentMethodRemarks: string;
+
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SiteInvoiceDefault {
+  id?: string;
+  siteId: string;
+  siteName: string;
+  companyName?: string;
+  billingCycle?: string;
+  opsIncharge?: string;
+  hrIncharge?: string;
+  invoiceIncharge?: string;
+  managerTentativeDate?: string;
+  hrTentativeDate?: string;
+  invoiceSharingTentativeDate?: string;
+  contractAmount?: number;
+  contractManagementFee?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SiteFinanceRecord {
+  id: string;
+  siteId: string;
+  siteName: string;
+  companyName?: string;
+  billingMonth: string; // YYYY-MM-DD
+  
+  contractAmount: number;
+  contractManagementFee: number;
+  billedAmount: number;
+  billedManagementFee: number;
+  
+  totalBilledAmount: number; // Generated (C+D)
+  
+  remarks?: string;
+  status: 'pending' | 'approved' | 'invoiced';
+  createdAt?: string;
+  updatedAt?: string;
+}

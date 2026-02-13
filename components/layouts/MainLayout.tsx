@@ -37,7 +37,7 @@ export const allNavLinks: NavLinkConfig[] = [
     { to: '/hr/policies-and-insurance', label: 'Policies & Insurance', icon: ShieldHalf, permission: 'manage_policies' },
     { to: '/billing/summary', label: 'Invoice Summary', icon: FileDigit, permission: 'view_invoice_summary' },
     { to: '/billing/cost-analysis', label: 'Verification Costing', icon: IndianRupee, permission: 'view_verification_costing' },
-    { to: '/billing/site-attendance-tracker', label: 'Site Attendance Tracker', icon: ClipboardList, permission: 'view_attendance_tracker' },
+    { to: '/finance?tab=attendance', label: 'Finance', icon: ClipboardList, permission: 'view_attendance_tracker' },
     { to: '/admin/approval-workflow', label: 'Leave Approval Settings', icon: GitBranch, permission: 'manage_approval_workflow' },
     { to: '/hr/leave-management', label: 'Leave Management', icon: GitPullRequest, permission: 'manage_leave_requests' },
     { to: '/admin/modules', label: 'Module Management', icon: PackagePlus, permission: 'manage_modules' },
