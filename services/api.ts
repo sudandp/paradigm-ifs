@@ -2623,6 +2623,33 @@ export const api = {
       actor: { id: approverId, name: approverData.name, role: 'admin' }
     });
   },
+  reconsiderLeaveRequest: async (id: string, approverId: string): Promise<void> => {
+    const { data: request, error: fetchError } = await supabase.from('leave_requests').select('approval_history, user_id').eq('id', id).single();
+    if (fetchError) throw fetchError;
+    
+    const { data: userProfile, error: userError } = await supabase.from('users').select('reporting_manager_id').eq('id', request.user_id).single();
+    if (userError) throw userError;
+
+    const { data: approverData, error: nameError } = await supabase.from('users').select('name').eq('id', approverId).single();
+    if (nameError) throw nameError;
+
+    const newHistoryRecord = { 
+        approver_id: approverId, 
+        approver_name: approverData.name, 
+        status: 'reconsidered', 
+        timestamp: new Date().toISOString(),
+        comments: 'Request reset for reconsideration.'
+    };
+    const updatedHistory = [...((request.approval_history as any[]) || []), newHistoryRecord];
+
+    const { error } = await supabase.from('leave_requests').update({ 
+        status: 'pending_manager_approval', 
+        current_approver_id: userProfile.reporting_manager_id || null, 
+        approval_history: updatedHistory 
+    }).eq('id', id);
+    
+    if (error) throw error;
+  },
   cancelApprovedLeave: async (id: string, cancellerId: string, reason: string): Promise<void> => {
     const { data: request, error: fetchError } = await supabase.from('leave_requests').select('approval_history, user_id, leave_type').eq('id', id).single();
     if (fetchError) throw fetchError;

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { LeaveRequest, LeaveRequestStatus, ExtraWorkLog, UserHoliday, LeaveType } from '../../types';
-import { Loader2, Check, X, Plus, XCircle, User, Calendar, FilterX, ChevronLeft, ChevronRight, Info, Pencil, Download } from 'lucide-react';
+import { Loader2, Check, X, Plus, XCircle, User, Calendar, FilterX, ChevronLeft, ChevronRight, Info, Pencil, Download, RotateCcw } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { format } from 'date-fns';
@@ -37,6 +37,11 @@ const StatusChip: React.FC<{ status: LeaveRequestStatus; approverName?: string |
     else if (status === 'approved' && approvalHistory && approvalHistory.length > 0) {
         const lastApprover = approvalHistory[approvalHistory.length - 1];
         displayText = `Approved by ${lastApprover.approverName || lastApprover.approver_name}`;
+    }
+    // Show who rejected for rejected status
+    else if (status === 'rejected' && approvalHistory && approvalHistory.length > 0) {
+        const lastApprover = approvalHistory[approvalHistory.length - 1];
+        displayText = `Rejected by ${lastApprover.approverName || lastApprover.approver_name}`;
     }
     
     return <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${styles[status]}`}>{displayText}</span>;
@@ -263,6 +268,22 @@ const LeaveManagement: React.FC = () => {
         }
     };
 
+    const handleReconsiderLeave = async (request: LeaveRequest) => {
+        if (!user) return;
+        if (!window.confirm('Are you sure you want to reconsider this rejected request? It will be reset to Pending Manager Approval.')) return;
+        
+        setActioningId(request.id);
+        try {
+            await api.reconsiderLeaveRequest(request.id, user.id);
+            setToast({ message: 'Request reset for reconsideration.', type: 'success' });
+            fetchData();
+        } catch (error) {
+            setToast({ message: 'Failed to reconsider leave.', type: 'error' });
+        } finally {
+            setActioningId(null);
+        }
+    };
+
     const handleExportReport = async () => {
         if (requests.length === 0) {
             setToast({ message: 'No data available to export.', type: 'error' });
@@ -371,6 +392,20 @@ const LeaveManagement: React.FC = () => {
                             aria-label="Cancel approved leave"
                         >
                             <XCircle className="h-4 w-4 text-orange-600" />
+                        </Button>
+                    )}
+
+                    {/* Reconsider Action (Rejected) */}
+                    {request.status === 'rejected' && isHRAdmin && (
+                        <Button 
+                            size="sm" 
+                            variant="icon" 
+                            onClick={() => handleReconsiderLeave(request)} 
+                            disabled={actioningId === request.id} 
+                            title="Reconsider Request" 
+                            aria-label="Reconsider rejected request"
+                        >
+                            <RotateCcw className="h-4 w-4 text-primary" />
                         </Button>
                     )}
                 </div>
