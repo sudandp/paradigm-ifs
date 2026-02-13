@@ -160,7 +160,7 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
     // While checking device status...
     if (user && deviceStatus === 'checking' && user.role !== 'developer') {
          return (
-             <div className="flex h-screen w-full items-center justify-center bg-gray-50">
+             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-50">
                  <div className="flex flex-col items-center">
                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
                      <p className="text-gray-500 font-medium">Verifying device...</p>
