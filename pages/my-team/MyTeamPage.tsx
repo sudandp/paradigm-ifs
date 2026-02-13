@@ -346,9 +346,14 @@ const MyTeamPage: React.FC = () => {
         const isActiveToday = loc && isToday(new Date(loc.timestamp));
         const indicatorColor = isActiveToday ? '#10b981' : '#ef4444';
 
-        const mapHtml = member.photoUrl 
-          ? `<div class="custom-user-marker" style="background-image: url(${member.photoUrl}); border-color: ${indicatorColor}"></div>`
-          : `<div class="custom-user-marker" style="border-color: ${indicatorColor}"><div class="user-marker-initials" style="color: ${indicatorColor}">${initials}</div></div>`;
+        const isValidPhoto = member.photoUrl && (member.photoUrl.startsWith('http') || member.photoUrl.startsWith('data:'));
+
+        const mapHtml = `
+          <div class="custom-user-marker" style="border-color: ${indicatorColor}; overflow: hidden;">
+            <div class="user-marker-initials" style="color: ${indicatorColor}">${initials}</div>
+            ${isValidPhoto ? `<img src="${member.photoUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 10;" onerror="this.style.display='none'" />` : ''}
+          </div>
+        `;
 
         const customIcon = L.divIcon({
           className: '',
@@ -401,6 +406,8 @@ const MyTeamPage: React.FC = () => {
             
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
               <select
+                id="location-filter"
+                name="locationFilter"
                 value={selectedLocation}
                 onChange={(e) => setSelectedLocation(e.target.value)}
                 className="w-full sm:w-48 px-3 py-2 bg-card border border-border rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-sm appearance-none cursor-pointer"
@@ -419,6 +426,8 @@ const MyTeamPage: React.FC = () => {
               <div className="relative w-full md:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted w-4 h-4" />
                 <input
+                  id="team-search"
+                  name="teamSearch"
                   type="text"
                   placeholder="Search team member..."
                   value={searchQuery}
@@ -439,6 +448,8 @@ const MyTeamPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <input 
+                      id="tracking-interval"
+                      name="trackingInterval"
                       type="number" 
                       min="1" 
                       max="60" 
@@ -472,7 +483,16 @@ const MyTeamPage: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center font-bold text-amber-700 overflow-hidden relative">
                       {req.userName.charAt(0)}
-                      {req.userPhoto && <img src={req.userPhoto} alt={req.userName} className="absolute inset-0 w-full h-full object-cover" />}
+                      {req.userPhoto && (
+                        <img 
+                          src={req.userPhoto} 
+                          alt={req.userName} 
+                          className="absolute inset-0 w-full h-full object-cover" 
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-bold text-gray-900 truncate">{req.userName}</p>
@@ -554,6 +574,9 @@ const MyTeamPage: React.FC = () => {
                             src={member.photoUrl} 
                             alt={member.name}
                             className="absolute inset-0 w-full h-full object-cover z-10"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
                           />
                         )}
                       </div>

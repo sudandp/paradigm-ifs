@@ -363,7 +363,7 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
                     <Monitor className="w-4 h-4" />
                   </div>
                   <div>
-                    <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Manufacturer</label>
+                    <div className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Manufacturer</div>
                     <p className="text-sm font-medium text-gray-700">{viewedDevice.deviceInfo?.manufacturer || 'Unknown'}</p>
                   </div>
                 </div>
@@ -373,7 +373,7 @@ const UserDeviceList: React.FC<UserDeviceListProps> = ({
                     <Cpu className="w-4 h-4" />
                   </div>
                   <div>
-                    <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Hardware Model</label>
+                    <div className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Hardware Model</div>
                     <p className="text-sm font-medium text-gray-700">{viewedDevice.deviceInfo?.deviceModel || 'Unknown'}</p>
                   </div>
                 </div>

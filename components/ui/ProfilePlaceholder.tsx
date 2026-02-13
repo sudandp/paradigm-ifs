@@ -12,8 +12,10 @@ interface ProfilePlaceholderProps {
 export const ProfilePlaceholder: React.FC<ProfilePlaceholderProps> = ({ className, photoUrl, seed }) => {
     const { user } = useAuthStore();
 
-    if (photoUrl) {
-        return <img src={photoUrl} alt="Profile" className={`object-cover ${className || ''}`} />;
+    const isValidPhoto = photoUrl && (photoUrl.startsWith('http') || photoUrl.startsWith('https') || photoUrl.startsWith('data:'));
+
+    if (isValidPhoto) {
+        return <img src={photoUrl} alt="Profile" className={`object-cover ${className || ''}`} onError={(e) => (e.currentTarget.style.display = 'none')} />;
     }
 
     const effectiveSeed = seed || user?.id;

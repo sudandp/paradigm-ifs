@@ -130,6 +130,8 @@ const SiteDashboard: React.FC = () => {
                         <Search className="h-5 w-5 text-gray-400" />
                     </div>
                     <input
+                        id="site-search"
+                        name="siteSearch"
                         type="text"
                         placeholder="Search by name or ID..."
                         value={searchTerm}

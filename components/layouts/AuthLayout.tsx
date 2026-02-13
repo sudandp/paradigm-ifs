@@ -52,11 +52,24 @@ const AuthLayout: React.FC = () => {
             {/* Full-screen background carousel */}
             <div className="fixed inset-0 w-full h-full">
                 {properties.map((imageUrl, index) => (
-                    <div
+                    <img
                         key={index}
-                        className={`absolute inset-0 w-full h-full bg-cover bg-center transition-opacity duration-1000 ease-in-out ${index === currentImageIndex ? 'opacity-100' : 'opacity-0'
+                        src={imageUrl}
+                        alt={`Background ${index + 1}`}
+                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out ${index === currentImageIndex ? 'opacity-100' : 'opacity-0'
                             }`}
-                        style={{ backgroundImage: `url(${imageUrl})` }}
+                        onError={(e) => {
+                           const target = e.target as HTMLImageElement;
+                           target.style.display = 'none'; // simple fallback: hide broken images
+                           
+                           // Auto-clean: Remove this broken image from the store if it's not a default one containing 'picsum'
+                           // We use a small timeout to avoid state updates during render
+                           if (!imageUrl.includes('picsum.photos')) {
+                               setTimeout(() => {
+                                   useAuthLayoutStore.getState().removeBackgroundImage(index);
+                               }, 0);
+                           }
+                        }}
                     />
                 ))}
                 <div className="absolute inset-0 bg-black/30"></div> {/* Dark overlay */}

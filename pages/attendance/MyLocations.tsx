@@ -347,6 +347,7 @@ const MyLocations: React.FC = () => {
                 value={locationName}
                 onChange={handleNameChange}
                 placeholder="e.g. Office HQ"
+                autoComplete="off"
                 required
               />
               <Input
@@ -357,6 +358,7 @@ const MyLocations: React.FC = () => {
                 onChange={(e) => setLatitude(e.target.value)}
                 placeholder="12.9716"
                 step="any"
+                autoComplete="off"
                 disabled={editingLocationId && !canManageLocations}
               />
               <Input
@@ -367,14 +369,15 @@ const MyLocations: React.FC = () => {
                 onChange={(e) => setLongitude(e.target.value)}
                 placeholder="77.5946"
                 step="any"
+                autoComplete="off"
                 disabled={editingLocationId && !canManageLocations}
               />
               <Input
-                label="Address (optional)"
                 id="address"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Street, City, State"
+                autoComplete="street-address"
                 disabled={editingLocationId && !canManageLocations}
               />
             </div>
@@ -426,6 +429,7 @@ const MyLocations: React.FC = () => {
                         placeholder="Search by name or address..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        autoComplete="off"
                       />
                     </div>
 
@@ -501,6 +505,7 @@ const MyLocations: React.FC = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 icon={<Search className="h-4 w-4" />}
+                autoComplete="off"
               />
             </div>
 

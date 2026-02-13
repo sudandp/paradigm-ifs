@@ -318,9 +318,9 @@ const ProfilePage: React.FC = () => {
                     <section>
                         <h3 className="fo-section-title mb-4">Profile Details</h3>
                         <form onSubmit={handleProfileSubmit(onProfileSubmit)} className="space-y-4">
-                            <Input label="Full Name" id="name" error={profileErrors.name?.message} registration={register('name')} />
-                            <Input label="Email Address" id="email" type="email" error={profileErrors.email?.message} registration={register('email')} readOnly className="!bg-gray-700/50" />
-                            <Input label="Phone Number" id="phone" type="tel" error={profileErrors.phone?.message} registration={register('phone')} />
+                            <Input label="Full Name" id="name" error={profileErrors.name?.message} registration={register('name')} autoComplete="name" />
+                            <Input label="Email Address" id="email" type="email" error={profileErrors.email?.message} registration={register('email')} readOnly className="!bg-gray-700/50" autoComplete="email" />
+                            <Input label="Phone Number" id="phone" type="tel" error={profileErrors.phone?.message} registration={register('phone')} autoComplete="tel" />
                             <div className="flex justify-end pt-2"><Button type="submit" isLoading={isSaving} disabled={!isDirty}>Save Changes</Button></div>
                         </form>
                     </section>
@@ -673,10 +673,10 @@ const ProfilePage: React.FC = () => {
                         </div>
                         <form onSubmit={handleProfileSubmit(onProfileSubmit)} className="space-y-5">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <Input label="Full Name" id="name" error={profileErrors.name?.message} registration={register('name')} className="bg-gray-50 border-gray-200 focus:bg-white transition-colors" />
-                                <Input label="Phone Number" id="phone" type="tel" error={profileErrors.phone?.message} registration={register('phone')} className="bg-gray-50 border-gray-200 focus:bg-white transition-colors" />
+                                <Input label="Full Name" id="name" error={profileErrors.name?.message} registration={register('name')} className="bg-gray-50 border-gray-200 focus:bg-white transition-colors" autoComplete="name" />
+                                <Input label="Phone Number" id="phone" type="tel" error={profileErrors.phone?.message} registration={register('phone')} className="bg-gray-50 border-gray-200 focus:bg-white transition-colors" autoComplete="tel" />
                                 <div className="md:col-span-2">
-                                    <Input label="Email Address" id="email" type="email" error={profileErrors.email?.message} registration={register('email')} readOnly className="bg-gray-100/50 text-gray-500 cursor-not-allowed border-gray-200" />
+                                    <Input label="Email Address" id="email" type="email" error={profileErrors.email?.message} registration={register('email')} readOnly className="bg-gray-100/50 text-gray-500 cursor-not-allowed border-gray-200" autoComplete="email" />
                                 </div>
                             </div>
                             <div className="flex justify-end pt-3 border-t border-gray-100">

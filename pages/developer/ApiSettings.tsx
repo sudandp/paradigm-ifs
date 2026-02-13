@@ -209,8 +209,10 @@ export const ApiSettings: React.FC = () => {
                                 {store.apiSettings.autoBackupEnabled && (
                                     <div className={`mt-4 pt-4 border-t ${isMobile ? 'border-white/10' : 'border-border'} grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4`}>
                                         <div>
-                                            <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Frequency</label>
+                                            <label htmlFor="backup-frequency" className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Frequency</label>
                                             <select 
+                                                id="backup-frequency"
+                                                name="backup-frequency"
                                                 className={`w-full h-10 px-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-accent/40 ${isMobile ? 'border-white/10 bg-[#062b1a] text-white' : 'border-border bg-white text-primary-text'}`}
                                                 value={store.apiSettings.backupSchedule?.frequency || 'daily'}
                                                 onChange={e => store.updateApiSettings({ 
@@ -230,8 +232,10 @@ export const ApiSettings: React.FC = () => {
                                         {/* Frequency Specific Fields */}
                                         {store.apiSettings.backupSchedule?.frequency === 'weekly' && (
                                             <div>
-                                                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Day of Week</label>
+                                                <label htmlFor="backup-day-of-week" className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Day of Week</label>
                                                 <select 
+                                                    id="backup-day-of-week"
+                                                    name="backup-day-of-week"
                                                     className={`w-full h-10 px-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-accent/40 ${isMobile ? 'border-white/10 bg-[#062b1a] text-white' : 'border-border bg-white text-primary-text'}`}
                                                     value={store.apiSettings.backupSchedule?.dayOfWeek ?? 0}
                                                     onChange={e => store.updateApiSettings({ 
@@ -255,8 +259,10 @@ export const ApiSettings: React.FC = () => {
                                         {store.apiSettings.backupSchedule?.frequency === 'monthly' && (
                                             <>
                                                 <div>
-                                                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Interval</label>
+                                                    <label htmlFor="backup-interval" className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Interval</label>
                                                     <select 
+                                                        id="backup-interval"
+                                                        name="backup-interval"
                                                         className={`w-full h-10 px-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-accent/40 ${isMobile ? 'border-white/10 bg-[#062b1a] text-white' : 'border-border bg-white text-primary-text'}`}
                                                         value={store.apiSettings.backupSchedule?.interval ?? 1}
                                                         onChange={e => store.updateApiSettings({ 
@@ -272,8 +278,10 @@ export const ApiSettings: React.FC = () => {
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Day of Month</label>
+                                                    <label htmlFor="backup-day-of-month" className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Day of Month</label>
                                                     <Input 
+                                                        id="backup-day-of-month"
+                                                        name="backup-day-of-month"
                                                         type="number"
                                                         min={1}
                                                         max={31}
@@ -293,8 +301,10 @@ export const ApiSettings: React.FC = () => {
                                         {store.apiSettings.backupSchedule?.frequency === 'yearly' && (
                                             <>
                                                 <div>
-                                                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Month</label>
+                                                    <label htmlFor="backup-month-of-year" className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Month</label>
                                                     <select 
+                                                        id="backup-month-of-year"
+                                                        name="backup-month-of-year"
                                                         className={`w-full h-10 px-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-accent/40 ${isMobile ? 'border-white/10 bg-[#062b1a] text-white' : 'border-border bg-white text-primary-text'}`}
                                                         value={store.apiSettings.backupSchedule?.monthOfYear ?? 1}
                                                         onChange={e => store.updateApiSettings({ 
@@ -319,8 +329,10 @@ export const ApiSettings: React.FC = () => {
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Day</label>
+                                                    <label htmlFor="backup-day-of-year" className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Day</label>
                                                     <Input 
+                                                        id="backup-day-of-year"
+                                                        name="backup-day-of-year"
                                                         type="number"
                                                         min={1}
                                                         max={31}
@@ -338,8 +350,10 @@ export const ApiSettings: React.FC = () => {
                                         )}
 
                                         <div>
-                                            <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Start Time</label>
+                                            <label htmlFor="backup-start-time" className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Start Time</label>
                                             <Input 
+                                                id="backup-start-time"
+                                                name="backup-start-time"
                                                 type="time"
                                                 className="w-full"
                                                 value={store.apiSettings.backupSchedule?.startTime || '00:00'}

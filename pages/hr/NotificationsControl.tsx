@@ -251,7 +251,7 @@ const NotificationsControl: React.FC = () => {
                                 </Select>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-primary-text">Notify this recipient...</label>
+                                    <p className="text-sm font-medium text-primary-text">Notify this recipient...</p>
                                     <Select 
                                         value={newRule.recipientRole || ''} 
                                         onChange={(e) => setNewRule({ ...newRule, recipientRole: e.target.value, recipientUserId: undefined })}
@@ -436,7 +436,7 @@ const NotificationsControl: React.FC = () => {
 
                             {!broadcastData.role && (
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-primary-text">Select Recipients</label>
+                                    <p className="text-sm font-medium text-primary-text">Select Recipients</p>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-3 border border-border rounded-xl bg-page/50">
                                         {users.map(user => (
                                             <Checkbox 
@@ -465,7 +465,7 @@ const NotificationsControl: React.FC = () => {
                             />
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-primary-text">Message Content</label>
+                                <p className="text-sm font-medium text-primary-text">Message Content</p>
                                 <textarea 
                                     className="w-full h-32 p-4 rounded-xl border border-border focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
                                     placeholder="Type your message here..."

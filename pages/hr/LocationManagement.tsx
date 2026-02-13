@@ -273,11 +273,11 @@ const LocationManagement: React.FC = () => {
             <MapPin className="h-5 w-5 mr-2 text-muted" /> {editingLocationId ? 'Edit Location' : 'Add New Location'}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Input label="Name (optional)" id="locName" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Office HQ" />
-            <Input label="Radius (meters)" id="locRadius" type="number" value={newRadius} onChange={(e) => setNewRadius(e.target.value)} min="10" max="1000" />
-            <Input label="Latitude" id="locLat" type="number" value={newLatitude} onChange={(e) => setNewLatitude(e.target.value)} placeholder="12.9716" />
-            <Input label="Longitude" id="locLng" type="number" value={newLongitude} onChange={(e) => setNewLongitude(e.target.value)} placeholder="77.5946" />
-            <Input label="Address (optional)" id="locAddr" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Street, City, State" />
+            <Input label="Name (optional)" id="locName" name="locationName" autoComplete="organization" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Office HQ" />
+            <Input label="Radius (meters)" id="locRadius" name="locationRadius" type="number" value={newRadius} onChange={(e) => setNewRadius(e.target.value)} min="10" max="1000" />
+            <Input label="Latitude" id="locLat" name="locationLat" type="number" value={newLatitude} onChange={(e) => setNewLatitude(e.target.value)} placeholder="12.9716" />
+            <Input label="Longitude" id="locLng" name="locationLng" type="number" value={newLongitude} onChange={(e) => setNewLongitude(e.target.value)} placeholder="77.5946" />
+            <Input label="Address (optional)" id="locAddr" name="locationAddress" autoComplete="street-address" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Street, City, State" />
           </div>
           <div className="flex flex-wrap mt-4 gap-4">
             <Button variant="secondary" onClick={handleUseCurrentLocation} isLoading={isFetchingLocation} disabled={isFetchingLocation}>
@@ -306,14 +306,14 @@ const LocationManagement: React.FC = () => {
             <UsersIcon className="h-5 w-5 mr-2 text-muted" /> Assign Location to User
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select label="Select User" id="assignUser" value={assignUserId} onChange={(e) => setAssignUserId(e.target.value)}>
+            <Select label="Select User" id="assignUser" name="assignUser" value={assignUserId} onChange={(e) => setAssignUserId(e.target.value)}>
               <option value="">-- Select User --</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>{u.name}</option>
               ))}
             </Select>
             <div>
-              <label className="block text-sm font-medium text-muted mb-2">Select Location(s)</label>
+              <p className="block text-sm font-medium text-muted mb-2">Select Location(s)</p>
               <div className="border border-border rounded-lg p-3 max-h-48 overflow-y-auto bg-page">
                 {locations.length === 0 ? (
                   <p className="text-muted text-sm">No locations available.</p>
@@ -350,6 +350,8 @@ const LocationManagement: React.FC = () => {
 
           <div className="mb-4">
             <Input 
+              id="locations-search"
+              name="locationsSearch"
               placeholder="Search locations by name..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

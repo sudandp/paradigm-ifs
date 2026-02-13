@@ -159,12 +159,12 @@ export const GmcPolicyConfig: React.FC = () => {
 
                 <div className="space-y-4 pt-4 border-t">
                     <h4 className="font-semibold text-primary-text">Opt-In Details</h4>
-                    <div>
-                        <label className="block text-sm font-medium text-muted">Opt-In Disclaimer</label>
+                     <div>
+                        <h5 className="block text-sm font-medium text-muted">Opt-In Disclaimer</h5>
                         <textarea {...register('optInDisclaimer')} rows={3} className="form-input mt-1" />
                     </div>
                      <div>
-                        <label className="block text-sm font-medium text-muted">Coverage Details</label>
+                        <h5 className="block text-sm font-medium text-muted">Coverage Details</h5>
                         <textarea {...register('coverageDetails')} rows={2} className="form-input mt-1" />
                     </div>
                 </div>
@@ -173,7 +173,7 @@ export const GmcPolicyConfig: React.FC = () => {
                     <div className="space-y-4 pt-4 border-t">
                          <h4 className="font-semibold text-primary-text">Opt-Out Details</h4>
                          <div>
-                            <label className="block text-sm font-medium text-muted">Opt-Out Disclaimer</label>
+                            <h5 className="block text-sm font-medium text-muted">Opt-Out Disclaimer</h5>
                             <textarea {...register('optOutDisclaimer')} rows={3} className="form-input mt-1" />
                         </div>
                         <Controller name="requireAlternateInsurance" control={control} render={({ field }) => <ToggleSwitch id="require-alt-ins" label="Require proof of alternate insurance on opt-out" checked={field.value} onChange={field.onChange} />} />

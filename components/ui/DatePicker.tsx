@@ -235,7 +235,7 @@ const DatePicker: React.FC<DatePickerProps> = ({ label, id, error, value, onChan
 
   return (
     <div ref={pickerRef} className="w-full">
-      {label && <label htmlFor={id} className={`block text-xs font-semibold mb-1.5 uppercase tracking-wider ${isDark ? 'text-emerald-500/60' : 'text-muted'}`}>{label}</label>}
+      {label && <div className={`block text-xs font-semibold mb-1.5 uppercase tracking-wider ${isDark ? 'text-emerald-500/60' : 'text-muted'}`}>{label}</div>}
       <div className="relative">
         <div
           id={id}

@@ -81,6 +81,7 @@ const ForgotPassword = () => {
                         type="email"
                         autoComplete="email"
                         placeholder="Email Address"
+                        aria-label="Email Address"
                         registration={register('email')}
                         error={errors.email?.message}
                         className="!pl-12 !bg-white/10 !text-white !border-white/20 placeholder:!text-gray-400 focus:!border-[#22c55e] !py-3 !rounded-xl transition-all"

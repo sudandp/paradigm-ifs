@@ -316,6 +316,8 @@ const UserManagement: React.FC = () => {
                                 <tr className="bg-gray-50/50">
                                     <th className="px-6 py-2">
                                         <input
+                                            id="filter-name"
+                                            name="filterName"
                                             type="text"
                                             placeholder="Filter..."
                                             value={filterName}
@@ -325,6 +327,8 @@ const UserManagement: React.FC = () => {
                                     </th>
                                     <th className="px-6 py-2">
                                         <input
+                                            id="filter-email"
+                                            name="filterEmail"
                                             type="text"
                                             placeholder="Filter..."
                                             value={filterEmail}
@@ -334,6 +338,8 @@ const UserManagement: React.FC = () => {
                                     </th>
                                     <th className="px-6 py-2">
                                         <select
+                                            id="filter-role"
+                                            name="filterRole"
                                             value={filterRole}
                                             onChange={(e) => setFilterRole(e.target.value)}
                                             className="w-full text-sm font-normal px-2 py-1.5 border border-border rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
@@ -346,6 +352,8 @@ const UserManagement: React.FC = () => {
                                     </th>
                                     <th className="px-6 py-2">
                                         <input
+                                            id="filter-site"
+                                            name="filterSite"
                                             type="text"
                                             placeholder="Filter..."
                                             value={filterSite}
@@ -355,6 +363,8 @@ const UserManagement: React.FC = () => {
                                     </th>
                                     <th className="px-6 py-2">
                                         <input
+                                            id="filter-biometric-id"
+                                            name="filterBiometricId"
                                             type="text"
                                             placeholder="Filter..."
                                             value={filterBiometricId}

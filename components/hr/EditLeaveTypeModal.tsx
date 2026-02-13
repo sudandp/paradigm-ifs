@@ -46,7 +46,7 @@ const EditLeaveTypeModal: React.FC<EditLeaveTypeModalProps> = ({
           Select the correct leave type for this request. If the leave is already approved, balances (including Comp Off logs) will be automatically adjusted.
         </p>
         <div className="pt-2">
-          <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1 tracking-wider">Leave Type</label>
+          <span className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1 tracking-wider">Leave Type</span>
           <div className="relative">
             <select
               value={selectedType}

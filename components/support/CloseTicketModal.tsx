@@ -73,7 +73,7 @@ const CloseTicketModal: React.FC<CloseTicketModalProps> = ({ isOpen, onClose, on
               {errors.rating && <p className="mt-2 text-xs text-red-500 text-center">{errors.rating.message}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-muted text-center">Your Feedback</label>
+              <span className="block text-sm font-medium text-muted text-center">Your Feedback</span>
               <textarea {...register('feedback')} rows={4} className={`mt-1 form-input ${errors.feedback ? 'form-input--error' : ''}`} />
               {errors.feedback && <p className="mt-1 text-xs text-red-600">{errors.feedback.message}</p>}
             </div>

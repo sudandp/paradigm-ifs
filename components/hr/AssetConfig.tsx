@@ -190,7 +190,7 @@ const OtherAssetForm: React.FC<{ index: number; control: any }> = ({ index, cont
         <div>
              <Controller name={`assets.${index}.accessories`} control={control} render={({ field }) => (
                  <>
-                    <label className="block text-sm font-medium text-muted">Accessories List</label>
+                    <h4 className="block text-sm font-medium text-muted">Accessories List</h4>
                     <textarea {...field} rows={3} className="form-input mt-1" />
                  </>
              )} />

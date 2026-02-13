@@ -458,10 +458,12 @@ const LeaveManagement: React.FC = () => {
             <div className="bg-card p-5 rounded-xl border border-border shadow-sm mb-8">
                 <div className="flex flex-col lg:flex-row gap-5 items-end">
                     <div className="w-full lg:w-72">
-                        <label className="block text-xs font-bold text-muted uppercase mb-2 ml-1 tracking-wider">Filter by Employee</label>
+                        <label htmlFor="filter-employee" className="block text-xs font-bold text-muted uppercase mb-2 ml-1 tracking-wider">Filter by Employee</label>
                         <div className="relative">
                             <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none" />
                             <select 
+                                id="filter-employee"
+                                name="filterEmployee"
                                 value={selectedUserId}
                                 onChange={(e) => setSelectedUserId(e.target.value)}
                                 className="w-full !pl-10 pr-10 h-11 rounded-xl bg-page border border-border text-primary-text focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all appearance-none text-sm font-medium"
@@ -478,10 +480,12 @@ const LeaveManagement: React.FC = () => {
                     </div>
                     
                     <div className="w-full lg:w-56">
-                        <label className="block text-xs font-bold text-muted uppercase mb-2 ml-1 tracking-wider">Filter by Date</label>
+                        <label htmlFor="filter-date" className="block text-xs font-bold text-muted uppercase mb-2 ml-1 tracking-wider">Filter by Date</label>
                         <div className="relative">
                             <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted pointer-events-none" />
                             <input 
+                                id="filter-date"
+                                name="filterDate"
                                 type="date"
                                 value={selectedDate}
                                 onChange={(e) => setSelectedDate(e.target.value)}
@@ -659,6 +663,9 @@ const LeaveManagement: React.FC = () => {
                     <div className="flex items-center gap-3">
                         <span className="text-sm text-muted">Show</span>
                         <select 
+                            id="pageSize"
+                            name="pageSize"
+                            aria-label="Rows per page"
                             value={pageSize}
                             onChange={(e) => {
                                 setPageSize(Number(e.target.value));

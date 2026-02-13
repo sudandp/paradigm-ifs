@@ -145,6 +145,7 @@ const Login: React.FC = () => {
                             type="email"
                             autoComplete="email"
                             placeholder="Email"
+                            aria-label="Email address"
                             registration={registerEmail('email')}
                             error={emailErrors.email?.message}
                             className="!pl-12 !bg-black/60 !text-white !border-white/10 focus:!border-[#22c55e] placeholder:!text-gray-500 !py-3 !rounded-xl transition-all"
@@ -157,6 +158,7 @@ const Login: React.FC = () => {
                             type="password"
                             autoComplete="current-password"
                             placeholder="Password"
+                            aria-label="Password"
                             registration={registerEmail('password')}
                             error={emailErrors.password?.message}
                             className="!pl-12 !bg-black/60 !text-white !border-white/10 focus:!border-[#22c55e] placeholder:!text-gray-500 !py-3 !rounded-xl transition-all"

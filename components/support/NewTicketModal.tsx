@@ -171,7 +171,7 @@ const NewTicketModal: React.FC<NewTicketModalProps> = ({ isOpen, onClose, onSucc
           <div className="p-6 space-y-4">
             <Input label="Title / Subject" {...register('title')} error={errors.title?.message} />
             <div>
-              <label className="block text-sm font-medium text-muted">Description</label>
+              <span className="block text-sm font-medium text-muted">Description</span>
               <textarea {...register('description')} rows={5} className={`mt-1 form-input ${errors.description ? 'form-input--error' : ''}`} />
               {errors.description && <p className="mt-1 text-xs text-red-600">{errors.description.message}</p>}
             </div>

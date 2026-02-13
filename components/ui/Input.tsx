@@ -10,6 +10,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   registration?: UseFormRegisterReturn;
   icon?: React.ReactNode;
   autoCapitalizeCustom?: boolean;
+  'aria-label'?: string;
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(({ label, labelClassName, id, error, description, registration, icon, autoCapitalizeCustom = true, ...props }, ref) => {
@@ -35,6 +36,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({ label, labelClas
         className={finalClassName}
         style={icon ? { paddingLeft: '3.5rem' } : undefined}
         aria-invalid={!!error}
+        aria-label={props['aria-label'] || label}
         autoCapitalize={autoCapitalizeCustom ? "words" : undefined}
         {...registration}
         {...otherProps}

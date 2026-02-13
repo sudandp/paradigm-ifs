@@ -133,7 +133,7 @@ const DesignationSubForm: React.FC<{
                 )}
             />
             <div>
-                <label className="block text-sm font-medium text-muted mb-2">Uniform Items</label>
+                <h5 className="block text-sm font-medium text-muted mb-2">Uniform Items</h5>
                 <div className="space-y-2">
                 {items.map((item, itemIndex) => (
                     <div key={item.id} className="flex items-center gap-2">

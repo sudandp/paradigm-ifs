@@ -24,6 +24,7 @@ import Button from '../ui/Button';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { CheckCircle, XCircle, Calendar, FileText, MapPin } from 'lucide-react';
+import { ProfilePlaceholder } from '../ui/ProfilePlaceholder';
 
 const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({ type, size = "h-5 w-5" }) => {
     const iconMap: Record<NotificationType, React.ElementType> = {
@@ -291,10 +292,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                             {unlockRequests.map(req => (
                                                 <div key={req.id} className={`rounded-xl p-3 border ${isMobile ? 'bg-black/20 border-white/5' : 'bg-emerald-50/30 border-emerald-100'}`}>
                                                     <div className="flex items-center gap-3 mb-3">
-                                                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center font-bold text-emerald-700 overflow-hidden relative text-xs">
-                                                            {req.userName.charAt(0)}
-                                                            {req.userPhoto && <img src={req.userPhoto} alt={req.userName} className="absolute inset-0 w-full h-full object-cover" />}
-                                                        </div>
+                                                        <ProfilePlaceholder photoUrl={req.userPhoto} seed={req.userId} className="absolute inset-0 w-8 h-8 rounded-lg" />
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center justify-between">
                                                                 <p className={`text-xs font-bold truncate ${isMobile ? 'text-white' : 'text-gray-900'}`}>{req.userName}</p>

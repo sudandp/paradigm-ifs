@@ -14,6 +14,7 @@ import { api } from '../../services/api';
 import { User, AttendanceEvent, LeaveRequest } from '../../types';
 import { calculateDistanceMeters, reverseGeocode } from '../../utils/locationUtils';
 import UserDeviceList from '../../components/devices/UserDeviceList';
+import { ProfilePlaceholder } from '../../components/ui/ProfilePlaceholder';
 
 // Helper to safely format ISO strings and prevent RangeErrors
 const safeFormatISO = (dateStr: string | undefined | null, formatStr: string, fallback = 'N/A') => {
@@ -287,11 +288,7 @@ const TeamMemberProfile: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3">
-                  {member.photoUrl ? (
-                    <img src={member.photoUrl} alt={member.name} className="w-12 h-12 rounded-full object-cover border-2 border-accent/20" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center text-accent font-bold text-lg">{member.name.charAt(0)}</div>
-                  )}
+                  <ProfilePlaceholder photoUrl={member.photoUrl} seed={member.id} className="w-12 h-12 rounded-full border-2 border-accent/20" />
                   <div className="flex flex-col">
                     <h1 className="text-xl sm:text-2xl font-bold leading-tight">{member.name}</h1>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">

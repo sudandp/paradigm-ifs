@@ -110,6 +110,7 @@ const UpdatePassword = () => {
           id="password"
           type="password"
           placeholder="New Password"
+          aria-label="New Password"
           autoComplete="new-password"
           registration={register('password')}
           error={errors.password?.message}
@@ -119,6 +120,7 @@ const UpdatePassword = () => {
           id="confirmPassword"
           type="password"
           placeholder="Confirm New Password"
+          aria-label="Confirm New Password"
           autoComplete="new-password"
           registration={register('confirmPassword')}
           error={errors.confirmPassword?.message}

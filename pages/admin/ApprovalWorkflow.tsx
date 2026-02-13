@@ -160,6 +160,7 @@ const ApprovalWorkflow: React.FC = () => {
                                                     <td className="px-6 py-4">
                                                         <Select
                                                             label=""
+                                                            aria-label={`Reporting Manager for ${user.name}`}
                                                             id={`manager-for-desktop-${user.id}`}
                                                             value={user.reportingManagerId || ''}
                                                             onChange={e => handleManagerChange(user.id, e.target.value)}
@@ -185,8 +186,8 @@ const ApprovalWorkflow: React.FC = () => {
                                                 <p className="text-sm text-muted capitalize">{roles.find(r => r.id === user.role)?.displayName || user.role.replace(/_/g, ' ')}</p>
                                             </div>
                                             <div className="p-3 border-t border-border">
-                                                <label className="text-sm text-muted block mb-1">Manager</label>
                                                 <Select
+                                                    label="Manager"
                                                     id={`manager-for-mobile-${user.id}`}
                                                     value={user.reportingManagerId || ''}
                                                     onChange={e => handleManagerChange(user.id, e.target.value)}

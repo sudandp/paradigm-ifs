@@ -31,6 +31,9 @@ const Pagination: React.FC<PaginationProps> = ({
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted">Show</span>
           <select
+            id="pageSize"
+            name="pageSize"
+            aria-label="Rows per page"
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
             className="bg-page border border-border text-primary-text text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-1.5 transition-all outline-none"

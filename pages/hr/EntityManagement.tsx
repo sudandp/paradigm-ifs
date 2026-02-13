@@ -812,6 +812,8 @@ const EntityManagement: React.FC = () => {
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
                 <input
+                    id="client-search"
+                    name="clientSearch"
                     type="text"
                     placeholder="Search across all clients and sites..."
                     value={searchTerm}

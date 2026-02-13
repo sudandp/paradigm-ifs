@@ -55,21 +55,21 @@ const SignUp: React.FC = () => {
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-             <div className="relative">
+            <div className="relative">
                 <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
-                <Input id="name" type="text" placeholder="Full Name" registration={register('name')} error={errors.name?.message} className="!pl-11 !bg-white/10 !text-white !border-white/20 placeholder:!text-gray-300 autofill:!bg-white/10 autofill:!text-white" />
+                <Input id="name" type="text" placeholder="Full Name" aria-label="Full Name" registration={register('name')} error={errors.name?.message} className="!pl-11 !bg-white/10 !text-white !border-white/20 placeholder:!text-gray-300 autofill:!bg-white/10 autofill:!text-white" />
             </div>
             <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
-                <Input id="email" type="email" placeholder="admin@paradigmfms.com" registration={register('email')} error={errors.email?.message} className="!pl-11 !bg-white/10 !text-white !border-white/20 placeholder:!text-gray-300 autofill:!bg-white/10 autofill:!text-white" />
+                <Input id="email" type="email" placeholder="admin@paradigmfms.com" aria-label="Email Address" registration={register('email')} error={errors.email?.message} className="!pl-11 !bg-white/10 !text-white !border-white/20 placeholder:!text-gray-300 autofill:!bg-white/10 autofill:!text-white" />
             </div>
             <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
-                <Input id="password" type="password" placeholder="••••••••••" registration={register('password')} error={errors.password?.message} className="!pl-11 !bg-white/10 !text-white !border-white/20 placeholder:!text-gray-300 autofill:!bg-white/10 autofill:!text-white" />
+                <Input id="password" type="password" placeholder="••••••••••" aria-label="Password" registration={register('password')} error={errors.password?.message} className="!pl-11 !bg-white/10 !text-white !border-white/20 placeholder:!text-gray-300 autofill:!bg-white/10 autofill:!text-white" />
             </div>
             <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
-                <Input id="confirmPassword" type="password" placeholder="Confirm Password" registration={register('confirmPassword')} error={errors.confirmPassword?.message} className="!pl-11 !bg-white/10 !text-white !border-white/20 placeholder:!text-gray-300 autofill:!bg-white/10 autofill:!text-white" />
+                <Input id="confirmPassword" type="password" placeholder="Confirm Password" aria-label="Confirm Password" registration={register('confirmPassword')} error={errors.confirmPassword?.message} className="!pl-11 !bg-white/10 !text-white !border-white/20 placeholder:!text-gray-300 autofill:!bg-white/10 autofill:!text-white" />
             </div>
             
             {error && <p className="text-sm text-red-400 text-center">{error}</p>}

@@ -174,8 +174,11 @@ const VerificationDashboard: React.FC = () => {
                         <Search className="h-5 w-5 text-gray-400" />
                     </div>
                     <input
+                        id="onboarding-search"
+                        name="onboardingSearch"
                         type="text"
                         placeholder="Search by name, ID, site..."
+                        aria-label="Search onboarding forms"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         className="form-input block w-full !pl-10 pr-3 py-2 border-border rounded-lg leading-5 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-accent focus:border-accent sm:text-sm"
