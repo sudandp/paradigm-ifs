@@ -10,7 +10,7 @@ import type {
   ExtraWorkLog, PerfiosVerificationData, HolidayListItem, UniformRequestItem, IssuedTool, RecurringHolidayRule,
   BiometricDevice, ChecklistTemplate, FieldReport, FieldAttendanceViolation,
   NotificationRule, NotificationType, Company, GmcPolicySettings, StaffAttendanceRules,
-  GmcSubmission, UserHoliday, AttendanceUnlockRequest, LeaveType
+  GmcSubmission, UserHoliday, AttendanceUnlockRequest, LeaveType, SiteAttendanceRecord
 } from '../types';
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { 
@@ -294,6 +294,35 @@ export const api = {
       roles: (rolesData || []).map(toCamelCase),
       holidays: (holidaysData || []).map(toCamelCase),
     };
+  },
+
+  // --- Site Attendance Tracker ---
+  getSiteAttendanceRecords: async (): Promise<SiteAttendanceRecord[]> => {
+    const { data, error } = await supabase
+      .from('site_attendance_tracker')
+      .select('*')
+      .order('billing_date', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
+
+  saveSiteAttendanceRecord: async (record: Partial<SiteAttendanceRecord>): Promise<SiteAttendanceRecord> => {
+    const { id, billingDifference, managementFeeDifference, variationStatus, createdAt, updatedAt, ...rest } = record;
+    const dbData = toSnakeCase(rest);
+    let query;
+    if (id) {
+      query = supabase.from('site_attendance_tracker').update(dbData).eq('id', id);
+    } else {
+      query = supabase.from('site_attendance_tracker').insert(dbData);
+    }
+    const { data, error } = await query.select().single();
+    if (error) throw error;
+    return toCamelCase(data);
+  },
+
+  deleteSiteAttendanceRecord: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('site_attendance_tracker').delete().eq('id', id);
+    if (error) throw error;
   },
 
     // --- Settings ---

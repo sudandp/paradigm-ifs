@@ -1689,3 +1689,19 @@ export interface GmcSubmission {
   spouseGender?: string | null;
   updatedAt: string;
 }
+
+export interface SiteAttendanceRecord {
+  id: string;
+  siteId: string;
+  siteName: string;
+  billingDate: string;
+  contractAmount: number;
+  contractManagementFee: number;
+  billedAmount: number;
+  billedManagementFee: number;
+  billingDifference: number;
+  managementFeeDifference: number;
+  variationStatus: 'Profit' | 'Loss';
+  createdAt?: string;
+  updatedAt?: string;
+}

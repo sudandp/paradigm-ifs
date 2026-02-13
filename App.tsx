@@ -79,6 +79,8 @@ const OnboardingPdfOutput = lazyWithRetry(() => import('./pages/onboarding/Onboa
 const UniformDashboard = lazyWithRetry(() => import('./pages/uniforms/UniformDashboard'));
 const CostAnalysis = lazyWithRetry(() => import('./pages/billing/CostAnalysis'));
 const InvoiceSummary = lazyWithRetry(() => import('./pages/billing/InvoiceSummary'));
+const SiteAttendanceTracker = lazyWithRetry(() => import('./pages/billing/SiteAttendanceTracker'));
+const AddSiteAttendanceRecord = lazyWithRetry(() => import('./pages/forms/AddSiteAttendanceRecord'));
 const FieldStaffTracking = lazyWithRetry(() => import('./pages/hr/FieldStaffTracking'));
 const LocationManagement = lazyWithRetry(() => import('./pages/hr/LocationManagement'));
 const PreUpload = lazyWithRetry(() => import('./pages/onboarding/PreUpload'));
@@ -747,6 +749,9 @@ const App: React.FC = () => {
           {/* Billing */}
           <Route element={<ProtectedRoute requiredPermission="view_verification_costing" />}>
             <Route path="billing/cost-analysis" element={<CostAnalysis />} />
+            <Route path="billing/site-attendance-tracker" element={<SiteAttendanceTracker />} />
+            <Route path="billing/site-attendance-tracker/add" element={<AddSiteAttendanceRecord />} />
+            <Route path="billing/site-attendance-tracker/edit/:id" element={<AddSiteAttendanceRecord />} />
           </Route>
           <Route element={<ProtectedRoute requiredPermission="view_invoice_summary" />}>
             <Route path="billing/summary" element={<InvoiceSummary />} />
