@@ -27,7 +27,7 @@ const AppDownloadModal: React.FC<AppDownloadModalProps> = ({ isOpen, onClose }) 
         if (id === 'android') {
             // Direct APK Download - simulate delay for loading state
             await new Promise(resolve => setTimeout(resolve, 800));
-            window.location.href = '/paradigm-office.apk';
+            window.location.href = '/Paradigm Office.apk';
             setTimeout(() => {
                 setLoadingPlatform(null);
                 onClose();
