@@ -749,6 +749,8 @@ const App: React.FC = () => {
           {/* Billing */}
           <Route element={<ProtectedRoute requiredPermission="view_verification_costing" />}>
             <Route path="billing/cost-analysis" element={<CostAnalysis />} />
+          </Route>
+          <Route element={<ProtectedRoute requiredPermission="view_attendance_tracker" />}>
             <Route path="billing/site-attendance-tracker" element={<SiteAttendanceTracker />} />
             <Route path="billing/site-attendance-tracker/add" element={<AddSiteAttendanceRecord />} />
             <Route path="billing/site-attendance-tracker/edit/:id" element={<AddSiteAttendanceRecord />} />

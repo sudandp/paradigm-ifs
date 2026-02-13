@@ -50,6 +50,9 @@ export const allPermissions: { key: Permission; name: string; description: strin
     { key: 'view_mobile_nav_attendance', name: 'Mobile Nav: Attendance', description: 'Show Attendance tab in mobile navigation.' },
     { key: 'view_mobile_nav_tasks', name: 'Mobile Nav: Tasks', description: 'Show Tasks tab in mobile navigation.' },
     { key: 'view_mobile_nav_profile', name: 'Mobile Nav: Profile', description: 'Show Profile tab in mobile navigation.' },
+    { key: 'manage_finance_settings', name: 'Manage Finance Settings', description: 'Control over global finance configurations.' },
+    { key: 'view_finance_reports', name: 'View Finance Reports', description: 'Access to consolidated financial reports.' },
+    { key: 'view_attendance_tracker', name: 'View Site Attendance Tracker', description: 'Monitor and track site-level attendance records.' },
 ] as const].sort((a, b) => a.name.localeCompare(b.name));
 
 const RoleManagement: React.FC = () => {

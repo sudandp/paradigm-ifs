@@ -44,7 +44,10 @@ export type Permission =
   | 'view_mobile_nav_home'
   | 'view_mobile_nav_attendance'
   | 'view_mobile_nav_tasks'
-  | 'view_mobile_nav_profile';
+  | 'view_mobile_nav_profile'
+  | 'manage_finance_settings'
+  | 'view_finance_reports'
+  | 'view_attendance_tracker';
 
 export interface AppModule {
   id: string;
