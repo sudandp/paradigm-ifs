@@ -1739,8 +1739,17 @@ export interface SiteInvoiceRecord {
   invoiceSentTime: string;
   invoiceSentMethodRemarks: string;
 
+  createdBy?: string;
+  createdByName?: string;
+  createdByRole?: string;
   createdAt?: string;
   updatedAt?: string;
+
+  // soft delete
+  deletedAt?: string;
+  deletedBy?: string;
+  deletedByName?: string;
+  deletedReason?: string;
 }
 
 export interface SiteInvoiceDefault {
@@ -1777,6 +1786,15 @@ export interface SiteFinanceRecord {
   
   remarks?: string;
   status: 'pending' | 'approved' | 'invoiced';
+  createdBy?: string;
+  createdByName?: string;
+  createdByRole?: string;
   createdAt?: string;
   updatedAt?: string;
+
+  // Deletion tracking
+  deletedAt?: string;
+  deletedBy?: string;
+  deletedByName?: string;
+  deletedReason?: string;
 }

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../services/api';
+import { supabase } from '../../services/supabase';
+import { useAuthStore } from '../../store/authStore';
 import type { SiteInvoiceRecord, SiteInvoiceDefault, Organization } from '../../types';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
@@ -48,6 +50,7 @@ const AddSiteAttendanceRecord: React.FC = () => {
     const INVOICE_INCHARGE_OPTIONS = ['Arpitha', 'Sinchana'];
 
     const [siteDefaults, setSiteDefaults] = useState<SiteInvoiceDefault[]>([]);
+    const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -59,6 +62,11 @@ const AddSiteAttendanceRecord: React.FC = () => {
                 ]);
                 setSites(fetchedSites);
                 setSiteDefaults(fetchedDefaults);
+
+                const { user: authUser } = useAuthStore.getState();
+                if (authUser) {
+                    setCurrentUser({ id: authUser.id, name: authUser.name || 'Unknown' });
+                }
 
                 if (isEditing && id) {
                     const records = await api.getSiteInvoiceRecords();
@@ -135,7 +143,14 @@ const AddSiteAttendanceRecord: React.FC = () => {
 
         setIsSaving(true);
         try {
-            await api.saveSiteInvoiceRecord(record);
+            const payload = { ...record };
+            if (!isEditing && currentUser) {
+                const { user: authUser } = useAuthStore.getState();
+                payload.createdBy = currentUser.id;
+                payload.createdByName = currentUser.name;
+                payload.createdByRole = authUser?.role;
+            }
+            await api.saveSiteInvoiceRecord(payload);
             setToast({ message: `Record ${isEditing ? 'updated' : 'created'} successfully!`, type: 'success' });
             setTimeout(() => navigate('/finance?tab=attendance'), 1500);
         } catch (error) {

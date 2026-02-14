@@ -4,12 +4,10 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { api } from '../../services/api';
 import type { SiteInvoiceRecord, SiteInvoiceDefault } from '../../types';
-import AdminPageHeader from '../../components/admin/AdminPageHeader';
-import { format, differenceInCalendarDays, parseISO, isBefore, isToday, startOfDay } from 'date-fns';
-import { Loader2, Plus, Trash2, Edit2, ClipboardList, CheckCircle2, Clock, Mail, AlertTriangle, Building, Download, Upload, FileSpreadsheet, X } from 'lucide-react';
-import Button from '../../components/ui/Button';
+import { format, differenceInCalendarDays, parseISO, isBefore, isToday, startOfDay, subDays } from 'date-fns';
+import { Loader2, Plus, Trash2, Edit2, ClipboardList, CheckCircle2, Clock, Mail, AlertTriangle, Building, Download, Upload, FileSpreadsheet, X, Search, RotateCcw, ShieldX, Info } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
 import Toast from '../../components/ui/Toast';
-import StatCard from '../../components/ui/StatCard';
 
 const SiteAttendanceTracker: React.FC = () => {
     const navigate = useNavigate();
@@ -22,15 +20,44 @@ const SiteAttendanceTracker: React.FC = () => {
     const [siteDefaults, setSiteDefaults] = useState<SiteInvoiceDefault[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Filter & Pagination State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const ROWS_PER_PAGE = 15;
+
+    // Deletion State
+    const [deletedRecords, setDeletedRecords] = useState<SiteInvoiceRecord[]>([]);
+    const [activeSubTab, setActiveSubTab] = useState<'active' | 'log'>('active');
+    const [recordToDelete, setRecordToDelete] = useState<SiteInvoiceRecord | null>(null);
+    const [deleteReason, setDeleteReason] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isRestoring, setIsRestoring] = useState<string | null>(null);
+
+    const { user } = useAuthStore();
+
     const fetchInitialData = useCallback(async () => {
         setIsLoading(true);
         try {
-            const [fetchedRecords, fetchedDefaults] = await Promise.all([
+            const [fetchedRecords, fetchedDefaults, fetchedDeleted] = await Promise.all([
                 api.getSiteInvoiceRecords(),
-                api.getSiteInvoiceDefaults()
+                api.getSiteInvoiceDefaults(),
+                api.getDeletedSiteInvoiceRecords()
             ]);
             setRecords(fetchedRecords);
             setSiteDefaults(fetchedDefaults);
+            setDeletedRecords(fetchedDeleted);
+
+            // Auto-cleanup records older than 7 days
+            const sevenDaysAgo = subDays(new Date(), 7);
+            const recordsToCleanup = fetchedDeleted.filter(r => 
+                r.deletedAt && new Date(r.deletedAt) < sevenDaysAgo
+            );
+
+            if (recordsToCleanup.length > 0) {
+                await Promise.all(recordsToCleanup.map(r => api.permanentlyDeleteSiteInvoiceRecord(r.id)));
+                const refreshedDeleted = await api.getDeletedSiteInvoiceRecords();
+                setDeletedRecords(refreshedDeleted);
+            }
         } catch (error) {
             console.error('Error fetching tracker data:', error);
             setToast({ message: 'Failed to load data', type: 'error' });
@@ -43,38 +70,68 @@ const SiteAttendanceTracker: React.FC = () => {
         fetchInitialData();
     }, [fetchInitialData]);
 
-    const handleDelete = async (id: string) => {
-        if (!window.confirm('Are you sure you want to delete this record?')) return;
+    const handleSoftDelete = async () => {
+        if (!recordToDelete || !deleteReason.trim() || !user) return;
+        setIsDeleting(true);
         try {
-            await api.deleteSiteInvoiceRecord(id);
-            setToast({ message: 'Record deleted', type: 'success' });
+            await api.softDeleteSiteInvoiceRecord(recordToDelete.id, deleteReason, user.id, user.name || 'Unknown');
+            setToast({ message: 'Record moved to deletion log', type: 'success' });
+            setRecordToDelete(null);
+            setDeleteReason('');
             fetchInitialData();
         } catch (error) {
-            console.error('Delete error:', error);
+            setToast({ message: 'Failed to delete record', type: 'error' });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleRestore = async (id: string) => {
+        setIsRestoring(id);
+        try {
+            await api.restoreSiteInvoiceRecord(id);
+            setToast({ message: 'Record restored successfully', type: 'success' });
+            fetchInitialData();
+        } catch (error) {
+            setToast({ message: 'Failed to restore record', type: 'error' });
+        } finally {
+            setIsRestoring(null);
+        }
+    };
+
+    const handlePermanentDelete = async (id: string) => {
+        if (!window.confirm('This will permanently delete the record. Continue?')) return;
+        try {
+            await api.permanentlyDeleteSiteInvoiceRecord(id);
+            setToast({ message: 'Record permanently deleted', type: 'success' });
+            fetchInitialData();
+        } catch (error) {
             setToast({ message: 'Failed to delete record', type: 'error' });
         }
     };
 
     const getDelayColor = (delay: number | null) => {
-        if (delay === null) return '';
-        if (delay > 5) return 'bg-red-100 text-red-700 font-black';
-        if (delay > 0) return 'bg-orange-100 text-orange-700 font-bold';
-        if (delay === 0) return 'bg-green-50 text-green-700';
-        return 'bg-green-100 text-green-800 font-bold';
+        if (delay === null) return 'text-gray-400';
+        if (delay > 5) return 'text-rose-600 bg-rose-50 px-2 py-0.5 rounded font-bold';
+        if (delay > 0) return 'text-amber-600 bg-amber-50 px-2 py-0.5 rounded font-semibold';
+        return 'text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded font-medium';
     };
 
     const calculateDelay = (received: string, tentative: string): number | null => {
         if (!received || !tentative) return null;
-        return differenceInCalendarDays(parseISO(received), parseISO(tentative));
+        try {
+            return differenceInCalendarDays(parseISO(received), parseISO(tentative));
+        } catch (e) {
+            return null;
+        }
     };
 
-    // --- Excel Export ---
+    // --- Excel Functions ---
     const handleExport = async () => {
         setIsExporting(true);
         try {
             const workbook = new ExcelJS.Workbook();
             const ws = workbook.addWorksheet('Invoice Tracker');
-
             ws.columns = [
                 { header: 'Site Name', key: 'siteName', width: 25 },
                 { header: 'Company Name', key: 'companyName', width: 18 },
@@ -82,288 +139,233 @@ const SiteAttendanceTracker: React.FC = () => {
                 { header: 'Ops Incharge', key: 'opsIncharge', width: 15 },
                 { header: 'HR Incharge', key: 'hrIncharge', width: 15 },
                 { header: 'Invoice Incharge', key: 'invoiceIncharge', width: 18 },
-                { header: 'Ops Remarks', key: 'opsRemarks', width: 20 },
-                { header: 'HR Remarks', key: 'hrRemarks', width: 20 },
-                { header: 'Finance Remarks', key: 'financeRemarks', width: 20 },
-                { header: 'Mgr Tentative Date', key: 'managerTentativeDate', width: 18 },
-                { header: 'Mgr Received Date', key: 'managerReceivedDate', width: 18 },
-                { header: 'HR Tentative Date', key: 'hrTentativeDate', width: 18 },
-                { header: 'HR Received Date', key: 'hrReceivedDate', width: 18 },
-                { header: 'Attendance Received Time', key: 'attendanceReceivedTime', width: 22 },
-                { header: 'Invoice Tentative Date', key: 'invoiceSharingTentativeDate', width: 22 },
-                { header: 'Invoice Prepared Date', key: 'invoicePreparedDate', width: 20 },
-                { header: 'Invoice Sent Date', key: 'invoiceSentDate', width: 18 },
-                { header: 'Invoice Sent Time', key: 'invoiceSentTime', width: 18 },
-                { header: 'Sent Method/Remarks', key: 'invoiceSentMethodRemarks', width: 22 },
             ];
-
-            // Style header row
-            ws.getRow(1).font = { bold: true, size: 11 };
-            ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
-            ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-            ws.getRow(1).alignment = { horizontal: 'center', vertical: 'middle' };
-
-            records.forEach(r => {
-                ws.addRow({
-                    siteName: r.siteName,
-                    companyName: r.companyName,
-                    billingCycle: r.billingCycle,
-                    opsIncharge: r.opsIncharge,
-                    hrIncharge: r.hrIncharge,
-                    invoiceIncharge: r.invoiceIncharge,
-                    opsRemarks: r.opsRemarks,
-                    hrRemarks: r.hrRemarks,
-                    financeRemarks: r.financeRemarks,
-                    managerTentativeDate: r.managerTentativeDate || '',
-                    managerReceivedDate: r.managerReceivedDate || '',
-                    hrTentativeDate: r.hrTentativeDate || '',
-                    hrReceivedDate: r.hrReceivedDate || '',
-                    attendanceReceivedTime: r.attendanceReceivedTime || '',
-                    invoiceSharingTentativeDate: r.invoiceSharingTentativeDate || '',
-                    invoicePreparedDate: r.invoicePreparedDate || '',
-                    invoiceSentDate: r.invoiceSentDate || '',
-                    invoiceSentTime: r.invoiceSentTime || '',
-                    invoiceSentMethodRemarks: r.invoiceSentMethodRemarks || '',
-                });
-            });
-
+            ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF006B3F' } };
+            records.forEach(r => ws.addRow(r));
             const buffer = await workbook.xlsx.writeBuffer();
-            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            saveAs(blob, `Site_Invoice_Tracker_${format(new Date(), 'yyyyMMdd')}.xlsx`);
-            setToast({ message: 'Excel exported successfully!', type: 'success' });
+            saveAs(new Blob([buffer]), `Attendance_Tracker_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+            setToast({ message: 'Exported successfully!', type: 'success' });
         } catch (err) {
-            console.error('Export error:', err);
-            setToast({ message: 'Failed to export data', type: 'error' });
+            setToast({ message: 'Failed to export', type: 'error' });
         } finally {
             setIsExporting(false);
         }
     };
 
-    // --- Download Template (with site defaults pre-filled) ---
     const handleDownloadTemplate = async () => {
         setIsExporting(true);
         try {
             const workbook = new ExcelJS.Workbook();
-            const ws = workbook.addWorksheet('Invoice Template');
-
+            const ws = workbook.addWorksheet('Template');
             ws.columns = [
                 { header: 'Site Name', key: 'siteName', width: 25 },
-                { header: 'Company Name', key: 'companyName', width: 18 },
-                { header: 'Billing Cycle', key: 'billingCycle', width: 18 },
-                { header: 'Ops Incharge', key: 'opsIncharge', width: 15 },
-                { header: 'HR Incharge', key: 'hrIncharge', width: 15 },
-                { header: 'Invoice Incharge', key: 'invoiceIncharge', width: 18 },
-                { header: 'Ops Remarks', key: 'opsRemarks', width: 20 },
-                { header: 'HR Remarks', key: 'hrRemarks', width: 20 },
-                { header: 'Finance Remarks', key: 'financeRemarks', width: 20 },
-                { header: 'Mgr Tentative Date', key: 'managerTentativeDate', width: 18 },
-                { header: 'Mgr Received Date', key: 'managerReceivedDate', width: 18 },
-                { header: 'HR Tentative Date', key: 'hrTentativeDate', width: 18 },
-                { header: 'HR Received Date', key: 'hrReceivedDate', width: 18 },
-                { header: 'Attendance Received Time', key: 'attendanceReceivedTime', width: 22 },
-                { header: 'Invoice Tentative Date', key: 'invoiceSharingTentativeDate', width: 22 },
-                { header: 'Invoice Prepared Date', key: 'invoicePreparedDate', width: 20 },
-                { header: 'Invoice Sent Date', key: 'invoiceSentDate', width: 18 },
-                { header: 'Invoice Sent Time', key: 'invoiceSentTime', width: 18 },
-                { header: 'Sent Method/Remarks', key: 'invoiceSentMethodRemarks', width: 22 },
+                { header: 'Company Name', key: 'companyName', width: 20 },
+                { header: 'Billing Cycle', key: 'billingCycle', width: 20 },
+                { header: 'Ops Incharge', key: 'opsIncharge', width: 20 },
+                { header: 'HR Incharge', key: 'hrIncharge', width: 20 },
+                { header: 'Invoice Incharge', key: 'invoiceIncharge', width: 20 },
             ];
-
-            ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+            ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
             ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D9488' } };
-            ws.getRow(1).alignment = { horizontal: 'center', vertical: 'middle' };
-
-            // Pre-fill with site defaults
-            siteDefaults.forEach(d => {
-                ws.addRow({
-                    siteName: d.siteName,
-                    companyName: d.companyName || '',
-                    billingCycle: d.billingCycle || '',
-                    opsIncharge: d.opsIncharge || '',
-                    hrIncharge: d.hrIncharge || '',
-                    invoiceIncharge: d.invoiceIncharge || '',
-                    opsRemarks: '',
-                    hrRemarks: '',
-                    financeRemarks: '',
-                    managerTentativeDate: d.managerTentativeDate || '',
-                    managerReceivedDate: '',
-                    hrTentativeDate: d.hrTentativeDate || '',
-                    hrReceivedDate: '',
-                    attendanceReceivedTime: '',
-                    invoiceSharingTentativeDate: d.invoiceSharingTentativeDate || '',
-                    invoicePreparedDate: '',
-                    invoiceSentDate: '',
-                    invoiceSentTime: '',
-                    invoiceSentMethodRemarks: '',
-                });
-            });
-
+            siteDefaults.forEach(d => ws.addRow(d));
             const buffer = await workbook.xlsx.writeBuffer();
-            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            saveAs(blob, `Invoice_Template_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+            saveAs(new Blob([buffer]), 'Attendance_Template.xlsx');
             setToast({ message: 'Template downloaded!', type: 'success' });
         } catch (err) {
-            console.error('Template error:', err);
-            setToast({ message: 'Failed to generate template', type: 'error' });
+            setToast({ message: 'Failed to download template', type: 'error' });
         } finally {
             setIsExporting(false);
         }
     };
 
-    // --- Excel Import (parse and preview) ---
-    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
         if (!file) return;
-
         try {
             const workbook = new ExcelJS.Workbook();
-            const arrayBuffer = await file.arrayBuffer();
-            await workbook.xlsx.load(arrayBuffer);
+            await workbook.xlsx.load(await file.arrayBuffer());
             const ws = workbook.getWorksheet(1);
-
             const parsed: Partial<SiteInvoiceRecord>[] = [];
-            ws?.eachRow((row, rowNumber) => {
-                if (rowNumber === 1) return;
-
-                const siteName = row.getCell(1).value?.toString() || '';
-                if (!siteName) return;
-
-                const getDateStr = (cell: any): string => {
-                    const val = cell.value;
-                    if (!val) return '';
-                    if (val instanceof Date) return format(val, 'yyyy-MM-dd');
-                    return val.toString();
-                };
-
+            ws?.eachRow((row, i) => {
+                if (i === 1) return;
                 parsed.push({
-                    siteName,
+                    siteName: row.getCell(1).value?.toString() || '',
                     companyName: row.getCell(2).value?.toString() || '',
                     billingCycle: row.getCell(3).value?.toString() || '',
                     opsIncharge: row.getCell(4).value?.toString() || '',
                     hrIncharge: row.getCell(5).value?.toString() || '',
                     invoiceIncharge: row.getCell(6).value?.toString() || '',
-                    opsRemarks: row.getCell(7).value?.toString() || '',
-                    hrRemarks: row.getCell(8).value?.toString() || '',
-                    financeRemarks: row.getCell(9).value?.toString() || '',
-                    managerTentativeDate: getDateStr(row.getCell(10)),
-                    managerReceivedDate: getDateStr(row.getCell(11)),
-                    hrTentativeDate: getDateStr(row.getCell(12)),
-                    hrReceivedDate: getDateStr(row.getCell(13)),
-                    attendanceReceivedTime: row.getCell(14).value?.toString() || '',
-                    invoiceSharingTentativeDate: getDateStr(row.getCell(15)),
-                    invoicePreparedDate: getDateStr(row.getCell(16)),
-                    invoiceSentDate: getDateStr(row.getCell(17)),
-                    invoiceSentTime: row.getCell(18).value?.toString() || '',
-                    invoiceSentMethodRemarks: row.getCell(19).value?.toString() || '',
                 });
             });
-
-            if (parsed.length === 0) {
-                setToast({ message: 'No valid rows found in the file', type: 'error' });
-            } else {
-                setPreviewData(parsed);
-                setToast({ message: `${parsed.length} records parsed. Review below.`, type: 'success' });
-            }
+            setPreviewData(parsed.filter(p => !!p.siteName));
+            setToast({ message: 'File parsed. Please review.', type: 'success' });
         } catch (err) {
-            console.error('Import error:', err);
-            setToast({ message: 'Failed to parse Excel file', type: 'error' });
+            setToast({ message: 'Failed to parse file', type: 'error' });
         }
-        if (event.target) event.target.value = '';
     };
 
     const handleConfirmImport = async () => {
+        if (!user) return;
         setIsImporting(true);
         try {
-            await api.bulkSaveSiteInvoiceRecords(previewData);
-            setToast({ message: `${previewData.length} records imported successfully!`, type: 'success' });
+            const recordsWithUser = previewData.map(r => ({
+                ...r,
+                createdBy: user.id,
+                createdByName: user.name,
+                createdByRole: user.role
+            }));
+            await api.bulkSaveSiteInvoiceRecords(recordsWithUser);
+            setToast({ message: 'Records imported!', type: 'success' });
             setPreviewData([]);
             fetchInitialData();
         } catch (err) {
-            console.error('Bulk save error:', err);
-            setToast({ message: 'Failed to import records', type: 'error' });
+            setToast({ message: 'Import failed', type: 'error' });
         } finally {
             setIsImporting(false);
         }
     };
 
+    // --- Filter & Stats ---
+    const currentRecords = activeSubTab === 'active' ? records : deletedRecords;
+
+    const filteredRecords = useMemo(() => {
+        return currentRecords.filter(r => 
+            r.siteName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (r.companyName || '').toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [currentRecords, searchQuery]);
+
     const stats = useMemo(() => {
         const total = records.length;
-        const sentRecords = records.filter(r => !!r.invoiceSentDate);
-        const onTimeCount = sentRecords.filter(r => {
-            if (!r.invoiceSentDate || !r.invoiceSharingTentativeDate) return false;
-            return !isBefore(parseISO(r.invoiceSharingTentativeDate), parseISO(r.invoiceSentDate));
-        }).length;
-
-        const mailSentCount = sentRecords.filter(r =>
-            r.invoiceSentMethodRemarks?.toLowerCase().includes('mail')
-        ).length;
-
-        const pendingCount = total - sentRecords.length;
-
+        const sent = records.filter(r => !!r.invoiceSentDate).length;
+        const pending = total - sent;
         const today = startOfDay(new Date());
-        const dueSites = records.filter(r => {
+        const due = records.filter(r => {
             if (!!r.invoiceSentDate || !r.invoiceSharingTentativeDate) return false;
-            const tentativeDate = parseISO(r.invoiceSharingTentativeDate);
-            return isBefore(tentativeDate, today) || isToday(tentativeDate);
+            return isBefore(parseISO(r.invoiceSharingTentativeDate), today) || isToday(parseISO(r.invoiceSharingTentativeDate));
         });
-
-        return { total, onTimeCount, mailSentCount, pendingCount, dueSites, invoiceSentCount: sentRecords.length };
+        return { total, sent, pending, due };
     }, [records]);
 
+    const totalPages = Math.ceil(filteredRecords.length / ROWS_PER_PAGE);
+    const paginatedRecords = filteredRecords.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
+
+    useEffect(() => { setCurrentPage(1); }, [searchQuery, activeSubTab]);
+
+    const isAdmin = ['admin', 'super_admin', 'management', 'hr'].includes(user?.role || '');
+
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4 mb-2 flex-wrap">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <Button variant="outline" onClick={handleDownloadTemplate} disabled={isExporting}>
-                        <FileSpreadsheet className="h-4 w-4 mr-1" />
-                        Template
-                    </Button>
-                    <Button variant="outline" onClick={handleExport} disabled={isExporting}>
-                        <Download className="h-4 w-4 mr-1" />
-                        Export
-                    </Button>
-                    <div className="relative">
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".xlsx"
-                            onChange={handleFileUpload}
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full"
-                        />
-                        <Button variant="outline">
-                            <Upload className="h-4 w-4 mr-1" />
+        <div className="space-y-6 max-w-[1400px] mx-auto">
+            {/* ── Action Bar ── */}
+            <div className="bg-white rounded-xl border border-gray-200/80 shadow-sm p-5">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                            onClick={handleDownloadTemplate}
+                            disabled={isExporting}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                        >
+                            <Download className="h-3.5 w-3.5 text-emerald-600" />
+                            Template
+                        </button>
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                            <Upload className="h-3.5 w-3.5 text-emerald-600" />
                             Import
-                        </Button>
+                        </button>
+                        <button
+                            onClick={handleExport}
+                            disabled={isExporting}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                        >
+                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                            Export
+                        </button>
+                        <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
                     </div>
+                    <button
+                        onClick={() => navigate('/finance/attendance/add')}
+                        className="inline-flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-[#006B3F] rounded-lg hover:bg-[#005632] transition-all duration-150 shadow-sm shadow-emerald-900/10 hover:shadow-md hover:shadow-emerald-900/15 hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                        <Plus className="h-3.5 w-3.5" />
+                        New Entry
+                    </button>
                 </div>
-                <Button onClick={() => navigate('/finance/attendance/add')}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    New Entry
-                </Button>
             </div>
 
-            {/* Statistics Section */}
-            {!isLoading && records.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    <StatCard title="Sent On Time" value={stats.onTimeCount} icon={CheckCircle2} />
-                    <StatCard title="Mail Sent" value={stats.mailSentCount} icon={Mail} />
-                    <StatCard title="Pending" value={stats.pendingCount} icon={Clock} />
-                    <StatCard title="Invoice Sent" value={stats.invoiceSentCount} icon={FileSpreadsheet} />
-                    <StatCard title="Total Sites" value={stats.total} icon={Building} />
+            {/* ── KPI Summary Cards ── */}
+            {!isLoading && (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white rounded-xl border border-gray-200/80 p-5 transition-all duration-150 hover:shadow-md hover:-translate-y-0.5">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-emerald-600">Total Sites</p>
+                                <h3 className="text-xl font-bold text-gray-900 mt-1.5">{stats.total}</h3>
+                                <p className="text-[10px] font-medium text-gray-400 mt-1">Active site connections</p>
+                            </div>
+                            <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+                                <Building className="h-5 w-5 text-emerald-600" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-gray-200/80 p-5 transition-all duration-150 hover:shadow-md hover:-translate-y-0.5">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-rose-600">Pending Invoices</p>
+                                <h3 className="text-xl font-bold text-gray-900 mt-1.5">{stats.pending}</h3>
+                                <p className="text-[10px] font-medium text-rose-500 mt-1">{stats.due.length} Action required</p>
+                            </div>
+                            <div className="w-10 h-10 rounded-lg bg-rose-50 flex items-center justify-center">
+                                <Clock className="h-5 w-5 text-rose-600" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-gray-200/80 p-5 transition-all duration-150 hover:shadow-md hover:-translate-y-0.5">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-emerald-600">Successfully Sent</p>
+                                <h3 className="text-xl font-bold text-gray-900 mt-1.5">{stats.sent}</h3>
+                                <p className="text-[10px] font-medium text-emerald-500 mt-1">{Math.round((stats.sent / (stats.total || 1)) * 100)}% Completion</p>
+                            </div>
+                            <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl border border-gray-200/80 p-5 transition-all duration-150 hover:shadow-md hover:-translate-y-0.5">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-emerald-600">Mail Dispatched</p>
+                                <h3 className="text-xl font-bold text-gray-900 mt-1.5">{records.filter(r => r.invoiceSentMethodRemarks?.toLowerCase().includes('mail')).length}</h3>
+                                <p className="text-[10px] font-medium text-gray-400 mt-1">Via organizational email</p>
+                            </div>
+                            <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+                                <Mail className="h-5 w-5 text-emerald-600" />
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
-            {/* Due Dates Alert Section */}
-            {!isLoading && stats.dueSites.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-4">
-                    <div className="bg-red-100 p-2 rounded-xl">
-                        <AlertTriangle className="h-6 w-6 text-red-600" />
+            {/* ── Due Alerts ── */}
+            {!isLoading && stats.due.length > 0 && (
+                <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-4 flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center shrink-0">
+                        <AlertTriangle className="h-4 w-4 text-rose-600" />
                     </div>
                     <div>
-                        <h4 className="text-red-900 font-bold text-sm">Action Required: Pending Due Invoices</h4>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                            {stats.dueSites.map(site => (
-                                <span key={site.id} className="bg-red-600 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase shadow-sm">
-                                    {site.siteName} (Due: {format(parseISO(site.invoiceSharingTentativeDate), 'dd MMM')})
+                        <h4 className="text-sm font-bold text-rose-900">Immediate Action Required</h4>
+                        <p className="text-xs text-rose-700 mt-0.5">The following sites have reached their tentative invoice sharing date:</p>
+                        <div className="flex flex-wrap gap-1.5 mt-2.5">
+                            {stats.due.map(site => (
+                                <span key={site.id} className="inline-flex items-center px-2 py-0.5 rounded-md bg-white border border-rose-200 text-rose-800 text-[10px] font-bold shadow-sm whitespace-nowrap">
+                                    {site.siteName} (Due: {site.invoiceSharingTentativeDate ? format(parseISO(site.invoiceSharingTentativeDate), 'dd MMM') : 'N/A'})
                                 </span>
                             ))}
                         </div>
@@ -371,164 +373,365 @@ const SiteAttendanceTracker: React.FC = () => {
                 </div>
             )}
 
-            {/* Import Preview Section */}
-            {previewData.length > 0 && (
-                <div className="bg-white border border-blue-200 rounded-2xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-bottom-4">
-                    <div className="p-5 border-b border-border bg-blue-50/50 flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h3 className="text-lg font-bold text-primary-text flex items-center gap-2">
-                                <FileSpreadsheet className="h-5 w-5 text-blue-600" />
-                                Preview Import ({previewData.length} Records)
-                            </h3>
-                            <p className="text-sm text-muted mt-1">Review the data before confirming the import.</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <Button variant="secondary" onClick={() => setPreviewData([])}>
-                                <X className="h-4 w-4 mr-1" /> Discard
-                            </Button>
-                            <Button onClick={handleConfirmImport} disabled={isImporting} className="bg-emerald-600 hover:bg-emerald-700 text-white px-6">
-                                {isImporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                                Confirm & Import
-                            </Button>
+            {/* ── Main Data Section ── */}
+            <div className="bg-white rounded-xl border border-gray-200/80 shadow-sm overflow-hidden">
+                <div className="px-5 py-3 border-b border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-6">
+                        <div className="flex bg-gray-100/80 p-1 rounded-lg">
+                            <button
+                                onClick={() => setActiveSubTab('active')}
+                                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                    activeSubTab === 'active' 
+                                        ? 'bg-white text-emerald-700 shadow-sm' 
+                                        : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                Active Records
+                            </button>
+                            <button
+                                onClick={() => setActiveSubTab('log')}
+                                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                    activeSubTab === 'log' 
+                                        ? 'bg-white text-rose-700 shadow-sm' 
+                                        : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                Deletion Log
+                                {deletedRecords.length > 0 && (
+                                    <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-600 text-[10px]">
+                                        {deletedRecords.length}
+                                    </span>
+                                )}
+                            </button>
                         </div>
                     </div>
-                    <div className="overflow-x-auto max-h-[400px]">
-                        <table className="w-full text-xs text-left">
-                            <thead className="bg-gray-50 sticky top-0 border-b border-border z-10">
-                                <tr>
-                                    <th className="px-3 py-3 font-bold text-muted uppercase">#</th>
-                                    <th className="px-3 py-3 font-bold text-muted uppercase">Site Name</th>
-                                    <th className="px-3 py-3 font-bold text-muted uppercase">Company</th>
-                                    <th className="px-3 py-3 font-bold text-muted uppercase">Billing Cycle</th>
-                                    <th className="px-3 py-3 font-bold text-muted uppercase">Ops</th>
-                                    <th className="px-3 py-3 font-bold text-muted uppercase">HR</th>
-                                    <th className="px-3 py-3 font-bold text-muted uppercase">Invoice</th>
-                                    <th className="px-3 py-3 font-bold text-muted uppercase">Mgr Tent.</th>
-                                    <th className="px-3 py-3 font-bold text-muted uppercase">HR Tent.</th>
-                                    <th className="px-3 py-3 font-bold text-muted uppercase">Inv. Tent.</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {previewData.map((row, idx) => (
-                                    <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
-                                        <td className="px-3 py-2.5 text-muted">{idx + 1}</td>
-                                        <td className="px-3 py-2.5 font-bold">{row.siteName}</td>
-                                        <td className="px-3 py-2.5">{row.companyName}</td>
-                                        <td className="px-3 py-2.5">{row.billingCycle}</td>
-                                        <td className="px-3 py-2.5">{row.opsIncharge}</td>
-                                        <td className="px-3 py-2.5">{row.hrIncharge}</td>
-                                        <td className="px-3 py-2.5">{row.invoiceIncharge}</td>
-                                        <td className="px-3 py-2.5">{row.managerTentativeDate || '-'}</td>
-                                        <td className="px-3 py-2.5">{row.hrTentativeDate || '-'}</td>
-                                        <td className="px-3 py-2.5">{row.invoiceSharingTentativeDate || '-'}</td>
+
+                    {!isLoading && (
+                        <div className="flex flex-1 items-center justify-end gap-3 w-full sm:w-auto">
+                            <div className="relative flex-1 max-w-xs">
+                                <input
+                                    type="text"
+                                    placeholder={`Search ${activeSubTab === 'active' ? 'records' : 'deleted ones'}...`}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full h-8 pl-8 pr-3 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 outline-none transition-all placeholder:text-gray-400"
+                                />
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {isLoading ? (
+                    <div className="flex flex-col items-center justify-center py-24 gap-3">
+                        <Loader2 className="h-7 w-7 animate-spin text-emerald-500" />
+                        <span className="text-sm text-gray-400 font-medium">Loading records...</span>
+                    </div>
+                ) : filteredRecords.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+                        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-5">
+                            <ClipboardList className="h-7 w-7 text-gray-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900">
+                            {activeSubTab === 'active' ? 'No attendance records' : 'Deletion log is empty'}
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1.5 max-w-xs">
+                            {activeSubTab === 'active' 
+                                ? 'No records found for the current filter. Add a new entry to get started.' 
+                                : 'Records deleted in the last 7 days will appear here.'}
+                        </p>
+                        {activeSubTab === 'active' && (
+                            <button
+                                onClick={() => navigate('/finance/attendance/add')}
+                                className="mt-5 inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold text-white bg-[#006B3F] rounded-lg hover:bg-[#005632] transition-all"
+                            >
+                                <Plus className="h-4 w-4" />
+                                Add First Entry
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-gray-50/80 border-b border-gray-200">
+                                        <th className="px-5 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Site Information</th>
+                                        <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Incharges (Ops / HR)</th>
+                                        {activeSubTab === 'active' ? (
+                                            <>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Mgr Delay</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">HR Delay</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Sharing Delay</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Deleted By</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Reason</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Deleted At</th>
+                                            </>
+                                        )}
+                                        <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-24">Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {paginatedRecords.map((record, idx) => {
+                                        const mgrDelay = calculateDelay(record.managerReceivedDate!, record.managerTentativeDate!);
+                                        const hrDelay = calculateDelay(record.hrReceivedDate!, record.hrTentativeDate!);
+                                        const sharingDelay = calculateDelay(record.invoiceSentDate!, record.invoiceSharingTentativeDate!);
+
+                                        return (
+                                            <tr key={record.id} className="hover:bg-gray-50/60 transition-all duration-100 group">
+                                                <td className="px-5 py-3.5">
+                                                    <div className="font-semibold text-gray-900 text-sm">{record.siteName}</div>
+                                                    <div className="text-[11px] text-gray-400 mt-0.5">{record.companyName || '—'}</div>
+                                                    {record.billingCycle && <div className="inline-block mt-1.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-tighter">{record.billingCycle}</div>}
+                                                </td>
+                                                <td className="px-4 py-3.5 hidden md:table-cell">
+                                                    <div className="text-xs text-gray-600 font-medium">Ops: {record.opsIncharge || '—'}</div>
+                                                    <div className="text-[11px] text-gray-400 mt-0.5">HR: {record.hrIncharge || '—'}</div>
+                                                </td>
+                                                {activeSubTab === 'active' ? (
+                                                    <>
+                                                        <td className="px-4 py-3.5 text-center text-xs">
+                                                            <span className={getDelayColor(mgrDelay)}>
+                                                                {mgrDelay !== null ? `${mgrDelay}d` : '—'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3.5 text-center text-xs">
+                                                            <span className={getDelayColor(hrDelay)}>
+                                                                {hrDelay !== null ? `${hrDelay}d` : '—'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3.5 text-center text-xs">
+                                                            <span className={getDelayColor(sharingDelay)}>
+                                                                {sharingDelay !== null ? `${sharingDelay}d` : '—'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3.5 text-center">
+                                                            {record.invoiceSentDate ? (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+                                                                    <CheckCircle2 className="h-3 w-3" />
+                                                                    Sent
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold whitespace-nowrap">
+                                                                    <Clock className="h-3 w-3" />
+                                                                    Pending
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3.5">
+                                                            <div className="text-[11px] font-medium text-gray-900">{format(parseISO(record.createdAt!), 'dd MMM yyyy')}</div>
+                                                            <div className="flex items-center gap-1 mt-1">
+                                                                <span className="text-[10px] text-gray-400">{record.createdByName || 'System'}</span>
+                                                                {record.createdByRole && (
+                                                                    <span className="px-1 py-0.5 rounded bg-gray-100 text-[10px] font-bold text-gray-500 uppercase border border-gray-200">
+                                                                        {record.createdByRole.replace('_', ' ')}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td className="px-4 py-3.5">
+                                                            <div className="text-xs font-semibold text-gray-900">{record.deletedByName || 'Unknown'}</div>
+                                                            <div className="text-[10px] text-gray-400 mt-0.5">ID: {record.deletedBy?.slice(0, 8)}...</div>
+                                                        </td>
+                                                        <td className="px-4 py-3.5">
+                                                            <div className="flex items-start gap-1.5">
+                                                                <Info className="h-3 w-3 text-rose-400 mt-0.5 shrink-0" />
+                                                                <p className="text-xs text-rose-600 font-medium leading-relaxed italic">"{record.deletedReason || 'No reason provided'}"</p>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3.5">
+                                                            <div className="text-xs font-medium text-gray-900">{record.deletedAt ? format(parseISO(record.deletedAt), 'dd MMM, HH:mm') : '—'}</div>
+                                                            <div className="text-[10px] text-gray-400 mt-0.5">Auto-purge in 7 days</div>
+                                                        </td>
+                                                    </>
+                                                )}
+                                                <td className="px-4 py-3.5 text-right">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        {activeSubTab === 'active' ? (
+                                                            <>
+                                                                <button 
+                                                                    onClick={() => navigate(`/finance/attendance/edit/${record.id}`)} 
+                                                                    className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-all h-8 w-8 flex items-center justify-center border border-transparent hover:border-emerald-100"
+                                                                    title="Edit"
+                                                                >
+                                                                    <Edit2 className="h-3.5 w-3.5" />
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => setRecordToDelete(record)} 
+                                                                    className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all h-8 w-8 flex items-center justify-center border border-transparent hover:border-rose-100"
+                                                                    title="Delete"
+                                                                >
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <button 
+                                                                    onClick={() => handleRestore(record.id)} 
+                                                                    disabled={isRestoring === record.id || !isAdmin}
+                                                                    className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-all h-8 w-8 flex items-center justify-center border border-transparent hover:border-emerald-100 disabled:opacity-50"
+                                                                    title="Restore"
+                                                                >
+                                                                    {isRestoring === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => handlePermanentDelete(record.id)} 
+                                                                    disabled={!isAdmin}
+                                                                    className="p-1.5 text-gray-400 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-all h-8 w-8 flex items-center justify-center border border-transparent hover:border-rose-100 disabled:opacity-50"
+                                                                    title="Permanent Delete"
+                                                                >
+                                                                    <ShieldX className="h-3.5 w-3.5" />
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+                                <p className="text-xs text-gray-400">
+                                    Showing {((currentPage - 1) * ROWS_PER_PAGE) + 1}–{Math.min(currentPage * ROWS_PER_PAGE, filteredRecords.length)} of {filteredRecords.length}
+                                </p>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                        className="px-2.5 py-1 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40"
+                                    >Prev</button>
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map(page => (
+                                        <button
+                                            key={page}
+                                            onClick={() => setCurrentPage(page)}
+                                            className={`w-7 h-7 text-xs font-medium rounded-md transition-all ${page === currentPage ? 'bg-[#006B3F] text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                                        >{page}</button>
+                                    ))}
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                        className="px-2.5 py-1 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40"
+                                    >Next</button>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
+            {/* ── Import Preview Modal ── */}
+            {previewData.length > 0 && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl w-full max-w-5xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-gray-200">
+                        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-900">Attendance Import Preview</h2>
+                                <p className="text-sm text-gray-500 mt-0.5">{previewData.length} records ready to import</p>
+                            </div>
+                            <button onClick={() => setPreviewData([])} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                                <X className="h-5 w-5 text-gray-400" />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                                    <tr>
+                                        <th className="px-5 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Site Name</th>
+                                        <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Company</th>
+                                        <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Billing</th>
+                                        <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Ops Incharge</th>
+                                        <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">HR Incharge</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {previewData.map((record, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50/50">
+                                            <td className="px-5 py-3 font-semibold text-gray-900">{record.siteName}</td>
+                                            <td className="px-4 py-3 text-xs text-gray-600">{record.companyName}</td>
+                                            <td className="px-4 py-3 text-xs text-gray-600">{record.billingCycle}</td>
+                                            <td className="px-4 py-3 text-xs text-gray-600">{record.opsIncharge}</td>
+                                            <td className="px-4 py-3 text-xs text-gray-600">{record.hrIncharge}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+                            <button onClick={() => setPreviewData([])} className="px-5 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+                            <button
+                                onClick={handleConfirmImport}
+                                disabled={isImporting}
+                                className="inline-flex items-center gap-1.5 px-6 py-2 text-sm font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50"
+                            >
+                                {isImporting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                                Confirm Import
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Main Data Table */}
-            <div className="bg-card rounded-2xl border border-border overflow-hidden premium-glass">
-                {isLoading ? (
-                    <div className="flex flex-col items-center justify-center p-20 space-y-4">
-                        <Loader2 className="h-10 w-10 text-primary animate-spin" />
-                        <p className="text-muted italic">Loading invoice tracker data...</p>
-                    </div>
-                ) : records.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center p-20 space-y-4 text-center">
-                        <div className="bg-primary/10 p-4 rounded-full">
-                            <ClipboardList className="h-12 w-12 text-primary" />
-                        </div>
-                        <h3 className="text-xl font-semibold text-primary-text">No records found</h3>
-                        <p className="text-muted max-w-xs">Start tracking site invoices by adding your first entry or importing an Excel template.</p>
-                        <div className="flex gap-3">
-                            <Button onClick={() => navigate('/finance/attendance/add')} variant="secondary">
-                                <Plus className="h-4 w-4 mr-2" /> Add Entry
-                            </Button>
-                            <Button variant="outline" onClick={handleDownloadTemplate}>
-                                <FileSpreadsheet className="h-4 w-4 mr-2" /> Download Template
-                            </Button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-[11px] text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50 border-b-2 border-border text-[10px] uppercase font-bold text-muted-foreground">
-                                    <th className="px-3 py-3 border-r border-border w-10 text-center">S.No</th>
-                                    <th className="px-3 py-3 border-r border-border">Site Name</th>
-                                    <th className="px-3 py-3 border-r border-border">Ops Incharge</th>
-                                    <th className="px-3 py-3 border-r border-border">HR Incharge</th>
-                                    <th className="px-3 py-3 border-r border-border">Invoice Incharge</th>
-                                    <th className="px-3 py-3 border-r border-border bg-yellow-50 text-center">Difference (Mgr)</th>
-                                    <th className="px-3 py-3 border-r border-border bg-blue-50 text-center">Days Delayed (HR)</th>
-                                    <th className="px-3 py-3 border-r border-border bg-green-50 text-center">Days Delayed (Invoice)</th>
-                                    <th className="px-3 py-3 border-r border-border bg-green-50 text-center">Invoice Sent</th>
-                                    <th className="px-3 py-3 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {records.map((record, idx) => {
-                                    const managerDelay = calculateDelay(record.managerReceivedDate, record.managerTentativeDate);
-                                    const hrDelay = calculateDelay(record.hrReceivedDate, record.hrTentativeDate);
-                                    const invoiceDelay = calculateDelay(record.invoiceSentDate, record.invoiceSharingTentativeDate);
+            {/* ── Soft Delete Modal ── */}
+            {recordToDelete && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden border border-gray-100 flex flex-col">
+                        <div className="p-6">
+                            <div className="w-12 h-12 rounded-xl bg-rose-50 flex items-center justify-center mb-4">
+                                <Trash2 className="h-6 w-6 text-rose-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 tracking-tight">Delete Record?</h3>
+                            <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                                This record for <span className="font-bold text-gray-700">{recordToDelete.siteName}</span> will be moved to the deletion log.
+                            </p>
+                            
+                            <div className="mt-5">
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-2">Reason for deletion</label>
+                                <textarea
+                                    value={deleteReason}
+                                    onChange={(e) => setDeleteReason(e.target.value)}
+                                    placeholder="e.g. Duplicate entry, incorrect site data..."
+                                    className="w-full h-24 px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all resize-none placeholder:text-gray-300"
+                                />
+                            </div>
 
-                                    return (
-                                        <tr key={record.id} className="hover:bg-gray-50/50 transition-colors group">
-                                            <td className="px-3 py-3 border-r border-border text-center font-bold text-muted">{idx + 1}</td>
-                                            <td className="px-3 py-3 border-r border-border font-bold text-primary-text">{record.siteName}</td>
-                                            <td className="px-3 py-3 border-r border-border text-xs font-medium">{record.opsIncharge || '-'}</td>
-                                            <td className="px-3 py-3 border-r border-border text-xs font-medium">{record.hrIncharge || '-'}</td>
-                                            <td className="px-3 py-3 border-r border-border text-xs font-medium">{record.invoiceIncharge || '-'}</td>
-                                            <td className={`px-3 py-3 border-r border-border text-center ${getDelayColor(managerDelay)}`}>
-                                                {managerDelay !== null ? `${managerDelay} day${Math.abs(managerDelay) !== 1 ? 's' : ''}` : '-'}
-                                            </td>
-                                            <td className={`px-3 py-3 border-r border-border text-center ${getDelayColor(hrDelay)}`}>
-                                                {hrDelay !== null ? `${hrDelay} day${Math.abs(hrDelay) !== 1 ? 's' : ''}` : '-'}
-                                            </td>
-                                            <td className={`px-3 py-3 border-r border-border text-center ${getDelayColor(invoiceDelay)}`}>
-                                                {invoiceDelay !== null ? `${invoiceDelay} day${Math.abs(invoiceDelay) !== 1 ? 's' : ''}` : '-'}
-                                            </td>
-                                            <td className="px-3 py-3 border-r border-border text-center">
-                                                {record.invoiceSentDate ? (
-                                                    <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                                                        <CheckCircle2 className="h-3 w-3" /> Sent
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                                                        <Clock className="h-3 w-3" /> Pending
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-3 text-right space-x-1">
-                                                <button
-                                                    onClick={() => navigate(`/finance/attendance/edit/${record.id}`)}
-                                                    className="p-1.5 text-muted hover:text-primary hover:bg-primary/5 rounded-lg transition-all"
-                                                >
-                                                    <Edit2 className="h-3.5 w-3.5" />
-                                                </button>
-                                                <button onClick={() => handleDelete(record.id)} className="p-1.5 text-muted hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                            <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-100">
+                                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                                <span className="text-[10px] font-bold text-amber-700 leading-tight">Can be restored within 7 days. Permanent deletion thereafter.</span>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 flex gap-3">
+                            <button
+                                onClick={() => { setRecordToDelete(null); setDeleteReason(''); }}
+                                className="flex-1 px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSoftDelete}
+                                disabled={!deleteReason.trim() || isDeleting}
+                                className="flex-2 px-6 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl hover:bg-rose-700 transition-all shadow-md shadow-rose-900/10 disabled:opacity-50"
+                            >
+                                {isDeleting ? 'Deleting...' : 'Confirm Delete'}
+                            </button>
+                        </div>
                     </div>
-                )}
-            </div>
-
-            {toast && (
-                <Toast
-                    message={toast.message}
-                    type={toast.type}
-                    onDismiss={() => setToast(null)}
-                />
+                </div>
             )}
+
+            {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
         </div>
     );
 };

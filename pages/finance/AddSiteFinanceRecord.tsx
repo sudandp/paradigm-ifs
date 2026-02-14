@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../services/api';
+import { supabase } from '../../services/supabase';
+import { useAuthStore } from '../../store/authStore';
 import type { SiteFinanceRecord, SiteInvoiceDefault, Organization } from '../../types';
 import { useForm, Controller } from 'react-hook-form';
 import { ArrowLeft, Save, Building, Loader2, IndianRupee, MapPin, Calendar, ClipboardList, Wallet } from 'lucide-react';
@@ -17,6 +19,7 @@ const AddSiteFinanceRecord: React.FC = () => {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [sites, setSites] = useState<Organization[]>([]);
     const [siteDefaults, setSiteDefaults] = useState<SiteInvoiceDefault[]>([]);
+    const [currentUser, setCurrentUser] = useState<{ id: string, name: string, role: string } | null>(null);
 
     const { control, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<Partial<SiteFinanceRecord>>({
         defaultValues: {
@@ -61,6 +64,20 @@ const AddSiteFinanceRecord: React.FC = () => {
                 setSites(sitesList.sort((a: Organization, b: Organization) => (a.shortName || '').localeCompare(b.shortName || '')));
                 setSiteDefaults(defaults);
                 
+                // Fetch current user
+                // Fetch current user details from auth store if available, otherwise fallback to metadata
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (authUser) {
+                    const name = authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Unknown';
+                    // Fetch profile to get role
+                    const profile = await api.getUserById(authUser.id);
+                    setCurrentUser({ 
+                        id: authUser.id, 
+                        name, 
+                        role: profile?.role || 'user' 
+                    });
+                }
+
                 if (isEditing && id) {
                     // Logic to load existing record would go here
                 }
@@ -77,7 +94,15 @@ const AddSiteFinanceRecord: React.FC = () => {
     const onSubmit = async (data: Partial<SiteFinanceRecord>) => {
         setIsLoading(true);
         try {
-            await api.saveSiteFinanceRecord({ ...data, id: id });
+            const payload = { ...data, id: id };
+            // Add creator info for new records
+            if (!id && currentUser) {
+                payload.createdBy = currentUser.id;
+                payload.createdByName = currentUser.name;
+                payload.createdByRole = currentUser.role;
+            }
+            
+            await api.saveSiteFinanceRecord(payload);
             setToast({ message: 'Finance record saved successfully', type: 'success' });
             setTimeout(() => navigate('/finance?tab=site'), 1000);
         } catch (error) {
@@ -176,10 +201,28 @@ const AddSiteFinanceRecord: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {/* Contract Details */}
                         <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
-                             <h3 className="text-xs font-black text-emerald-500 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                <Wallet className="h-4 w-4" /> CONTRACT DETAILS
+                             <h3 className="text-xs font-black text-emerald-500 uppercase tracking-widest mb-6 flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <Wallet className="h-4 w-4" /> CONTRACT DETAILS
+                                </div>
+                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-black tracking-tighter">FIXED FROM SITE</span>
                             </h3>
                             <div className="space-y-6">
+                                <Controller
+                                    name="companyName"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Input 
+                                            label="Company Name" 
+                                            type="text" 
+                                            icon={<Building className="h-4 w-4" />} 
+                                            placeholder="Auto-filled..."
+                                            {...field}
+                                            readOnly
+                                            className="bg-gray-50/50 cursor-not-allowed border-dashed grayscale-[0.5] opacity-80"
+                                        />
+                                    )}
+                                />
                                 <Controller
                                     name="contractAmount"
                                     control={control}
@@ -191,14 +234,8 @@ const AddSiteFinanceRecord: React.FC = () => {
                                             icon={<IndianRupee className="h-4 w-4" />} 
                                             placeholder="0"
                                             {...field}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                field.onChange(val === '' ? '' : Number(val));
-                                            }}
-                                            onFocus={(e) => e.target.select()}
-                                            onKeyDown={(e) => {
-                                                if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
-                                            }}
+                                            readOnly
+                                            className="bg-gray-50/50 cursor-not-allowed border-dashed grayscale-[0.5] opacity-80"
                                         />
                                     )}
                                 />
@@ -213,14 +250,8 @@ const AddSiteFinanceRecord: React.FC = () => {
                                             icon={<IndianRupee className="h-4 w-4" />} 
                                             placeholder="0"
                                             {...field}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                field.onChange(val === '' ? '' : Number(val));
-                                            }}
-                                            onFocus={(e) => e.target.select()}
-                                            onKeyDown={(e) => {
-                                                if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
-                                            }}
+                                            readOnly
+                                            className="bg-gray-50/50 cursor-not-allowed border-dashed grayscale-[0.5] opacity-80"
                                         />
                                     )}
                                 />

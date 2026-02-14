@@ -329,7 +329,18 @@ export const api = {
     const { data, error } = await supabase
       .from('site_invoice_tracker')
       .select('*')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
+
+  getDeletedSiteInvoiceRecords: async (): Promise<SiteInvoiceRecord[]> => {
+    const { data, error } = await supabase
+      .from('site_invoice_tracker')
+      .select('*')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false });
     if (error) throw error;
     return (data || []).map(toCamelCase);
   },
@@ -348,7 +359,33 @@ export const api = {
     return toCamelCase(data);
   },
 
-  deleteSiteInvoiceRecord: async (id: string): Promise<void> => {
+  softDeleteSiteInvoiceRecord: async (id: string, reason: string, userId: string, userName: string): Promise<void> => {
+    const { error } = await supabase
+      .from('site_invoice_tracker')
+      .update({
+        deleted_at: new Date().toISOString(),
+        deleted_by: userId,
+        deleted_by_name: userName,
+        deleted_reason: reason
+      })
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  restoreSiteInvoiceRecord: async (id: string): Promise<void> => {
+    const { error } = await supabase
+      .from('site_invoice_tracker')
+      .update({
+        deleted_at: null,
+        deleted_by: null,
+        deleted_by_name: null,
+        deleted_reason: null
+      })
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  permanentlyDeleteSiteInvoiceRecord: async (id: string): Promise<void> => {
     const { error } = await supabase.from('site_invoice_tracker').delete().eq('id', id);
     if (error) throw error;
   },
@@ -4078,6 +4115,7 @@ export const api = {
       .from('site_finance_tracker')
       .select('*')
       .eq('billing_month', billingMonth)
+      .is('deleted_at', null)
       .order('site_name');
 
     if (error) throw error;
@@ -4112,5 +4150,53 @@ export const api = {
       console.error('Finance bulk save error:', error.message, error.details, error.hint);
       throw error;
     }
+  },
+
+  async deleteSiteFinanceRecord(id: string, reason: string, deletedBy: string, deletedByName: string): Promise<void> {
+    const { error } = await supabase
+      .from('site_finance_tracker')
+      .update({
+        deleted_at: new Date().toISOString(),
+        deleted_by: deletedBy,
+        deleted_by_name: deletedByName,
+        deleted_reason: reason
+      })
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  async getDeletedSiteFinanceRecords(): Promise<SiteFinanceRecord[]> {
+    const { data, error } = await supabase
+      .from('site_finance_tracker')
+      .select('*')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false });
+
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
+
+  async restoreSiteFinanceRecord(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('site_finance_tracker')
+      .update({
+        deleted_at: null,
+        deleted_by: null,
+        deleted_by_name: null,
+        deleted_reason: null
+      })
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  async permanentlyDeleteSiteFinanceRecord(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('site_finance_tracker')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
   }
 };
