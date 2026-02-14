@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { User } from '../../types';
@@ -14,7 +14,117 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import ApprovalModal from '../../components/admin/ApprovalModal';
 import LocationAssignmentModal from '../../components/admin/LocationAssignmentModal';
 import Pagination from '../../components/ui/Pagination';
-import Input from '../../components/ui/Input';
+
+// Helper for role names
+const getRoleName = (role: string) => {
+    return role ? role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A';
+}
+
+const getRoleBadgeClass = (role: string) => {
+    switch (role) {
+        case 'admin': return 'bg-purple-100 text-purple-700';
+        case 'hr': return 'bg-blue-100 text-blue-700';
+        case 'management': return 'bg-emerald-100 text-emerald-700';
+        case 'site_manager': return 'bg-orange-100 text-orange-800';
+        case 'field_staff': return 'bg-sky-100 text-sky-800';
+        case 'finance': return 'bg-teal-100 text-teal-700';
+        case 'developer': return 'bg-indigo-100 text-indigo-700';
+        case 'operation_manager': return 'bg-rose-100 text-rose-700';
+        case 'unverified': return 'bg-yellow-100 text-yellow-800';
+        default: return 'bg-slate-100 text-slate-700';
+    }
+};
+
+// Memoized Row for performance
+const UserRow = React.memo(({ 
+    user, handleApprove, handleEdit, handleManageLocations, handleDelete 
+}: { 
+    user: User, 
+    handleApprove: (u: User) => void, 
+    handleEdit: (u: User) => void, 
+    handleManageLocations: (u: User) => void, 
+    handleDelete: (u: User) => void 
+}) => (
+    <tr>
+        <td data-label="Name" className="px-6 py-4 font-medium">{user.name}</td>
+        <td data-label="Email" className="px-6 py-4 text-sm text-muted">{user.email}</td>
+        <td data-label="Role" className="px-6 py-4 text-sm text-muted">
+            <span className={`text-xs px-2 py-1 rounded-full font-medium ${getRoleBadgeClass(user.role)}`}>
+                {getRoleName(user.role)}
+            </span>
+            {user.role === 'unverified' && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 ml-2">Pending Approval</span>
+            )}
+        </td>
+        <td data-label="Site" className="px-6 py-4 text-sm text-muted">
+            {user.organizationName || '-'}
+        </td>
+        <td data-label="Biometric ID" className="px-6 py-4 text-sm font-mono text-muted">
+            {user.biometricId || '-'}
+        </td>
+        <td data-label="Actions" className="px-6 py-4">
+            <div className="flex items-center gap-2 md:justify-start justify-end">
+                {user.role === 'unverified' && (
+                    <Button variant="outline" size="sm" onClick={() => handleApprove(user)} aria-label={`Approve user ${user.name}`} title={`Approve user ${user.name}`}><UserCheck className="h-4 w-4 mr-2" />Approve</Button>
+                )}
+                <Button variant="icon" size="sm" onClick={() => handleEdit(user)} aria-label={`Edit user ${user.name}`} title={`Edit user ${user.name}`}><Edit className="h-4 w-4" /></Button>
+                <Button variant="icon" size="sm" onClick={() => handleManageLocations(user)} aria-label={`Manage Geofencing for ${user.name}`} title={`Manage Geofencing for ${user.name}`}><MapPin className="h-4 w-4 text-emerald-500" /></Button>
+                <Button variant="icon" onClick={() => handleDelete(user)} aria-label={`Delete user ${user.name}`} title={`Delete user ${user.name}`} className="p-2 hover:bg-red-500/10 rounded-full transition-colors"><Trash2 className="h-5 w-5 text-red-500" /></Button>
+            </div>
+        </td>
+    </tr>
+));
+
+// Memoized Card for Mobile view performance
+const UserCard = React.memo(({ 
+    user, handleApprove, handleEdit, handleManageLocations, handleDelete 
+}: { 
+    user: User, 
+    handleApprove: (u: User) => void, 
+    handleEdit: (u: User) => void, 
+    handleManageLocations: (u: User) => void, 
+    handleDelete: (u: User) => void 
+}) => (
+    <div className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col gap-3 h-full">
+        <div className="flex justify-between items-start">
+            <div>
+                <h3 className="font-semibold text-primary-text">{user.name}</h3>
+                <p className="text-sm text-muted">{user.email}</p>
+            </div>
+            <span className={`text-xs px-2 py-1 rounded-full font-medium ${getRoleBadgeClass(user.role)}`}>
+                {getRoleName(user.role)}
+            </span>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-2 text-sm mt-1 flex-grow">
+            <div>
+                <span className="text-xs text-muted block">Site</span>
+                <span className="font-medium text-primary-text">{user.organizationName || '-'}</span>
+            </div>
+            <div>
+                <span className="text-xs text-muted block">Biometric ID</span>
+                <span className="font-mono text-primary-text">{user.biometricId || '-'}</span>
+            </div>
+        </div>
+
+        <div className="pt-3 border-t border-border flex justify-end gap-2 mt-auto">
+            {user.role === 'unverified' && (
+                <Button variant="outline" size="sm" onClick={() => handleApprove(user)} className="flex-1">
+                    <UserCheck className="h-4 w-4 mr-2" />Approve
+                </Button>
+            )}
+            <Button variant="icon" size="sm" onClick={() => handleEdit(user)} className="h-9 w-9 border border-border rounded-lg">
+                <Edit className="h-4 w-4" />
+            </Button>
+            <Button variant="icon" size="sm" onClick={() => handleManageLocations(user)} className="h-9 w-9 border border-border rounded-lg">
+                <MapPin className="h-4 w-4 text-emerald-500" />
+            </Button>
+            <Button variant="icon" size="sm" onClick={() => handleDelete(user)} className="h-9 w-9 border border-border rounded-lg hover:bg-red-50 text-red-500">
+                <Trash2 className="h-4 w-4" />
+            </Button>
+        </div>
+    </div>
+));
 
 const UserManagement: React.FC = () => {
     const navigate = useNavigate();
@@ -25,13 +135,16 @@ const UserManagement: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [fetchedAllFiltered, setFetchedAllFiltered] = useState(false);
 
-    // Column filters
-    const [filterName, setFilterName] = useState('');
-    const [filterEmail, setFilterEmail] = useState('');
-    const [filterRole, setFilterRole] = useState('');
-    const [filterSite, setFilterSite] = useState('');
-    const [filterBiometricId, setFilterBiometricId] = useState('');
+    // Column filters as a single state object
+    const [filters, setFilters] = useState({
+        name: '',
+        email: '',
+        role: '',
+        site: '',
+        biometricId: ''
+    });
 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
@@ -42,16 +155,25 @@ const UserManagement: React.FC = () => {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const isMobile = useMediaQuery('(max-width: 767px)');
 
-    const hasActiveFilters = filterName || filterEmail || filterRole || filterSite || filterBiometricId;
+    const hasActiveFilters = useMemo(() => 
+        Object.values(filters).some(v => v !== ''),
+        [filters]
+    );
 
     const fetchUsers = useCallback(async () => {
-        setIsLoading(true);
+        // Only show full-page skeleton if we have no users yet
+        const shouldShowSkeleton = users.length === 0;
+        if (shouldShowSkeleton) setIsLoading(true);
+        
         try {
             if (hasActiveFilters) {
-                // When filters are active, fetch ALL users for client-side filtering
+                // If we've already fetched all users for filtering, don't fetch again
+                if (fetchedAllFiltered) return;
+
                 const allUsers = await api.getUsers();
                 setUsers(allUsers);
                 setTotalUsers(allUsers.length);
+                setFetchedAllFiltered(true);
             } else {
                 const res = await api.getUsers({ 
                     page: currentPage, 
@@ -60,13 +182,15 @@ const UserManagement: React.FC = () => {
                 });
                 setUsers(res.data);
                 setTotalUsers(res.total);
+                // Reset this when going back to server-side pagination
+                setFetchedAllFiltered(false);
             }
         } catch (error) {
             setToast({ message: 'Failed to fetch users.', type: 'error' });
         } finally {
             setIsLoading(false);
         }
-    }, [currentPage, pageSize, hasActiveFilters]);
+    }, [currentPage, pageSize, hasActiveFilters, fetchedAllFiltered, users.length, searchTerm]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -80,24 +204,24 @@ const UserManagement: React.FC = () => {
         navigate('/admin/users/add');
     };
 
-    const handleEdit = (user: User) => {
+    const handleEdit = useCallback((user: User) => {
         navigate(`/admin/users/edit/${user.id}`);
-    };
+    }, [navigate]);
 
-    const handleApprove = (user: User) => {
+    const handleApprove = useCallback((user: User) => {
         setCurrentUser(user);
         setIsApprovalModalOpen(true);
-    };
+    }, []);
 
-    const handleDelete = (user: User) => {
+    const handleDelete = useCallback((user: User) => {
         setCurrentUser(user);
         setIsDeleteModalOpen(true);
-    };
+    }, []);
 
-    const handleManageLocations = (user: User) => {
+    const handleManageLocations = useCallback((user: User) => {
         setCurrentUserForLocation(user);
         setIsLocationModalOpen(true);
-    };
+    }, []);
 
     const handleConfirmApproval = async (userId: string, newRole: string) => {
         setIsSaving(true);
@@ -105,6 +229,13 @@ const UserManagement: React.FC = () => {
             await api.approveUser(userId, newRole);
             setToast({ message: 'User approved and email confirmed successfully!', type: 'success' });
             setIsApprovalModalOpen(false);
+            
+            // Instant UI Update: Update the user in local state
+            setUsers(prevUsers => 
+                prevUsers.map(u => u.id === userId ? { ...u, role: newRole } : u)
+            );
+            
+            // Still background fetch to be safe/sync with server specialized fields if any
             fetchUsers();
         } catch (error) {
             setToast({ message: 'Failed to approve user.', type: 'error' });
@@ -115,11 +246,17 @@ const UserManagement: React.FC = () => {
 
     const handleConfirmDelete = async () => {
         if (currentUser) {
+            const userIdToDelete = currentUser.id;
             setIsSaving(true);
             try {
-                await api.deleteUser(currentUser.id);
+                await api.deleteUser(userIdToDelete);
                 setToast({ message: 'User deleted. Remember to also remove them from Supabase Auth.', type: 'success' });
                 setIsDeleteModalOpen(false);
+                
+                // Instant UI Update: Remove from local state
+                setUsers(prevUsers => prevUsers.filter(u => u.id !== userIdToDelete));
+                
+                // Background fetch to sync
                 fetchUsers();
             } catch (error) {
                 setToast({ message: 'Failed to delete user.', type: 'error' });
@@ -129,44 +266,37 @@ const UserManagement: React.FC = () => {
         }
     };
 
-    const getRoleName = (role: string) => {
-        return role ? role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A';
-    }
-
-    const getRoleBadgeClass = (role: string) => {
-        switch (role) {
-            case 'admin': return 'bg-purple-100 text-purple-700';
-            case 'hr': return 'bg-blue-100 text-blue-700';
-            case 'management': return 'bg-emerald-100 text-emerald-700';
-            case 'site_manager': return 'bg-orange-100 text-orange-800';
-            case 'field_staff': return 'bg-sky-100 text-sky-800';
-            case 'finance': return 'bg-teal-100 text-teal-700';
-            case 'developer': return 'bg-indigo-100 text-indigo-700';
-            case 'operation_manager': return 'bg-rose-100 text-rose-700';
-            case 'unverified': return 'bg-yellow-100 text-yellow-800';
-            default: return 'bg-slate-100 text-slate-700';
-        }
+    const clearAllFilters = () => {
+        setFilters({
+            name: '',
+            email: '',
+            role: '',
+            site: '',
+            biometricId: ''
+        });
     };
 
-    const clearAllFilters = () => {
-        setFilterName('');
-        setFilterEmail('');
-        setFilterRole('');
-        setFilterSite('');
-        setFilterBiometricId('');
+    const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFilters(prev => ({ ...prev, [name]: value }));
     };
 
     // Derive unique roles for dropdown
-    const uniqueRoles = Array.from(new Set(users.map(u => u.role).filter(Boolean))).sort();
+    const uniqueRoles = useMemo(() => 
+        Array.from(new Set(users.map(u => u.role).filter(Boolean))).sort(),
+        [users]
+    );
 
-    const filteredUsers = users.filter(user => {
-        if (filterName && !user.name?.toLowerCase().includes(filterName.toLowerCase())) return false;
-        if (filterEmail && !user.email?.toLowerCase().includes(filterEmail.toLowerCase())) return false;
-        if (filterRole && user.role !== filterRole) return false;
-        if (filterSite && !(user.organizationName || '').toLowerCase().includes(filterSite.toLowerCase())) return false;
-        if (filterBiometricId && !(user.biometricId || '').toLowerCase().includes(filterBiometricId.toLowerCase())) return false;
-        return true;
-    });
+    const filteredUsers = useMemo(() => {
+        return users.filter(user => {
+            if (filters.name && !user.name?.toLowerCase().includes(filters.name.toLowerCase())) return false;
+            if (filters.email && !user.email?.toLowerCase().includes(filters.email.toLowerCase())) return false;
+            if (filters.role && user.role !== filters.role) return false;
+            if (filters.site && !(user.organizationName || '').toLowerCase().includes(filters.site.toLowerCase())) return false;
+            if (filters.biometricId && !(user.biometricId || '').toLowerCase().includes(filters.biometricId.toLowerCase())) return false;
+            return true;
+        });
+    }, [users, filters]);
 
     return (
         <div className="p-4 border-0 shadow-none lg:bg-card lg:p-6 lg:rounded-xl lg:shadow-card">
@@ -215,18 +345,12 @@ const UserManagement: React.FC = () => {
                         <p className="mt-1">
                             Use the <strong>Add User</strong> button below to create a new user. Provide their name, email, role and a temporary password. The system will automatically provision their login, send them a verification email and create their profile.
                         </p>
-                        <p className="mt-2">
-                            Once they confirm their email they can sign in using the password you set. You can edit or delete users at any time from this page.
-                        </p>
                     </div>
                 </div>
             </div>
 
-
-
-
             {/* Content Area */}
-            {isLoading ? (
+            {isLoading && users.length === 0 ? (
                 <div className="w-full">
                     {/* Desktop Skeleton */}
                     <div className="hidden lg:block">
@@ -242,57 +366,54 @@ const UserManagement: React.FC = () => {
             ) : (
                 <>
                     {/* Mobile/Tablet View - Cards Grid */}
-                    <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {filteredUsers.map((user) => (
-                            <div key={user.id} className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col gap-3 h-full">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h3 className="font-semibold text-primary-text">{user.name}</h3>
-                                        <p className="text-sm text-muted">{user.email}</p>
-                                    </div>
-                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${getRoleBadgeClass(user.role)}`}>
-                                        {getRoleName(user.role)}
-                                    </span>
-                                </div>
-                                
-                                <div className="grid grid-cols-2 gap-2 text-sm mt-1 flex-grow">
-                                    <div>
-                                        <span className="text-xs text-muted block">Site</span>
-                                        <span className="font-medium text-primary-text">{user.organizationName || '-'}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-xs text-muted block">Biometric ID</span>
-                                        <span className="font-mono text-primary-text">{user.biometricId || '-'}</span>
-                                    </div>
-                                </div>
+                    <div className="lg:hidden">
+                        {/* Mobile Filter Row - Static so focus isn't lost */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4 bg-gray-50 p-3 rounded-lg border border-border">
+                            <input
+                                name="name"
+                                type="text"
+                                placeholder="Filter Name..."
+                                value={filters.name}
+                                onChange={handleFilterChange}
+                                className="w-full text-sm px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                            <input
+                                name="email"
+                                type="text"
+                                placeholder="Filter Email..."
+                                value={filters.email}
+                                onChange={handleFilterChange}
+                                className="w-full text-sm px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                        </div>
 
-                                <div className="pt-3 border-t border-border flex justify-end gap-2 mt-auto">
-                                    {user.role === 'unverified' && (
-                                        <Button variant="outline" size="sm" onClick={() => handleApprove(user)} className="flex-1">
-                                            <UserCheck className="h-4 w-4 mr-2" />Approve
-                                        </Button>
-                                    )}
-                                    <Button variant="icon" size="sm" onClick={() => handleEdit(user)} className="h-9 w-9 border border-border rounded-lg">
-                                        <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="icon" size="sm" onClick={() => handleManageLocations(user)} className="h-9 w-9 border border-border rounded-lg">
-                                        <MapPin className="h-4 w-4 text-emerald-500" />
-                                    </Button>
-                                    <Button variant="icon" size="sm" onClick={() => handleDelete(user)} className="h-9 w-9 border border-border rounded-lg hover:bg-red-50 text-red-500">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {filteredUsers.map((user) => (
+                                <UserCard 
+                                    key={user.id} 
+                                    user={user} 
+                                    handleApprove={handleApprove}
+                                    handleEdit={handleEdit}
+                                    handleManageLocations={handleManageLocations}
+                                    handleDelete={handleDelete}
+                                />
+                            ))}
+                            {filteredUsers.length === 0 && (
+                                <div className="col-span-full text-center py-8 text-muted">
+                                    No users found{hasActiveFilters ? ' matching the current filters' : ''}.
                                 </div>
-                            </div>
-                        ))}
-                        {filteredUsers.length === 0 && (
-                            <div className="col-span-full text-center py-8 text-muted">
-                                No users found{hasActiveFilters ? ' matching the current filters' : ''}.
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
 
                     {/* Desktop View - Table */}
-                    <div className="hidden lg:block overflow-x-auto max-w-full">
+                    <div className="hidden lg:block overflow-x-auto max-w-full relative">
+                        {/* Subtle loading indicator that doesn't block interactions */}
+                        {isLoading && (
+                            <div className="absolute top-0 right-0 p-1">
+                                <span className="animate-pulse text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">AUTO-REFRESHING...</span>
+                            </div>
+                        )}
                         <table className="w-full table-auto responsive-table">
                             <thead>
                                 <tr>
@@ -312,36 +433,36 @@ const UserManagement: React.FC = () => {
                                         </div>
                                     </th>
                                 </tr>
-                                {/* Filter Row */}
+                                {/* Filter Row - Stable and permanently mounted */}
                                 <tr className="bg-gray-50/50">
                                     <th className="px-6 py-2">
                                         <input
                                             id="filter-name"
-                                            name="filterName"
+                                            name="name"
                                             type="text"
                                             placeholder="Filter..."
-                                            value={filterName}
-                                            onChange={(e) => setFilterName(e.target.value)}
+                                            value={filters.name}
+                                            onChange={handleFilterChange}
                                             className="w-full text-sm font-normal px-2 py-1.5 border border-border rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                                         />
                                     </th>
                                     <th className="px-6 py-2">
                                         <input
                                             id="filter-email"
-                                            name="filterEmail"
+                                            name="email"
                                             type="text"
                                             placeholder="Filter..."
-                                            value={filterEmail}
-                                            onChange={(e) => setFilterEmail(e.target.value)}
+                                            value={filters.email}
+                                            onChange={handleFilterChange}
                                             className="w-full text-sm font-normal px-2 py-1.5 border border-border rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                                         />
                                     </th>
                                     <th className="px-6 py-2">
                                         <select
                                             id="filter-role"
-                                            name="filterRole"
-                                            value={filterRole}
-                                            onChange={(e) => setFilterRole(e.target.value)}
+                                            name="role"
+                                            value={filters.role}
+                                            onChange={handleFilterChange}
                                             className="w-full text-sm font-normal px-2 py-1.5 border border-border rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                                         >
                                             <option value="">All Roles</option>
@@ -353,22 +474,22 @@ const UserManagement: React.FC = () => {
                                     <th className="px-6 py-2">
                                         <input
                                             id="filter-site"
-                                            name="filterSite"
+                                            name="site"
                                             type="text"
                                             placeholder="Filter..."
-                                            value={filterSite}
-                                            onChange={(e) => setFilterSite(e.target.value)}
+                                            value={filters.site}
+                                            onChange={handleFilterChange}
                                             className="w-full text-sm font-normal px-2 py-1.5 border border-border rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                                         />
                                     </th>
                                     <th className="px-6 py-2">
                                         <input
                                             id="filter-biometric-id"
-                                            name="filterBiometricId"
+                                            name="biometricId"
                                             type="text"
                                             placeholder="Filter..."
-                                            value={filterBiometricId}
-                                            onChange={(e) => setFilterBiometricId(e.target.value)}
+                                            value={filters.biometricId}
+                                            onChange={handleFilterChange}
                                             className="w-full text-sm font-normal px-2 py-1.5 border border-border rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                                         />
                                     </th>
@@ -377,34 +498,14 @@ const UserManagement: React.FC = () => {
                             </thead>
                             <tbody className="divide-y divide-border md:bg-card md:divide-y-0">
                                 {filteredUsers.map((user) => (
-                                    <tr key={user.id}>
-                                        <td data-label="Name" className="px-6 py-4 font-medium">{user.name}</td>
-                                        <td data-label="Email" className="px-6 py-4 text-sm text-muted">{user.email}</td>
-                                        <td data-label="Role" className="px-6 py-4 text-sm text-muted">
-                                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${getRoleBadgeClass(user.role)}`}>
-                                                {getRoleName(user.role)}
-                                            </span>
-                                            {user.role === 'unverified' && (
-                                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 ml-2">Pending Approval</span>
-                                            )}
-                                        </td>
-                                        <td data-label="Site" className="px-6 py-4 text-sm text-muted">
-                                            {user.organizationName || '-'}
-                                        </td>
-                                        <td data-label="Biometric ID" className="px-6 py-4 text-sm font-mono text-muted">
-                                            {user.biometricId || '-'}
-                                        </td>
-                                        <td data-label="Actions" className="px-6 py-4">
-                                            <div className="flex items-center gap-2 md:justify-start justify-end">
-                                                {user.role === 'unverified' && (
-                                                    <Button variant="outline" size="sm" onClick={() => handleApprove(user)} aria-label={`Approve user ${user.name}`} title={`Approve user ${user.name}`}><UserCheck className="h-4 w-4 mr-2" />Approve</Button>
-                                                )}
-                                                <Button variant="icon" size="sm" onClick={() => handleEdit(user)} aria-label={`Edit user ${user.name}`} title={`Edit user ${user.name}`}><Edit className="h-4 w-4" /></Button>
-                                                <Button variant="icon" size="sm" onClick={() => handleManageLocations(user)} aria-label={`Manage Geofencing for ${user.name}`} title={`Manage Geofencing for ${user.name}`}><MapPin className="h-4 w-4 text-emerald-500" /></Button>
-                                                <Button variant="icon" onClick={() => handleDelete(user)} aria-label={`Delete user ${user.name}`} title={`Delete user ${user.name}`} className="p-2 hover:bg-red-500/10 rounded-full transition-colors"><Trash2 className="h-5 w-5 text-red-500" /></Button>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    <UserRow 
+                                        key={user.id} 
+                                        user={user} 
+                                        handleApprove={handleApprove}
+                                        handleEdit={handleEdit}
+                                        handleManageLocations={handleManageLocations}
+                                        handleDelete={handleDelete}
+                                    />
                                 ))}
                             </tbody>
                         </table>
