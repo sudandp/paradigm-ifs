@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../services/api';
-import type { SiteFinanceRecord, SiteInvoiceDefault } from '../../types';
+import type { SiteFinanceRecord, SiteInvoiceDefault, Organization } from '../../types';
 import { useForm, Controller } from 'react-hook-form';
 import { ArrowLeft, Save, Building, Loader2, IndianRupee, MapPin, Calendar, ClipboardList, Wallet } from 'lucide-react';
 import Button from '../../components/ui/Button';
@@ -15,6 +15,7 @@ const AddSiteFinanceRecord: React.FC = () => {
     const isEditing = !!id;
     const [isLoading, setIsLoading] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [sites, setSites] = useState<Organization[]>([]);
     const [siteDefaults, setSiteDefaults] = useState<SiteInvoiceDefault[]>([]);
 
     const { control, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<Partial<SiteFinanceRecord>>({
@@ -50,12 +51,18 @@ const AddSiteFinanceRecord: React.FC = () => {
         const loadData = async () => {
             setIsLoading(true);
             try {
-                const defaults = await api.getSiteInvoiceDefaults();
-                setSiteDefaults(defaults.sort((a, b) => a.siteName.localeCompare(b.siteName)));
+                const [fetchedSites, defaults] = await Promise.all([
+                    api.getOrganizations(),
+                    api.getSiteInvoiceDefaults()
+                ]);
+                
+                // Handle both array and paginated response
+                const sitesList = Array.isArray(fetchedSites) ? fetchedSites : fetchedSites.data || [];
+                setSites(sitesList.sort((a: Organization, b: Organization) => (a.shortName || '').localeCompare(b.shortName || '')));
+                setSiteDefaults(defaults);
                 
                 if (isEditing && id) {
                     // Logic to load existing record would go here
-                    // For now keeping it simple as we focus on design
                 }
             } catch (error) {
                 console.error('Error loading data:', error);
@@ -83,13 +90,27 @@ const AddSiteFinanceRecord: React.FC = () => {
 
     const handleSiteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const selectedSiteId = e.target.value;
-        const selectedSite = siteDefaults.find(s => s.siteId === selectedSiteId);
-        if (selectedSite) {
-            setValue('siteId', selectedSite.siteId);
-            setValue('siteName', selectedSite.siteName);
-            setValue('companyName', selectedSite.companyName);
-            if (selectedSite.contractAmount) setValue('contractAmount', selectedSite.contractAmount);
-            if (selectedSite.contractManagementFee) setValue('contractManagementFee', selectedSite.contractManagementFee);
+        const selectedOrg = sites.find(s => s.id === selectedSiteId);
+        
+        if (selectedOrg) {
+            // UUID Validation helper
+            const isValidUUID = (uuid: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uuid);
+            
+            setValue('siteId', selectedOrg.id && isValidUUID(selectedOrg.id) ? selectedOrg.id : undefined);
+            setValue('siteName', selectedOrg.shortName);
+            
+            // Auto-fill from defaults if available
+            const defaults = siteDefaults.find(d => d.siteId === selectedOrg.id || d.siteName === selectedOrg.shortName);
+            if (defaults) {
+                setValue('companyName', defaults.companyName);
+                if (defaults.contractAmount) setValue('contractAmount', defaults.contractAmount);
+                if (defaults.contractManagementFee) setValue('contractManagementFee', defaults.contractManagementFee);
+            } else {
+                // Clear billing specific defaults if no match found
+                setValue('companyName', '');
+                setValue('contractAmount', '' as any);
+                setValue('contractManagementFee', '' as any);
+            }
         }
     };
 
@@ -126,8 +147,8 @@ const AddSiteFinanceRecord: React.FC = () => {
                                     defaultValue={watch('siteId') || ''}
                                 >
                                     <option value="" disabled>Select a site...</option>
-                                    {siteDefaults.map(site => (
-                                        <option key={site.siteId} value={site.siteId}>{site.siteName}</option>
+                                    {sites.map(site => (
+                                        <option key={site.id} value={site.id}>{site.shortName}</option>
                                     ))}
                                 </select>
                                 <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">

@@ -4086,6 +4086,9 @@ export const api = {
 
   async saveSiteFinanceRecord(record: Partial<SiteFinanceRecord>): Promise<SiteFinanceRecord> {
     const dbRecord = toSnakeCase(record);
+    // Omit generated columns before upsert
+    delete dbRecord.total_billed_amount;
+    
     const { data, error } = await supabase
       .from('site_finance_tracker')
       .upsert(dbRecord)
@@ -4099,9 +4102,15 @@ export const api = {
   async bulkSaveSiteFinanceRecords(records: Partial<SiteFinanceRecord>[]): Promise<void> {
     const dbRecords = records.map(r => {
       const { id, createdAt, updatedAt, ...rest } = r;
-      return toSnakeCase(rest);
+      const snaked = toSnakeCase(rest);
+      // Omit generated columns before insert
+      delete snaked.total_billed_amount;
+      return snaked;
     });
-    const { error } = await supabase.from('site_finance_tracker').upsert(dbRecords);
-    if (error) throw error;
+    const { error } = await supabase.from('site_finance_tracker').insert(dbRecords);
+    if (error) {
+      console.error('Finance bulk save error:', error.message, error.details, error.hint);
+      throw error;
+    }
   }
 };

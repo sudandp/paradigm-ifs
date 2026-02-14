@@ -112,12 +112,16 @@ const SiteFinanceTracker: React.FC = () => {
                 if (!siteName) return;
 
                 const siteDef = siteDefaults.find(s => s.siteName === siteName);
+                
+                // UUID Validation helper
+                const isValidUUID = (uuid: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uuid);
+                const validatedSiteId = siteDef?.siteId && isValidUUID(siteDef.siteId) ? siteDef.siteId : undefined;
 
                 const bAmount = Number(row.getCell(5).value) || 0;
                 const bFee = Number(row.getCell(6).value) || 0;
 
                 parsed.push({
-                    siteId: siteDef?.siteId || '',
+                    siteId: validatedSiteId,
                     siteName,
                     companyName: row.getCell(2).value?.toString() || '',
                     contractAmount: Number(row.getCell(3).value) || 0,
