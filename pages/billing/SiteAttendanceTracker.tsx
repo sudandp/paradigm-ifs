@@ -22,8 +22,12 @@ const SiteAttendanceTracker: React.FC = () => {
 
     // Filter & Pagination State
     const [searchQuery, setSearchQuery] = useState('');
+    const [filters, setFilters] = useState({ siteName: '', status: '' });
     const [currentPage, setCurrentPage] = useState(1);
-    const ROWS_PER_PAGE = 15;
+    const [rowsPerPage, setRowsPerPage] = useState(15);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     // Deletion State
     const [deletedRecords, setDeletedRecords] = useState<SiteInvoiceRecord[]>([]);
@@ -70,17 +74,47 @@ const SiteAttendanceTracker: React.FC = () => {
         fetchInitialData();
     }, [fetchInitialData]);
 
-    const handleSoftDelete = async () => {
-        if (!recordToDelete || !deleteReason.trim() || !user) return;
+    const handleDelete = async (reason: string) => {
+        if (isBulkDeleting) {
+            await handleBulkDelete(reason);
+            return;
+        }
+        if (!recordToDelete || !user) return;
         setIsDeleting(true);
         try {
-            await api.softDeleteSiteInvoiceRecord(recordToDelete.id, deleteReason, user.id, user.name || 'Unknown');
+            await api.softDeleteSiteInvoiceRecord(recordToDelete.id, reason, user.id, user.name || 'Unknown');
             setToast({ message: 'Record moved to deletion log', type: 'success' });
             setRecordToDelete(null);
             setDeleteReason('');
+            setShowDeleteModal(false);
             fetchInitialData();
         } catch (error) {
             setToast({ message: 'Failed to delete record', type: 'error' });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleBulkDelete = async (reason: string) => {
+        if (selectedIds.size === 0 || !user) return;
+        setIsDeleting(true);
+        try {
+            const ids = Array.from(selectedIds);
+            await api.bulkSoftDeleteSiteInvoiceRecords(
+                ids,
+                reason,
+                user.id,
+                user.name || 'Unknown'
+            );
+            setToast({ message: `${selectedIds.size} records moved to deletion log`, type: 'success' });
+            setSelectedIds(new Set());
+            setDeleteReason('');
+            setIsBulkDeleting(false);
+            setShowDeleteModal(false);
+            fetchInitialData();
+        } catch (error) {
+            console.error('Bulk delete error:', error);
+            setToast({ message: 'Failed to delete selected records', type: 'error' });
         } finally {
             setIsDeleting(false);
         }
@@ -230,11 +264,21 @@ const SiteAttendanceTracker: React.FC = () => {
     const currentRecords = activeSubTab === 'active' ? records : deletedRecords;
 
     const filteredRecords = useMemo(() => {
-        return currentRecords.filter(r => 
-            r.siteName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (r.companyName || '').toLowerCase().includes(searchQuery.toLowerCase())
-        );
-    }, [currentRecords, searchQuery]);
+        return currentRecords.filter(r => {
+            const matchesSearch = r.siteName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (r.companyName || '').toLowerCase().includes(searchQuery.toLowerCase());
+            
+            const matchesSiteName = !filters.siteName || 
+                r.siteName.toLowerCase().includes(filters.siteName.toLowerCase());
+                
+            const matchesStatus = !filters.status || (() => {
+                const isSent = !!r.invoiceSentDate;
+                return filters.status === 'sent' ? isSent : !isSent;
+            })();
+
+            return matchesSearch && matchesSiteName && matchesStatus;
+        });
+    }, [currentRecords, searchQuery, filters]);
 
     const stats = useMemo(() => {
         const total = records.length;
@@ -248,15 +292,40 @@ const SiteAttendanceTracker: React.FC = () => {
         return { total, sent, pending, due };
     }, [records]);
 
-    const totalPages = Math.ceil(filteredRecords.length / ROWS_PER_PAGE);
-    const paginatedRecords = filteredRecords.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
+    const totalPages = Math.ceil(filteredRecords.length / rowsPerPage);
+    const paginatedRecords = filteredRecords.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
-    useEffect(() => { setCurrentPage(1); }, [searchQuery, activeSubTab]);
+    const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            const allIds = paginatedRecords.map(r => r.id);
+            setSelectedIds(new Set(allIds));
+        } else {
+            setSelectedIds(new Set());
+        }
+    };
+
+    const handleSelectRow = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    useEffect(() => { 
+        setCurrentPage(1); 
+    }, [searchQuery, filters, activeSubTab]);
+
+    useEffect(() => {
+        setFilters({ siteName: '', status: '' });
+        setSelectedIds(new Set());
+    }, [activeSubTab]);
 
     const isAdmin = ['admin', 'super_admin', 'management', 'hr'].includes(user?.role || '');
 
     return (
-        <div className="space-y-6 max-w-[1400px] mx-auto">
+        <div className="space-y-6 w-full px-4">
             {/* ── Action Bar ── */}
             <div className="bg-white rounded-xl border border-gray-200/80 shadow-sm p-5">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -456,6 +525,16 @@ const SiteAttendanceTracker: React.FC = () => {
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="bg-gray-50/80 border-b border-gray-200">
+                                        <th className="px-5 py-3 text-left w-10">
+                                            {activeSubTab === 'active' && (
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                    checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))}
+                                                    onChange={handleSelectAll}
+                                                />
+                                            )}
+                                        </th>
                                         <th className="px-5 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Site Information</th>
                                         <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Incharges (Ops / HR)</th>
                                         {activeSubTab === 'active' ? (
@@ -475,15 +554,66 @@ const SiteAttendanceTracker: React.FC = () => {
                                         )}
                                         <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-24">Actions</th>
                                     </tr>
+                                    {/* Filter Row */}
+                                    <tr className="bg-white border-b border-gray-100">
+                                        <td className="px-5 py-2" />
+                                        <td className="px-5 py-2">
+                                            <input 
+                                                type="text"
+                                                placeholder="Filter Site..."
+                                                value={filters.siteName}
+                                                onChange={(e) => setFilters(prev => ({ ...prev, siteName: e.target.value }))}
+                                                className="w-full text-[10px] px-2 py-1 bg-gray-50 border border-gray-200 rounded focus:border-emerald-500 outline-none transition-all"
+                                            />
+                                        </td>
+                                        <td className="px-4 py-2 hidden md:table-cell" />
+                                        {activeSubTab === 'active' ? (
+                                            <>
+                                                <td className="px-4 py-2" />
+                                                <td className="px-4 py-2" />
+                                                <td className="px-4 py-2" />
+                                                <td className="px-4 py-2">
+                                                    <select
+                                                        value={filters.status}
+                                                        onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                                                        className="w-full text-[10px] px-1 py-1 bg-gray-50 border border-gray-200 rounded focus:border-emerald-500 outline-none transition-all font-bold text-gray-600"
+                                                    >
+                                                        <option value="">All Status</option>
+                                                        <option value="sent">Sent</option>
+                                                        <option value="pending">Pending</option>
+                                                    </select>
+                                                </td>
+                                                <td className="px-4 py-2" />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <td className="px-4 py-2" />
+                                                <td className="px-4 py-2" />
+                                                <td className="px-4 py-2" />
+                                            </>
+                                        )}
+                                        <td className="px-4 py-2" />
+                                    </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {paginatedRecords.map((record, idx) => {
                                         const mgrDelay = calculateDelay(record.managerReceivedDate!, record.managerTentativeDate!);
                                         const hrDelay = calculateDelay(record.hrReceivedDate!, record.hrTentativeDate!);
                                         const sharingDelay = calculateDelay(record.invoiceSentDate!, record.invoiceSharingTentativeDate!);
+                                        const isSelected = selectedIds.has(record.id);
 
                                         return (
-                                            <tr key={record.id} className="hover:bg-gray-50/60 transition-all duration-100 group">
+                                            <tr key={record.id} className={`hover:bg-gray-50/60 transition-all duration-100 group ${isSelected ? 'bg-emerald-50/30' : ''}`}>
+                                                <td className="px-5 py-3.5">
+                                                    {activeSubTab === 'active' && (
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                            checked={isSelected}
+                                                            onChange={() => handleSelectRow(record.id)}
+                                                        />
+                                                    )}
+                                                </td>
                                                 <td className="px-5 py-3.5">
                                                     <div className="font-semibold text-gray-900 text-sm">{record.siteName}</div>
                                                     <div className="text-[11px] text-gray-400 mt-0.5">{record.companyName || '—'}</div>
@@ -565,7 +695,7 @@ const SiteAttendanceTracker: React.FC = () => {
                                                                     <Edit2 className="h-3.5 w-3.5" />
                                                                 </button>
                                                                 <button 
-                                                                    onClick={() => setRecordToDelete(record)} 
+                                                                    onClick={() => { setRecordToDelete(record); setIsBulkDeleting(false); setShowDeleteModal(true); }} 
                                                                     className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all h-8 w-8 flex items-center justify-center border border-transparent hover:border-rose-100"
                                                                     title="Delete"
                                                                 >
@@ -604,9 +734,27 @@ const SiteAttendanceTracker: React.FC = () => {
                         {/* Pagination */}
                         {totalPages > 1 && (
                             <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
-                                <p className="text-xs text-gray-400">
-                                    Showing {((currentPage - 1) * ROWS_PER_PAGE) + 1}–{Math.min(currentPage * ROWS_PER_PAGE, filteredRecords.length)} of {filteredRecords.length}
-                                </p>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-400">Rows per page:</span>
+                                        <select
+                                            value={rowsPerPage}
+                                            onChange={(e) => {
+                                                setRowsPerPage(Number(e.target.value));
+                                                setCurrentPage(1);
+                                            }}
+                                            className="h-7 px-2 text-[11px] font-bold text-gray-600 bg-gray-50 border border-gray-200 rounded outline-none focus:border-emerald-500 transition-all cursor-pointer"
+                                        >
+                                            <option value={10}>10</option>
+                                            <option value={15}>15</option>
+                                            <option value={20}>20</option>
+                                            <option value={50}>50</option>
+                                        </select>
+                                    </div>
+                                    <p className="text-xs text-gray-400">
+                                        Showing {((currentPage - 1) * rowsPerPage) + 1}–{Math.min(currentPage * rowsPerPage, filteredRecords.length)} of {filteredRecords.length}
+                                    </p>
+                                </div>
                                 <div className="flex items-center gap-1">
                                     <button
                                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -684,48 +832,98 @@ const SiteAttendanceTracker: React.FC = () => {
                 </div>
             )}
 
-            {/* ── Soft Delete Modal ── */}
-            {recordToDelete && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden border border-gray-100 flex flex-col">
-                        <div className="p-6">
-                            <div className="w-12 h-12 rounded-xl bg-rose-50 flex items-center justify-center mb-4">
-                                <Trash2 className="h-6 w-6 text-rose-600" />
-                            </div>
-                            <h3 className="text-lg font-bold text-gray-900 tracking-tight">Delete Record?</h3>
-                            <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-                                This record for <span className="font-bold text-gray-700">{recordToDelete.siteName}</span> will be moved to the deletion log.
-                            </p>
-                            
-                            <div className="mt-5">
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-2">Reason for deletion</label>
-                                <textarea
-                                    value={deleteReason}
-                                    onChange={(e) => setDeleteReason(e.target.value)}
-                                    placeholder="e.g. Duplicate entry, incorrect site data..."
-                                    className="w-full h-24 px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all resize-none placeholder:text-gray-300"
-                                />
-                            </div>
-
-                            <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-100">
-                                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                                <span className="text-[10px] font-bold text-amber-700 leading-tight">Can be restored within 7 days. Permanent deletion thereafter.</span>
-                            </div>
-                        </div>
-                        <div className="p-4 bg-gray-50 flex gap-3">
+            {/* Bulk Actions Bar */}
+            {selectedIds.size > 0 && activeSubTab === 'active' && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6">
+                        <span className="text-sm font-medium border-r border-gray-700 pr-6">
+                            {selectedIds.size} records selected
+                        </span>
+                        <div className="flex items-center gap-3">
                             <button
-                                onClick={() => { setRecordToDelete(null); setDeleteReason(''); }}
-                                className="flex-1 px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors"
+                                onClick={() => {
+                                    setIsBulkDeleting(true);
+                                    setShowDeleteModal(true);
+                                }}
+                                className="flex items-center gap-2 px-4 py-1.5 bg-red-500 hover:bg-red-600 rounded-full text-xs font-bold transition-all"
+                            >
+                                <Trash2 size={14} />
+                                Delete Selected
+                            </button>
+                            <button
+                                onClick={() => setSelectedIds(new Set())}
+                                className="px-4 py-1.5 hover:bg-white/10 rounded-full text-xs font-medium transition-all"
                             >
                                 Cancel
                             </button>
-                            <button
-                                onClick={handleSoftDelete}
-                                disabled={!deleteReason.trim() || isDeleting}
-                                className="flex-2 px-6 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl hover:bg-rose-700 transition-all shadow-md shadow-rose-900/10 disabled:opacity-50"
-                            >
-                                {isDeleting ? 'Deleting...' : 'Confirm Delete'}
-                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Modal */}
+            {showDeleteModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6">
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center text-red-600">
+                                    <Trash2 size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900">
+                                        {isBulkDeleting ? `Delete ${selectedIds.size} Records` : 'Delete Record'}
+                                    </h3>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        Records will be moved to the Deletion Log.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {!isBulkDeleting && recordToDelete && (
+                                <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-100">
+                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Selected Site</p>
+                                    <p className="text-sm font-semibold text-gray-900">{recordToDelete.siteName}</p>
+                                    <p className="text-xs text-gray-500 mt-0.5">{recordToDelete.companyName}</p>
+                                </div>
+                            )}
+
+                            <div className="mb-6">
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Reason for Deletion</label>
+                                <textarea
+                                    value={deleteReason}
+                                    onChange={(e) => setDeleteReason(e.target.value)}
+                                    placeholder="Enter reason..."
+                                    className="w-full h-24 px-4 py-3 bg-gray-50 border-2 border-transparent focus:border-red-500 rounded-xl outline-none transition-all resize-none text-sm"
+                                />
+                            </div>
+
+                            <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 mb-6 flex items-start gap-3">
+                                <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={16} />
+                                <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                                    Records can be restored from the Deletion Log within 7 days. After 7 days, they will be permanently deleted.
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowDeleteModal(false);
+                                        setRecordToDelete(null);
+                                        setIsBulkDeleting(false);
+                                    }}
+                                    className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(deleteReason)}
+                                    disabled={!deleteReason.trim() || isDeleting}
+                                    className="flex-2 py-3 px-6 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold shadow-lg shadow-red-200 transition-all flex items-center justify-center gap-2"
+                                >
+                                    {isDeleting ? 'Deleting...' : 'Confirm Deletion'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

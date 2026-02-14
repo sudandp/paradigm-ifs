@@ -372,6 +372,19 @@ export const api = {
     if (error) throw error;
   },
 
+  bulkSoftDeleteSiteInvoiceRecords: async (ids: string[], reason: string, userId: string, userName: string): Promise<void> => {
+    const { error } = await supabase
+      .from('site_invoice_tracker')
+      .update({
+        deleted_at: new Date().toISOString(),
+        deleted_by: userId,
+        deleted_by_name: userName,
+        deleted_reason: reason
+      })
+      .in('id', ids);
+    if (error) throw error;
+  },
+
   restoreSiteInvoiceRecord: async (id: string): Promise<void> => {
     const { error } = await supabase
       .from('site_invoice_tracker')
@@ -4162,6 +4175,20 @@ export const api = {
         deleted_reason: reason
       })
       .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  async bulkSoftDeleteSiteFinanceRecords(ids: string[], reason: string, deletedBy: string, deletedByName: string): Promise<void> {
+    const { error } = await supabase
+      .from('site_finance_tracker')
+      .update({
+        deleted_at: new Date().toISOString(),
+        deleted_by: deletedBy,
+        deleted_by_name: deletedByName,
+        deleted_reason: reason
+      })
+      .in('id', ids);
 
     if (error) throw error;
   },
