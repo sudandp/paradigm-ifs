@@ -812,18 +812,19 @@ export const api = {
     if (error) throw error;
     return (data || []).map(u => toCamelCase({ ...u, role: u.role_id }));
   },
-  getLatestLocations: async (userIds: string[]): Promise<Record<string, { latitude: number; longitude: number; timestamp: string }>> => {
+  getLatestLocations: async (userIds: string[]): Promise<Record<string, { latitude: number; longitude: number; timestamp: string; locationName?: string }>> => {
     if (userIds.length === 0) return {};
     
-    // Fetch latest location for each user in parallel for better performance
-    // than fetching all historical records and filtering in JS.
+    // Fetch latest attendance event for each user in parallel.
+    // We no longer filter out events without GPS coordinates so that
+    // office staff punches (which often lack lat/lng) still appear
+    // as recent activity on the My Team page.
     const results = await Promise.all(
       userIds.map(id => 
         supabase
           .from('attendance_events')
-          .select('user_id, latitude, longitude, timestamp')
+          .select('user_id, latitude, longitude, timestamp, location_name')
           .eq('user_id', id)
-          .not('latitude', 'is', null)
           .order('timestamp', { ascending: false })
           .limit(1)
           .maybeSingle()
