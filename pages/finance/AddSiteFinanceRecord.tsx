@@ -18,7 +18,9 @@ const AddSiteFinanceRecord: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [sites, setSites] = useState<Organization[]>([]);
+    const [trackerSites, setTrackerSites] = useState<{ id: string; name: string }[]>([]);
     const [siteDefaults, setSiteDefaults] = useState<SiteInvoiceDefault[]>([]);
+    const [activeDefault, setActiveDefault] = useState<SiteInvoiceDefault | null>(null);
     const [currentUser, setCurrentUser] = useState<{ id: string, name: string, role: string } | null>(null);
     const [recordMetadata, setRecordMetadata] = useState<{ createdBy?: string, createdByName?: string, createdAt?: string, updatedBy?: string, updatedByName?: string, updatedAt?: string } | null>(null);
 
@@ -55,15 +57,17 @@ const AddSiteFinanceRecord: React.FC = () => {
         const loadData = async () => {
             setIsLoading(true);
             try {
-                const [fetchedSites, defaults] = await Promise.all([
+                const [fetchedSites, defaults, trackerData] = await Promise.all([
                     api.getOrganizations(),
-                    api.getSiteInvoiceDefaults()
+                    api.getSiteInvoiceDefaults(),
+                    api.getUniqueTrackerSites()
                 ]);
                 
                 // Handle both array and paginated response
                 const sitesList = Array.isArray(fetchedSites) ? fetchedSites : fetchedSites.data || [];
-                setSites(sitesList.sort((a: Organization, b: Organization) => (a.shortName || '').localeCompare(b.shortName || '')));
+                setSites(sitesList);
                 setSiteDefaults(defaults);
+                setTrackerSites(trackerData);
                 
                 // Fetch current user
                 // Fetch current user details from auth store if available, otherwise fallback to metadata
@@ -119,7 +123,11 @@ const AddSiteFinanceRecord: React.FC = () => {
     const onSubmit = async (data: Partial<SiteFinanceRecord>) => {
         setIsLoading(true);
         try {
-            const payload = { ...data, id: id };
+            // Ensure billingMonth is formatted as YYYY-MM-01 to match tracker filter
+            const billingDate = data.billingMonth ? new Date(data.billingMonth) : new Date();
+            const formattedBillingMonth = format(startOfMonth(billingDate), 'yyyy-MM-dd');
+
+            const payload = { ...data, billingMonth: formattedBillingMonth, id: id };
             // Add creator info for new records
             if (!id && currentUser) {
                 payload.createdBy = currentUser.id;
@@ -132,6 +140,33 @@ const AddSiteFinanceRecord: React.FC = () => {
                 payload.updatedAt = new Date().toISOString();
             }
             
+            // Check if contract details updated for the year, and if so, update defaults
+            const currentYear = new Date(payload.billingMonth || new Date()).getFullYear();
+            const hasContractChanges = 
+                payload.contractAmount !== activeDefault?.contractAmount ||
+                payload.contractManagementFee !== activeDefault?.contractManagementFee ||
+                payload.companyName !== activeDefault?.companyName;
+
+            if (hasContractChanges && payload.siteId && payload.contractAmount !== undefined && payload.contractManagementFee !== undefined && payload.companyName) {
+                try {
+                    await api.upsertSiteContract(
+                         payload.siteId, 
+                         currentYear, 
+                         { 
+                             contractAmount: payload.contractAmount, 
+                             contractManagementFee: payload.contractManagementFee,
+                             companyName: payload.companyName
+                         }
+                    );
+                    // Refresh defaults in background? Optionally.
+                    const newDefaults = await api.getSiteInvoiceDefaults();
+                    setSiteDefaults(newDefaults);
+                } catch (e) {
+                    console.error("Failed to update site contract defaults:", e);
+                    // Don't block the main save
+                }
+            }
+
             await api.saveSiteFinanceRecord(payload);
             setToast({ message: 'Finance record saved successfully', type: 'success' });
             setTimeout(() => navigate('/finance?tab=site'), 1000);
@@ -143,28 +178,92 @@ const AddSiteFinanceRecord: React.FC = () => {
         }
     };
 
-    const handleSiteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const selectedSiteId = e.target.value;
-        const selectedOrg = sites.find(s => s.id === selectedSiteId);
+    // Merge sources for dropdown options
+    const mergedSiteOptions = React.useMemo(() => {
+        const optionsMap = new Map<string, string>();
         
-        if (selectedOrg) {
-            // UUID Validation helper
-            const isValidUUID = (uuid: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uuid);
+        // 1. Add organizations (using shortName as base)
+        sites.forEach(s => {
+             // Prefer Full Name if available? The user wants "Client Name" from tracker.
+             // If tracker shows full names, we should try to match.
+             // But let's start with shortName as fallback.
+             optionsMap.set(s.id, s.shortName);
+        });
+
+        // 2. Overlay with tracker sites (preferred source for existing sites)
+        trackerSites.forEach(s => {
+            if (s.name) {
+                optionsMap.set(s.id, s.name);
+            }
+        });
+
+        return Array.from(optionsMap.entries())
+            .map(([id, name]) => ({ id, name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [sites, trackerSites]);
+
+    const handleSiteChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const selectedSiteId = e.target.value;
+        const selectedOption = mergedSiteOptions.find(opt => opt.id === selectedSiteId);
+        // We still need the organization object for some logic? 
+        // Or can we rely just on ID? 
+        // The fallback logic needs selectedOrg from 'sites' list or needs to just use ID.
+        // Actually api.getLastFinanceRecordForSite takes ID.
+        
+        const selectedOrg = sites.find(s => s.id === selectedSiteId); // Fallback to get org details if needed
+        
+        if (selectedOption) {
+            setValue('siteId', selectedOption.id);
+            setValue('siteName', selectedOption.name); // Use the merged name!
             
-            setValue('siteId', selectedOrg.id && isValidUUID(selectedOrg.id) ? selectedOrg.id : undefined);
-            setValue('siteName', selectedOrg.shortName);
+            // Auto-fill from defaults if available - YEAR AWARE
+            const currentYear = new Date(watch('billingMonth') || new Date()).getFullYear();
             
-            // Auto-fill from defaults if available
-            const defaults = siteDefaults.find(d => d.siteId === selectedOrg.id || d.siteName === selectedOrg.shortName);
-            if (defaults) {
-                setValue('companyName', defaults.companyName);
-                if (defaults.contractAmount) setValue('contractAmount', defaults.contractAmount);
-                if (defaults.contractManagementFee) setValue('contractManagementFee', defaults.contractManagementFee);
+            const specificDefault = siteDefaults.find(d => 
+                (d.siteId === selectedOption.id || d.siteName === selectedOption.name) && 
+                d.billingYear === currentYear
+            );
+            
+            // Fallback to global default (no year)
+            const globalDefault = siteDefaults.find(d => 
+                (d.siteId === selectedOption.id || d.siteName === selectedOption.name) && 
+                (d.billingYear === null || d.billingYear === undefined)
+            );
+            
+            const effectiveDefault = specificDefault || globalDefault;
+
+            if (effectiveDefault) {
+                setActiveDefault(effectiveDefault);
+                setValue('companyName', effectiveDefault.companyName);
+                if (effectiveDefault.contractAmount) setValue('contractAmount', effectiveDefault.contractAmount);
+                if (effectiveDefault.contractManagementFee) setValue('contractManagementFee', effectiveDefault.contractManagementFee);
             } else {
-                // Clear billing specific defaults if no match found
-                setValue('companyName', '');
-                setValue('contractAmount', '' as any);
-                setValue('contractManagementFee', '' as any);
+                // FALLBACK: Try to fetch the latest finance record for this site
+                try {
+                    const lastRecord = await api.getLastFinanceRecordForSite(selectedOption.id);
+                    if (lastRecord) {
+                         // Use values from the last record
+                         const fallbackDefault: SiteInvoiceDefault = {
+                             siteId: selectedOption.id,
+                             siteName: selectedOption.name,
+                             companyName: lastRecord.companyName,
+                             contractAmount: lastRecord.contractAmount,
+                             contractManagementFee: lastRecord.contractManagementFee,
+                         };
+                         setActiveDefault(fallbackDefault);
+                         setValue('companyName', lastRecord.companyName);
+                         if (lastRecord.contractAmount) setValue('contractAmount', lastRecord.contractAmount);
+                         if (lastRecord.contractManagementFee) setValue('contractManagementFee', lastRecord.contractManagementFee);
+                         
+                         setToast({ message: 'Auto-filled from previous record', type: 'success' });
+                    } else {
+                        setActiveDefault(null);
+                        setToast({ message: 'No previous records found for auto-fill', type: 'error' });
+                    }
+                } catch (e) {
+                    console.error("Error fetching fallback record:", e);
+                    setActiveDefault(null);
+                }
             }
         }
     };
@@ -202,8 +301,8 @@ const AddSiteFinanceRecord: React.FC = () => {
                                     defaultValue={watch('siteId') || ''}
                                 >
                                     <option value="" disabled>Select a site...</option>
-                                    {sites.map(site => (
-                                        <option key={site.id} value={site.id}>{site.shortName}</option>
+                                    {mergedSiteOptions.map(site => (
+                                        <option key={site.id} value={site.id}>{site.name}</option>
                                     ))}
                                 </select>
                                 <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">

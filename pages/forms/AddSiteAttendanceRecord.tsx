@@ -38,7 +38,6 @@ const AddSiteAttendanceRecord: React.FC = () => {
         attendanceReceivedTime: '',
         invoiceSharingTentativeDate: '',
         invoicePreparedDate: '',
-        invoiceSentDate: '',
         invoiceSentTime: '',
         invoiceSentMethodRemarks: ''
     });
@@ -411,15 +410,6 @@ const AddSiteAttendanceRecord: React.FC = () => {
                         onChange={(e) => handleInputChange('invoiceSentTime', e.target.value)}
                         icon={<Clock className="h-4 w-4" />}
                         className={inputClass}
-                    />
-                    <Input
-                        id="invoiceSentMethodRemarks"
-                        name="invoiceSentMethodRemarks"
-                        label="Sent Through/Remarks"
-                        placeholder="e.g. Mail & Whatsapp"
-                        value={record.invoiceSentMethodRemarks || ''}
-                        onChange={(e) => handleInputChange('invoiceSentMethodRemarks', e.target.value)}
-                        className={`lg:col-span-2 ${inputClass}`}
                     />
                 </div>
             </div>

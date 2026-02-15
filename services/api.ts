@@ -403,6 +403,24 @@ export const api = {
     if (error) throw error;
   },
 
+  bulkRestoreSiteInvoiceRecords: async (ids: string[]): Promise<void> => {
+    const { error } = await supabase
+      .from('site_invoice_tracker')
+      .update({
+        deleted_at: null,
+        deleted_by: null,
+        deleted_by_name: null,
+        deleted_reason: null
+      })
+      .in('id', ids);
+    if (error) throw error;
+  },
+
+  bulkPermanentlyDeleteSiteInvoiceRecords: async (ids: string[]): Promise<void> => {
+    const { error } = await supabase.from('site_invoice_tracker').delete().in('id', ids);
+    if (error) throw error;
+  },
+
   // --- Site Invoice Defaults (Auto-fill templates) ---
   getSiteInvoiceDefaults: async (): Promise<SiteInvoiceDefault[]> => {
     const { data, error } = await supabase
@@ -411,6 +429,35 @@ export const api = {
       .order('site_name');
     if (error) throw error;
     return (data || []).map(toCamelCase);
+  },
+
+  upsertSiteContract: async (siteId: string, year: number, details: { contractAmount: number, contractManagementFee: number, companyName: string }): Promise<void> => {
+    // 1. Try to find existing contract for this site and year
+    const { data: existing } = await supabase.from('site_invoice_defaults')
+        .select('id')
+        .eq('site_id', siteId)
+        .eq('billing_year', year)
+        .maybeSingle();
+
+    const payload = {
+        site_id: siteId,
+        billing_year: year,
+        company_name: details.companyName,
+        contract_amount: details.contractAmount,
+        contract_management_fee: details.contractManagementFee,
+    };
+
+    if (existing) {
+        const { error } = await supabase.from('site_invoice_defaults').update(payload).eq('id', existing.id);
+        if (error) throw error;
+    } else {
+        // Need site_name for new insert
+        const { data: org } = await supabase.from('organizations').select('short_name').eq('id', siteId).single();
+        if (org) {
+            const { error } = await supabase.from('site_invoice_defaults').insert({ ...payload, site_name: org.short_name });
+            if (error) throw error;
+        }
+    }
   },
 
   saveSiteInvoiceDefault: async (record: Partial<SiteInvoiceDefault>): Promise<SiteInvoiceDefault> => {
@@ -4157,6 +4204,23 @@ export const api = {
     return toCamelCase(data);
   },
 
+  async getLastFinanceRecordForSite(siteId: string): Promise<SiteFinanceRecord | null> {
+    const { data, error } = await supabase
+      .from('site_finance_tracker')
+      .select('*')
+      .eq('site_id', siteId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw error;
+    }
+    return toCamelCase(data);
+  },
+
   async getSiteFinanceRecords(billingMonth: string): Promise<SiteFinanceRecord[]> {
     const { data, error } = await supabase
       .from('site_finance_tracker')
@@ -4260,5 +4324,46 @@ export const api = {
       .eq('id', id);
 
     if (error) throw error;
+  },
+
+  async bulkRestoreSiteFinanceRecords(ids: string[]): Promise<void> {
+    const { error } = await supabase
+      .from('site_finance_tracker')
+      .update({
+        deleted_at: null,
+        deleted_by: null,
+        deleted_by_name: null,
+        deleted_reason: null
+      })
+      .in('id', ids);
+
+    if (error) throw error;
+  },
+
+  async bulkPermanentlyDeleteSiteFinanceRecords(ids: string[]): Promise<void> {
+    const { error } = await supabase
+      .from('site_finance_tracker')
+      .delete()
+      .in('id', ids);
+
+    if (error) throw error;
+  },
+
+  async getUniqueTrackerSites(): Promise<{ id: string; name: string }[]> {
+    const { data, error } = await supabase
+      .from('site_finance_tracker')
+      .select('site_id, site_name')
+      .is('deleted_at', null);
+
+    if (error) throw error;
+    
+    const uniqueMap = new Map();
+    data?.forEach((item: any) => {
+        if (item.site_id && item.site_name) {
+            uniqueMap.set(item.site_id, item.site_name);
+        }
+    });
+
+    return Array.from(uniqueMap.entries()).map(([id, name]) => ({ id, name }));
   }
 };

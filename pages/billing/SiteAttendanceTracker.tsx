@@ -133,7 +133,7 @@ const SiteAttendanceTracker: React.FC = () => {
         }
     };
 
-    const handlePermanentDelete = async (id: string) => {
+  const handlePermanentDelete = async (id: string) => {
         if (!window.confirm('This will permanently delete the record. Continue?')) return;
         try {
             await api.permanentlyDeleteSiteInvoiceRecord(id);
@@ -144,11 +144,59 @@ const SiteAttendanceTracker: React.FC = () => {
         }
     };
 
+    const handleBulkRestore = async () => {
+        if (selectedIds.size === 0 || !isAdmin) return;
+        setIsRestoring('bulk');
+        try {
+            const ids = Array.from(selectedIds);
+            await api.bulkRestoreSiteInvoiceRecords(ids);
+            setToast({ message: `${selectedIds.size} records restored successfully`, type: 'success' });
+            setSelectedIds(new Set());
+            fetchInitialData();
+        } catch (error) {
+            setToast({ message: 'Failed to restore records', type: 'error' });
+        } finally {
+            setIsRestoring(null);
+        }
+    };
+
+    const handleBulkPermanentDelete = async () => {
+        if (selectedIds.size === 0 || !isAdmin) return;
+        if (!window.confirm(`Are you sure you want to permanently delete these ${selectedIds.size} records? This action cannot be undone.`)) return;
+
+        try {
+            const ids = Array.from(selectedIds);
+            await api.bulkPermanentlyDeleteSiteInvoiceRecords(ids);
+            setToast({ message: `${selectedIds.size} records permanently deleted`, type: 'success' });
+            setSelectedIds(new Set());
+            fetchInitialData();
+        } catch (error) {
+            setToast({ message: 'Failed to delete records', type: 'error' });
+        }
+    };
+
     const getDelayColor = (delay: number | null) => {
         if (delay === null) return 'text-gray-400';
         if (delay > 5) return 'text-rose-600 bg-rose-50 px-2 py-0.5 rounded font-bold';
         if (delay > 0) return 'text-amber-600 bg-amber-50 px-2 py-0.5 rounded font-semibold';
         return 'text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded font-medium';
+    };
+
+    const parseExcelDate = (val: any): string | null => {
+        if (!val) return null;
+        if (val instanceof Date) return format(val, 'yyyy-MM-dd');
+        const str = val.toString().trim();
+        if (!str) return null;
+        // Handle common Excel date formats or raw strings
+        try {
+            const date = new Date(str);
+            if (!isNaN(date.getTime())) {
+                return format(date, 'yyyy-MM-dd');
+            }
+        } catch (e) {
+            console.warn('Failed to parse date:', str);
+        }
+        return null;
     };
 
     const calculateDelay = (received: string, tentative: string): number | null => {
@@ -173,6 +221,21 @@ const SiteAttendanceTracker: React.FC = () => {
                 { header: 'Ops Incharge', key: 'opsIncharge', width: 15 },
                 { header: 'HR Incharge', key: 'hrIncharge', width: 15 },
                 { header: 'Invoice Incharge', key: 'invoiceIncharge', width: 18 },
+                { header: 'Ops Remarks', key: 'opsRemarks', width: 20 },
+                { header: 'HR Remarks', key: 'hrRemarks', width: 20 },
+                { header: 'Finance Remarks', key: 'financeRemarks', width: 20 },
+                { header: 'Manager Tentative Date', key: 'managerTentativeDate', width: 15 },
+                { header: 'Manager Received Date', key: 'managerReceivedDate', width: 15 },
+                { header: 'HR Tentative Date', key: 'hrTentativeDate', width: 15 },
+                { header: 'HR Received Date', key: 'hrReceivedDate', width: 15 },
+                { header: 'Attendance Received Time', key: 'attendanceReceivedTime', width: 12 },
+                { header: 'Invoice Sharing Tentative Date', key: 'invoiceSharingTentativeDate', width: 15 },
+                { header: 'Invoice Prepared Date', key: 'invoicePreparedDate', width: 15 },
+                { header: 'Invoice Sent Date', key: 'invoiceSentDate', width: 15 },
+                { header: 'Invoice Sent Time', key: 'invoiceSentTime', width: 12 },
+                { header: 'Invoice Sent Method Remarks', key: 'invoiceSentMethodRemarks', width: 25 },
+                { header: 'Received Balance', key: 'receivedBalance', width: 15 },
+                { header: 'Balance Receipt No / Remarks', key: 'receivedBalanceReceipt', width: 25 },
             ];
             ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
             ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF006B3F' } };
@@ -199,6 +262,21 @@ const SiteAttendanceTracker: React.FC = () => {
                 { header: 'Ops Incharge', key: 'opsIncharge', width: 20 },
                 { header: 'HR Incharge', key: 'hrIncharge', width: 20 },
                 { header: 'Invoice Incharge', key: 'invoiceIncharge', width: 20 },
+                { header: 'Ops Remarks', key: 'opsRemarks', width: 20 },
+                { header: 'HR Remarks', key: 'hrRemarks', width: 20 },
+                { header: 'Finance Remarks', key: 'financeRemarks', width: 20 },
+                { header: 'Manager Tentative Date', key: 'managerTentativeDate', width: 15 },
+                { header: 'Manager Received Date', key: 'managerReceivedDate', width: 15 },
+                { header: 'HR Tentative Date', key: 'hrTentativeDate', width: 15 },
+                { header: 'HR Received Date', key: 'hrReceivedDate', width: 15 },
+                { header: 'Attendance Received Time', key: 'attendanceReceivedTime', width: 12 },
+                { header: 'Invoice Sharing Tentative Date', key: 'invoiceSharingTentativeDate', width: 15 },
+                { header: 'Invoice Prepared Date', key: 'invoicePreparedDate', width: 15 },
+                { header: 'Invoice Sent Date', key: 'invoiceSentDate', width: 15 },
+                { header: 'Invoice Sent Time', key: 'invoiceSentTime', width: 12 },
+                { header: 'Invoice Sent Method Remarks', key: 'invoiceSentMethodRemarks', width: 25 },
+                { header: 'Received Balance', key: 'receivedBalance', width: 15 },
+                { header: 'Balance Receipt No / Remarks', key: 'receivedBalanceReceipt', width: 25 },
             ];
             ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
             ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D9488' } };
@@ -230,6 +308,19 @@ const SiteAttendanceTracker: React.FC = () => {
                     opsIncharge: row.getCell(4).value?.toString() || '',
                     hrIncharge: row.getCell(5).value?.toString() || '',
                     invoiceIncharge: row.getCell(6).value?.toString() || '',
+                    opsRemarks: row.getCell(7).value?.toString() || '',
+                    hrRemarks: row.getCell(8).value?.toString() || '',
+                    financeRemarks: row.getCell(9).value?.toString() || '',
+                    managerTentativeDate: parseExcelDate(row.getCell(10).value),
+                    managerReceivedDate: parseExcelDate(row.getCell(11).value),
+                    hrTentativeDate: parseExcelDate(row.getCell(12).value),
+                    hrReceivedDate: parseExcelDate(row.getCell(13).value),
+                    attendanceReceivedTime: row.getCell(14).value?.toString() || '',
+                    invoiceSharingTentativeDate: parseExcelDate(row.getCell(15).value),
+                    invoicePreparedDate: parseExcelDate(row.getCell(16).value),
+                    invoiceSentDate: parseExcelDate(row.getCell(17).value),
+                    invoiceSentTime: row.getCell(18).value?.toString() || '',
+                    invoiceSentMethodRemarks: row.getCell(19).value?.toString() || '',
                 });
             });
             setPreviewData(parsed.filter(p => !!p.siteName));
@@ -253,8 +344,10 @@ const SiteAttendanceTracker: React.FC = () => {
             setToast({ message: 'Records imported!', type: 'success' });
             setPreviewData([]);
             fetchInitialData();
-        } catch (err) {
-            setToast({ message: 'Import failed', type: 'error' });
+        } catch (err: any) {
+            console.error('Import failed:', err);
+            const detailedError = err.message || err.details || 'Check console for details';
+            setToast({ message: `Import failed: ${detailedError}`, type: 'error' });
         } finally {
             setIsImporting(false);
         }
@@ -526,14 +619,12 @@ const SiteAttendanceTracker: React.FC = () => {
                                 <thead>
                                     <tr className="bg-gray-50/80 border-b border-gray-200">
                                         <th className="px-5 py-3 text-left w-10">
-                                            {activeSubTab === 'active' && (
-                                                <input 
-                                                    type="checkbox" 
-                                                    className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                                    checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))}
-                                                    onChange={handleSelectAll}
-                                                />
-                                            )}
+                                            <input 
+                                                type="checkbox" 
+                                                className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))}
+                                                onChange={handleSelectAll}
+                                            />
                                         </th>
                                         <th className="px-5 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Site Information</th>
                                         <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Incharges (Ops / HR)</th>
@@ -605,14 +696,12 @@ const SiteAttendanceTracker: React.FC = () => {
                                         return (
                                             <tr key={record.id} className={`hover:bg-gray-50/60 transition-all duration-100 group ${isSelected ? 'bg-emerald-50/30' : ''}`}>
                                                 <td className="px-5 py-3.5">
-                                                    {activeSubTab === 'active' && (
-                                                        <input 
-                                                            type="checkbox" 
-                                                            className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                                            checked={isSelected}
-                                                            onChange={() => handleSelectRow(record.id)}
-                                                        />
-                                                    )}
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                        checked={isSelected}
+                                                        onChange={() => handleSelectRow(record.id)}
+                                                    />
                                                 </td>
                                                 <td className="px-5 py-3.5">
                                                     <div className="font-semibold text-gray-900 text-sm">{record.siteName}</div>
@@ -833,23 +922,44 @@ const SiteAttendanceTracker: React.FC = () => {
             )}
 
             {/* Bulk Actions Bar */}
-            {selectedIds.size > 0 && activeSubTab === 'active' && (
+            {selectedIds.size > 0 && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
                     <div className="bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6">
                         <span className="text-sm font-medium border-r border-gray-700 pr-6">
                             {selectedIds.size} records selected
                         </span>
                         <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => {
-                                    setIsBulkDeleting(true);
-                                    setShowDeleteModal(true);
-                                }}
-                                className="flex items-center gap-2 px-4 py-1.5 bg-red-500 hover:bg-red-600 rounded-full text-xs font-bold transition-all"
-                            >
-                                <Trash2 size={14} />
-                                Delete Selected
-                            </button>
+                            {activeSubTab === 'active' ? (
+                                <button
+                                    onClick={() => {
+                                        setIsBulkDeleting(true);
+                                        setShowDeleteModal(true);
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-1.5 bg-red-500 hover:bg-red-600 rounded-full text-xs font-bold transition-all"
+                                >
+                                    <Trash2 size={14} />
+                                    Delete Selected
+                                </button>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={handleBulkRestore}
+                                        disabled={isRestoring === 'bulk'}
+                                        className="flex items-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-full text-xs font-bold transition-all disabled:opacity-50"
+                                    >
+                                        <RotateCcw size={14} className={isRestoring === 'bulk' ? 'animate-spin' : ''} />
+                                        Restore Selected
+                                    </button>
+                                    <button
+                                        onClick={handleBulkPermanentDelete}
+                                        disabled={!isAdmin}
+                                        className="flex items-center gap-2 px-4 py-1.5 bg-rose-600 hover:bg-rose-700 rounded-full text-xs font-bold transition-all disabled:opacity-50"
+                                    >
+                                        <ShieldX size={14} />
+                                        Permanently Delete
+                                    </button>
+                                </>
+                            )}
                             <button
                                 onClick={() => setSelectedIds(new Set())}
                                 className="px-4 py-1.5 hover:bg-white/10 rounded-full text-xs font-medium transition-all"

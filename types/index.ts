@@ -1766,6 +1766,7 @@ export interface SiteInvoiceDefault {
   invoiceSharingTentativeDate?: string;
   contractAmount?: number;
   contractManagementFee?: number;
+  billingYear?: number | null; // Null means "Applicable to all years unless overridden"
   createdAt?: string;
   updatedAt?: string;
 }

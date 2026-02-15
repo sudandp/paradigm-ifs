@@ -6,7 +6,10 @@ import { api } from '../../services/api';
 import type { SiteFinanceRecord, SiteInvoiceDefault } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import { format, startOfMonth } from 'date-fns';
-import { Loader2, Plus, Edit2, Trash2, IndianRupee, FileSpreadsheet, TrendingUp, TrendingDown, ClipboardCheck, Building2, Download, Upload, AlertTriangle } from 'lucide-react';
+import { 
+    Loader2, Plus, Edit2, Trash2, IndianRupee, FileSpreadsheet, TrendingUp, TrendingDown, 
+    ClipboardCheck, Building2, Download, Upload, AlertTriangle, RotateCcw, ShieldX, Search, Info 
+} from 'lucide-react';
 import Toast from '../../components/ui/Toast';
 
 const SiteFinanceTracker: React.FC = () => {
@@ -330,6 +333,41 @@ const SiteFinanceTracker: React.FC = () => {
         }
     };
 
+    const isAdmin = ['admin', 'super_admin', 'management', 'hr'].includes(user?.role || '');
+
+    const handleBulkRestore = async () => {
+        if (selectedIds.size === 0 || !isAdmin) return;
+        setIsRestoring('bulk');
+        try {
+            const ids = Array.from(selectedIds);
+            await api.bulkRestoreSiteFinanceRecords(ids);
+            setToast({ message: `${selectedIds.size} records restored successfully`, type: 'success' });
+            setSelectedIds(new Set());
+            fetchData();
+        } catch (error) {
+            console.error('Bulk restore error:', error);
+            setToast({ message: 'Failed to restore records', type: 'error' });
+        } finally {
+            setIsRestoring(null);
+        }
+    };
+
+    const handleBulkPermanentDelete = async () => {
+        if (selectedIds.size === 0 || !isAdmin) return;
+        if (!confirm(`Are you sure you want to permanently delete these ${selectedIds.size} records? This action cannot be undone.`)) return;
+
+        try {
+            const ids = Array.from(selectedIds);
+            await api.bulkPermanentlyDeleteSiteFinanceRecords(ids);
+            setToast({ message: `${selectedIds.size} records permanently deleted`, type: 'success' });
+            setSelectedIds(new Set());
+            fetchData();
+        } catch (error) {
+            console.error('Bulk permanent delete error:', error);
+            setToast({ message: 'Failed to delete records permanently', type: 'error' });
+        }
+    };
+
     // Calculate variations for stats
     let totalBillingVariation = 0;
     let totalFeeVariation = 0;
@@ -596,14 +634,12 @@ const SiteFinanceTracker: React.FC = () => {
                                 <thead>
                                     <tr className="bg-gray-50/80 border-b border-gray-200">
                                         <th className="px-5 py-3 text-left w-10">
-                                            {activeSubTab === 'active' && (
-                                                <input 
-                                                    type="checkbox" 
-                                                    className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                                    checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))}
-                                                    onChange={handleSelectAll}
-                                                />
-                                            )}
+                                            <input 
+                                                type="checkbox" 
+                                                className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))}
+                                                onChange={handleSelectAll}
+                                            />
                                         </th>
                                         <th className="px-5 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Client Name</th>
                                         {activeSubTab === 'active' ? (
@@ -688,14 +724,12 @@ const SiteFinanceTracker: React.FC = () => {
                                         return (
                                             <tr key={record.id} className={`hover:bg-gray-50/60 transition-colors duration-100 group ${isSelected ? 'bg-emerald-50/30' : ''}`}>
                                                 <td className="px-5 py-3.5">
-                                                    {activeSubTab === 'active' && (
-                                                        <input 
-                                                            type="checkbox" 
-                                                            className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                                            checked={isSelected}
-                                                            onChange={() => handleSelectRow(record.id)}
-                                                        />
-                                                    )}
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                        checked={isSelected}
+                                                        onChange={() => handleSelectRow(record.id)}
+                                                    />
                                                 </td>
                                                 <td className="px-5 py-3.5">
                                                     <div className="font-semibold text-gray-900 text-sm">{record.siteName}</div>
@@ -909,23 +943,44 @@ const SiteFinanceTracker: React.FC = () => {
             )}
 
             {/* Bulk Actions Bar */}
-            {selectedIds.size > 0 && activeSubTab === 'active' && (
+            {selectedIds.size > 0 && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
                     <div className="bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6">
                         <span className="text-sm font-medium border-r border-gray-700 pr-6">
                             {selectedIds.size} records selected
                         </span>
                         <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => {
-                                    setIsBulkDeleting(true);
-                                    setShowDeleteModal(true);
-                                }}
-                                className="flex items-center gap-2 px-4 py-1.5 bg-red-500 hover:bg-red-600 rounded-full text-xs font-bold transition-all"
-                            >
-                                <Trash2 size={14} />
-                                Delete Selected
-                            </button>
+                            {activeSubTab === 'active' ? (
+                                <button
+                                    onClick={() => {
+                                        setIsBulkDeleting(true);
+                                        setShowDeleteModal(true);
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-1.5 bg-red-500 hover:bg-red-600 rounded-full text-xs font-bold transition-all"
+                                >
+                                    <Trash2 size={14} />
+                                    Delete Selected
+                                </button>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={handleBulkRestore}
+                                        disabled={isRestoring === 'bulk'}
+                                        className="flex items-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-full text-xs font-bold transition-all disabled:opacity-50"
+                                    >
+                                        <RotateCcw size={14} className={isRestoring === 'bulk' ? 'animate-spin' : ''} />
+                                        Restore Selected
+                                    </button>
+                                    <button
+                                        onClick={handleBulkPermanentDelete}
+                                        disabled={!isAdmin}
+                                        className="flex items-center gap-2 px-4 py-1.5 bg-rose-600 hover:bg-rose-700 rounded-full text-xs font-bold transition-all disabled:opacity-50"
+                                    >
+                                        <ShieldX size={14} />
+                                        Permanently Delete
+                                    </button>
+                                </>
+                            )}
                             <button
                                 onClick={() => setSelectedIds(new Set())}
                                 className="px-4 py-1.5 hover:bg-white/10 rounded-full text-xs font-medium transition-all"
