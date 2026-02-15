@@ -20,6 +20,7 @@ const AddSiteFinanceRecord: React.FC = () => {
     const [sites, setSites] = useState<Organization[]>([]);
     const [siteDefaults, setSiteDefaults] = useState<SiteInvoiceDefault[]>([]);
     const [currentUser, setCurrentUser] = useState<{ id: string, name: string, role: string } | null>(null);
+    const [recordMetadata, setRecordMetadata] = useState<{ createdBy?: string, createdByName?: string, createdAt?: string, updatedBy?: string, updatedByName?: string, updatedAt?: string } | null>(null);
 
     const { control, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<Partial<SiteFinanceRecord>>({
         defaultValues: {
@@ -79,7 +80,31 @@ const AddSiteFinanceRecord: React.FC = () => {
                 }
 
                 if (isEditing && id) {
-                    // Logic to load existing record would go here
+                    const record = await api.getSiteFinanceRecord(id);
+                    if (record) {
+                        reset({
+                            siteId: record.siteId,
+                            siteName: record.siteName,
+                            billingMonth: record.billingMonth,
+                            companyName: record.companyName,
+                            contractAmount: record.contractAmount,
+                            contractManagementFee: record.contractManagementFee,
+                            billedAmount: record.billedAmount, // Ensure these are set for editing
+                            billedManagementFee: record.billedManagementFee,
+                            status: record.status
+                        });
+                        setRecordMetadata({
+                            createdBy: record.createdBy,
+                            createdByName: record.createdByName,
+                            createdAt: record.createdAt,
+                            updatedBy: record.updatedBy, // These might not be in the type yet, but good to have
+                            updatedAt: record.updatedAt,
+                            updatedByName: record.updatedByName // If available
+                        });
+                    } else {
+                        setToast({ message: 'Record not found', type: 'error' });
+                        navigate('/finance?tab=site');
+                    }
                 }
             } catch (error) {
                 console.error('Error loading data:', error);
@@ -89,7 +114,7 @@ const AddSiteFinanceRecord: React.FC = () => {
             }
         };
         loadData();
-    }, [isEditing, id]);
+    }, [isEditing, id, reset, navigate]);
 
     const onSubmit = async (data: Partial<SiteFinanceRecord>) => {
         setIsLoading(true);
@@ -100,6 +125,11 @@ const AddSiteFinanceRecord: React.FC = () => {
                 payload.createdBy = currentUser.id;
                 payload.createdByName = currentUser.name;
                 payload.createdByRole = currentUser.role;
+            } else if (id && currentUser) {
+                // Update tracker for edits
+                payload.updatedBy = currentUser.id;
+                payload.updatedByName = currentUser.name;
+                payload.updatedAt = new Date().toISOString();
             }
             
             await api.saveSiteFinanceRecord(payload);
@@ -205,7 +235,6 @@ const AddSiteFinanceRecord: React.FC = () => {
                                 <div className="flex items-center gap-2">
                                     <Wallet className="h-4 w-4" /> CONTRACT DETAILS
                                 </div>
-                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-black tracking-tighter">FIXED FROM SITE</span>
                             </h3>
                             <div className="space-y-6">
                                 <Controller
@@ -218,8 +247,7 @@ const AddSiteFinanceRecord: React.FC = () => {
                                             icon={<Building className="h-4 w-4" />} 
                                             placeholder="Auto-filled..."
                                             {...field}
-                                            readOnly
-                                            className="bg-gray-50/50 cursor-not-allowed border-dashed grayscale-[0.5] opacity-80"
+                                            className="bg-white border-gray-200 focus:border-emerald-500"
                                         />
                                     )}
                                 />
@@ -234,8 +262,15 @@ const AddSiteFinanceRecord: React.FC = () => {
                                             icon={<IndianRupee className="h-4 w-4" />} 
                                             placeholder="0"
                                             {...field}
-                                            readOnly
-                                            className="bg-gray-50/50 cursor-not-allowed border-dashed grayscale-[0.5] opacity-80"
+                                            className="bg-white border-gray-200 focus:border-emerald-500"
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                field.onChange(val === '' ? '' : Number(val));
+                                            }}
+                                            onFocus={(e) => e.target.select()}
+                                            onKeyDown={(e) => {
+                                                if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+                                            }}
                                         />
                                     )}
                                 />
@@ -250,8 +285,15 @@ const AddSiteFinanceRecord: React.FC = () => {
                                             icon={<IndianRupee className="h-4 w-4" />} 
                                             placeholder="0"
                                             {...field}
-                                            readOnly
-                                            className="bg-gray-50/50 cursor-not-allowed border-dashed grayscale-[0.5] opacity-80"
+                                            className="bg-white border-gray-200 focus:border-emerald-500"
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                field.onChange(val === '' ? '' : Number(val));
+                                            }}
+                                            onFocus={(e) => e.target.select()}
+                                            onKeyDown={(e) => {
+                                                if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+                                            }}
                                         />
                                     )}
                                 />
@@ -311,6 +353,27 @@ const AddSiteFinanceRecord: React.FC = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Metadata Section (Only for Edits) */}
+                    {isEditing && recordMetadata && (
+                        <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
+                             <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Record History</h3>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                <div>
+                                    <span className="block font-bold text-gray-500 mb-0.5">Created By</span>
+                                    <span className="text-gray-900 font-medium">{recordMetadata.createdByName || 'Unknown'}</span>
+                                    <span className="text-gray-400 ml-2">{recordMetadata.createdAt ? format(new Date(recordMetadata.createdAt), 'dd MMM yyyy, hh:mm a') : '-'}</span>
+                                </div>
+                                {recordMetadata.updatedAt && (
+                                    <div>
+                                        <span className="block font-bold text-gray-500 mb-0.5">Last Updated</span>
+                                        <span className="text-gray-900 font-medium">{currentUser?.name} (You)</span> 
+                                        <span className="text-gray-400 ml-2">{format(new Date(), 'dd MMM yyyy')}</span>
+                                    </div>
+                                )}
+                             </div>
+                        </div>
+                    )}
 
                     {/* Bottom Summary Bar */}
                     <div className="bg-white rounded-3xl border border-gray-300 p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">

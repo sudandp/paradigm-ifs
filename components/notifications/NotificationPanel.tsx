@@ -19,11 +19,11 @@ import {
     ChevronUp
 } from 'lucide-react';
 import { format, formatDistanceToNow, isToday, isYesterday, parseISO } from 'date-fns';
-import type { Notification, NotificationType, AttendanceUnlockRequest, LeaveRequest, ExtraWorkLog } from '../../types';
+import type { Notification, NotificationType, AttendanceUnlockRequest, LeaveRequest, ExtraWorkLog, SiteFinanceRecord } from '../../types';
 import Button from '../ui/Button';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
-import { CheckCircle, XCircle, Calendar, FileText, MapPin } from 'lucide-react';
+import { CheckCircle, XCircle, Calendar, FileText, MapPin, IndianRupee } from 'lucide-react';
 import { ProfilePlaceholder } from '../ui/ProfilePlaceholder';
 
 const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({ type, size = "h-5 w-5" }) => {
@@ -68,15 +68,16 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
     const [unlockRequests, setUnlockRequests] = React.useState<AttendanceUnlockRequest[]>([]);
     const [leaveRequests, setLeaveRequests] = React.useState<LeaveRequest[]>([]);
     const [extraWorkClaims, setExtraWorkClaims] = React.useState<ExtraWorkLog[]>([]);
+    const [financeRequests, setFinanceRequests] = React.useState<SiteFinanceRecord[]>([]);
     
-    // State for expandable sections
     const [expandedSections, setExpandedSections] = React.useState({
         unlocks: false,
         leaves: false,
-        claims: false
+        claims: false,
+        finance: false
     });
 
-    const toggleSection = (section: 'unlocks' | 'leaves' | 'claims') => {
+    const toggleSection = (section: 'unlocks' | 'leaves' | 'claims' | 'finance') => {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
@@ -102,16 +103,20 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
             }
 
             const isPrivileged = ['admin', 'hr', 'management', 'operation_manager', 'site_manager'].includes(user.role);
-            const [unlocks, leaves, claims] = await Promise.all([
+            const [unlocks, leaves, claims, finance] = await Promise.all([
                 api.getAttendanceUnlockRequests(isPrivileged ? undefined : user.id),
                 leavesPromise,
                 ['admin', 'hr', 'operation_manager', 'site_manager'].includes(user.role) 
                     ? api.getExtraWorkLogs({ status: 'Pending' }) 
-                    : Promise.resolve({ data: [], total: 0 })
+                    : Promise.resolve({ data: [], total: 0 }),
+                ['admin', 'finance', 'super_admin'].includes(user.role)
+                    ? api.getPendingFinanceRecords()
+                    : Promise.resolve([])
             ]);
             setUnlockRequests(unlocks.filter(r => r.userId !== user.id));
             setLeaveRequests(leaves.data.filter(r => r.userId !== user.id));
             setExtraWorkClaims(claims.data.filter(c => c.userId !== user.id));
+            setFinanceRequests(finance.filter(f => f.createdBy !== user.id));
         } catch (err) {
             console.error('Error fetching pending approvals:', err);
         }
@@ -157,6 +162,18 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
             setExtraWorkClaims(prev => prev.filter(c => c.id !== claimId));
         } catch (err) {
             console.error('Error responding to claim:', err);
+        } finally {
+            setIsActionLoading(null);
+        }
+    };
+
+    const handleRespondToFinance = async (recordId: string, action: 'approved' | 'rejected') => {
+        setIsActionLoading(recordId);
+        try {
+            await api.respondToFinanceRecord(recordId, action);
+            setFinanceRequests(prev => prev.filter(r => r.id !== recordId));
+        } catch (err) {
+            console.error('Error responding to finance record:', err);
         } finally {
             setIsActionLoading(null);
         }
@@ -246,7 +263,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                 className={`flex-1 overflow-y-auto custom-scrollbar ${isMobile ? 'bg-[#0A3D2E]' : 'bg-white'}`}
             >
                 {/* Pending Approvals Section */}
-                {(unlockRequests.length > 0 || leaveRequests.length > 0 || extraWorkClaims.length > 0) && (
+                {(unlockRequests.length > 0 || leaveRequests.length > 0 || extraWorkClaims.length > 0 || financeRequests.length > 0) && (
                     <div className={`border-b ${isMobile ? 'border-white/10 bg-gradient-to-b from-white/5 to-transparent' : 'border-gray-100 bg-amber-50/30'}`}>
                         <div className="px-6 py-4 flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -258,7 +275,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                 </h5>
                             </div>
                             <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${isMobile ? 'bg-white/10 text-white border border-white/5' : 'bg-amber-100 text-amber-700'}`}>
-                                {unlockRequests.length + leaveRequests.length + extraWorkClaims.length}
+                                {unlockRequests.length + leaveRequests.length + extraWorkClaims.length + financeRequests.length}
                             </span>
                         </div>
                         
@@ -461,6 +478,87 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                                             disabled={isActionLoading === claim.id}
                                                             className={`flex-1 text-[9px] uppercase font-bold h-8 ${isMobile ? 'border-white/10 text-white hover:bg-white/5' : 'border-blue-200 text-blue-700 hover:bg-blue-50'}`}
                                                             onClick={() => handleRespondToClaim(claim.id, 'reject')}
+                                                        >
+                                                            <XCircle className="w-3 h-3 mr-1" /> Reject
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Finance Requests */}
+                            {financeRequests.length > 0 && (
+                                <div className={`group rounded-2xl overflow-hidden transition-all duration-300 border ${isMobile ? 'border-white/10 bg-transparent' : 'border-rose-100 bg-white hover:shadow-md'}`}>
+                                    <button 
+                                        onClick={() => toggleSection('finance')}
+                                        className="w-full p-3 flex items-center justify-between bg-transparent"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-xl flex items-center justify-center ${isMobile ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-600'}`}>
+                                                <IndianRupee className="w-4 h-4" />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className={`text-xs font-bold ${isMobile ? 'text-white' : 'text-gray-900'}`}>Finance Updates</p>
+                                                <p className={`text-[10px] ${isMobile ? 'text-white/50' : 'text-gray-500'}`}>Review updates</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full text-[10px] font-bold ${isMobile ? 'bg-rose-500 text-black shadow-[0_0_10px_rgba(244,63,94,0.4)]' : 'bg-rose-100 text-rose-700'}`}>
+                                                {financeRequests.length}
+                                            </span>
+                                            {expandedSections.finance ? <ChevronUp className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} /> : <ChevronDown className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} />}
+                                        </div>
+                                    </button>
+                                    
+                                    {expandedSections.finance && (
+                                        <div className={`p-3 space-y-3 border-t ${isMobile ? 'border-white/5' : 'border-rose-100/50'}`}>
+                                            {financeRequests.map(req => (
+                                                <div key={req.id} className={`rounded-xl p-3 border ${isMobile ? 'bg-black/20 border-white/5' : 'bg-rose-50/30 border-rose-100'}`}>
+                                                    <div className="flex items-center gap-3 mb-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center font-bold text-rose-700 overflow-hidden relative text-xs">
+                                                            {req.createdByName?.charAt(0) || 'F'}
+                                                            <IndianRupee className="w-4 h-4" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between">
+                                                                <p className={`text-xs font-bold truncate ${isMobile ? 'text-white' : 'text-gray-900'}`}>{req.createdByName}</p>
+                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 border border-rose-500/20`}>Finance</span>
+                                                            </div>
+                                                            <div className="flex items-center justify-between mt-0.5">
+                                                                <p className={`text-[9px] ${isMobile ? 'text-white/50' : 'text-rose-700/60'}`}>
+                                                                    {req.createdByRole ? (
+                                                                        <span className="uppercase tracking-tighter mr-2">{req.createdByRole.replace('_', ' ')}</span>
+                                                                    ) : null}
+                                                                    {req.createdAt && format(parseISO(req.createdAt), 'dd MMM, hh:mm a')}
+                                                                </p>
+                                                                <span className="text-[10px] font-bold text-gray-900">
+                                                                    ₹{(req.totalBilledAmount || (req.billedAmount + req.billedManagementFee)).toLocaleString()}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`rounded-lg p-2.5 border mb-3 ${isMobile ? 'bg-black/20 border-white/5' : 'bg-white border-rose-100/50'}`}>
+                                                      <p className={`text-[11px] font-bold ${isMobile ? 'text-white/90' : 'text-gray-900'}`}>{req.siteName}</p>
+                                                      <p className={`text-[10px] italic leading-relaxed ${isMobile ? 'text-white/70' : 'text-gray-600'}`}>{req.remarks || 'No remarks provided'}</p>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <Button 
+                                                            size="sm" 
+                                                            disabled={isActionLoading === req.id}
+                                                            className="flex-1 bg-rose-600 hover:bg-rose-700 border-none text-[9px] uppercase font-bold h-8 shadow-lg shadow-rose-900/20"
+                                                            onClick={() => handleRespondToFinance(req.id, 'approved')}
+                                                        >
+                                                            <CheckCircle className="w-3 h-3 mr-1" /> Approve
+                                                        </Button>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="outline"
+                                                            disabled={isActionLoading === req.id}
+                                                            className={`flex-1 text-[9px] uppercase font-bold h-8 ${isMobile ? 'border-white/10 text-white hover:bg-white/5' : 'border-rose-200 text-rose-700 hover:bg-rose-50'}`}
+                                                            onClick={() => handleRespondToFinance(req.id, 'rejected')}
                                                         >
                                                             <XCircle className="w-3 h-3 mr-1" /> Reject
                                                         </Button>

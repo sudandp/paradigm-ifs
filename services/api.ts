@@ -4123,6 +4123,40 @@ export const api = {
   }
 ,
   // Site Finance
+  async getPendingFinanceRecords(): Promise<SiteFinanceRecord[]> {
+    const { data, error } = await supabase
+      .from('site_finance_tracker')
+      .select('*')
+      .eq('status', 'pending')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
+
+  async respondToFinanceRecord(id: string, status: 'approved' | 'rejected'): Promise<void> {
+    const { error } = await supabase
+      .from('site_finance_tracker')
+      .update({ status })
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+  async getSiteFinanceRecord(id: string): Promise<SiteFinanceRecord | null> {
+    const { data, error } = await supabase
+      .from('site_finance_tracker')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null; // No rows found
+      throw error;
+    }
+    return toCamelCase(data);
+  },
+
   async getSiteFinanceRecords(billingMonth: string): Promise<SiteFinanceRecord[]> {
     const { data, error } = await supabase
       .from('site_finance_tracker')
@@ -4142,7 +4176,7 @@ export const api = {
     
     const { data, error } = await supabase
       .from('site_finance_tracker')
-      .upsert(dbRecord)
+      .upsert({ ...dbRecord, status: 'pending' })
       .select()
       .single();
 
@@ -4156,6 +4190,7 @@ export const api = {
       const snaked = toSnakeCase(rest);
       // Omit generated columns before insert
       delete snaked.total_billed_amount;
+      snaked.status = 'pending';
       return snaked;
     });
     const { error } = await supabase.from('site_finance_tracker').insert(dbRecords);

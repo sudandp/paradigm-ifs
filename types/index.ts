@@ -1791,6 +1791,8 @@ export interface SiteFinanceRecord {
   createdByRole?: string;
   createdAt?: string;
   updatedAt?: string;
+  updatedBy?: string;
+  updatedByName?: string;
 
   // Deletion tracking
   deletedAt?: string;
