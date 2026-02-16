@@ -19,7 +19,7 @@ import {
     ChevronUp
 } from 'lucide-react';
 import { format, formatDistanceToNow, isToday, isYesterday, parseISO } from 'date-fns';
-import type { Notification, NotificationType, AttendanceUnlockRequest, LeaveRequest, ExtraWorkLog, SiteFinanceRecord } from '../../types';
+import type { Notification, NotificationType, AttendanceUnlockRequest, LeaveRequest, ExtraWorkLog, SiteFinanceRecord, SiteInvoiceRecord } from '../../types';
 import Button from '../ui/Button';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
@@ -69,15 +69,17 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
     const [leaveRequests, setLeaveRequests] = React.useState<LeaveRequest[]>([]);
     const [extraWorkClaims, setExtraWorkClaims] = React.useState<ExtraWorkLog[]>([]);
     const [financeRequests, setFinanceRequests] = React.useState<SiteFinanceRecord[]>([]);
+    const [invoiceAlerts, setInvoiceAlerts] = React.useState<SiteInvoiceRecord[]>([]);
     
     const [expandedSections, setExpandedSections] = React.useState({
         unlocks: false,
         leaves: false,
         claims: false,
-        finance: false
+        finance: false,
+        invoices: false
     });
 
-    const toggleSection = (section: 'unlocks' | 'leaves' | 'claims' | 'finance') => {
+    const toggleSection = (section: 'unlocks' | 'leaves' | 'claims' | 'finance' | 'invoices') => {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
@@ -85,42 +87,105 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
     const fetchPendingApprovals = React.useCallback(async () => {
-        if (!user || user.role === 'field_staff') return;
+        if (!user || user.role === 'field_staff' || user.role === 'unverified') return;
         try {
-            const isSuperAdmin = ['admin', 'super_admin'].includes((user.role || '').toLowerCase());
+            const role = (user.role || '').toLowerCase();
+            const isSuperAdmin = ['admin', 'super_admin', 'developer', 'management'].includes(role);
+            const isHR = ['hr', 'hr_ops'].includes(role);
+            const isFinance = ['finance_manager'].includes(role);
 
+            console.log('[Approvals] Fetching for role:', role, '| isSuperAdmin:', isSuperAdmin, '| isHR:', isHR, '| isFinance:', isFinance, '| userId:', user.id);
+
+            // --- Leave Requests ---
             let leavesPromise;
-            // Only Admin/SuperAdmin sees ALL pending requests
             if (isSuperAdmin) {
                 leavesPromise = Promise.all([
                     api.getLeaveRequests({ status: 'pending_manager_approval' }),
                     api.getLeaveRequests({ status: 'pending_hr_confirmation' })
                 ]).then(([res1, res2]) => ({ data: [...res1.data, ...res2.data] }));
+            } else if (isHR) {
+                leavesPromise = Promise.all([
+                    api.getLeaveRequests({ status: 'pending_manager_approval', forApproverId: user.id }),
+                    api.getLeaveRequests({ status: 'pending_hr_confirmation' })
+                ]).then(([res1, res2]) => ({ data: [...res1.data, ...res2.data] }));
             } else {
-                // Regular Manager/HR/Finance: sees requests assigned to them or for their team
                 leavesPromise = api.getLeaveRequests({ 
                     status: 'pending_manager_approval',
                     forApproverId: user.id 
                 });
             }
 
-            const [unlocks, leaves, claims, finance] = await Promise.all([
+            const financeManagerId = (isSuperAdmin || isFinance) ? undefined : user.id;
+
+            const [unlocksResult, leavesResult, claimsResult, financeResult, invoicesResult] = await Promise.allSettled([
                 api.getAttendanceUnlockRequests(isSuperAdmin ? undefined : user.id),
                 leavesPromise,
                 api.getExtraWorkLogs({ 
                     status: 'Pending', 
                     managerId: isSuperAdmin ? undefined : user.id 
                 }),
-                api.getPendingFinanceRecords(isSuperAdmin ? undefined : user.id)
+                api.getPendingFinanceRecords(financeManagerId),
+                api.getSiteInvoiceRecords(financeManagerId)
             ]);
-            setUnlockRequests(unlocks.filter(r => r.userId !== user.id));
-            setLeaveRequests(leaves.data.filter(r => r.userId !== user.id));
-            setExtraWorkClaims(claims.data.filter(c => c.userId !== user.id));
-            setFinanceRequests(finance.filter(f => f.createdBy !== user.id));
+
+            console.log('[Approvals] Results:', {
+                unlocks: unlocksResult.status === 'fulfilled' ? `${unlocksResult.value.length} items` : `FAILED: ${unlocksResult.reason}`,
+                leaves: leavesResult.status === 'fulfilled' ? `${leavesResult.value.data.length} items` : `FAILED: ${leavesResult.reason}`,
+                claims: claimsResult.status === 'fulfilled' ? `${claimsResult.value.data.length} items` : `FAILED: ${claimsResult.reason}`,
+                finance: financeResult.status === 'fulfilled' ? `${financeResult.value.length} items` : `FAILED: ${financeResult.reason}`,
+                invoices: invoicesResult.status === 'fulfilled' ? `${invoicesResult.value.length} items` : `FAILED: ${invoicesResult.reason}`
+            });
+
+            let finalUnlocks: AttendanceUnlockRequest[] = [];
+            let finalLeaves: LeaveRequest[] = [];
+            let finalClaims: ExtraWorkLog[] = [];
+            let finalFinance: SiteFinanceRecord[] = [];
+            let finalInvoices: SiteInvoiceRecord[] = [];
+
+            if (unlocksResult.status === 'fulfilled') {
+                finalUnlocks = unlocksResult.value.filter(r => r.userId !== user.id);
+                setUnlockRequests(finalUnlocks);
+            }
+
+            if (leavesResult.status === 'fulfilled') {
+                finalLeaves = leavesResult.value.data.filter((r: any) => r.userId !== user.id);
+                setLeaveRequests(finalLeaves);
+            }
+
+            if (claimsResult.status === 'fulfilled') {
+                finalClaims = claimsResult.value.data.filter((c: any) => c.userId !== user.id);
+                setExtraWorkClaims(finalClaims);
+            }
+
+            if (financeResult.status === 'fulfilled') {
+                finalFinance = financeResult.value.filter(f => f.createdBy !== user.id);
+                setFinanceRequests(finalFinance);
+            }
+
+            if (invoicesResult.status === 'fulfilled') {
+                // Filter for "Due" invoices: !invoiceSentDate && invoiceSharingTentativeDate <= today
+                const today = new Date().toISOString().split('T')[0];
+                finalInvoices = (invoicesResult.value || []).filter(inv => 
+                    !inv.invoiceSentDate && 
+                    inv.invoiceSharingTentativeDate && 
+                    inv.invoiceSharingTentativeDate <= today
+                );
+                setInvoiceAlerts(finalInvoices);
+            }
+
+            // Auto-expand sections that have pending items
+            setExpandedSections({
+                unlocks: finalUnlocks.length > 0,
+                leaves: finalLeaves.length > 0,
+                claims: finalClaims.length > 0,
+                finance: finalFinance.length > 0,
+                invoices: finalInvoices.length > 0
+            });
+
         } catch (err) {
             console.error('Error fetching pending approvals:', err);
         }
-    }, [user]);
+    }, [user, api]);
 
     React.useEffect(() => {
         if (isOpen) {
@@ -482,6 +547,66 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                                             <XCircle className="w-3 h-3 mr-1" /> Reject
                                                         </Button>
                                                     </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Invoice Alerts */}
+                            {invoiceAlerts.length > 0 && (
+                                <div className={`group rounded-2xl overflow-hidden transition-all duration-300 border ${isMobile ? 'border-white/10 bg-transparent' : 'border-amber-100 bg-white hover:shadow-md'}`}>
+                                    <button 
+                                        onClick={() => toggleSection('invoices')}
+                                        className="w-full p-3 flex items-center justify-between bg-transparent"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-xl flex items-center justify-center ${isMobile ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600'}`}>
+                                                <IndianRupee className="w-4 h-4" />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className={`text-xs font-bold ${isMobile ? 'text-white' : 'text-gray-900'}`}>Invoice Alerts</p>
+                                                <p className={`text-[10px] ${isMobile ? 'text-white/50' : 'text-gray-500'}`}>Due for sharing</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full text-[10px] font-bold ${isMobile ? 'bg-amber-500 text-black shadow-[0_0_10px_rgba(245,158,11,0.4)]' : 'bg-amber-100 text-amber-700'}`}>
+                                                {invoiceAlerts.length}
+                                            </span>
+                                            {expandedSections.invoices ? <ChevronUp className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} /> : <ChevronDown className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} />}
+                                        </div>
+                                    </button>
+                                    
+                                    {expandedSections.invoices && (
+                                        <div className={`p-3 space-y-3 border-t ${isMobile ? 'border-white/5' : 'border-amber-100/50'}`}>
+                                            {invoiceAlerts.map(inv => (
+                                                <div key={inv.id} className={`rounded-xl p-3 border ${isMobile ? 'bg-black/20 border-white/5' : 'bg-amber-50/30 border-amber-100'}`}>
+                                                    <div className="flex items-center gap-3 mb-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center font-bold text-amber-700 overflow-hidden relative text-xs">
+                                                            {inv.siteName.charAt(0)}
+                                                            <IndianRupee className="w-4 h-4" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between">
+                                                                <p className={`text-xs font-bold truncate ${isMobile ? 'text-white' : 'text-gray-900'}`}>{inv.siteName}</p>
+                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20`}>Due</span>
+                                                            </div>
+                                                            <p className={`text-[9px] ${isMobile ? 'text-white/50' : 'text-amber-700/60'}`}>
+                                                                Tentative: {inv.invoiceSharingTentativeDate ? format(parseISO(inv.invoiceSharingTentativeDate), 'dd MMM yyyy') : 'N/A'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <Button 
+                                                        size="sm" 
+                                                        className="w-full bg-amber-600 hover:bg-amber-700 border-none text-[9px] uppercase font-bold h-8 shadow-lg shadow-amber-900/20"
+                                                        onClick={() => {
+                                                            navigate('/finance?tab=attendance');
+                                                            onClose();
+                                                        }}
+                                                    >
+                                                        View Tracker
+                                                    </Button>
                                                 </div>
                                             ))}
                                         </div>
