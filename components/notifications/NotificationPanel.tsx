@@ -87,7 +87,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
     const fetchPendingApprovals = React.useCallback(async () => {
         if (!user || user.role === 'field_staff') return;
         try {
-            const isSuperAdmin = ['admin', 'super_admin'].includes(user.role);
+            const isSuperAdmin = ['admin', 'super_admin'].includes((user.role || '').toLowerCase());
 
             let leavesPromise;
             // Only Admin/SuperAdmin sees ALL pending requests

@@ -58,6 +58,8 @@ export const getAppUserProfile = async (supabaseUser: SupabaseUser): Promise<App
             organizationId: data.organization_id,
             organizationName: data.organization_name,
             reportingManagerId: data.reporting_manager_id,
+            reportingManager2Id: data.reporting_manager_2_id,
+            reportingManager3Id: data.reporting_manager_3_id,
             photoUrl: data.photo_url,
         };
     } catch (e) {

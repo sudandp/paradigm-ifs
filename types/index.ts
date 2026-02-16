@@ -79,6 +79,8 @@ export interface User {
   organizationId?: string;
   organizationName?: string;
   reportingManagerId?: string;
+  reportingManager2Id?: string;
+  reportingManager3Id?: string;
   photoUrl?: string;
   biometricId?: string;
 

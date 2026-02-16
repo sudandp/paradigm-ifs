@@ -12,7 +12,7 @@ import OrgWorkflowCard from '../../components/admin/OrgWorkflowCard';
 import Pagination from '../../components/ui/Pagination';
 
 
-type UserWithManager = User & { managerName?: string };
+type UserWithManager = User & { managerName?: string, manager2Name?: string, manager3Name?: string };
 
 type ViewTab = 'table' | '2d';
 
@@ -36,7 +36,11 @@ const ApprovalWorkflow: React.FC = () => {
                 api.getApprovalWorkflowSettings(),
                 api.getRoles()
             ]);
-            setUsers(usersData);
+            // Sort users alphabetically by name
+            const sortedUsers = [...usersData].sort((a, b) => 
+                (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+            );
+            setUsers(sortedUsers);
             setFinalConfirmationRole(settingsData.finalConfirmationRole);
             // Filter to only show roles that can be approvers, plus the special "reporting_manager" option
             const approverRoles = rolesData.filter(r => ['admin', 'hr', 'operation_manager'].includes(r.id));
@@ -54,16 +58,25 @@ const ApprovalWorkflow: React.FC = () => {
         fetchData();
     }, [fetchData]);
 
-    const handleManagerChange = (userId: string, managerId: string) => {
+    const handleManagerChange = (userId: string, managerId: string, slot: 1 | 2 | 3 = 1) => {
         setUsers(currentUsers =>
-            currentUsers.map(u => u.id === userId ? { ...u, reportingManagerId: managerId || undefined } : u)
+            currentUsers.map(u => {
+                if (u.id !== userId) return u;
+                if (slot === 1) return { ...u, reportingManagerId: managerId || undefined };
+                if (slot === 2) return { ...u, reportingManager2Id: managerId || undefined };
+                return { ...u, reportingManager3Id: managerId || undefined };
+            })
         );
     };
 
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            await Promise.all(users.map(u => api.updateUserReportingManager(u.id, u.reportingManagerId || null)));
+            await Promise.all(users.flatMap(u => [
+                api.updateUserReportingManager(u.id, u.reportingManagerId || null, 1),
+                api.updateUserReportingManager(u.id, u.reportingManager2Id || null, 2),
+                api.updateUserReportingManager(u.id, u.reportingManager3Id || null, 3)
+            ]));
             await api.updateApprovalWorkflowSettings(finalConfirmationRole);
             setToast({ message: 'Workflow saved successfully!', type: 'success' });
             fetchData(); // re-fetch to confirm names
@@ -147,26 +160,58 @@ const ApprovalWorkflow: React.FC = () => {
                                     <table className="min-w-full">
                                         <thead className="bg-page">
                                             <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Employee</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Role</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase w-1/3">Reporting Manager</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Employee</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Role</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Reporting Manager</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Reporting Manager 2</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Reporting Manager 3</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-card divide-y divide-border">
                                             {users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(user => (
                                                 <tr key={user.id}>
-                                                    <td className="px-6 py-4 font-medium text-primary-text">{user.name}</td>
-                                                    <td className="px-6 py-4 text-sm text-muted capitalize">{roles.find(r => r.id === user.role)?.displayName || user.role.replace(/_/g, ' ')}</td>
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-4 py-4 font-medium text-primary-text whitespace-nowrap">{user.name}</td>
+                                                    <td className="px-4 py-4 text-sm text-muted capitalize whitespace-nowrap">{roles.find(r => r.id === user.role)?.displayName || user.role.replace(/_/g, ' ')}</td>
+                                                    <td className="px-4 py-4">
                                                         <Select
                                                             label=""
                                                             aria-label={`Reporting Manager for ${user.name}`}
-                                                            id={`manager-for-desktop-${user.id}`}
+                                                            id={`manager-1-desktop-${user.id}`}
                                                             value={user.reportingManagerId || ''}
-                                                            onChange={e => handleManagerChange(user.id, e.target.value)}
-                                                            className="w-full"
+                                                            onChange={e => handleManagerChange(user.id, e.target.value, 1)}
+                                                            className="w-full min-w-[160px]"
                                                         >
-                                                            <option value="">None (Reports to Final Approver)</option>
+                                                            <option value="">None</option>
+                                                            {users.filter(m => m.id !== user.id).map(manager => (
+                                                                <option key={manager.id} value={manager.id}>{manager.name}</option>
+                                                            ))}
+                                                        </Select>
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <Select
+                                                            label=""
+                                                            aria-label={`Reporting Manager 2 for ${user.name}`}
+                                                            id={`manager-2-desktop-${user.id}`}
+                                                            value={user.reportingManager2Id || ''}
+                                                            onChange={e => handleManagerChange(user.id, e.target.value, 2)}
+                                                            className="w-full min-w-[160px]"
+                                                        >
+                                                            <option value="">None</option>
+                                                            {users.filter(m => m.id !== user.id).map(manager => (
+                                                                <option key={manager.id} value={manager.id}>{manager.name}</option>
+                                                            ))}
+                                                        </Select>
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <Select
+                                                            label=""
+                                                            aria-label={`Reporting Manager 3 for ${user.name}`}
+                                                            id={`manager-3-desktop-${user.id}`}
+                                                            value={user.reportingManager3Id || ''}
+                                                            onChange={e => handleManagerChange(user.id, e.target.value, 3)}
+                                                            className="w-full min-w-[160px]"
+                                                        >
+                                                            <option value="">None</option>
                                                             {users.filter(m => m.id !== user.id).map(manager => (
                                                                 <option key={manager.id} value={manager.id}>{manager.name}</option>
                                                             ))}
@@ -185,12 +230,34 @@ const ApprovalWorkflow: React.FC = () => {
                                                 <p className="font-semibold text-primary-text">{user.name}</p>
                                                 <p className="text-sm text-muted capitalize">{roles.find(r => r.id === user.role)?.displayName || user.role.replace(/_/g, ' ')}</p>
                                             </div>
-                                            <div className="p-3 border-t border-border">
+                                            <div className="p-3 border-t border-border space-y-3">
                                                 <Select
-                                                    label="Manager"
-                                                    id={`manager-for-mobile-${user.id}`}
+                                                    label="Manager 1"
+                                                    id={`manager-1-mobile-${user.id}`}
                                                     value={user.reportingManagerId || ''}
-                                                    onChange={e => handleManagerChange(user.id, e.target.value)}
+                                                    onChange={e => handleManagerChange(user.id, e.target.value, 1)}
+                                                >
+                                                    <option value="">None</option>
+                                                    {users.filter(m => m.id !== user.id).map(manager => (
+                                                        <option key={manager.id} value={manager.id}>{manager.name}</option>
+                                                    ))}
+                                                </Select>
+                                                <Select
+                                                    label="Manager 2"
+                                                    id={`manager-2-mobile-${user.id}`}
+                                                    value={user.reportingManager2Id || ''}
+                                                    onChange={e => handleManagerChange(user.id, e.target.value, 2)}
+                                                >
+                                                    <option value="">None</option>
+                                                    {users.filter(m => m.id !== user.id).map(manager => (
+                                                        <option key={manager.id} value={manager.id}>{manager.name}</option>
+                                                    ))}
+                                                </Select>
+                                                <Select
+                                                    label="Manager 3"
+                                                    id={`manager-3-mobile-${user.id}`}
+                                                    value={user.reportingManager3Id || ''}
+                                                    onChange={e => handleManagerChange(user.id, e.target.value, 3)}
                                                 >
                                                     <option value="">None</option>
                                                     {users.filter(m => m.id !== user.id).map(manager => (

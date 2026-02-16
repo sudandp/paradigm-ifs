@@ -11,7 +11,7 @@ interface WorkflowNode extends User {
 }
 
 interface WorkflowChart2DProps {
-    users: (User & { managerName?: string })[];
+    users: (User & { managerName?: string, manager2Name?: string, manager3Name?: string })[];
     externalSearchQuery?: string;
     externalZoom?: number;
     showControls?: boolean; // default true for backward compatibility
@@ -68,17 +68,39 @@ const WorkflowChart2D: React.FC<WorkflowChart2DProps> = ({
         });
 
         const roots: WorkflowNode[] = [];
+        const hasParent = new Set<string>();
         users.forEach((user) => {
             const node = nodeMap.get(user.id)!;
+            // Primary manager
             if (user.reportingManagerId) {
                 const parent = nodeMap.get(user.reportingManagerId);
                 if (parent) {
                     parent.children!.push(node);
-                } else {
-                    roots.push(node);
+                    hasParent.add(user.id);
                 }
-            } else {
-                roots.push(node);
+            }
+            // Manager 2 – add a reference clone
+            if ((user as any).reportingManager2Id) {
+                const parent2 = nodeMap.get((user as any).reportingManager2Id);
+                if (parent2) {
+                    parent2.children!.push({ ...node, id: user.id + '-m2', children: [] });
+                    hasParent.add(user.id);
+                }
+            }
+            // Manager 3 – add a reference clone
+            if ((user as any).reportingManager3Id) {
+                const parent3 = nodeMap.get((user as any).reportingManager3Id);
+                if (parent3) {
+                    parent3.children!.push({ ...node, id: user.id + '-m3', children: [] });
+                    hasParent.add(user.id);
+                }
+            }
+        });
+
+        // Roots are users not under any manager
+        users.forEach((user) => {
+            if (!hasParent.has(user.id)) {
+                roots.push(nodeMap.get(user.id)!);
             }
         });
 

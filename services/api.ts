@@ -543,7 +543,11 @@ export const api = {
     
     let filteredData = data || [];
     if (managerId) {
-        filteredData = filteredData.filter((row: any) => row.user?.reporting_manager_id === managerId);
+        filteredData = filteredData.filter((row: any) => 
+            row.user?.reporting_manager_id === managerId || 
+            row.user?.reporting_manager_2_id === managerId || 
+            row.user?.reporting_manager_3_id === managerId
+        );
     }
     
     return filteredData.map(toCamelCase);
@@ -923,24 +927,28 @@ export const api = {
     if (error) return null;
     return toCamelCase({ ...data, role: data.role_id });
   },
-  getUsersWithManagers: async (): Promise<(User & { managerName?: string })[]> => {
-    const { data: users, error } = await supabase.from('users').select('*, reporting_manager_id, role_id');
+  getUsersWithManagers: async (): Promise<(User & { managerName?: string, manager2Name?: string, manager3Name?: string })[]> => {
+    const { data: users, error } = await supabase.from('users').select('*');
     if (error) throw error;
     const camelUsers = (users || []).map(u => ({
       ...toCamelCase({ ...u, role: u.role_id }),
-      reportingManagerId: u.reporting_manager_id
+      reportingManagerId: u.reporting_manager_id,
+      reportingManager2Id: u.reporting_manager_2_id,
+      reportingManager3Id: u.reporting_manager_3_id
     }));
     const userMap = new Map(camelUsers.map(u => [u.id, u.name]));
     return camelUsers.map(u => ({
       ...u,
-      managerName: u.reportingManagerId ? userMap.get(u.reportingManagerId) : undefined
+      managerName: u.reportingManagerId ? userMap.get(u.reportingManagerId) : undefined,
+      manager2Name: u.reportingManager2Id ? userMap.get(u.reportingManager2Id) : undefined,
+      manager3Name: u.reportingManager3Id ? userMap.get(u.reportingManager3Id) : undefined
     }));
   },
   getTeamMembers: async (managerId: string): Promise<User[]> => {
     const { data, error } = await supabase
       .from('users')
       .select('*, role_id')
-      .eq('reporting_manager_id', managerId);
+      .or(`reporting_manager_id.eq.${managerId},reporting_manager_2_id.eq.${managerId},reporting_manager_3_id.eq.${managerId}`);
     if (error) throw error;
     return (data || []).map(u => toCamelCase({ ...u, role: u.role_id }));
   },
@@ -977,7 +985,11 @@ export const api = {
   getFieldStaff: async (managerId?: string) => {
     let users = await api.getUsers();
     if (managerId) {
-      users = users.filter((u: any) => u.reportingManagerId === managerId);
+      users = users.filter((u: any) => 
+        u.reportingManagerId === managerId || 
+        u.reportingManager2Id === managerId || 
+        u.reportingManager3Id === managerId
+      );
     }
     return users.filter((u: any) => u.role === 'field_staff');
   },
@@ -1213,8 +1225,9 @@ export const api = {
     if (error) throw error;
   },
 
-  updateUserReportingManager: async (userId: string, managerId: string | null) => {
-    const { error } = await supabase.from('users').update({ reporting_manager_id: managerId }).eq('id', userId);
+  updateUserReportingManager: async (userId: string, managerId: string | null, slot: 1 | 2 | 3 = 1) => {
+    const columnMap = { 1: 'reporting_manager_id', 2: 'reporting_manager_2_id', 3: 'reporting_manager_3_id' };
+    const { error } = await supabase.from('users').update({ [columnMap[slot]]: managerId }).eq('id', userId);
     if (error) throw error;
   },
 
@@ -1462,7 +1475,7 @@ export const api = {
   getAttendanceUnlockRequests: async (managerId?: string): Promise<AttendanceUnlockRequest[]> => {
     let query = supabase
       .from('attendance_unlock_requests')
-      .select('*, user:user_id(name, photo_url, reporting_manager_id)')
+      .select('*, user:user_id(name, photo_url, reporting_manager_id, reporting_manager_2_id, reporting_manager_3_id)')
       .eq('status', 'pending')
       .order('requested_at', { ascending: false });
       
@@ -1471,7 +1484,11 @@ export const api = {
     
     let filteredData = data;
     if (managerId) {
-        filteredData = data.filter((row: any) => row.user?.reporting_manager_id === managerId);
+        filteredData = data.filter((row: any) => 
+            row.user?.reporting_manager_id === managerId || 
+            row.user?.reporting_manager_2_id === managerId || 
+            row.user?.reporting_manager_3_id === managerId
+        );
     }
     
     return filteredData.map((row: any) => ({
@@ -2349,7 +2366,25 @@ export const api = {
     if (filter?.userId) query = query.eq('user_id', filter.userId);
     if (filter?.userIds) query = query.in('user_id', filter.userIds);
     if (filter?.status) query = query.eq('status', filter.status);
-    if (filter?.forApproverId) query = query.eq('current_approver_id', filter.forApproverId);
+    
+    // Multi-manager support: if forApproverId is set, also match employees who have
+    // this person as their 2nd or 3rd reporting manager
+    if (filter?.forApproverId) {
+      // First, find all user IDs who have this approver as manager 2 or 3
+      const { data: extraUsers } = await supabase.from('users')
+        .select('id')
+        .or(`reporting_manager_2_id.eq.${filter.forApproverId},reporting_manager_3_id.eq.${filter.forApproverId}`);
+      
+      const extraUserIds = (extraUsers || []).map(u => u.id);
+      
+      if (extraUserIds.length > 0) {
+        // Match: current_approver_id = this approver OR user_id is in the extra users list
+        query = query.or(`current_approver_id.eq.${filter.forApproverId},user_id.in.(${extraUserIds.join(',')})`);
+      } else {
+        query = query.eq('current_approver_id', filter.forApproverId);
+      }
+    }
+
     if (filter?.startDate && filter?.endDate) {
       query = query.lte('start_date', filter.endDate).gte('end_date', filter.startDate);
     }
@@ -2934,7 +2969,7 @@ export const api = {
     if (error) throw error;
   },
   getExtraWorkLogs: async (filter?: { userId?: string, managerId?: string, status?: string, workDate?: string, page?: number, pageSize?: number }): Promise<{ data: ExtraWorkLog[], total: number }> => {
-    let query = supabase.from('extra_work_logs').select('*, user:user_id(reporting_manager_id)', { count: 'exact' });
+    let query = supabase.from('extra_work_logs').select('*, user:user_id(reporting_manager_id, reporting_manager_2_id, reporting_manager_3_id)', { count: 'exact' });
     if (filter?.userId) query = query.eq('user_id', filter.userId);
     if (filter?.status) query = query.eq('status', filter.status);
     if (filter?.workDate) query = query.eq('work_date', filter.workDate);
@@ -2950,7 +2985,11 @@ export const api = {
 
     let filteredData = data || [];
     if (filter?.managerId) {
-      filteredData = filteredData.filter((row: any) => row.user?.reporting_manager_id === filter.managerId);
+      filteredData = filteredData.filter((row: any) => 
+        row.user?.reporting_manager_id === filter.managerId ||
+        row.user?.reporting_manager_2_id === filter.managerId ||
+        row.user?.reporting_manager_3_id === filter.managerId
+      );
     }
 
     return { data: filteredData.map(toCamelCase), total: count || filteredData.length };
@@ -4220,7 +4259,7 @@ export const api = {
   async getPendingFinanceRecords(managerId?: string): Promise<SiteFinanceRecord[]> {
     let query = supabase
       .from('site_finance_tracker')
-      .select('*, creator:created_by(reporting_manager_id)')
+      .select('*, creator:created_by(reporting_manager_id, reporting_manager_2_id, reporting_manager_3_id)')
       .eq('status', 'pending')
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
@@ -4230,7 +4269,11 @@ export const api = {
 
     let filteredData = data || [];
     if (managerId) {
-        filteredData = filteredData.filter((row: any) => row.creator?.reporting_manager_id === managerId);
+        filteredData = filteredData.filter((row: any) => 
+            row.creator?.reporting_manager_id === managerId ||
+            row.creator?.reporting_manager_2_id === managerId ||
+            row.creator?.reporting_manager_3_id === managerId
+        );
     }
 
     return filteredData.map(toCamelCase);
