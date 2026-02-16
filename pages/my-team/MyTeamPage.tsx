@@ -144,7 +144,7 @@ const MyTeamPage: React.FC = () => {
       let members: User[] = [];
       
       // Fetch members based on user role
-      if (['admin', 'hr', 'management', 'hr_ops'].includes(user.role)) {
+      if (['admin', 'super_admin'].includes(user.role)) {
         members = await api.getUsers();
       } else {
         members = await api.getTeamMembers(user.id);
@@ -195,8 +195,8 @@ const MyTeamPage: React.FC = () => {
   const fetchUnlockRequests = async () => {
     if (!user || user.role === 'field_staff') return;
     try {
-      const isPrivileged = ['admin', 'hr', 'management', 'hr_ops'].includes(user.role);
-      const requests = await api.getAttendanceUnlockRequests(isPrivileged ? undefined : user.id);
+      const isSuperAdmin = ['admin', 'super_admin'].includes(user.role);
+      const requests = await api.getAttendanceUnlockRequests(isSuperAdmin ? undefined : user.id);
       setUnlockRequests(requests.filter(r => r.userId !== user.id));
     } catch (err) {
       console.error('Error fetching unlock requests:', err);

@@ -40,12 +40,16 @@ const SiteAttendanceTracker: React.FC = () => {
     const { user } = useAuthStore();
 
     const fetchInitialData = useCallback(async () => {
+        if (!user) return;
         setIsLoading(true);
         try {
+            const isSuperAdmin = ['admin', 'super_admin'].includes(user.role);
+            const managerId = isSuperAdmin ? undefined : user.id;
+
             const [fetchedRecords, fetchedDefaults, fetchedDeleted] = await Promise.all([
-                api.getSiteInvoiceRecords(),
-                api.getSiteInvoiceDefaults(),
-                api.getDeletedSiteInvoiceRecords()
+                api.getSiteInvoiceRecords(managerId),
+                api.getSiteInvoiceDefaults(managerId),
+                api.getDeletedSiteInvoiceRecords(managerId)
             ]);
             setRecords(fetchedRecords);
             setSiteDefaults(fetchedDefaults);

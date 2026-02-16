@@ -325,22 +325,34 @@ export const api = {
     if (error) throw error;
   },
 
-  getSiteInvoiceRecords: async (): Promise<SiteInvoiceRecord[]> => {
-    const { data, error } = await supabase
+  getSiteInvoiceRecords: async (managerId?: string): Promise<SiteInvoiceRecord[]> => {
+    let query = supabase
       .from('site_invoice_tracker')
       .select('*')
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
+      
+    if (managerId) {
+        query = query.eq('created_by', managerId);
+    }
+    
+    const { data, error } = await query;
     if (error) throw error;
     return (data || []).map(toCamelCase);
   },
 
-  getDeletedSiteInvoiceRecords: async (): Promise<SiteInvoiceRecord[]> => {
-    const { data, error } = await supabase
+  getDeletedSiteInvoiceRecords: async (managerId?: string): Promise<SiteInvoiceRecord[]> => {
+    let query = supabase
       .from('site_invoice_tracker')
       .select('*')
       .not('deleted_at', 'is', null)
       .order('deleted_at', { ascending: false });
+      
+    if (managerId) {
+        query = query.eq('created_by', managerId);
+    }
+    
+    const { data, error } = await query;
     if (error) throw error;
     return (data || []).map(toCamelCase);
   },
@@ -422,16 +434,22 @@ export const api = {
   },
 
   // --- Site Invoice Defaults (Auto-fill templates) ---
-  getSiteInvoiceDefaults: async (): Promise<SiteInvoiceDefault[]> => {
-    const { data, error } = await supabase
+  getSiteInvoiceDefaults: async (managerId?: string): Promise<SiteInvoiceDefault[]> => {
+    let query = supabase
       .from('site_invoice_defaults')
       .select('*')
       .order('site_name');
+      
+    if (managerId) {
+        query = query.eq('created_by', managerId);
+    }
+    
+    const { data, error } = await query;
     if (error) throw error;
     return (data || []).map(toCamelCase);
   },
 
-  upsertSiteContract: async (siteId: string, year: number, details: { contractAmount: number, contractManagementFee: number, companyName: string }): Promise<void> => {
+  upsertSiteContract: async (siteId: string, year: number, details: { contractAmount: number, contractManagementFee: number, companyName: string, createdBy?: string, createdByName?: string }): Promise<void> => {
     // 1. Try to find existing contract for this site and year
     const { data: existing } = await supabase.from('site_invoice_defaults')
         .select('id')
@@ -448,13 +466,21 @@ export const api = {
     };
 
     if (existing) {
-        const { error } = await supabase.from('site_invoice_defaults').update(payload).eq('id', existing.id);
+        const { error } = await supabase.from('site_invoice_defaults').update({
+            ...payload,
+            updated_at: new Date().toISOString()
+        }).eq('id', existing.id);
         if (error) throw error;
     } else {
         // Need site_name for new insert
         const { data: org } = await supabase.from('organizations').select('short_name').eq('id', siteId).single();
         if (org) {
-            const { error } = await supabase.from('site_invoice_defaults').insert({ ...payload, site_name: org.short_name });
+            const { error } = await supabase.from('site_invoice_defaults').insert({ 
+                ...payload, 
+                site_name: org.short_name,
+                created_by: details.createdBy,
+                created_by_name: details.createdByName
+            });
             if (error) throw error;
         }
     }
@@ -465,7 +491,10 @@ export const api = {
     const dbData = toSnakeCase(rest);
     let query;
     if (id) {
-      query = supabase.from('site_invoice_defaults').update(dbData).eq('id', id);
+      query = supabase.from('site_invoice_defaults').update({
+          ...dbData,
+          updated_at: new Date().toISOString()
+      }).eq('id', id);
     } else {
       query = supabase.from('site_invoice_defaults').upsert(dbData, { onConflict: 'site_id' });
     }
@@ -505,13 +534,19 @@ export const api = {
   },
 
   // --- Onboarding & Verification ---
-  getVerificationSubmissions: async (status?: string, organizationId?: string): Promise<OnboardingData[]> => {
-    let query = supabase.from('onboarding_submissions').select('*');
+  getVerificationSubmissions: async (status?: string, organizationId?: string, managerId?: string): Promise<OnboardingData[]> => {
+    let query = supabase.from('onboarding_submissions').select('*, user:user_id(reporting_manager_id)');
     if (status) query = query.eq('status', status);
     if (organizationId) query = query.eq('organization_id', organizationId);
     const { data, error } = await query.order('created_at', { ascending: false }).limit(5000);
     if (error) throw error;
-    return (data || []).map(toCamelCase);
+    
+    let filteredData = data || [];
+    if (managerId) {
+        filteredData = filteredData.filter((row: any) => row.user?.reporting_manager_id === managerId);
+    }
+    
+    return filteredData.map(toCamelCase);
   },
 
   getOnboardingDataById: async (id: string): Promise<OnboardingData | null> => {
@@ -939,7 +974,13 @@ export const api = {
   getLocationHistory: async (userId: string, startTs: string, endTs: string): Promise<AttendanceEvent[]> => {
     return api.getAttendanceEvents(userId, startTs, endTs);
   },
-  getFieldStaff: async () => api.getUsers().then(users => users.filter((u: any) => u.role === 'field_staff')),
+  getFieldStaff: async (managerId?: string) => {
+    let users = await api.getUsers();
+    if (managerId) {
+      users = users.filter((u: any) => u.reportingManagerId === managerId);
+    }
+    return users.filter((u: any) => u.role === 'field_staff');
+  },
 
   getTeamLocations: async (userIds: string[]): Promise<Record<string, { state: string; city: string }>> => {
     if (userIds.length === 0) return {};
@@ -2892,8 +2933,8 @@ export const api = {
     const { error } = await supabase.from('extra_work_logs').insert(toSnakeCase({ ...claimData, status: 'Pending' }));
     if (error) throw error;
   },
-  getExtraWorkLogs: async (filter?: { userId?: string, status?: string, workDate?: string, page?: number, pageSize?: number }): Promise<{ data: ExtraWorkLog[], total: number }> => {
-    let query = supabase.from('extra_work_logs').select('*', { count: 'exact' });
+  getExtraWorkLogs: async (filter?: { userId?: string, managerId?: string, status?: string, workDate?: string, page?: number, pageSize?: number }): Promise<{ data: ExtraWorkLog[], total: number }> => {
+    let query = supabase.from('extra_work_logs').select('*, user:user_id(reporting_manager_id)', { count: 'exact' });
     if (filter?.userId) query = query.eq('user_id', filter.userId);
     if (filter?.status) query = query.eq('status', filter.status);
     if (filter?.workDate) query = query.eq('work_date', filter.workDate);
@@ -2904,9 +2945,15 @@ export const api = {
       query = query.range(from, to);
     }
 
-    const { data, count, error } = await query.order('work_date', { ascending: false });
+    let { data, count, error } = await query.order('work_date', { ascending: false });
     if (error) throw error;
-    return { data: (data || []).map(toCamelCase), total: count || 0 };
+
+    let filteredData = data || [];
+    if (filter?.managerId) {
+      filteredData = filteredData.filter((row: any) => row.user?.reporting_manager_id === filter.managerId);
+    }
+
+    return { data: filteredData.map(toCamelCase), total: count || filteredData.length };
   },
   approveExtraWorkClaim: async (claimId: string, approverId: string): Promise<void> => {
     const { data: approverData, error: nameError } = await supabase.from('users').select('name').eq('id', approverId).single();
@@ -4170,16 +4217,23 @@ export const api = {
   }
 ,
   // Site Finance
-  async getPendingFinanceRecords(): Promise<SiteFinanceRecord[]> {
-    const { data, error } = await supabase
+  async getPendingFinanceRecords(managerId?: string): Promise<SiteFinanceRecord[]> {
+    let query = supabase
       .from('site_finance_tracker')
-      .select('*')
+      .select('*, creator:created_by(reporting_manager_id)')
       .eq('status', 'pending')
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
+    const { data, error } = await query;
     if (error) throw error;
-    return (data || []).map(toCamelCase);
+
+    let filteredData = data || [];
+    if (managerId) {
+        filteredData = filteredData.filter((row: any) => row.creator?.reporting_manager_id === managerId);
+    }
+
+    return filteredData.map(toCamelCase);
   },
 
   async respondToFinanceRecord(id: string, status: 'approved' | 'rejected'): Promise<void> {
@@ -4221,14 +4275,19 @@ export const api = {
     return toCamelCase(data);
   },
 
-  async getSiteFinanceRecords(billingMonth: string): Promise<SiteFinanceRecord[]> {
-    const { data, error } = await supabase
+  async getSiteFinanceRecords(billingMonth: string, managerId?: string): Promise<SiteFinanceRecord[]> {
+    let query = supabase
       .from('site_finance_tracker')
       .select('*')
       .eq('billing_month', billingMonth)
       .is('deleted_at', null)
       .order('site_name');
 
+    if (managerId) {
+        query = query.eq('created_by', managerId);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     return (data || []).map(toCamelCase);
   },
@@ -4292,13 +4351,18 @@ export const api = {
     if (error) throw error;
   },
 
-  async getDeletedSiteFinanceRecords(): Promise<SiteFinanceRecord[]> {
-    const { data, error } = await supabase
+  async getDeletedSiteFinanceRecords(managerId?: string): Promise<SiteFinanceRecord[]> {
+    let query = supabase
       .from('site_finance_tracker')
       .select('*')
       .not('deleted_at', 'is', null)
       .order('deleted_at', { ascending: false });
 
+    if (managerId) {
+        query = query.eq('created_by', managerId);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     return (data || []).map(toCamelCase);
   },

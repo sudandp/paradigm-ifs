@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { Search, Eye, FileText, Send, RefreshCw, AlertTriangle, Loader2, CheckSquare, XSquare, Square } from 'lucide-react';
 import Toast from '@/components/ui/Toast';
+import { useAuthStore } from '@/store/authStore';
 
 const VerificationChecks: React.FC<{ submission: OnboardingData; isSyncing: boolean }> = ({ submission, isSyncing }) => {
     if (submission.status !== 'verified' || !submission.portalSyncStatus) {
@@ -59,19 +60,26 @@ const VerificationDashboard: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [syncingId, setSyncingId] = useState<string | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const { user } = useAuthStore();
     const navigate = useNavigate();
 
     const fetchSubmissions = useCallback(async () => {
+        if (!user) return;
         setIsLoading(true);
         try {
-            const data = await api.getVerificationSubmissions(statusFilter === 'all' ? undefined : statusFilter);
+            const isSuperAdmin = ['admin', 'super_admin'].includes(user.role);
+            const data = await api.getVerificationSubmissions(
+                statusFilter === 'all' ? undefined : statusFilter,
+                undefined,
+                isSuperAdmin ? undefined : user.id
+            );
             setSubmissions(data);
         } catch (error) {
             console.error("Failed to fetch submissions", error);
         } finally {
             setIsLoading(false);
         }
-    }, [statusFilter]);
+    }, [statusFilter, user]);
 
     useEffect(() => {
         fetchSubmissions();

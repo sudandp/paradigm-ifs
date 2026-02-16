@@ -155,7 +155,9 @@ const AddSiteFinanceRecord: React.FC = () => {
                          { 
                              contractAmount: payload.contractAmount, 
                              contractManagementFee: payload.contractManagementFee,
-                             companyName: payload.companyName
+                             companyName: payload.companyName,
+                             createdBy: currentUser.id,
+                             createdByName: currentUser.name
                          }
                     );
                     // Refresh defaults in background? Optionally.

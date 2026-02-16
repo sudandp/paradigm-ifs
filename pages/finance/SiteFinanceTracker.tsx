@@ -34,12 +34,16 @@ const SiteFinanceTracker: React.FC = () => {
     const [isRestoring, setIsRestoring] = useState<string | null>(null);
 
     const fetchData = useCallback(async () => {
+        if (!user) return;
         setIsLoading(true);
         try {
+            const isSuperAdmin = ['admin', 'super_admin'].includes(user.role);
+            const managerId = isSuperAdmin ? undefined : user.id;
+
             const [recordsData, defaultsData, deletedData] = await Promise.all([
-                api.getSiteFinanceRecords(billingMonth),
-                api.getSiteInvoiceDefaults(),
-                api.getDeletedSiteFinanceRecords()
+                api.getSiteFinanceRecords(billingMonth, managerId),
+                api.getSiteInvoiceDefaults(managerId),
+                api.getDeletedSiteFinanceRecords(managerId)
             ]);
             setRecords(recordsData);
             setDeletedRecords(deletedData);

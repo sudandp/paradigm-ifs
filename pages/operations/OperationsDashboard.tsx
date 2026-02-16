@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import FormHeader from '../../components/onboarding/FormHeader';
 import DatePicker from '../../components/ui/DatePicker';
 import StatCard from '../../components/ui/StatCard';
+import { useAuthStore } from '../../store/authStore';
 
 const OperationsDashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -22,6 +23,7 @@ const OperationsDashboard: React.FC = () => {
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const { user } = useAuthStore();
 
     const [dateRange, setDateRange] = useState<Range[]>([
         {
@@ -39,11 +41,13 @@ const OperationsDashboard: React.FC = () => {
 
     useEffect(() => {
         const fetchData = async () => {
+            if (!user) return;
             setIsLoading(true);
             try {
+                const isSuperAdmin = ['admin', 'super_admin'].includes(user.role);
                 const [subs, staff, orgs] = await Promise.all([
-                    api.getVerificationSubmissions(),
-                    api.getFieldStaff(),
+                    api.getVerificationSubmissions(undefined, undefined, isSuperAdmin ? undefined : user.id),
+                    api.getFieldStaff(isSuperAdmin ? undefined : user.id),
                     api.getOrganizations()
                 ]);
                 setSubmissions(subs);
@@ -56,7 +60,7 @@ const OperationsDashboard: React.FC = () => {
             }
         };
         fetchData();
-    }, []);
+    }, [user]);
 
     const filteredSubmissions = useMemo(() => {
         const startDate = dateRange[0].startDate;

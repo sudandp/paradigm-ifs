@@ -103,7 +103,12 @@ const LeaveManagement: React.FC = () => {
         };
         const fetchUsers = async () => {
             try {
-                const users = await api.getUsers();
+                let users;
+                if (['admin', 'super_admin'].includes(user?.role || '')) {
+                    users = await api.getUsers();
+                } else {
+                    users = await api.getTeamMembers(user?.id || '');
+                }
                 setAllUsers(users.map(u => ({ id: u.id, name: u.name })).sort((a, b) => a.name.localeCompare(b.name)));
             } catch (e) {
                 console.error('Failed to fetch users:', e);
@@ -130,8 +135,8 @@ const LeaveManagement: React.FC = () => {
                 pageSize: pageSize
             };
 
-            // Admin, HR, and Management see all requests. Managers see only their team's requests.
-            if (user.role !== 'admin' && user.role !== 'hr' && user.role !== 'management') {
+            // Admin / SuperAdmin see all requests. Others (including HR/Management) see only their team's requests.
+            if (!['admin', 'super_admin'].includes(user.role)) {
                 // For managers, get their team's requests
                 const teamMembers = await api.getTeamMembers(user.id);
                 const teamIds = teamMembers.map(m => m.id);
@@ -343,10 +348,10 @@ const LeaveManagement: React.FC = () => {
         if (!user) return null;
 
         // HR/Admin can edit leave type for any request that is not rejected/withdrawn/cancelled
-        const isHRAdmin = ['hr', 'admin'].includes(user.role);
-        const isMyTurn = request.currentApproverId === user.id || user.role === 'admin';
+        const isSuperAdmin = ['admin', 'super_admin'].includes(user.role);
+        const isMyTurn = request.currentApproverId === user.id || isSuperAdmin;
 
-        if (isHRAdmin || isMyTurn) {
+        if (isSuperAdmin || isMyTurn) {
             return (
                 <div className="flex gap-2">
                     {/* Approval Actions */}
@@ -396,7 +401,7 @@ const LeaveManagement: React.FC = () => {
                     )}
 
                     {/* Reconsider Action (Rejected) */}
-                    {request.status === 'rejected' && isHRAdmin && (
+                    {request.status === 'rejected' && isSuperAdmin && (
                         <Button 
                             size="sm" 
                             variant="icon" 

@@ -46,9 +46,11 @@ const SiteDashboard: React.FC = () => {
         }
         setIsLoading(true);
         try {
+            const isSuperAdmin = ['admin', 'super_admin'].includes(user?.role || '');
             const data = await api.getVerificationSubmissions(
                 statusFilter === 'all' ? undefined : statusFilter,
-                selectedOrgId
+                selectedOrgId,
+                isSuperAdmin ? undefined : user?.id
             );
             setSubmissions(data);
         } catch (error) {

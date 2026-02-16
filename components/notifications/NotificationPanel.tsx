@@ -87,31 +87,31 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
     const fetchPendingApprovals = React.useCallback(async () => {
         if (!user || user.role === 'field_staff') return;
         try {
+            const isSuperAdmin = ['admin', 'super_admin'].includes(user.role);
+
             let leavesPromise;
-            // Admin/HR sees ALL pending requests (both Manager and HR stages)
-            if (user.role === 'admin' || user.role === 'hr') {
+            // Only Admin/SuperAdmin sees ALL pending requests
+            if (isSuperAdmin) {
                 leavesPromise = Promise.all([
                     api.getLeaveRequests({ status: 'pending_manager_approval' }),
                     api.getLeaveRequests({ status: 'pending_hr_confirmation' })
                 ]).then(([res1, res2]) => ({ data: [...res1.data, ...res2.data] }));
             } else {
-                // Regular Manager: sees requests assigned to them
+                // Regular Manager/HR/Finance: sees requests assigned to them or for their team
                 leavesPromise = api.getLeaveRequests({ 
                     status: 'pending_manager_approval',
                     forApproverId: user.id 
                 });
             }
 
-            const isPrivileged = ['admin', 'hr', 'management', 'operation_manager', 'site_manager'].includes(user.role);
             const [unlocks, leaves, claims, finance] = await Promise.all([
-                api.getAttendanceUnlockRequests(isPrivileged ? undefined : user.id),
+                api.getAttendanceUnlockRequests(isSuperAdmin ? undefined : user.id),
                 leavesPromise,
-                ['admin', 'hr', 'operation_manager', 'site_manager'].includes(user.role) 
-                    ? api.getExtraWorkLogs({ status: 'Pending' }) 
-                    : Promise.resolve({ data: [], total: 0 }),
-                ['admin', 'finance', 'super_admin'].includes(user.role)
-                    ? api.getPendingFinanceRecords()
-                    : Promise.resolve([])
+                api.getExtraWorkLogs({ 
+                    status: 'Pending', 
+                    managerId: isSuperAdmin ? undefined : user.id 
+                }),
+                api.getPendingFinanceRecords(isSuperAdmin ? undefined : user.id)
             ]);
             setUnlockRequests(unlocks.filter(r => r.userId !== user.id));
             setLeaveRequests(leaves.data.filter(r => r.userId !== user.id));
