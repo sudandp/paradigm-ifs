@@ -178,7 +178,9 @@ const UserManagement: React.FC = () => {
                 const res = await api.getUsers({ 
                     page: currentPage, 
                     pageSize,
-                    search: searchTerm 
+                    search: searchTerm,
+                    sortBy: 'name',
+                    sortAscending: true
                 });
                 setUsers(res.data);
                 setTotalUsers(res.total);
@@ -295,7 +297,7 @@ const UserManagement: React.FC = () => {
             if (filters.site && !(user.organizationName || '').toLowerCase().includes(filters.site.toLowerCase())) return false;
             if (filters.biometricId && !(user.biometricId || '').toLowerCase().includes(filters.biometricId.toLowerCase())) return false;
             return true;
-        });
+        }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     }, [users, filters]);
 
     return (

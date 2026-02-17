@@ -843,15 +843,17 @@ export const api = {
 
 
   // --- Users & Orgs ---
-  getUsers: async (filter?: { page?: number, pageSize?: number, search?: string }): Promise<any> => {
+  getUsers: async (filter?: { page?: number, pageSize?: number, search?: string, sortBy?: string, sortAscending?: boolean }): Promise<any> => {
     let query = supabase.from('users').select('*, role_id', { count: 'exact' });
     
     if (filter?.search) {
       query = query.or(`name.ilike.%${filter.search}%,email.ilike.%${filter.search}%`);
     }
 
-    // Always sort by created_at descending so newest users appear first
-    query = query.order('created_at', { ascending: false });
+    // Default to created_at descending if no sort specified
+    const sortBy = filter?.sortBy || 'created_at';
+    const sortAscending = filter?.sortAscending ?? (filter?.sortBy ? true : false);
+    query = query.order(sortBy, { ascending: sortAscending });
 
     const isPaginated = filter?.page !== undefined && filter?.pageSize !== undefined;
     if (isPaginated) {
@@ -4175,11 +4177,12 @@ export const api = {
 
       // 2. Calculate breakdown
       const breakdown = calculateSiteTravelTime(events);
+      const user = await this.getUserById(userId);
+      if (!user) return;
       
       // 3. Fetch settings
       const settings = await this.getAttendanceSettings();
-      const user = await this.getUserById(userId);
-      if (!user || user.role !== 'field_staff') return;
+      if (user.role !== 'field_staff') return;
 
       const rules = settings.field;
       if (!rules.enableSiteTimeTracking) return;
@@ -4241,14 +4244,23 @@ export const api = {
             });
           }
         }
-      } else if (existingForDay && existingForDay.status === 'pending') {
+      } else if (existingForDay && (existingForDay.status === 'pending' || existingForDay.status === 'escalated')) {
         // Violation was fixed (e.g. user visited more sites later in the day)
-        // We can either delete it or mark it as resolved.
-        // For now, let's delete pending violations that are no longer valid.
+        // Delete violations that are no longer valid, even if they were already escalated.
         await supabase
           .from('field_attendance_violations')
           .delete()
           .eq('id', existingForDay.id);
+
+        // Also delete related notifications to avoid clutter in HR/Admin panel
+        const violationDate = format(new Date(date), 'yyyy-MM-dd');
+        // Search by both ID and Name to be safe (Edge function might have used either)
+        await supabase
+          .from('notifications')
+          .delete()
+          .or(`message.ilike.%${userId}%,message.ilike.%${user.name}%`)
+          .ilike('message', `%${violationDate}%`)
+          .ilike('message', '%Field attendance violation%');
       }
     } catch (error) {
       console.error('Error processing field attendance violations:', error);

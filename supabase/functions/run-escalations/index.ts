@@ -35,7 +35,7 @@ Deno.serve(async (req: any) => {
     
     const { data: violationsToEscalate, error: fetchError } = await supabaseClient
       .from('field_attendance_violations')
-      .select('id, user_id, date')
+      .select('id, user_id, date, users(name)')
       .eq('status', 'pending')
       .lt('created_at', fortyEightHoursAgo);
 
@@ -55,17 +55,17 @@ Deno.serve(async (req: any) => {
       if (updateError) throw updateError;
       escalatedCount = (violationsToEscalate as any[]).length;
 
-      // 2. Notify HR/Admin about escalations
+      // 2. Notify Admin about escalations
       const { data: recipients } = await supabaseClient
         .from('users')
         .select('id')
-        .in('role_id', ['admin', 'hr']);
+        .eq('role_id', 'admin');
 
       if (recipients && (recipients as any[]).length > 0) {
         const notifications = (violationsToEscalate as any[]).flatMap((v: any) => 
           (recipients as any[]).map((r: any) => ({
             user_id: r.id,
-            message: `URGENT: Field attendance violation for user ${v.user_id} on ${v.date} has been escalated to HR/Admin.`,
+            message: `URGENT: Field attendance violation for user ${v.users?.name || v.user_id} on ${v.date} has been escalated to Admin.`,
             type: 'security',
           }))
         );
