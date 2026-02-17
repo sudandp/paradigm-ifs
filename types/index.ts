@@ -1759,13 +1759,6 @@ export interface SiteInvoiceDefault {
   siteId: string;
   siteName: string;
   companyName?: string;
-  billingCycle?: string;
-  opsIncharge?: string;
-  hrIncharge?: string;
-  invoiceIncharge?: string;
-  managerTentativeDate?: string;
-  hrTentativeDate?: string;
-  invoiceSharingTentativeDate?: string;
   contractAmount?: number;
   contractManagementFee?: number;
   billingYear?: number | null; // Null means "Applicable to all years unless overridden"

@@ -12,6 +12,7 @@ interface SearchableSelectProps {
   labelClassName?: string;
   isMobile?: boolean;
   isLoading?: boolean;
+  allowCustom?: boolean;
 }
 
 const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -24,7 +25,8 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   className = "",
   labelClassName = "",
   isMobile = false,
-  isLoading = false
+  isLoading = false,
+  allowCustom = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState(value || "");
@@ -39,13 +41,20 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
-        // Reset search term to current value if no selection was made
-        setSearchTerm(value || "");
+        if (allowCustom) {
+            // Keep the typed term if custom is allowed
+            if (searchTerm !== value) {
+                onChange(searchTerm);
+            }
+        } else {
+            // Reset search term to current value if no selection was made
+            setSearchTerm(value || "");
+        }
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [value]);
+  }, [value, allowCustom, searchTerm, onChange]);
 
   const filteredOptions = options.filter(option =>
     option.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -61,6 +70,15 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     onChange("");
     setSearchTerm("");
     setIsOpen(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+    if (allowCustom) {
+        onChange(val);
+    }
+    setIsOpen(true);
   };
 
   return (
@@ -88,13 +106,15 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
             }`}
             placeholder={isLoading ? "Loading..." : placeholder}
             value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setIsOpen(true);
-            }}
+            onChange={handleInputChange}
             onFocus={(e) => {
               setIsOpen(true);
               e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' && allowCustom) {
+                    setIsOpen(false);
+                }
             }}
             disabled={isLoading}
           />
@@ -112,7 +132,10 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
                     <X className="h-4 w-4" />
                   </button>
                 )}
-                <div className={`text-muted transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+                <div 
+                    className={`text-muted transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} cursor-pointer`}
+                    onClick={() => setIsOpen(!isOpen)}
+                >
                   <ChevronDown className="h-4 w-4" />
                 </div>
               </>
@@ -148,6 +171,11 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
           ) : (
             <div className={`px-4 py-8 text-center text-sm ${isMobile ? 'text-gray-500' : 'text-muted italic'}`}>
               No results found for "{searchTerm}"
+              {allowCustom && (
+                  <div className="mt-2 text-accent font-bold cursor-pointer" onClick={() => setIsOpen(false)}>
+                      Use custom name
+                  </div>
+              )}
             </div>
           )}
         </div>

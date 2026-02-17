@@ -718,7 +718,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                                 <IndianRupee className="w-4 h-4" />
                                             </div>
                                             <div className="text-left">
-                                                <p className={`text-xs font-bold ${isMobile ? 'text-white' : 'text-gray-900'}`}>Finance Updates</p>
+                                                <p className={`text-xs font-bold ${isMobile ? 'text-white' : 'text-gray-900'}`}>Tracker Updates</p>
                                                 <p className={`text-[10px] ${isMobile ? 'text-white/50' : 'text-gray-500'}`}>Review updates</p>
                                             </div>
                                         </div>
@@ -735,7 +735,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                             <div className="flex items-center gap-2 px-1 py-1">
                                                 <AlertTriangle className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
                                                 <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-amber-400' : 'text-amber-700'}`}>
-                                                    Attention: Finance Approval Required
+                                                    Attention: Tracker Approval Required
                                                 </span>
                                             </div>
                                             {financeRequests.map(req => (
@@ -748,7 +748,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center justify-between">
                                                                 <p className={`text-xs font-bold truncate ${isMobile ? 'text-white' : 'text-gray-900'}`}>{req.createdByName}</p>
-                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 border border-rose-500/20`}>Finance</span>
+                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 border border-rose-500/20`}>Tracker</span>
                                                             </div>
                                                             <div className="flex items-center justify-between mt-0.5">
                                                                 <p className={`text-[9px] ${isMobile ? 'text-white/50' : 'text-rose-700/60'}`}>

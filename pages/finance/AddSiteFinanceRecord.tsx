@@ -9,6 +9,7 @@ import { ArrowLeft, Save, Building, Loader2, IndianRupee, MapPin, Calendar, Clip
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Toast from '../../components/ui/Toast';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 import { format, startOfMonth } from 'date-fns';
 
 const AddSiteFinanceRecord: React.FC = () => {
@@ -57,17 +58,26 @@ const AddSiteFinanceRecord: React.FC = () => {
         const loadData = async () => {
             setIsLoading(true);
             try {
-                const [fetchedSites, defaults, trackerData] = await Promise.all([
+                const [fetchedSites, defaults, financeTrackerSites, attendanceRecords] = await Promise.all([
                     api.getOrganizations(),
                     api.getSiteInvoiceDefaults(),
-                    api.getUniqueTrackerSites()
+                    api.getUniqueTrackerSites(),
+                    api.getSiteInvoiceRecords()
                 ]);
                 
                 // Handle both array and paginated response
                 const sitesList = Array.isArray(fetchedSites) ? fetchedSites : fetchedSites.data || [];
                 setSites(sitesList);
                 setSiteDefaults(defaults);
-                setTrackerSites(trackerData);
+                
+                // Merge finance and attendance tracker sites
+                const allTrackerSites = [...financeTrackerSites];
+                attendanceRecords.forEach(r => {
+                    if (r.siteName && !allTrackerSites.find(s => s.name === r.siteName)) {
+                        allTrackerSites.push({ id: r.siteId || r.siteName, name: r.siteName });
+                    }
+                });
+                setTrackerSites(allTrackerSites);
                 
                 // Fetch current user
                 // Fetch current user details from auth store if available, otherwise fallback to metadata
@@ -128,6 +138,12 @@ const AddSiteFinanceRecord: React.FC = () => {
             const formattedBillingMonth = format(startOfMonth(billingDate), 'yyyy-MM-dd');
 
             const payload = { ...data, billingMonth: formattedBillingMonth, id: id };
+            
+            // UUID check removed to support text-based Site IDs (e.g. from organizations)
+            // if (payload.siteId && !uuidRegex.test(payload.siteId)) {
+            //     payload.siteId = null as any; 
+            // }
+
             // Add creator info for new records
             if (!id && currentUser) {
                 payload.createdBy = currentUser.id;
@@ -204,68 +220,58 @@ const AddSiteFinanceRecord: React.FC = () => {
             .sort((a, b) => a.name.localeCompare(b.name));
     }, [sites, trackerSites]);
 
-    const handleSiteChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const selectedSiteId = e.target.value;
-        const selectedOption = mergedSiteOptions.find(opt => opt.id === selectedSiteId);
-        // We still need the organization object for some logic? 
-        // Or can we rely just on ID? 
-        // The fallback logic needs selectedOrg from 'sites' list or needs to just use ID.
-        // Actually api.getLastFinanceRecordForSite takes ID.
+    const handleSiteSelection = async (selectedSiteId: string, selectedSiteName: string) => {
+        setValue('siteId', selectedSiteId);
+        setValue('siteName', selectedSiteName);
         
-        const selectedOrg = sites.find(s => s.id === selectedSiteId); // Fallback to get org details if needed
+        // Auto-fill from defaults if available - YEAR AWARE
+        const currentYear = new Date(watch('billingMonth') || new Date()).getFullYear();
         
-        if (selectedOption) {
-            setValue('siteId', selectedOption.id);
-            setValue('siteName', selectedOption.name); // Use the merged name!
-            
-            // Auto-fill from defaults if available - YEAR AWARE
-            const currentYear = new Date(watch('billingMonth') || new Date()).getFullYear();
-            
-            const specificDefault = siteDefaults.find(d => 
-                (d.siteId === selectedOption.id || d.siteName === selectedOption.name) && 
-                d.billingYear === currentYear
-            );
-            
-            // Fallback to global default (no year)
-            const globalDefault = siteDefaults.find(d => 
-                (d.siteId === selectedOption.id || d.siteName === selectedOption.name) && 
-                (d.billingYear === null || d.billingYear === undefined)
-            );
-            
-            const effectiveDefault = specificDefault || globalDefault;
+        const specificDefault = siteDefaults.find(d => 
+            (d.siteId === selectedSiteId || d.siteName === selectedSiteName) && 
+            d.billingYear === currentYear
+        );
+        
+        // Fallback to global default (no year)
+        const globalDefault = siteDefaults.find(d => 
+            (d.siteId === selectedSiteId || d.siteName === selectedSiteName) && 
+            (d.billingYear === null || d.billingYear === undefined)
+        );
+        
+        const effectiveDefault = specificDefault || globalDefault;
 
-            if (effectiveDefault) {
-                setActiveDefault(effectiveDefault);
-                setValue('companyName', effectiveDefault.companyName);
-                if (effectiveDefault.contractAmount) setValue('contractAmount', effectiveDefault.contractAmount);
-                if (effectiveDefault.contractManagementFee) setValue('contractManagementFee', effectiveDefault.contractManagementFee);
-            } else {
-                // FALLBACK: Try to fetch the latest finance record for this site
-                try {
-                    const lastRecord = await api.getLastFinanceRecordForSite(selectedOption.id);
-                    if (lastRecord) {
-                         // Use values from the last record
-                         const fallbackDefault: SiteInvoiceDefault = {
-                             siteId: selectedOption.id,
-                             siteName: selectedOption.name,
-                             companyName: lastRecord.companyName,
-                             contractAmount: lastRecord.contractAmount,
-                             contractManagementFee: lastRecord.contractManagementFee,
-                         };
-                         setActiveDefault(fallbackDefault);
-                         setValue('companyName', lastRecord.companyName);
-                         if (lastRecord.contractAmount) setValue('contractAmount', lastRecord.contractAmount);
-                         if (lastRecord.contractManagementFee) setValue('contractManagementFee', lastRecord.contractManagementFee);
-                         
-                         setToast({ message: 'Auto-filled from previous record', type: 'success' });
-                    } else {
-                        setActiveDefault(null);
-                        setToast({ message: 'No previous records found for auto-fill', type: 'error' });
-                    }
-                } catch (e) {
-                    console.error("Error fetching fallback record:", e);
+        if (effectiveDefault) {
+            setActiveDefault(effectiveDefault);
+            setValue('companyName', effectiveDefault.companyName);
+            if (effectiveDefault.contractAmount) setValue('contractAmount', effectiveDefault.contractAmount);
+            if (effectiveDefault.contractManagementFee) setValue('contractManagementFee', effectiveDefault.contractManagementFee);
+        } else {
+            // FALLBACK: Try to fetch the latest finance record for this site
+            try {
+                // If it's a UUID/ID, try by ID. If it's a custom name, try by name.
+                const lastRecord = await api.getLastFinanceRecordForSite(selectedSiteId);
+                if (lastRecord) {
+                        // Use values from the last record
+                        const fallbackDefault: SiteInvoiceDefault = {
+                            siteId: selectedSiteId,
+                            siteName: selectedSiteName,
+                            companyName: lastRecord.companyName,
+                            contractAmount: lastRecord.contractAmount,
+                            contractManagementFee: lastRecord.contractManagementFee,
+                        };
+                        setActiveDefault(fallbackDefault);
+                        setValue('companyName', lastRecord.companyName);
+                        if (lastRecord.contractAmount) setValue('contractAmount', lastRecord.contractAmount);
+                        if (lastRecord.contractManagementFee) setValue('contractManagementFee', lastRecord.contractManagementFee);
+                        
+                        setToast({ message: 'Auto-filled from previous record', type: 'success' });
+                } else {
                     setActiveDefault(null);
+                    setToast({ message: 'No previous records found for auto-fill', type: 'error' });
                 }
+            } catch (e) {
+                console.error("Error fetching fallback record:", e);
+                setActiveDefault(null);
             }
         }
     };
@@ -294,33 +300,35 @@ const AddSiteFinanceRecord: React.FC = () => {
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
                     {/* Top Section: Site & Date */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-emerald-500 uppercase tracking-wider ml-1">Select Site</label>
-                            <div className="relative">
-                                <select
-                                    className="w-full px-4 h-12 rounded-xl border border-gray-200 bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all appearance-none font-medium"
-                                    onChange={handleSiteChange}
-                                    defaultValue={watch('siteId') || ''}
-                                >
-                                    <option value="" disabled>Select a site...</option>
-                                    {mergedSiteOptions.map(site => (
-                                        <option key={site.id} value={site.id}>{site.name}</option>
-                                    ))}
-                                </select>
-                                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                                </div>
-                            </div>
+                        <div className="space-y-2">
+                            <SearchableSelect
+                                label="Select Site"
+                                placeholder="Select or type site name..."
+                                options={mergedSiteOptions.map(s => ({ id: s.id, name: s.name }))}
+                                value={watch('siteName') || ''}
+                                onChange={(val) => {
+                                    const matched = mergedSiteOptions.find(opt => opt.name === val);
+                                    if (matched) {
+                                        handleSiteSelection(matched.id, matched.name);
+                                    } else {
+                                        handleSiteSelection(val, val);
+                                    }
+                                }}
+                                allowCustom
+                                labelClassName="text-emerald-500 uppercase tracking-wider ml-1"
+                            />
                         </div>
                         <div className="space-y-2">
                              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Billing Date</label>
-                             <Controller
+                            <Controller
                                 name="billingMonth"
                                 control={control}
                                 render={({ field }) => (
                                     <Input 
                                         type="date" 
-                                        {...field} 
+                                        {...field}
+                                        value={field.value ? field.value.split('T')[0] : ''} // Ensure YYYY-MM-DD
+                                        disabled={false}
                                         className="h-12 !pl-4 border-gray-200 focus:border-emerald-500"
                                     />
                                 )}

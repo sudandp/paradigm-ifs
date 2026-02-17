@@ -7,6 +7,7 @@ import type { SiteInvoiceRecord, SiteInvoiceDefault, Organization } from '../../
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 import { Save, ArrowLeft, ClipboardList, TrendingUp, Building, Calendar, Users, Briefcase, FileText, Clock } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { format, getDate, getMonth, getYear, set, parseISO } from 'date-fns';
@@ -17,7 +18,7 @@ const AddSiteAttendanceRecord: React.FC = () => {
     const isEditing = !!id;
     const isMobile = useMediaQuery('(max-width: 767px)');
 
-     const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [sites, setSites] = useState<Organization[]>([]);
     const [record, setRecord] = useState<Partial<SiteInvoiceRecord>>({
@@ -44,9 +45,9 @@ const AddSiteAttendanceRecord: React.FC = () => {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
     const BILLING_CYCLES = ['1st Billing Cycle', '2nd Billing Cycle', '3rd Billing Cycle'];
-    const OPS_INCHARGE_OPTIONS = ['Sandeep', 'Shilpa', 'Isaac', 'Venkat'];
-    const HR_INCHARGE_OPTIONS = ['Chandana', 'Pooja', 'Kavya'];
-    const INVOICE_INCHARGE_OPTIONS = ['Arpitha', 'Sinchana'];
+    const [opsInchargeOptions, setOpsInchargeOptions] = useState<string[]>([]);
+    const [hrInchargeOptions, setHrInchargeOptions] = useState<string[]>([]);
+    const [invoiceInchargeOptions, setInvoiceInchargeOptions] = useState<string[]>([]);
 
     const [siteDefaults, setSiteDefaults] = useState<SiteInvoiceDefault[]>([]);
     const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
@@ -55,12 +56,45 @@ const AddSiteAttendanceRecord: React.FC = () => {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                const [fetchedSites, fetchedDefaults] = await Promise.all([
+                const [fetchedSites, fetchedDefaults, trackerRecords] = await Promise.all([
                     api.getOrganizations(),
-                    api.getSiteInvoiceDefaults()
+                    api.getSiteInvoiceDefaults(),
+                    api.getSiteInvoiceRecords()
                 ]);
-                setSites(fetchedSites);
-                setSiteDefaults(fetchedDefaults);
+
+                // Extract unique site names from tracker records
+                const trackerSiteNames = Array.from(new Set(trackerRecords.map(r => r.siteName).filter(Boolean)));
+                
+                // Merge with fetched sites
+                const allSites: Organization[] = [...(fetchedSites || [])];
+                trackerSiteNames.forEach(name => {
+                    if (!allSites.find(s => s.shortName === name)) {
+                        allSites.push({ id: name!, shortName: name!, name: name! } as any as Organization);
+                    }
+                });
+                
+                setSites(allSites);
+                setSiteDefaults(fetchedDefaults || []);
+
+                // Extract unique incharge names from tracker records
+                const opsSet = new Set<string>();
+                const hrSet = new Set<string>();
+                const invoiceSet = new Set<string>();
+
+                trackerRecords.forEach(r => {
+                    if (r.opsIncharge) opsSet.add(r.opsIncharge);
+                    if (r.hrIncharge) hrSet.add(r.hrIncharge);
+                    if (r.invoiceIncharge) invoiceSet.add(r.invoiceIncharge);
+                });
+
+                // Add default options if not present
+                ['Sandeep', 'Shilpa', 'Isaac', 'Venkat'].forEach(name => opsSet.add(name));
+                ['Chandana', 'Pooja', 'Kavya'].forEach(name => hrSet.add(name));
+                ['Arpitha', 'Sinchana'].forEach(name => invoiceSet.add(name));
+
+                setOpsInchargeOptions(Array.from(opsSet).sort());
+                setHrInchargeOptions(Array.from(hrSet).sort());
+                setInvoiceInchargeOptions(Array.from(invoiceSet).sort());
 
                 const { user: authUser } = useAuthStore.getState();
                 if (authUser) {
@@ -68,9 +102,12 @@ const AddSiteAttendanceRecord: React.FC = () => {
                 }
 
                 if (isEditing && id) {
-                    const records = await api.getSiteInvoiceRecords();
-                    const existingRecord = records.find(r => r.id === id);
+                    const existingRecord = trackerRecords.find(r => r.id === id);
                     if (existingRecord) {
+                        // Ensure siteId is not null/empty if siteName exists
+                        if (!existingRecord.siteId && existingRecord.siteName) {
+                            existingRecord.siteId = existingRecord.siteName;
+                        }
                         setRecord(existingRecord);
                     } else {
                         setToast({ message: 'Record not found', type: 'error' });
@@ -92,12 +129,18 @@ const AddSiteAttendanceRecord: React.FC = () => {
             const updated = { ...prev, [field]: value };
 
             if (field === 'siteId') {
-                const site = sites.find(s => s.id === value);
+                const site = sites.find(s => s.id === value || s.shortName === value);
                 if (site) {
+                    updated.siteId = site.id;
                     updated.siteName = site.shortName;
+                } else {
+                    updated.siteId = value;
+                    updated.siteName = value;
                 }
+                
                 // Auto-fill from defaults
-                const defaults = siteDefaults.find(d => d.siteId === value);
+                const targetId = site ? site.id : value;
+                const defaults = siteDefaults.find(d => d.siteId === targetId || d.siteName === value);
                 if (defaults) {
                     updated.companyName = defaults.companyName || updated.companyName;
                     updated.billingCycle = defaults.billingCycle || updated.billingCycle;
@@ -143,6 +186,15 @@ const AddSiteAttendanceRecord: React.FC = () => {
         setIsSaving(true);
         try {
             const payload = { ...record };
+            
+            // Validate UUID for siteId. If custom name (not UUID), set siteId to null to avoid 400 error
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (payload.siteId && !uuidRegex.test(payload.siteId)) {
+                // For SiteInvoiceRecord, site_id is nullable (based on migration script analysis)
+                // However, types might be strict. Let's force it to null/undefined for the API call
+                (payload as any).siteId = null;
+            }
+
             if (!isEditing && currentUser) {
                 const { user: authUser } = useAuthStore.getState();
                 payload.createdBy = currentUser.id;
@@ -194,20 +246,21 @@ const AddSiteAttendanceRecord: React.FC = () => {
                 <SectionHeader icon={Briefcase} title="Description" bgColor="text-orange-600" />
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div className="space-y-1 group">
-                        <label htmlFor="siteId" className={labelClass}>Select Site</label>
-                        <select
-                            id="siteId"
-                            name="siteId"
-                            className={selectClass}
-                            value={record.siteId}
-                            onChange={(e) => handleInputChange('siteId', e.target.value)}
-                            required
-                        >
-                            <option value="">Select a site...</option>
-                            {sites.map(site => (
-                                <option key={site.id} value={site.id}>{site.shortName}</option>
-                            ))}
-                        </select>
+                        <SearchableSelect
+                            label="Select Site"
+                            placeholder="Select or type site name..."
+                            options={sites.map(s => ({ id: s.id, name: s.shortName }))}
+                            value={record.siteName || ''}
+                            onChange={(val) => {
+                                const matchedSite = sites.find(s => s.shortName === val);
+                                if (matchedSite) {
+                                    handleInputChange('siteId', matchedSite.id);
+                                } else {
+                                    handleInputChange('siteId', val);
+                                }
+                            }}
+                            allowCustom
+                        />
                     </div>
                     <Input
                         id="companyName"
@@ -234,49 +287,34 @@ const AddSiteAttendanceRecord: React.FC = () => {
                         </select>
                     </div>
                     <div className="space-y-1 group">
-                        <label htmlFor="opsIncharge" className={labelClass}>Ops Incharge</label>
-                        <select
-                            id="opsIncharge"
-                            name="opsIncharge"
-                            className={selectClass}
+                        <SearchableSelect
+                            label="Ops Incharge"
+                            placeholder="Select or type name..."
+                            options={opsInchargeOptions.map(name => ({ id: name, name }))}
                             value={record.opsIncharge || ''}
-                            onChange={(e) => handleInputChange('opsIncharge', e.target.value)}
-                        >
-                            <option value="">Select...</option>
-                            {OPS_INCHARGE_OPTIONS.map(name => (
-                                <option key={name} value={name}>{name}</option>
-                            ))}
-                        </select>
+                            onChange={(val) => handleInputChange('opsIncharge', val)}
+                            allowCustom
+                        />
                     </div>
                     <div className="space-y-1 group">
-                        <label htmlFor="hrIncharge" className={labelClass}>HR Incharge</label>
-                        <select
-                            id="hrIncharge"
-                            name="hrIncharge"
-                            className={selectClass}
+                        <SearchableSelect
+                            label="HR Incharge"
+                            placeholder="Select or type name..."
+                            options={hrInchargeOptions.map(name => ({ id: name, name }))}
                             value={record.hrIncharge || ''}
-                            onChange={(e) => handleInputChange('hrIncharge', e.target.value)}
-                        >
-                            <option value="">Select...</option>
-                            {HR_INCHARGE_OPTIONS.map(name => (
-                                <option key={name} value={name}>{name}</option>
-                            ))}
-                        </select>
+                            onChange={(val) => handleInputChange('hrIncharge', val)}
+                            allowCustom
+                        />
                     </div>
                     <div className="space-y-1 group">
-                        <label htmlFor="invoiceIncharge" className={labelClass}>Invoice Incharge</label>
-                        <select
-                            id="invoiceIncharge"
-                            name="invoiceIncharge"
-                            className={selectClass}
+                        <SearchableSelect
+                            label="Invoice Incharge"
+                            placeholder="Select or type name..."
+                            options={invoiceInchargeOptions.map(name => ({ id: name, name }))}
                             value={record.invoiceIncharge || ''}
-                            onChange={(e) => handleInputChange('invoiceIncharge', e.target.value)}
-                        >
-                            <option value="">Select...</option>
-                            {INVOICE_INCHARGE_OPTIONS.map(name => (
-                                <option key={name} value={name}>{name}</option>
-                            ))}
-                        </select>
+                            onChange={(val) => handleInputChange('invoiceIncharge', val)}
+                            allowCustom
+                        />
                     </div>
                     <Input
                         id="opsRemarks"

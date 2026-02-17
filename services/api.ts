@@ -330,7 +330,7 @@ export const api = {
       .from('site_invoice_tracker')
       .select('*')
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('site_name');
       
     if (managerId) {
         query = query.eq('created_by', managerId);
@@ -346,7 +346,7 @@ export const api = {
       .from('site_invoice_tracker')
       .select('*')
       .not('deleted_at', 'is', null)
-      .order('deleted_at', { ascending: false });
+      .order('site_name');
       
     if (managerId) {
         query = query.eq('created_by', managerId);
@@ -473,7 +473,14 @@ export const api = {
         if (error) throw error;
     } else {
         // Need site_name for new insert
-        const { data: org } = await supabase.from('organizations').select('short_name').eq('id', siteId).single();
+        // Only query organizations if siteId is a valid UUID
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        let org = null;
+        if (uuidRegex.test(siteId)) {
+            const { data } = await supabase.from('organizations').select('short_name').eq('id', siteId).single();
+            org = data;
+        }
+
         if (org) {
             const { error } = await supabase.from('site_invoice_defaults').insert({ 
                 ...payload, 
@@ -4363,7 +4370,7 @@ export const api = {
     
     const { data, error } = await supabase
       .from('site_finance_tracker')
-      .upsert({ ...dbRecord, status: 'pending' })
+      .upsert({ status: 'pending', ...dbRecord })
       .select()
       .single();
 

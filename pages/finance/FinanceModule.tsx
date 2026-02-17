@@ -26,7 +26,7 @@ const FinanceModule: React.FC = () => {
 
     return (
         <div className="p-4 md:p-6 space-y-6">
-            <AdminPageHeader title="Finance" />
+            <AdminPageHeader title="Tracker" />
             
             <div className="border-b border-border">
                 <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
@@ -50,7 +50,7 @@ const FinanceModule: React.FC = () => {
                         }`}
                     >
                         <IndianRupee className="h-4 w-4" />
-                        Site Tracker
+                        Monthly Invoice Tracker
                     </button>
                 </nav>
             </div>
