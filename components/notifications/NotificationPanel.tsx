@@ -76,13 +76,14 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         leaves: false,
         claims: false,
         finance: false,
-        invoices: false
+        invoices: false,
+        general: false,
+        violations: false
     });
 
-    const toggleSection = (section: 'unlocks' | 'leaves' | 'claims' | 'finance' | 'invoices') => {
+    const toggleSection = (section: 'unlocks' | 'leaves' | 'claims' | 'finance' | 'invoices' | 'general' | 'violations') => {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
-
     const [isActionLoading, setIsActionLoading] = React.useState<string | null>(null);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -173,7 +174,8 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                 setInvoiceAlerts(finalInvoices);
             }
 
-            // Auto-expand sections that have pending items
+            // Disable auto-expand as per user request to "hide all by default"
+            /*
             setExpandedSections({
                 unlocks: finalUnlocks.length > 0,
                 leaves: finalLeaves.length > 0,
@@ -181,6 +183,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                 finance: finalFinance.length > 0,
                 invoices: finalInvoices.length > 0
             });
+            */
 
         } catch (err) {
             console.error('Error fetching pending approvals:', err);
@@ -268,7 +271,11 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         ];
 
         const startIndex = (currentPage - 1) * pageSize;
-        const pagedNotifs = notifications.slice(startIndex, startIndex + pageSize);
+        // Filter out security violations from the general list
+        const filteredNotifs = notifications.filter(notif => 
+            notif.type !== 'security' && !notif.message.includes('Field attendance violation')
+        );
+        const pagedNotifs = filteredNotifs.slice(startIndex, startIndex + pageSize);
 
         pagedNotifs.forEach(notif => {
             const date = parseISO(notif.createdAt);
@@ -343,8 +350,69 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                 {unlockRequests.length + leaveRequests.length + extraWorkClaims.length + financeRequests.length}
                             </span>
                         </div>
-                        
+
                         <div className="px-4 pb-4 space-y-3">
+                            {/* Security Violations (Violations found in Notification table) */}
+                            {notifications.some(n => n.type === 'security' || n.message.includes('Field attendance violation')) && (
+                                <div className={`group rounded-2xl overflow-hidden transition-all duration-300 border ${isMobile ? 'border-red-500/30 bg-red-500/5' : 'border-red-100 bg-red-50/10 hover:shadow-md'}`}>
+                                    <button 
+                                        onClick={() => toggleSection('violations')}
+                                        className="w-full p-3 flex items-center justify-between bg-transparent"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-xl flex items-center justify-center ${isMobile ? 'bg-red-500/20 text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'bg-red-100 text-red-600'}`}>
+                                                <Shield className="w-4 h-4" />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className={`text-xs font-bold ${isMobile ? 'text-white' : 'text-gray-900'}`}>Security Violations</p>
+                                                <p className={`text-[10px] ${isMobile ? 'text-red-400' : 'text-red-500'}`}>Urgent Attention Need</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full text-[10px] font-bold ${isMobile ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.4)]' : 'bg-red-100 text-red-700'}`}>
+                                                {notifications.filter(n => n.type === 'security' || n.message.includes('Field attendance violation')).length}
+                                            </span>
+                                            {expandedSections.violations ? <ChevronUp className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} /> : <ChevronDown className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} />}
+                                        </div>
+                                    </button>
+
+                                    {expandedSections.violations && (
+                                        <div className={`p-3 space-y-3 border-t ${isMobile ? 'border-red-500/10' : 'border-red-100'}`}>
+                                            <div className="flex items-center gap-2 px-1 py-1">
+                                                <AlertTriangle className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+                                                <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-red-400' : 'text-red-700'}`}>
+                                                    Priority Warning: Escalated Violations
+                                                </span>
+                                            </div>
+                                            {notifications.filter(n => n.type === 'security' || n.message.includes('Field attendance violation')).map(notif => (
+                                                <div 
+                                                    key={notif.id} 
+                                                    onClick={() => handleNotificationClick(notif)}
+                                                    className={`rounded-xl p-3 border cursor-pointer transition-all hover:scale-[1.02] ${isMobile ? 'bg-red-950/20 border-red-500/20' : 'bg-white border-red-100 shadow-sm'}`}
+                                                >
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="p-1.5 rounded-lg bg-red-100 text-red-600">
+                                                            <Shield className="w-3 h-3" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className={`text-[11px] leading-relaxed mb-2 ${isMobile ? 'text-white/90' : 'text-gray-800'}`}>
+                                                                {notif.message}
+                                                            </p>
+                                                            <div className="flex items-center justify-between">
+                                                                <span className={`text-[9px] flex items-center gap-1 ${isMobile ? 'text-white/40' : 'text-red-700/60'}`}>
+                                                                    <Clock className="h-2.5 w-2.5" />
+                                                                    {formatDistanceToNow(parseISO(notif.createdAt), { addSuffix: true })}
+                                                                </span>
+                                                                {!notif.isRead && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             {/* Attendance Unlock Requests */}
                             {unlockRequests.length > 0 && (
                                 <div className={`group rounded-2xl overflow-hidden transition-all duration-300 border ${isMobile ? 'border-white/10 bg-transparent' : 'border-emerald-100 bg-white hover:shadow-md'}`}>
@@ -371,6 +439,12 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                     
                                     {expandedSections.unlocks && (
                                         <div className={`p-3 space-y-3 border-t ${isMobile ? 'border-white/5' : 'border-emerald-100/50'}`}>
+                                            <div className="flex items-center gap-2 px-1 py-1">
+                                                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                                                <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-amber-400' : 'text-amber-700'}`}>
+                                                    Attention: Approval Required
+                                                </span>
+                                            </div>
                                             {unlockRequests.map(req => (
                                                 <div key={req.id} className={`rounded-xl p-3 border ${isMobile ? 'bg-black/20 border-white/5' : 'bg-emerald-50/30 border-emerald-100'}`}>
                                                     <div className="flex items-center gap-3 mb-3">
@@ -438,6 +512,12 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                     
                                     {expandedSections.leaves && (
                                         <div className={`p-3 space-y-3 border-t ${isMobile ? 'border-white/5' : 'border-orange-100/50'}`}>
+                                            <div className="flex items-center gap-2 px-1 py-1">
+                                                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                                                <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-amber-400' : 'text-amber-700'}`}>
+                                                    Attention: Leave Verification
+                                                </span>
+                                            </div>
                                             {leaveRequests.map(req => (
                                                 <div key={req.id} className={`rounded-xl p-3 border ${isMobile ? 'bg-black/20 border-white/5' : 'bg-orange-50/30 border-orange-100'}`}>
                                                     <div className="flex items-center gap-3 mb-3">
@@ -510,6 +590,12 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                     
                                     {expandedSections.claims && (
                                         <div className={`p-3 space-y-3 border-t ${isMobile ? 'border-white/5' : 'border-blue-100/50'}`}>
+                                            <div className="flex items-center gap-2 px-1 py-1">
+                                                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                                                <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-amber-400' : 'text-amber-700'}`}>
+                                                    Attention: Extra Work Review
+                                                </span>
+                                            </div>
                                             {extraWorkClaims.map(claim => (
                                                 <div key={claim.id} className={`rounded-xl p-3 border ${isMobile ? 'bg-black/20 border-white/5' : 'bg-blue-50/30 border-blue-100'}`}>
                                                     <div className="flex items-center gap-3 mb-3">
@@ -580,6 +666,12 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                     
                                     {expandedSections.invoices && (
                                         <div className={`p-3 space-y-3 border-t ${isMobile ? 'border-white/5' : 'border-amber-100/50'}`}>
+                                            <div className="flex items-center gap-2 px-1 py-1">
+                                                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                                                <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-amber-400' : 'text-amber-700'}`}>
+                                                    Warning: Invoices Due for Sharing
+                                                </span>
+                                            </div>
                                             {invoiceAlerts.map(inv => (
                                                 <div key={inv.id} className={`rounded-xl p-3 border ${isMobile ? 'bg-black/20 border-white/5' : 'bg-amber-50/30 border-amber-100'}`}>
                                                     <div className="flex items-center gap-3 mb-3">
@@ -640,6 +732,12 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                     
                                     {expandedSections.finance && (
                                         <div className={`p-3 space-y-3 border-t ${isMobile ? 'border-white/5' : 'border-rose-100/50'}`}>
+                                            <div className="flex items-center gap-2 px-1 py-1">
+                                                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                                                <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-amber-400' : 'text-amber-700'}`}>
+                                                    Attention: Finance Approval Required
+                                                </span>
+                                            </div>
                                             {financeRequests.map(req => (
                                                 <div key={req.id} className={`rounded-xl p-3 border ${isMobile ? 'bg-black/20 border-white/5' : 'bg-rose-50/30 border-rose-100'}`}>
                                                     <div className="flex items-center gap-3 mb-3">
@@ -699,76 +797,100 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                     </div>
                 )}
 
-                {groupedNotifications.length > 0 ? (
-                    <div className={`divide-y pt-2 ${isMobile ? 'divide-white/5' : 'divide-gray-50'}`}>
-                        {groupedNotifications.map((group) => (
-                            <div key={group.title} className="pb-4">
-                                <div className={`px-6 py-3 ${isMobile ? 'bg-white/5' : 'bg-gray-50/50'}`}>
-                                    <h5 className={`text-[10px] font-black uppercase tracking-[0.15em] flex items-center gap-2 ${isMobile ? 'text-white/50' : 'text-muted/60'}`}>
-                                        <div className="w-1 h-3 bg-accent/40 rounded-full" />
-                                        {group.title}
-                                    </h5>
-                                </div>
-                                
-                                <div className={`divide-y ${isMobile ? 'divide-white/5' : 'divide-gray-50'}`}>
-                                    {group.items.map((notif) => (
-                                        <div
-                                            key={notif.id}
-                                            onClick={() => handleNotificationClick(notif)}
-                                            className={`group relative flex items-start gap-4 px-6 py-4 cursor-pointer transition-all duration-300 ${
-                                                !notif.isRead
-                                                ? isMobile ? 'bg-white/5 hover:bg-white/10' : 'bg-accent/5 hover:bg-accent/10'
-                                                : isMobile ? 'hover:bg-white/5' : 'hover:bg-gray-50'
-                                            }`}
-                                        >
-                                            {!notif.isRead && (
-                                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-10 bg-accent rounded-r-full" />
-                                            )}
-                                            
-                                            <NotificationIcon type={notif.type} size="h-4 w-4" />
-                                            
-                                            <div className="flex-1 min-w-0">
-                                                <p className={`text-sm leading-relaxed mb-1.5 ${
-                                                    !notif.isRead 
-                                                    ? isMobile ? 'text-white font-semibold' : 'text-gray-900 font-semibold' 
-                                                    : isMobile ? 'text-white/70 font-normal' : 'text-gray-600 font-normal'
-                                                }`}>
-                                                    {notif.message}
-                                                </p>
-                                                <span className={`text-[11px] flex items-center gap-1 ${isMobile ? 'text-white/50' : 'text-muted'}`}>
-                                                    <Clock className="h-3 w-3" />
-                                                    {formatDistanceToNow(parseISO(notif.createdAt), { addSuffix: true })}
-                                                </span>
-                                            </div>
-                                            
-                                            <button 
-                                                className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all ${isMobile ? 'text-white/50 hover:text-white' : 'text-muted hover:text-accent'}`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    markAsRead(notif.id);
-                                                }}
-                                            >
-                                                <Check className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="flex flex-col items-center justify-center py-24 text-center px-10">
-                        <div className="relative mb-6">
-                            <div className={`w-20 h-20 rounded-3xl flex items-center justify-center rotate-6 ${isMobile ? 'bg-white/5' : 'bg-gray-50'}`}>
-                                <Inbox className={`h-10 w-10 ${isMobile ? 'text-white/10' : 'text-gray-200'}`} />
-                            </div>
-                            <div className={`absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl shadow-lg border flex items-center justify-center -rotate-6 ${isMobile ? 'bg-[#0A3D2E] border-white/10' : 'bg-white border-gray-100'}`}>
-                                <Check className="h-5 w-5 text-accent" />
-                            </div>
+                {/* General Notifications Toggle Header */}
+                <div className={`border-b border-t mt-4 px-6 py-4 flex items-center justify-between cursor-pointer ${isMobile ? 'border-white/10 bg-white/5' : 'border-gray-100 bg-gray-50'}`}
+                    onClick={() => toggleSection('general')}
+                >
+                    <div className="flex items-center gap-2">
+                        <div className={`p-1.5 rounded-lg ${isMobile ? 'bg-sky-500/20 text-sky-400' : 'bg-sky-100 text-sky-700'}`}>
+                            <Bell className="w-3.5 h-3.5" />
                         </div>
-                        <h5 className={`font-bold text-lg mb-2 ${isMobile ? 'text-white' : 'text-gray-900'}`}>No notifications</h5>
-                        <p className={`text-sm ${isMobile ? 'text-white/40' : 'text-gray-400'}`}>You're all caught up!</p>
+                        <h5 className={`text-[11px] font-black uppercase tracking-widest ${isMobile ? 'text-white/90' : 'text-sky-900'}`}>
+                            Recent Updates
+                        </h5>
                     </div>
+                    <div className="flex items-center gap-3">
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${isMobile ? 'bg-white/10 text-white' : 'bg-sky-100 text-sky-700'}`}>
+                            {notifications.length}
+                        </span>
+                        {expandedSections.general ? <ChevronUp className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} /> : <ChevronDown className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} />}
+                    </div>
+                </div>
+
+                {expandedSections.general && (
+                    <>
+                        {groupedNotifications.length > 0 ? (
+                            <div className={`divide-y pt-2 ${isMobile ? 'divide-white/5' : 'divide-gray-50'}`}>
+                                {groupedNotifications.map((group) => (
+                                    <div key={group.title} className="pb-4">
+                                        <div className={`px-6 py-3 ${isMobile ? 'bg-white/5' : 'bg-gray-50/50'}`}>
+                                            <h5 className={`text-[10px] font-black uppercase tracking-[0.15em] flex items-center gap-2 ${isMobile ? 'text-white/50' : 'text-muted/60'}`}>
+                                                <div className="w-1 h-3 bg-accent/40 rounded-full" />
+                                                {group.title}
+                                            </h5>
+                                        </div>
+                                        
+                                        <div className={`divide-y ${isMobile ? 'divide-white/5' : 'divide-gray-50'}`}>
+                                            {group.items.map((notif) => (
+                                                <div
+                                                    key={notif.id}
+                                                    onClick={() => handleNotificationClick(notif)}
+                                                    className={`group relative flex items-start gap-4 px-6 py-4 cursor-pointer transition-all duration-300 ${
+                                                        !notif.isRead
+                                                        ? isMobile ? 'bg-white/5 hover:bg-white/10' : 'bg-accent/5 hover:bg-accent/10'
+                                                        : isMobile ? 'hover:bg-white/5' : 'hover:bg-gray-50'
+                                                    }`}
+                                                >
+                                                    {!notif.isRead && (
+                                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-10 bg-accent rounded-r-full" />
+                                                    )}
+                                                    
+                                                    <NotificationIcon type={notif.type} size="h-4 w-4" />
+                                                    
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`text-sm leading-relaxed mb-1.5 ${
+                                                            !notif.isRead 
+                                                            ? isMobile ? 'text-white font-semibold' : 'text-gray-900 font-semibold' 
+                                                            : isMobile ? 'text-white/70 font-normal' : 'text-gray-600 font-normal'
+                                                        }`}>
+                                                            {notif.message}
+                                                        </p>
+                                                        <span className={`text-[11px] flex items-center gap-1 ${isMobile ? 'text-white/50' : 'text-muted'}`}>
+                                                            <Clock className="h-3 w-3" />
+                                                            {formatDistanceToNow(parseISO(notif.createdAt), { addSuffix: true })}
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    <button 
+                                                        className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all ${isMobile ? 'text-white/50 hover:text-white' : 'text-muted hover:text-accent'}`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            markAsRead(notif.id);
+                                                        }}
+                                                    >
+                                                        <Check className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-24 text-center px-10">
+                                <div className="relative mb-6">
+                                    <div className={`w-20 h-20 rounded-3xl flex items-center justify-center rotate-6 ${isMobile ? 'bg-white/5' : 'bg-gray-50'}`}>
+                                        <Inbox className={`h-10 w-10 ${isMobile ? 'text-white/10' : 'text-gray-200'}`} />
+                                    </div>
+                                    <div className={`absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl shadow-lg border flex items-center justify-center -rotate-6 ${isMobile ? 'bg-[#0A3D2E] border-white/10' : 'bg-white border-gray-100'}`}>
+                                        <Check className="h-5 w-5 text-accent" />
+                                    </div>
+                                </div>
+                                <h5 className={`font-bold text-lg mb-2 ${isMobile ? 'text-white' : 'text-gray-900'}`}>No notifications</h5>
+                                <p className={`text-sm ${isMobile ? 'text-white/40' : 'text-gray-400'}`}>You're all caught up!</p>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
             
