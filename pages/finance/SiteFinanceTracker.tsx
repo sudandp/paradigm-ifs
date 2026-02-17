@@ -37,7 +37,8 @@ const SiteFinanceTracker: React.FC = () => {
         if (!user) return;
         setIsLoading(true);
         try {
-            const isSuperAdmin = ['admin', 'super_admin'].includes(user.role);
+            const userRole = (user.role || '').toLowerCase();
+            const isSuperAdmin = ['admin', 'super_admin', 'finance_manager', 'management', 'hr', 'hr_ops'].includes(userRole);
             const managerId = isSuperAdmin ? undefined : user.id;
 
             const [recordsData, defaultsData, deletedData] = await Promise.all([

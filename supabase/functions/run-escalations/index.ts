@@ -1,4 +1,9 @@
-declare const Deno: any;
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+  serve(handler: (req: Request) => Promise<Response> | Response): void;
+};
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -7,7 +12,24 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-Deno.serve(async (req: any) => {
+interface Violation {
+  id: string;
+  user_id: string;
+  date: string;
+  users: { name: string } | { name: string }[] | null;
+}
+
+interface Recipient {
+  id: string;
+}
+
+interface NotificationInsert {
+  user_id: string;
+  message: string;
+  type: string;
+}
+
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -43,6 +65,7 @@ Deno.serve(async (req: any) => {
 
     let escalatedCount = 0;
     if (violationsToEscalate && violationsToEscalate.length > 0) {
+      const violations = violationsToEscalate as Violation[];
       const { error: updateError } = await supabaseClient
         .from('field_attendance_violations')
         .update({
@@ -50,25 +73,31 @@ Deno.serve(async (req: any) => {
           escalation_level: 1,
           escalated_at: new Date().toISOString(),
         })
-        .in('id', (violationsToEscalate as any[]).map((v: any) => v.id));
+        .in('id', violations.map(v => v.id));
 
       if (updateError) throw updateError;
-      escalatedCount = (violationsToEscalate as any[]).length;
+      escalatedCount = violations.length;
 
       // 2. Notify Admin about escalations
-      const { data: recipients } = await supabaseClient
+      const { data: recipientsData } = await supabaseClient
         .from('users')
         .select('id')
         .eq('role_id', 'admin');
 
-      if (recipients && (recipients as any[]).length > 0) {
-        const notifications = (violationsToEscalate as any[]).flatMap((v: any) => 
-          (recipients as any[]).map((r: any) => ({
+      const recipients = recipientsData as Recipient[] | null;
+
+      if (recipients && recipients.length > 0) {
+        const notifications: NotificationInsert[] = violations.flatMap((v: Violation) => {
+          // Robustly get user name from join (might be object or array)
+          const userData = Array.isArray(v.users) ? v.users[0] : v.users;
+          const userName = userData?.name || v.user_id;
+          
+          return recipients.map((r: Recipient) => ({
             user_id: r.id,
-            message: `URGENT: Field attendance violation for user ${v.users?.name || v.user_id} on ${v.date} has been escalated to Admin.`,
+            message: `URGENT: Field attendance violation for user ${userName} on ${v.date} has been escalated to Admin.`,
             type: 'security',
-          }))
-        );
+          }));
+        });
 
         await supabaseClient.from('notifications').insert(notifications);
       }
@@ -85,8 +114,9 @@ Deno.serve(async (req: any) => {
       }
     )
 
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: error?.message || String(error) }), {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     })

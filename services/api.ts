@@ -4254,11 +4254,20 @@ export const api = {
 
         // Also delete related notifications to avoid clutter in HR/Admin panel
         const violationDate = format(new Date(date), 'yyyy-MM-dd');
-        // Search by both ID and Name to be safe (Edge function might have used either)
+        // Clear notifications that specifically mention this violation for this user
+        // We look for both the user ID and the date to be precise.
         await supabase
           .from('notifications')
           .delete()
-          .or(`message.ilike.%${userId}%,message.ilike.%${user.name}%`)
+          .ilike('message', `%${userId}%`)
+          .ilike('message', `%${violationDate}%`)
+          .ilike('message', '%Field attendance violation%');
+          
+        // Additionally try searching by name if the ID was replaced by the cleanup script
+        await supabase
+          .from('notifications')
+          .delete()
+          .ilike('message', `%${user.name}%`)
           .ilike('message', `%${violationDate}%`)
           .ilike('message', '%Field attendance violation%');
       }
