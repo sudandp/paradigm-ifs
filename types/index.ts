@@ -104,6 +104,8 @@ export interface User {
   compOffOpeningDate?: string; // YYYY-MM-DD
   floatingLeaveOpeningBalance?: number;
   floatingLeaveOpeningDate?: string; // YYYY-MM-DD
+  otHoursBank?: number;
+  monthlyOtHours?: number;
 }
 
 export interface BiometricDevice {

@@ -253,6 +253,21 @@ export async function registerDevice(
     const existingCheck = await isDeviceAuthorized(userId, normalizedId);
     if (existingCheck.device) {
       if (existingCheck.status === 'active') {
+        // If it's an existing device, check if it was used recently 
+        // to determine if we should notify about a "switch"
+        const lastUsed = existingCheck.device.lastUsedAt ? new Date(existingCheck.device.lastUsedAt).getTime() : 0;
+        const now = new Date().getTime();
+        const oneHour = 60 * 60 * 1000;
+
+        // If not used in the last hour on THIS device, consider it a switch/re-login notification
+        if (now - lastUsed > oneHour) {
+          try {
+            await api.sendDeviceChangeAlert(userId, '', 'Previous Session', deviceName);
+          } catch (notifyErr) {
+            console.warn('Failed to send device switch alert:', notifyErr);
+          }
+        }
+
         // Update last used time and sync newest info (battery, ip, etc.)
         await supabase
           .from('user_devices')
@@ -274,13 +289,11 @@ export async function registerDevice(
           message: 'Device registration is pending approval',
         };
       } else if (existingCheck.status === 'revoked') {
-        // Revoked devices ALWAYS require admin approval to re-activate
-        const request = await createDeviceChangeRequest(userId, deviceType, normalizedId, deviceName, deviceInfo);
+        // Revoked devices require manual re-activation request
         return {
           success: false,
-          request,
           requiresApproval: true,
-          message: 'This device was previously revoked. A request has been sent for admin approval.',
+          message: 'This device was previously revoked. Please contact admin or request re-activation.',
         };
       }
     }
@@ -317,6 +330,13 @@ export async function registerDevice(
       // Log activity
       await logDeviceActivity(userId, data.id, 'registration', deviceInfo);
       
+      // Notify reporting manager about the new device
+      try {
+        await api.sendDeviceChangeAlert(userId, '', 'None (New)', deviceName);
+      } catch (notifyErr) {
+        console.warn('Failed to send device change alert:', notifyErr);
+      }
+      
       return {
         success: true,
         device: {
@@ -337,13 +357,11 @@ export async function registerDevice(
         message: 'Device registered successfully',
       };
     } else {
-      // Exceeds limit - create an approval request for admin/HR
-      const request = await createDeviceChangeRequest(userId, deviceType, normalizedId, deviceName, deviceInfo);
+      // Exceeds limit - don't auto-create request, let the user "press" to request
       return {
         success: false,
-        request,
         requiresApproval: true,
-        message: `You have reached your limit of ${limit} ${deviceType} device(s). A request has been sent for admin approval.`,
+        message: `Device limit of ${limit} reached for your role. Please request access to use this device.`,
       };
     }
   } catch (error) {
@@ -363,6 +381,33 @@ export async function createDeviceChangeRequest(
   deviceInfo: DeviceInfo
 ): Promise<DeviceChangeRequest> {
   try {
+    // Check if a pending request already exists for this device
+    const { data: existingRequest } = await supabase
+      .from('device_change_requests')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('device_identifier', deviceIdentifier)
+      .eq('status', 'pending')
+      .maybeSingle();
+
+    if (existingRequest) {
+      return {
+        ...existingRequest,
+        userId: existingRequest.user_id,
+        deviceType: existingRequest.device_type,
+        deviceIdentifier: existingRequest.device_identifier,
+        deviceName: existingRequest.device_name,
+        deviceInfo: existingRequest.device_info || {},
+        requestedAt: existingRequest.requested_at,
+        reviewedById: existingRequest.reviewed_by_id,
+        reviewedAt: existingRequest.reviewed_at,
+        rejectionReason: existingRequest.rejection_reason,
+        reportingManagerNotified: existingRequest.reporting_manager_notified,
+        createdAt: existingRequest.created_at,
+        updatedAt: existingRequest.updated_at,
+      };
+    }
+
     const { data, error } = await supabase
       .from('device_change_requests')
       .insert({
@@ -744,8 +789,20 @@ export async function getDeviceActivityLogs(
 // =============================================
 
 async function notifyDeviceChangeRequest(requestId: string, userId: string): Promise<void> {
-  // TODO: Implement notification to admins, HR, and reporting manager
-  console.log(`Notify device change request ${requestId} for user ${userId}`);
+  try {
+    const { data: user } = await supabase.from('users').select('name, reporting_manager_id').eq('id', userId).single();
+    if (!user || !user.reporting_manager_id) return;
+
+    await api.createNotification({
+      userId: user.reporting_manager_id,
+      title: '📱 Device Access Request',
+      message: `${user.name} has exceeded their device limit and requested access for a new device.`,
+      type: 'approval_request',
+      link: '/user-management' // Or a specific device approval page if it exists
+    });
+  } catch (error) {
+    console.error('Error notifying device change request:', error);
+  }
 }
 
 async function notifyDeviceApproved(
@@ -753,8 +810,16 @@ async function notifyDeviceApproved(
   deviceName: string,
   approvedById: string
 ): Promise<void> {
-  // TODO: Implement notification to user
-  console.log(`Notify device approved: ${deviceName} for user ${userId}`);
+  try {
+    await api.createNotification({
+      userId: userId,
+      title: '✅ Device Approved',
+      message: `Your device "${deviceName}" has been approved for use.`,
+      type: 'info'
+    });
+  } catch (error) {
+    console.error('Error notifying device approved:', error);
+  }
 }
 
 async function notifyDeviceRejected(
@@ -762,6 +827,14 @@ async function notifyDeviceRejected(
   deviceName: string,
   reason: string
 ): Promise<void> {
-  // TODO: Implement notification to user
-  console.log(`Notify device rejected: ${deviceName} for user ${userId}`);
+  try {
+    await api.createNotification({
+      userId: userId,
+      title: '❌ Device Request Rejected',
+      message: `Your request for device "${deviceName}" was rejected. Reason: ${reason}`,
+      type: 'security'
+    });
+  } catch (error) {
+    console.error('Error notifying device rejected:', error);
+  }
 }

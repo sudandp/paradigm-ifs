@@ -22,6 +22,7 @@ import { usePWAStore } from './store/pwaStore';
 import { useNotificationStore } from './store/notificationStore';
 
 
+import { AlertTriangle } from 'lucide-react';
 import { withTimeout } from './utils/async';
 import { lazyWithRetry } from './utils/lazyLoad';
 
@@ -165,6 +166,60 @@ const ThemeManager: React.FC = () => {
   return null;
 };
 
+// Global Error Boundary to prevent white screen
+class GlobalErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error('[GlobalErrorBoundary] Caught error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
+          <div className="bg-white p-8 rounded-2xl shadow-xl border border-red-100 max-w-md">
+            <div className="bg-red-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="h-8 w-8 text-red-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h2>
+            <p className="text-gray-600 mb-8">
+              The application encountered an unexpected error. This often happens if your session has expired.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => window.location.reload()}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-colors"
+              >
+                Reload Application
+              </button>
+              <button 
+                onClick={() => {
+                   localStorage.clear();
+                   Preferences.clear();
+                   window.location.href = '/auth/login';
+                }}
+                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl transition-colors"
+              >
+                Go to Login
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // Helper: keys & ignored routes for last-path storage
 // We persist the last visited path in localStorage so it survives
 // across browser reloads and tab closures.  This enables the app to
@@ -287,7 +342,7 @@ const App: React.FC = () => {
         setLoading(false);
         setInitialized(true);
       }
-    }, 30000); // 30 seconds fallback
+    }, 10000); // 10 seconds fallback (reduced from 30s)
 
     const initializeApp = async () => {
       setLoading(true);
@@ -314,8 +369,11 @@ const App: React.FC = () => {
 
               if (refreshError) {
                 console.error('Failed to restore session from long-term token:', refreshError.message);
-                // Don't remove the token immediately, it might be a transient network error
-                // await Preferences.remove({ key: 'supabase.auth.rememberMe' });
+                // If the error is a definitive auth failure (400), clear the token
+                if (refreshError.message?.includes('400') || refreshError.message?.includes('invalid refresh token')) {
+                  console.warn('Invalid refresh token detected. Clearing persistent storage.');
+                  await Preferences.remove({ key: 'supabase.auth.rememberMe' });
+                }
               } else {
                 session = refreshData.session;
               }
@@ -436,9 +494,8 @@ const App: React.FC = () => {
             // For now, we prefer keeping the user logged in.
           }
         }, 0);
-      } else if (event === 'SIGNED_OUT') {
-        // Only clear the user immediately ON SIGNED_OUT event
         if (isMounted) {
+          // If we had a user but now we don't, or if the event is a definitive logout
           setUser(null);
           resetAttendance();
           useOnboardingStore.getState().reset();
@@ -446,9 +503,21 @@ const App: React.FC = () => {
       }
     });
 
+    // Listen for global auth failures from API
+    const handleAuthFailure = (e: any) => {
+        const error = e.detail;
+        useAuthStore.getState().forceLogout(
+            error?.message?.includes('expired') 
+                ? 'Your session has expired. Please log in again.' 
+                : 'Authentication error. Please log in again.'
+        );
+    };
+    window.addEventListener('supabase-auth-failure', handleAuthFailure);
+
     return () => {
       isMounted = false;
       subscription?.unsubscribe();
+      window.removeEventListener('supabase-auth-failure', handleAuthFailure);
       clearTimeout(fallbackTimeout);
     };
   }, [setUser, setInitialized, resetAttendance, setLoading]);
@@ -597,7 +666,9 @@ const App: React.FC = () => {
         {/* 4. All protected main application routes are nested here */}
         <Route path="/" element={
           <SecurityWrapper>
-            <MainLayoutWrapper />
+            <GlobalErrorBoundary>
+              <MainLayoutWrapper />
+            </GlobalErrorBoundary>
           </SecurityWrapper>
         }>
           {/* Default route for authenticated users */}

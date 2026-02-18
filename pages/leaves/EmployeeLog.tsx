@@ -248,41 +248,51 @@ const EmployeeLog: React.FC = () => {
                                     .map((event, index) => (
                                         <div
                                             key={`${event.timestamp}-${index}`}
-                                            className={`p-3 rounded-lg border-l-4 ${event.type === 'check-in'
-                                                ? 'bg-emerald-50 border-emerald-500'
-                                                : 'bg-rose-50 border-rose-500'
-                                                }`}
+                                            className={`p-3 rounded-lg border-l-4 ${
+                                                event.type === 'check-in' ? 'bg-emerald-50 border-emerald-500' :
+                                                event.type === 'check-out' ? 'bg-rose-50 border-rose-500' :
+                                                event.type === 'break-in' ? 'bg-amber-50 border-amber-500' :
+                                                'bg-sky-50 border-sky-500'
+                                            }`}
                                         >
                                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                                                 <div className="flex items-center gap-3">
                                                     <div
-                                                        className={`p-2 rounded-lg ${event.type === 'check-in'
-                                                            ? 'bg-emerald-100 text-emerald-700'
-                                                            : 'bg-rose-100 text-rose-700'
-                                                            }`}
+                                                        className={`p-2 rounded-lg ${
+                                                            event.type === 'check-in' ? 'bg-emerald-100 text-emerald-700' :
+                                                            event.type === 'check-out' ? 'bg-rose-100 text-rose-700' :
+                                                            event.type === 'break-in' ? 'bg-amber-100 text-amber-700' :
+                                                            'bg-sky-100 text-sky-700'
+                                                        }`}
                                                     >
                                                         <Clock className="h-4 w-4" />
                                                     </div>
                                                     <div>
-                                                        <div className={`font-semibold capitalize ${event.type === 'check-in'
-                                                            ? 'text-emerald-900'
-                                                            : 'text-rose-900'
-                                                            }`}>
-                                                            {event.type.replace('-', ' ')}
+                                                        <div className={`font-semibold capitalize ${
+                                                            event.type === 'check-in' ? 'text-emerald-900' :
+                                                            event.type === 'check-out' ? 'text-rose-900' :
+                                                            event.type === 'break-in' ? 'text-amber-900' :
+                                                            'text-sky-900'
+                                                        }`}>
+                                                            {event.type === 'check-in' ? (event.workType === 'field' ? 'Check In' : 'Punch In') :
+                                                             event.type === 'check-out' ? (event.workType === 'field' ? 'Check Out' : 'Punch Out') :
+                                                             event.type.replace('-', ' ')}
                                                         </div>
-                                                        <div className={`text-sm font-medium ${event.type === 'check-in'
-                                                            ? 'text-emerald-700'
-                                                            : 'text-rose-700'
-                                                            }`}>
+                                                        <div className={`text-sm font-medium ${
+                                                            event.type === 'check-in' ? 'text-emerald-700' :
+                                                            event.type === 'check-out' ? 'text-rose-700' :
+                                                            event.type === 'break-in' ? 'text-amber-700' :
+                                                            'text-sky-700'
+                                                        }`}>
                                                             {format(new Date(event.timestamp), 'hh:mm a')}
                                                         </div>
                                                     </div>
                                                 </div>
-                                                {event.latitude && event.longitude && (
+                                                {(event.locationName || (event.latitude && event.longitude)) && (
                                                     <div className="flex items-start gap-2 text-sm bg-white px-3 py-1.5 rounded-lg border border-gray-200 max-w-md">
                                                         <MapPin className="h-4 w-4 text-indigo-400 md:text-indigo-600 flex-shrink-0 mt-0.5" />
-                                                        <span className="text-xs break-words text-white md:text-gray-700">
-                                                            {event.locationName || `${event.latitude.toFixed(4)}, ${event.longitude.toFixed(4)}`}
+                                                        <span className="text-xs break-words text-gray-700">
+                                                            {event.locationName || `${event.latitude?.toFixed(4)}, ${event.longitude?.toFixed(4)}`}
                                                         </span>
                                                     </div>
                                                 )}
@@ -293,17 +303,25 @@ const EmployeeLog: React.FC = () => {
 
                             {/* Summary Footer */}
                             <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
-                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                        <span className="text-white md:text-gray-500">Check-ins:</span>
-                                        <span className="ml-2 font-semibold text-emerald-400 md:text-emerald-600">
-                                            {group.checkIns.length}
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                                    <div className="flex items-center">
+                                        <span className="text-gray-500">Punch Ins:</span>
+                                        <span className="ml-1 font-bold text-emerald-600">{group.checkIns.length}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <span className="text-gray-500">Punch Outs:</span>
+                                        <span className="ml-1 font-bold text-rose-600">{group.checkOuts.length}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <span className="text-gray-500">Breaks In:</span>
+                                        <span className="ml-1 font-bold text-amber-600">
+                                            {group.events.filter(e => e.type === 'break-in').length}
                                         </span>
                                     </div>
-                                    <div>
-                                        <span className="text-white md:text-gray-500">Check-outs:</span>
-                                        <span className="ml-2 font-semibold text-rose-400 md:text-rose-600">
-                                            {group.checkOuts.length}
+                                    <div className="flex items-center">
+                                        <span className="text-gray-500">Breaks Out:</span>
+                                        <span className="ml-1 font-bold text-sky-600">
+                                            {group.events.filter(e => e.type === 'break-out').length}
                                         </span>
                                     </div>
                                 </div>

@@ -85,18 +85,26 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
                     setDeviceStatus('authorized');
                     // Mark this user as checked
                     lastCheckedUserId.current = user.id;
-                } else if (result.request || result.requiresApproval) {
-                    // registerDevice() already created a device_change_request,
-                    // so show the pending/approval status directly
+                } else if (result.request) {
+                    // Device is awaiting approval
                     setDeviceStatus('pending');
                     setDeviceInfo({ 
-                       id: result.request?.id || '', 
+                       id: result.request.id, 
+                       name: deviceName, 
+                       type: deviceType as DeviceType 
+                    });
+                    setDeviceMessage(result.message);
+                } else if (result.requiresApproval) {
+                    // Limit reached, wait for user to "press" request button
+                    setDeviceStatus('limit_reached');
+                    setDeviceInfo({ 
+                       id: '', 
                        name: deviceName, 
                        type: deviceType as DeviceType 
                     });
                     setDeviceMessage(result.message);
                 } else {
-                    // Other error (no request created)
+                    // Other error (e.g. revoked)
                     setDeviceStatus('revoked');
                     setDeviceInfo({ 
                        id: '', 

@@ -111,7 +111,15 @@ const LeaveDashboard: React.FC = () => {
     const [isHolidaySelectionEnabled, setIsHolidaySelectionEnabled] = useState(false);
     const [activeHolidayPool, setActiveHolidayPool] = useState<{ name: string; date: string }[]>([]);
     const [viewingDate, setViewingDate] = useState(new Date());
+    const [threshold, setThreshold] = useState(8);
     const currentYear = viewingDate.getFullYear();
+
+    const formatPreciseHours = (hours: number) => {
+        const totalMinutes = Math.round((hours || 0) * 60);
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        return `${h}h ${m}m`;
+    };
 
     const { officeHolidays, fieldHolidays } = useSettingsStore();
 
@@ -152,13 +160,36 @@ const LeaveDashboard: React.FC = () => {
                 const end = endOfMonth(viewingDate).toISOString();
                 const events = await api.getAttendanceEvents(user.id, start, end);
 
-                // Group by day
+                // Groups events by day for calculation
                 const eventsByDay: Record<string, AttendanceEvent[]> = {};
                 events.forEach(e => {
                     const dateStr = format(new Date(e.timestamp), 'yyyy-MM-dd');
                     if (!eventsByDay[dateStr]) eventsByDay[dateStr] = [];
                     eventsByDay[dateStr].push(e);
                 });
+
+                // Fetch Holiday Selection Settings and determine threshold
+                const settings = await api.getAttendanceSettings();
+                
+                // Map User Role to Staff Category (office, field, site)
+                let staffCategory: keyof AttendanceSettings = 'field';
+                const userRole = user.role.toLowerCase();
+                if ([
+                    'admin', 'hr', 'finance', 'developer', 'management', 'office_staff', 
+                    'back_office_staff', 'bd', 'operation_manager', 'field_staff',
+                    'finance_manager', 'hr_ops', 'business developer', 'unverified',
+                    'operation manager', 'field staff', 'finance manager', 'hr ops'
+                ].includes(userRole)) {
+                    staffCategory = 'office';
+                } else if (['site_manager', 'site_supervisor', 'site manager', 'site supervisor'].includes(userRole)) {
+                    staffCategory = 'site';
+                } else {
+                    staffCategory = 'field';
+                }
+
+                const userRules = settings[staffCategory];
+                const shiftThreshold = userRules?.dailyWorkingHours?.max || 8;
+                setThreshold(shiftThreshold);
 
                 let totalOT = 0;
                 Object.values(eventsByDay).forEach(dayEvents => {
@@ -178,39 +209,19 @@ const LeaveDashboard: React.FC = () => {
                     });
 
                     const hours = totalMinutes / 60;
-                    if (hours > 8) {
-                        totalOT += (hours - 8);
+                    if (hours > shiftThreshold) {
+                        totalOT += (hours - shiftThreshold);
                     }
                 });
                 setCalculatedOTHours(parseFloat(totalOT.toFixed(1)));
-            }
 
-            // Fetch Holiday Selection Settings
-            const settings = await api.getAttendanceSettings();
-            
-            // Map User Role to Staff Category (office, field, site)
-            let staffCategory: keyof AttendanceSettings = 'field';
-            const userRole = user.role.toLowerCase();
-            if ([
-                'admin', 'hr', 'finance', 'developer', 'management', 'office_staff', 
-                'back_office_staff', 'bd', 'operation_manager', 'field_staff',
-                'finance_manager', 'hr_ops', 'business developer', 'unverified',
-                'operation manager', 'field staff', 'finance manager', 'hr ops'
-            ].includes(userRole)) {
-                staffCategory = 'office';
-            } else if (['site_manager', 'site_supervisor', 'site manager', 'site supervisor'].includes(userRole)) {
-                staffCategory = 'site';
-            } else {
-                staffCategory = 'field';
-            }
-
-            const userRules = settings[staffCategory];
-            setIsHolidaySelectionEnabled(userRules.enableCustomHolidays || false);
-            setActiveHolidayPool(userRules.holidayPool || HOLIDAY_SELECTION_POOL);
-            
-            if (userRules.enableCustomHolidays) {
-                const selections = await api.getUserHolidays(user.id);
-                setUserHolidays(selections);
+                setIsHolidaySelectionEnabled(userRules?.enableCustomHolidays || false);
+                setActiveHolidayPool(userRules?.holidayPool || HOLIDAY_SELECTION_POOL);
+                
+                if (userRules?.enableCustomHolidays) {
+                    const selections = await api.getUserHolidays(user.id);
+                    setUserHolidays(selections);
+                }
             }
 
         } catch (error: any) {
@@ -295,16 +306,31 @@ const LeaveDashboard: React.FC = () => {
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-primary-text">My Leave Requests</h2>
                 {!isMobile && (
-                    <Button onClick={handleNewRequest}><Plus className="mr-2 h-4" /> New Request</Button>
+                    <div className="flex gap-2">
+                        <Button onClick={handleNewRequest}><Plus className="mr-2 h-4" /> New Request</Button>
+                    </div>
                 )}
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6 justify-items-center md:justify-items-start">
                 {balanceCards.map(b => <LeaveBalanceCard key={b.title} {...b} />)}
-                {/* Show Overtime card only for field staff */}
-                {user?.role === 'field_staff' && (
-                    <LeaveBalanceCard title="Overtime Hours" value={`${calculatedOTHours} hrs`} icon={Clock} />
-                )}
+                {/* Show Overtime card for everyone now that we track it persistent */}
+                <div className="relative group w-full">
+                    <LeaveBalanceCard 
+                        title="Monthly OT Hours" 
+                        value={formatPreciseHours(user?.monthlyOtHours || 0)} 
+                        icon={Clock} 
+                    />
+                    <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="bg-popover text-popover-foreground text-[10px] p-2 rounded shadow-lg border border-border w-48 pointer-events-none">
+                            <p className="font-bold border-b border-border mb-1 pb-1">OT Accumulation</p>
+                            <p>Current Bank: <span className="text-accent-dark font-bold">
+                                {formatPreciseHours(user?.otHoursBank || 0)}
+                            </span></p>
+                            <p className="mt-1 text-muted-foreground italic">Every 8h of accumulated OT is automatically converted to 1 Comp Off.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Holiday Selection Section */}

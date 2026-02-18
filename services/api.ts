@@ -271,8 +271,25 @@ const fetchAll = async <T,>(queryBuilder: any, pageSize = 1000): Promise<T[]> =>
 };
 
 export const api = {
-  toSnakeCase,
   toCamelCase,
+  handleError: (error: any): never => {
+    if (!error) throw new Error('An unknown error occurred.');
+    
+    // Check for definitive auth failures (400 - Invalid Token/Expired Session)
+    const isAuthError = 
+        (error.status === 400 || error.code === '400') && 
+        (error.message?.includes('invalid') || error.message?.includes('expired') || error.message?.includes('token'));
+    
+    const isUnauthorized = error.status === 401 || error.code === '401';
+    
+    if (isAuthError || isUnauthorized) {
+        console.error('CRITICAL AUTH ERROR (400/401) DETECTED:', error.message);
+        // We trigger an event that authStore or App.tsx can handle
+        window.dispatchEvent(new CustomEvent('supabase-auth-failure', { detail: error }));
+    }
+    
+    throw error;
+  },
   // --- Initial Data Loading ---
   getInitialAppData: async (): Promise<{ settings: any; roles: Role[]; holidays: Holiday[] }> => {
     const { data: settingsData, error: settingsError } = await supabase
@@ -280,14 +297,14 @@ export const api = {
       .select('*')
       .eq('id', 'singleton')
       .maybeSingle();
-    if (settingsError) throw new Error('Failed to fetch core application settings.');
+    if (settingsError) return api.handleError(settingsError);
     if (!settingsData) throw new Error('Core application settings are missing from the database.');
 
     const { data: rolesData, error: rolesError } = await supabase.from('roles').select('*');
-    if (rolesError) throw new Error('Failed to fetch user roles.');
+    if (rolesError) return api.handleError(rolesError);
 
     const { data: holidaysData, error: holidaysError } = await supabase.from('holidays').select('*');
-    if (holidaysError) throw new Error('Failed to fetch holidays.');
+    if (holidaysError) return api.handleError(holidaysError);
 
     return {
       settings: toCamelCase(settingsData),
@@ -1852,7 +1869,7 @@ export const api = {
   },
   getAttendanceSettings: async (): Promise<AttendanceSettings> => {
     const { data, error } = await supabase.from('settings').select('attendance_settings').eq('id', 'singleton').single();
-    if (error) throw error;
+    if (error) return api.handleError(error);
     if (!data?.attendance_settings) throw new Error('Attendance settings are not configured.');
     return toCamelCase(data.attendance_settings) as AttendanceSettings;
   },
@@ -2064,7 +2081,10 @@ export const api = {
         .lte('timestamp', `${currentYear}-12-31`)
     ]);
 
-    if (leavesError || compOffError || otError || holidaysError || eventsError) throw new Error("Failed to fetch all leave balance data.");
+    if (leavesError || compOffError || otError || holidaysError || eventsError) {
+      const firstError = leavesError || compOffError || otError || holidaysError || eventsError;
+      return api.handleError(firstError);
+    }
 
     // Expiry Check Logic Helper
     const isExpired = (expiryDate?: string) => expiryDate ? todayStr > expiryDate : false;
@@ -2405,7 +2425,7 @@ export const api = {
     }
 
     const { data, count, error } = await query.order('start_date', { ascending: false });
-    if (error) throw error;
+    if (error) return api.handleError(error);
     
     // Get unique approver IDs
     const approverIds = [...new Set((data || []).map(item => item.current_approver_id).filter(Boolean))];
@@ -2510,7 +2530,7 @@ export const api = {
   },
   getNotifications: async (userId: string): Promise<Notification[]> => {
     const { data, error } = await supabase.from('notifications').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) return api.handleError(error);
     return (data || []).map(toCamelCase);
   },
   createNotification: async (data: Omit<Notification, 'id' | 'createdAt' | 'isRead'>): Promise<Notification> => {
@@ -2530,7 +2550,7 @@ export const api = {
 
   getNotificationRules: async (): Promise<NotificationRule[]> => {
     const { data, error } = await supabase.from('notification_rules').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) return api.handleError(error);
     return data.map(toCamelCase);
   },
 
@@ -3806,7 +3826,7 @@ export const api = {
     // Get the user's reporting manager
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('reporting_manager_id')
+      .select('name, reporting_manager_id')
       .eq('id', userId)
       .single();
 
@@ -3815,10 +3835,12 @@ export const api = {
       return;
     }
 
+    const name = userName || userData.name || 'An employee';
+
     await api.createNotification({
       userId: userData.reporting_manager_id,
       title: '📱 Device Change Detected',
-      message: `${userName} logged in from a new device. Previous device: ${oldDevice}, New device: ${newDevice}`,
+      message: `${name} logged in from a new device. Previous device: ${oldDevice}, New device: ${newDevice}`,
       type: 'info',
       link: `/user-management`,
     });

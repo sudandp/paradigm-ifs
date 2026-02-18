@@ -85,7 +85,7 @@ const MobileLayout: React.FC = () => {
 
             {/* Notification Panel Overlay */}
             {isPanelOpen && (
-                <div className="fixed inset-0 z-[100] animate-in slide-in-from-right duration-300">
+                <div className="fixed inset-0 z-[100] animate-slide-in-right">
                     <NotificationPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} isMobile={true} />
                 </div>
             )}

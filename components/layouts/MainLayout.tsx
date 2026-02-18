@@ -327,14 +327,14 @@ const MainLayout: React.FC = () => {
 
             {/* Notification Sidebar - Desktop (> 1024px) */}
             {isDesktop && isPanelOpen && (
-                <aside className="w-[400px] flex-shrink-0 bg-white border-l border-gray-200/60 rounded-3xl overflow-hidden shadow-sm animate-in slide-in-from-right duration-300">
+                <aside className="w-[400px] flex-shrink-0 bg-white border-l border-gray-200/60 rounded-3xl overflow-hidden shadow-sm animate-slide-in-right">
                     <NotificationPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} isMobile={false} />
                 </aside>
             )}
 
             {/* Notification Overlay - Mobile & Tablet */}
             {(isMobile || isTablet) && isPanelOpen && (
-                <div className={`fixed inset-y-0 right-0 z-[100] animate-in slide-in-from-right duration-300 ${isMobile ? 'w-full' : 'w-[400px]'}`}>
+                <div className={`fixed inset-y-0 right-0 z-[100] animate-slide-in-right ${isMobile ? 'w-full' : 'w-[400px]'}`}>
                     <NotificationPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} isMobile={isMobile} />
                 </div>
             )}

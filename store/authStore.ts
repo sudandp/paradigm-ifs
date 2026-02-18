@@ -107,6 +107,8 @@ interface AuthState {
     /** Derived: true when user has an unused approved unlock available. */
     isPunchUnlocked: boolean;
     isFieldCheckedIn: boolean;
+    isFieldCheckedOut: boolean;
+    forceLogout: (reason?: string) => Promise<void>;
 }
 
 // Helper for time-based greetings
@@ -140,6 +142,14 @@ export const useAuthStore = create<AuthState>()(
         dailyUnlockRequestCount: 0,
         isPunchUnlocked: false,
         isFieldCheckedIn: false,
+        isFieldCheckedOut: false,
+        forceLogout: async (reason) => {
+            console.log(`Force logout triggered. Reason: ${reason || 'Unknown'}`);
+            set({ error: reason || 'Your session has expired. Please log in again.', loading: false, user: null });
+            await Preferences.remove({ key: 'supabase.auth.rememberMe' });
+            await authService.signOut();
+            get().resetAttendance();
+        },
 
         isLoginAnimationPending: false,
         setLoginAnimationPending: (pending) => set({ isLoginAnimationPending: pending }),
@@ -163,7 +173,8 @@ export const useAuthStore = create<AuthState>()(
             approvedUnlockCount: 0,
             dailyUnlockRequestCount: 0,
             isPunchUnlocked: false,
-            isFieldCheckedIn: false
+            isFieldCheckedIn: false,
+            isFieldCheckedOut: false
         }),
         setError: (error) => set({ error }),
 
@@ -173,6 +184,8 @@ export const useAuthStore = create<AuthState>()(
             // Ensure a clean state before attempting login. This helps if there's a stale session
             // lingering that might confuse the client or the user.
             try {
+                // Clear all persistent tokens to ensure a completely fresh start
+                await Preferences.remove({ key: 'supabase.auth.rememberMe' });
                 await authService.signOut();
             } catch (e) {
                 // Ignore signout errors, we just want to try to clear state
@@ -320,10 +333,16 @@ export const useAuthStore = create<AuthState>()(
                     console.error('Failed to send logout farewell notification', e);
                 }
             }
-            // Clear the long-term token on logout
+            // Clear all persistent tokens on logout
             await Preferences.remove({ key: 'supabase.auth.rememberMe' });
-            // The onAuthStateChange listener in App.tsx will call setUser(null).
+            await Preferences.remove({ key: 'rememberedEmail' });
+            
+            // Trigger the actual sign out
             await authService.signOut();
+            
+            // Local state cleanup
+            get().resetAttendance();
+            set({ user: null, error: null, loading: false });
         },
 
         updateUserProfile: (updates) => set((state) => ({
@@ -377,7 +396,8 @@ export const useAuthStore = create<AuthState>()(
                         approvedUnlockCount,
                         dailyUnlockRequestCount,
                         isPunchUnlocked: approvedUnlockCount > 0,
-                        isFieldCheckedIn: false
+                        isFieldCheckedIn: false,
+                        isFieldCheckedOut: false
                     });
                     return;
                 }
@@ -430,7 +450,8 @@ export const useAuthStore = create<AuthState>()(
                     approvedUnlockCount,
                     dailyUnlockRequestCount,
                     isPunchUnlocked,
-                    isFieldCheckedIn
+                    isFieldCheckedIn,
+                    isFieldCheckedOut: lastFieldPunchEvent ? (lastFieldPunchEvent.type === 'check-out') : false
                 });
             } catch (error) {
                 console.error("Failed to check attendance status:", error);

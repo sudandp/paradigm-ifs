@@ -288,7 +288,7 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
                         ) : (
                             <>
                                 <Save className="w-4 h-4 mr-2" />
-                                Add Entry
+                                Add Punch
                             </>
                         )}
                     </button>

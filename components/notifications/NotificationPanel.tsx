@@ -188,7 +188,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         } catch (err) {
             console.error('Error fetching pending approvals:', err);
         }
-    }, [user, api]);
+    }, [user]);
 
     React.useEffect(() => {
         if (isOpen) {
@@ -291,14 +291,17 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         return groups.filter(g => g.items.length > 0);
     }, [notifications, currentPage, pageSize]);
 
-    const totalPages = Math.ceil(notifications.length / pageSize);
+    const filteredNotifCount = notifications.filter(notif => 
+        notif.type !== 'security' && !notif.message.includes('Field attendance violation')
+    ).length;
+    const totalPages = Math.ceil(filteredNotifCount / pageSize);
 
     if (!isOpen) return null;
 
     return (
-        <div className={`h-full w-full flex flex-col animate-in slide-in-from-right duration-300 ${isMobile ? 'bg-[#0A3D2E]' : 'bg-white'}`}>
+        <div className={`h-full w-full flex flex-col animate-slide-in-right ${isMobile ? 'bg-[#0A3D2E]' : 'bg-white'}`}>
             {/* Header */}
-            <div className={`flex items-center justify-between px-6 pt-24 pb-5 border-b ${isMobile ? 'bg-[#0A3D2E] border-white/10' : 'bg-white border-gray-100'}`}>
+            <div className={`flex items-center justify-between px-6 pt-6 pb-5 border-b ${isMobile ? 'bg-[#0A3D2E] border-white/10' : 'bg-white border-gray-100'}`}>
                 <div className="flex items-center gap-3">
                     <h4 className={`font-bold text-xl ${isMobile ? 'text-white' : 'text-gray-900'}`}>Notifications</h4>
                     {unreadCount > 0 && (
@@ -811,7 +814,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                     </div>
                     <div className="flex items-center gap-3">
                         <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${isMobile ? 'bg-white/10 text-white' : 'bg-sky-100 text-sky-700'}`}>
-                            {notifications.length}
+                            {filteredNotifCount}
                         </span>
                         {expandedSections.general ? <ChevronUp className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} /> : <ChevronDown className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} />}
                     </div>

@@ -88,8 +88,8 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
       case 'limit_reached':
         return {
           title: 'Device Limit Reached',
-          description: customMessage || `You have reached your limit for ${deviceType} devices. You must remove an old device below to register this one.`,
-          actionText: 'Try Again',
+          description: customMessage || `You have reached your limit of authorized ${deviceType} sessions. You can remove an older device below to continue, or request a limit increase from your manager.`,
+          actionText: 'Request Access',
           showRequestButton: true,
         };
       case 'pending':
