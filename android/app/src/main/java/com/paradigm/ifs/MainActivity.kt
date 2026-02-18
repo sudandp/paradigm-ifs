@@ -106,6 +106,10 @@ class MainActivity : AppCompatActivity() {
         // Zoom control
         settings.builtInZoomControls = true
         settings.displayZoomControls = false
+        
+        // Enable Geolocation
+        settings.setGeolocationEnabled(true)
+        settings.setGeolocationDatabasePath(applicationContext.filesDir.path)
 
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -142,6 +146,14 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     progressBar.visibility = View.VISIBLE
                 }
+            }
+            
+            override fun onGeolocationPermissionsShowPrompt(
+                origin: String?,
+                callback: GeolocationPermissions.Callback?
+            ) {
+                // Grant permission to JavaScript immediately as native permissions are checked on startup
+                callback?.invoke(origin, true, false)
             }
 
             // For Android 5.0+
