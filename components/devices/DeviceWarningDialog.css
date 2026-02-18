@@ -241,17 +241,65 @@
 
 /* Base Responsive */
 @media (max-width: 767px) {
+    .device-warning-card {
+        max-width: 100% !important;
+        margin: 0 12px !important;
+    }
+
     .dw-device-card {
         gap: 8px !important;
-        padding: 10px !important;
+        padding: 10px 12px !important;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: space-between !important;
     }
+
     .dw-device-card-icon {
         width: 36px !important;
         height: 36px !important;
         min-width: 36px !important;
+        flex-shrink: 0 !important;
     }
-    .dw-btn-remove-compact {
-        padding: 6px 12px !important;
+
+    .dw-device-card-info {
+        flex: 1 !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .dw-device-card-name {
+        font-size: 13px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    /* Override global button[class*="remove"] mobile styles */
+    .dw-btn-remove-compact,
+    button.dw-btn-remove-compact,
+    .dw-device-card .dw-btn-remove-compact,
+    .dw-device-card button.dw-btn-remove-compact,
+    .device-warning-card .dw-btn-remove-compact {
+        position: static !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: auto !important;
+        height: auto !important;
+        min-width: auto !important;
+        padding: 6px 14px !important;
         font-size: 12px !important;
+        font-weight: 600 !important;
+        border-radius: 10px !important;
+        background-color: #1a4d2e !important;
+        color: #ffffff !important;
+        border: none !important;
+        box-shadow: none !important;
+        transform: none !important;
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+        cursor: pointer !important;
     }
 }

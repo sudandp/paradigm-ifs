@@ -26,6 +26,7 @@ import {
   generateDeviceName,
   detectDeviceType,
 } from '../utils/deviceFingerprint';
+import { api } from './api';
 
 /**
  * Get device limits for a specific staff category
@@ -40,8 +41,8 @@ export async function getDeviceLimits(roleId: string): Promise<DeviceLimitsConfi
     
     if (error) throw error;
     
-    const attendanceSettings = settings?.attendance_settings || {};
-    const deviceLimits = attendanceSettings.deviceLimits || {};
+    
+    const attendanceSettings = api.toCamelCase(settings?.attendance_settings || {});
     
     // Map role to staff category
     const normalizedRole = (roleId || '').toLowerCase();
@@ -273,56 +274,14 @@ export async function registerDevice(
           message: 'Device registration is pending approval',
         };
       } else if (existingCheck.status === 'revoked') {
-        // If revoked, check if we can re-activate (within limits)
-        const limits = await getDeviceLimits(roleId);
-        const currentCount = await getActiveDeviceCount(userId, deviceType);
-        const limit = limits[deviceType];
-        
-        if (currentCount < limit) {
-          // Re-activate
-          const { data, error } = await supabase
-            .from('user_devices')
-            .update({
-              status: 'active',
-              last_used_at: new Date().toISOString(),
-              device_info: deviceInfo,
-              approved_by_id: userId,
-              approved_at: new Date().toISOString(),
-            })
-            .eq('id', existingCheck.device.id)
-            .select()
-            .single();
-          
-          if (error) throw error;
-          
-          await logDeviceActivity(userId, data.id, 'registration', deviceInfo);
-          
-          return {
-            success: true,
-            device: {
-              ...data,
-              userId: data.user_id,
-              deviceType: data.device_type,
-              deviceIdentifier: data.device_identifier,
-              deviceName: data.device_name,
-              deviceInfo: data.device_info || {},
-              registeredAt: data.registered_at,
-              lastUsedAt: data.last_used_at,
-              approvedById: data.approved_by_id,
-              approvedAt: data.approved_at,
-              createdAt: data.created_at,
-              updatedAt: data.updated_at,
-            },
-            requiresApproval: false,
-            message: 'Device re-activated successfully',
-          };
-        } else {
-          return {
-            success: false,
-            requiresApproval: true,
-            message: `This device was previously revoked. You have reached your limit of ${limit} ${deviceType} device(s). Please remove an old device to re-register this one.`,
-          };
-        }
+        // Revoked devices ALWAYS require admin approval to re-activate
+        const request = await createDeviceChangeRequest(userId, deviceType, normalizedId, deviceName, deviceInfo);
+        return {
+          success: false,
+          request,
+          requiresApproval: true,
+          message: 'This device was previously revoked. A request has been sent for admin approval.',
+        };
       }
     }
 
@@ -378,11 +337,13 @@ export async function registerDevice(
         message: 'Device registered successfully',
       };
     } else {
-      // Exceeds limit - provide clear message for self-management
+      // Exceeds limit - create an approval request for admin/HR
+      const request = await createDeviceChangeRequest(userId, deviceType, normalizedId, deviceName, deviceInfo);
       return {
         success: false,
+        request,
         requiresApproval: true,
-        message: `You have reached your limit of ${limit} ${deviceType} device(s). Please remove an old device from the list to register this one.`,
+        message: `You have reached your limit of ${limit} ${deviceType} device(s). A request has been sent for admin approval.`,
       };
     }
   } catch (error) {

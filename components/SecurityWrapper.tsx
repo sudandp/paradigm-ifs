@@ -4,7 +4,7 @@ import { useSecurityCheck } from '../hooks/useSecurityCheck';
 import SecurityWarningModal from '../components/ui/SecurityWarningModal';
 import { api } from '../services/api';
 import { isAdmin } from '../utils/auth';
-import { getCurrentDevice, registerDevice, getDeviceLimits } from '../services/deviceService';
+import { getCurrentDevice, registerDevice, getDeviceLimits, createDeviceChangeRequest } from '../services/deviceService';
 import DeviceWarningDialog from './devices/DeviceWarningDialog';
 import { DeviceType } from '../types';
 
@@ -26,6 +26,7 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
     const [deviceInfo, setDeviceInfo] = useState<{ id: string, name: string, type: DeviceType } | null>(null);
     const [deviceMessage, setDeviceMessage] = useState('');
     const [limits, setLimits] = useState<{ web: number; android: number; ios: number }>({ web: 1, android: 1, ios: 1 });
+    const [isRequestingAccess, setIsRequestingAccess] = useState(false);
 
     // Track which user.id we've already checked to prevent re-running on profile updates
     const lastCheckedUserId = useRef<string | null>(null);
@@ -84,38 +85,25 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
                     setDeviceStatus('authorized');
                     // Mark this user as checked
                     lastCheckedUserId.current = user.id;
+                } else if (result.request || result.requiresApproval) {
+                    // registerDevice() already created a device_change_request,
+                    // so show the pending/approval status directly
+                    setDeviceStatus('pending');
+                    setDeviceInfo({ 
+                       id: result.request?.id || '', 
+                       name: deviceName, 
+                       type: deviceType as DeviceType 
+                    });
+                    setDeviceMessage(result.message);
                 } else {
-                    // Registration failed or pending approval
-                    // Order matters: check for specific errors before the generic requiresApproval flag
-                    if (result.message.includes('revoked')) {
-                        setDeviceStatus('revoked');
-                        setDeviceInfo({ 
-                           id: '', 
-                           name: deviceName, 
-                           type: deviceType as DeviceType 
-                        });
-                        setDeviceMessage(result.message);
-                    } else if (result.message.includes('limit of')) {
-                        setDeviceStatus('limit_reached');
-                        setDeviceInfo({ 
-                           id: '', 
-                           name: deviceName, 
-                           type: deviceType as DeviceType 
-                        });
-                        setDeviceMessage(result.message);
-                    } else if (result.requiresApproval) {
-                        setDeviceStatus('pending');
-                        setDeviceInfo({ 
-                            id: result.request?.id || '', 
-                            name: deviceName, 
-                            type: deviceType as DeviceType 
-                        });
-                        setDeviceMessage(result.message);
-                    } else {
-                        // Other error
-                        setDeviceStatus('pending'); // Treat as pending/blocked
-                        setDeviceMessage(result.message);
-                    }
+                    // Other error (no request created)
+                    setDeviceStatus('revoked');
+                    setDeviceInfo({ 
+                       id: '', 
+                       name: deviceName, 
+                       type: deviceType as DeviceType 
+                    });
+                    setDeviceMessage(result.message || 'Unable to register device. Please try again.');
                 }
 
             } catch (error) {
@@ -129,6 +117,36 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
 
         checkDevice();
     }, [user?.id]); // Only depend on user.id, not full user object
+
+    // Handler for "Request Access" button - creates a device change request
+    const handleRequestAccess = async () => {
+        if (!user) return;
+        try {
+            setIsRequestingAccess(true);
+            const { deviceIdentifier, deviceType, deviceName, deviceInfo: dInfo } = await getCurrentDevice();
+            await createDeviceChangeRequest(
+                user.id,
+                deviceType as DeviceType,
+                deviceIdentifier,
+                deviceName,
+                dInfo
+            );
+            // Switch to pending status after successful request
+            setDeviceStatus('pending');
+            setDeviceMessage('Your device access request has been submitted. Please wait for admin/HR approval.');
+        } catch (e: any) {
+            console.error('Failed to request access:', e);
+            // If it's a duplicate request error, show pending anyway
+            if (e?.message?.includes('duplicate') || e?.code === '23505') {
+                setDeviceStatus('pending');
+                setDeviceMessage('You already have a pending request. Please wait for admin/HR approval.');
+            } else {
+                setDeviceMessage('Failed to submit request. Please try again.');
+            }
+        } finally {
+            setIsRequestingAccess(false);
+        }
+    };
 
     // 1. Check basic security (Dev mode / Location spoofing)
     if (user && !isExemptFromSecurityChecks && !securityCheck.isSecure) {
@@ -148,11 +166,9 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
                 deviceType={deviceInfo?.type || 'web'}
                 limits={limits}
                 customMessage={deviceMessage}
+                isRequestingAccess={isRequestingAccess}
                 onLogout={() => useAuthStore.getState().logout()}
-                onRequestAccess={() => {
-                     // Reload to check status again
-                     window.location.reload();
-                }}
+                onRequestAccess={handleRequestAccess}
             />
         );
     }
