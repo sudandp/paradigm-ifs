@@ -2155,49 +2155,51 @@ const AttendanceDashboard: React.FC = () => {
             {/* Filters Section */}
             <div className="bg-transparent md:bg-white p-0 md:p-4 rounded-xl shadow-none md:shadow-sm border-none md:border md:border-gray-100 flex flex-col gap-6">
                 
-                {/* Date Pills - Scrollable on mobile */}
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none no-scrollbar">
-                    {['Today', 'Last 7 Days', 'This Month'].map(filter => (
-                        <Button
-                            key={filter}
-                            type="button"
-                            onClick={() => handleSetDateFilter(filter)}
-                            className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all ${
-                                activeDateFilter === filter
-                                    ? "bg-[#22c55e] text-white shadow-md border-none"
-                                    : "bg-[#0b291a] md:bg-white text-gray-300 md:text-gray-700 border border-[#1a3d2c] md:border-gray-300 hover:opacity-80"
-                            }`}
-                        >
-                            {filter}
-                        </Button>
-                    ))}
-                    <div className="relative flex-shrink-0" ref={datePickerRef}>
-                         <Button
-                            type="button"
-                            onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                            className={`whitespace-nowrap flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all ${
-                                activeDateFilter === 'Custom'
-                                    ? "bg-[#22c55e] text-white shadow-md border-none"
-                                    : "bg-[#0b291a] md:bg-white text-gray-300 md:text-gray-700 border border-[#1a3d2c] md:border-gray-300 hover:opacity-80"
-                            }`}
-                        >
-                            <Calendar className="h-4 w-4" />
-                            {activeDateFilter === 'Custom'
-                                ? `${format(dateRange.startDate!, 'dd MMM')} - ${format(dateRange.endDate!, 'dd MMM')}`
-                                : 'Custom Range'}
-                        </Button>
-                        {isDatePickerOpen && (
-                            <div className="absolute top-full left-0 mt-2 z-50 bg-[#0b291a] md:bg-card border border-[#1a3d2c] md:border-border rounded-xl shadow-xl p-2 min-w-[300px]">
-                                <DateRangePicker
-                                    onChange={handleCustomDateChange}
-                                    months={1}
-                                    ranges={dateRangeArray}
-                                    direction="horizontal"
-                                    maxDate={new Date()}
-                                />
-                            </div>
-                        )}
+                {/* Date Pills - Scrollable on mobile, with date picker outside scroll container to prevent clipping */}
+                <div className="relative" ref={datePickerRef}>
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none no-scrollbar">
+                        {['Today', 'Last 7 Days', 'This Month'].map(filter => (
+                            <Button
+                                key={filter}
+                                type="button"
+                                onClick={() => handleSetDateFilter(filter)}
+                                className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all ${
+                                    activeDateFilter === filter
+                                        ? "bg-[#22c55e] text-white shadow-md border-none"
+                                        : "bg-[#0b291a] md:bg-white text-gray-300 md:text-gray-700 border border-[#1a3d2c] md:border-gray-300 hover:opacity-80"
+                                }`}
+                            >
+                                {filter}
+                            </Button>
+                        ))}
+                        <div className="flex-shrink-0">
+                             <Button
+                                type="button"
+                                onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+                                className={`whitespace-nowrap flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all ${
+                                    activeDateFilter === 'Custom'
+                                        ? "bg-[#22c55e] text-white shadow-md border-none"
+                                        : "bg-[#0b291a] md:bg-white text-gray-300 md:text-gray-700 border border-[#1a3d2c] md:border-gray-300 hover:opacity-80"
+                                }`}
+                            >
+                                <Calendar className="h-4 w-4" />
+                                {activeDateFilter === 'Custom'
+                                    ? `${format(dateRange.startDate!, 'dd MMM')} - ${format(dateRange.endDate!, 'dd MMM')}`
+                                    : 'Custom Range'}
+                            </Button>
+                        </div>
                     </div>
+                    {isDatePickerOpen && (
+                        <div className="absolute top-full right-0 mt-2 z-50 bg-[#0b291a] md:bg-card border border-[#1a3d2c] md:border-border rounded-xl shadow-xl p-2 min-w-[300px]">
+                            <DateRangePicker
+                                onChange={handleCustomDateChange}
+                                months={1}
+                                ranges={dateRangeArray}
+                                direction="horizontal"
+                                maxDate={new Date()}
+                            />
+                        </div>
+                    )}
                 </div>
 
                 {/* Dropdowns Grid */}
