@@ -1,0 +1,12 @@
+{
+	"appId": "com.paradigm.ifs",
+	"appName": "Paradigm IFS",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https",
+		"hostname": "paradigm-ifs.vercel.app"
+	},
+	"android": {
+		"allowMixedContent": true
+	}
+}

@@ -511,9 +511,10 @@ export const useAuthStore = create<AuthState>()(
 
                 try {
                     // Stage 1: Primary - Robust Position Acquisition with internal fallbacks
-                    position = await getPrecisePosition(150, 15000);
+                    // 25s timeout gives Android GPS sufficient warmup time (cold start can take 15-30s)
+                    position = await getPrecisePosition(150, 25000);
                 } catch (err: any) {
-                    console.warn('Location acquisition failed:', err.message);
+                    console.warn('[Location] All location acquisition stages failed:', err.message);
                     // Provide a more descriptive fallback than just "GPS Unavailable"
                     const orgSuffix = user.organizationName ? `Near ${user.organizationName} (Estimated)` : 'GPS Unavailable';
                     locationStatus = err.message.includes('permission') 

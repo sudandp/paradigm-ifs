@@ -1,0 +1,1 @@
+import{j as a}from"./index-D5q3SS3D.js";const r=({status:s})=>{const t={pending:"status-chip--pending",verified:"status-chip--verified",rejected:"status-chip--rejected",draft:"status-chip--draft"}[s]||"status-chip--draft";return a.jsx("span",{className:`status-chip ${t}`,children:s})};export{r as S};

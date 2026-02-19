@@ -49,8 +49,11 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string> 
 /**
  * Attempt to obtain a high‑accuracy geolocation fix with multi-stage fallbacks.
  * Skips Capacitor permission checks on web to avoid "Not implemented" errors.
+ *
+ * Android-optimized: Allows cached positions in fallbacks and includes a
+ * navigator.geolocation WebView fallback for maximum reliability.
  */
-export async function getPrecisePosition(accuracyThreshold: number = 50, timeoutMs: number = 10000): Promise<GeolocationPosition> {
+export async function getPrecisePosition(accuracyThreshold: number = 50, timeoutMs: number = 20000): Promise<GeolocationPosition> {
   // Accessing permissions via Capacitor is only necessary/supported on native platforms (iOS/Android).
   if (Capacitor.isNativePlatform()) {
     try {
@@ -69,47 +72,108 @@ export async function getPrecisePosition(accuracyThreshold: number = 50, timeout
   return new Promise(async (resolve, reject) => {
     let bestPos: GeolocationPosition | null = null;
     let watchId: string | null = null;
+    let resolved = false;
+
+    const safeResolve = (pos: GeolocationPosition) => {
+      if (resolved) return;
+      resolved = true;
+      resolve(pos);
+    };
 
     const timer = setTimeout(async () => {
       if (watchId) {
-        await Geolocation.clearWatch({ id: watchId });
+        try { await Geolocation.clearWatch({ id: watchId }); } catch (_) {}
       }
 
       if (bestPos) {
-        resolve(bestPos);
-      } else {
+        safeResolve(bestPos);
+        return;
+      }
+
+      // Fallback chain: try multiple strategies with increasing leniency
+      console.warn('[Location] watchPosition timed out, trying fallback chain...');
+
+      // Fallback 1: Low-accuracy (Wi-Fi/Cell tower) — fast on Android
+      try {
+        const pos = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: false,
+          timeout: 8000,
+          maximumAge: 300000 // Accept cached positions up to 5 minutes old
+        });
+        console.log('[Location] Fallback 1 (low-accuracy) succeeded, accuracy:', pos.coords.accuracy);
+        safeResolve(pos as unknown as GeolocationPosition);
+        return;
+      } catch (err) {
+        console.warn('[Location] Fallback 1 (low-accuracy) failed:', err);
+      }
+
+      // Fallback 2: High-accuracy with generous cache
+      try {
+        const pos = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 8000,
+          maximumAge: 300000 // Accept cached positions up to 5 minutes old
+        });
+        console.log('[Location] Fallback 2 (high-accuracy cached) succeeded, accuracy:', pos.coords.accuracy);
+        safeResolve(pos as unknown as GeolocationPosition);
+        return;
+      } catch (err) {
+        console.warn('[Location] Fallback 2 (high-accuracy cached) failed:', err);
+      }
+
+      // Fallback 3: navigator.geolocation WebView API — this is what web-app-to-app converters use
+      // and is often more reliable on Android because it uses the browser engine's location stack
+      // (Wi-Fi triangulation, cell towers, cached GPS from Google Play Services)
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
         try {
-          const pos = await Geolocation.getCurrentPosition({
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 30000
-          });
-          resolve(pos as unknown as GeolocationPosition);
-        } catch (err) {
-          try {
-            const pos = await Geolocation.getCurrentPosition({
+          const webPos = await new Promise<GeolocationPosition>((res, rej) => {
+            navigator.geolocation.getCurrentPosition(res, rej, {
               enableHighAccuracy: false,
-              timeout: 5000,
-              maximumAge: 60000
+              timeout: 10000,
+              maximumAge: 300000
             });
-            resolve(pos as unknown as GeolocationPosition);
-          } catch (finalErr) {
-            reject(new Error('GPS Signal Weak. Please ensure you are outdoors or near a window.'));
-          }
+          });
+          console.log('[Location] Fallback 3 (WebView navigator.geolocation) succeeded, accuracy:', webPos.coords.accuracy);
+          safeResolve(webPos);
+          return;
+        } catch (err) {
+          console.warn('[Location] Fallback 3 (WebView navigator.geolocation) failed:', err);
         }
+
+        // Fallback 3b: WebView high-accuracy as absolute last resort
+        try {
+          const webPos = await new Promise<GeolocationPosition>((res, rej) => {
+            navigator.geolocation.getCurrentPosition(res, rej, {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 600000 // Accept cached up to 10 minutes
+            });
+          });
+          console.log('[Location] Fallback 3b (WebView high-accuracy) succeeded, accuracy:', webPos.coords.accuracy);
+          safeResolve(webPos);
+          return;
+        } catch (err) {
+          console.warn('[Location] Fallback 3b (WebView high-accuracy) failed:', err);
+        }
+      }
+
+      if (!resolved) {
+        reject(new Error('GPS Signal Weak. Please ensure you are outdoors or near a window and that location is enabled.'));
       }
     }, timeoutMs);
 
     try {
+      // Start watching for position updates with Capacitor
+      // Use maximumAge: 60000 to allow a reasonably recent cached position as initial fix
       watchId = await Geolocation.watchPosition(
         {
           enableHighAccuracy: true,
           timeout: timeoutMs,
-          maximumAge: 0
+          maximumAge: 60000 // Allow cached position up to 1 minute for faster initial fix
         },
         (position, err) => {
           if (err) {
-            console.warn('watchPosition error:', err);
+            console.warn('[Location] watchPosition error:', err);
             return;
           }
 
@@ -117,19 +181,21 @@ export async function getPrecisePosition(accuracyThreshold: number = 50, timeout
             const pos = position as unknown as GeolocationPosition;
             if (!bestPos || (pos.coords.accuracy && pos.coords.accuracy < (bestPos.coords.accuracy || Infinity))) {
               bestPos = pos;
+              console.log('[Location] watchPosition got fix, accuracy:', pos.coords.accuracy);
             }
             if (pos.coords.accuracy && pos.coords.accuracy <= accuracyThreshold) {
               clearTimeout(timer);
               if (watchId) {
-                Geolocation.clearWatch({ id: watchId });
+                Geolocation.clearWatch({ id: watchId }).catch(() => {});
               }
-              resolve(pos);
+              safeResolve(pos);
             }
           }
         }
       );
     } catch (err) {
-      console.error('Failed to start watchPosition:', err);
+      console.error('[Location] Failed to start watchPosition:', err);
+      // Don't reject here — the timer fallback chain will handle recovery
     }
   });
 }
