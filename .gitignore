@@ -37,6 +37,9 @@ android/local.properties
 android/captures/
 android/*.iml
 android/.idea/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+ios/App/App/public/
 
 # iOS build files
 ios/App/build/
