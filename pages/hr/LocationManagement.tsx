@@ -67,14 +67,18 @@ const LocationManagement: React.FC = () => {
     const loadData = async () => {
       try {
         const [locs, usr] = await Promise.all([api.getLocations(), api.getUsers()]);
-        setLocations(locs);
+        // Sort client-side as well to ensure newest are always at top
+        const sortedLocs = locs.sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        });
+        setLocations(sortedLocs);
         setUsers(usr);
       } catch (err) {
         console.error(err);
         setToast({ message: 'Failed to load locations or users.', type: 'error' });
       } finally {
-        // Minimum 10 second loading time
-        await new Promise(resolve => setTimeout(resolve, 10000));
         setIsLoading(false);
       }
     };
@@ -95,7 +99,12 @@ const LocationManagement: React.FC = () => {
   const refreshLocations = async () => {
     try {
       const locs = await api.getLocations();
-      setLocations(locs);
+      const sortedLocs = locs.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+      setLocations(sortedLocs);
     } catch (err) {
       console.error(err);
       setToast({ message: 'Failed to refresh locations.', type: 'error' });
@@ -188,6 +197,7 @@ const LocationManagement: React.FC = () => {
       setNewLatitude('');
       setNewLongitude('');
       setNewAddress('');
+      setCurrentPage(1);
       await refreshLocations();
     } catch (err: any) {
       console.error(err);
@@ -345,7 +355,7 @@ const LocationManagement: React.FC = () => {
         {/* Existing locations list */}
         <section>
           <h3 className="text-xl font-semibold text-primary-text mb-4 flex items-center">
-            <MapPin className="h-5 w-5 mr-2 text-muted" /> Existing Locations
+            <MapPin className="h-5 w-5 mr-2 text-muted" /> Existing Locations ({locations.length})
           </h3>
 
           <div className="mb-4">

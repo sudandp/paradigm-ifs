@@ -1674,7 +1674,8 @@ export const api = {
     // created_by_user property containing the joined user row.
     const { data, error } = await supabase
       .from('locations')
-      .select('*, created_by_user:created_by (id, name)');
+      .select('*, created_at, created_by_user:created_by (id, name)')
+      .order('created_at', { ascending: false });
     if (error) throw error;
     // Convert to camelCase and hoist the creator name into
     // createdByName for convenience.  Preserve other fields as is.
