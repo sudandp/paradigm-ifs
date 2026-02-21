@@ -16,6 +16,7 @@ import { isAdmin } from '../../utils/auth';
 import Header from './Header';
 import { NotificationPanel } from '../notifications/NotificationPanel';
 import BreakTrackingMonitor from '../attendance/BreakTrackingMonitor';
+import { useSettingsStore } from '../../store/settingsStore';
 
 export interface NavLinkConfig {
     to: string;
@@ -175,6 +176,8 @@ const MainLayout: React.FC = () => {
     const { autoScrollOnHover } = useUiSettingsStore();
     const location = useLocation();
     const { isMobile, isTablet, isDesktop } = useDevice();
+    const settingsStore = useSettingsStore();
+    const appVersion = settingsStore.apiSettings.appVersion || '1.0.0';
 
     const mainContentRef = useRef<HTMLDivElement>(null);
     const pageScrollIntervalRef = useRef<number | null>(null);
@@ -300,13 +303,25 @@ const MainLayout: React.FC = () => {
                         isMobile={isMobile}
                     />
                 </div>
-                <div className={`flex-shrink-0 px-2 pt-2 mt-auto flex items-center ${isMobile ? 'border-t border-transparent' : 'border-t border-border'}`}>
+                <div className={`flex-shrink-0 px-2 py-4 mt-auto flex flex-col items-center gap-2 ${isMobile ? 'border-t border-transparent' : 'border-t border-border'}`}>
+                    {isSidebarExpanded && (
+                        <div className={`text-[11px] font-medium tracking-wider uppercase opacity-40 transition-all duration-300 animate-fade-in ${isMobile ? 'text-white' : 'text-primary-text'}`}>
+                            v{appVersion}
+                        </div>
+                    )}
                     <button
                         onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-                        className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-colors ${isMobile ? 'text-white/70 hover:bg-white/10' : 'text-muted hover:bg-page'}`}
+                        className={`w-full flex items-center justify-center p-2 rounded-xl transition-all duration-200 ${isMobile ? 'text-white/70 hover:bg-white/10' : 'text-muted hover:bg-page active:scale-95'}`}
                         title={!isSidebarExpanded ? 'Expand sidebar' : 'Collapse sidebar'}
                     >
-                        {!isSidebarExpanded ? <ChevronsRight className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
+                        {!isSidebarExpanded ? (
+                            <div className="flex flex-col items-center gap-1.5 font-bold">
+                                <ChevronsRight className="h-5 w-5" />
+                                <span className="text-[8px] tracking-tighter uppercase opacity-30">v{appVersion}</span>
+                            </div>
+                        ) : (
+                            <ChevronsLeft className="h-5 w-5" />
+                        )}
                     </button>
                 </div>
             </aside>

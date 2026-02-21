@@ -197,6 +197,21 @@ export const ApiSettings: React.FC = () => {
                         <p className="text-sm text-muted -mt-2">Manage core system settings and data operations.</p>
                         <div className="space-y-6 pt-4">
                             <Checkbox id="pincode-verification" label="Enable Pincode API Verification" description="Auto-fill City/State from pincode during onboarding." checked={store.address.enablePincodeVerification} onChange={e => store.updateAddressSettings({ enablePincodeVerification: e.target.checked })} />
+                            
+                            <div className={`p-4 border rounded-lg ${isMobile ? 'border-[#1f3d2b] bg-[#041b0f]' : 'border-border bg-gray-50'}`}>
+                                <label htmlFor="app-version" className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Application Version</label>
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                    <Input 
+                                        id="app-version"
+                                        placeholder="e.g., 1.0.0" 
+                                        className="max-w-[150px]"
+                                        value={store.apiSettings.appVersion || ''} 
+                                        onChange={e => store.updateApiSettings({ appVersion: e.target.value })}
+                                    />
+                                    <p className="text-xs text-muted italic">This version is displayed in the sidebar/footer. Ensure it matches the build version for consistency.</p>
+                                </div>
+                            </div>
+
                             <div className={`p-4 border rounded-lg ${isMobile ? 'border-[#1f3d2b] bg-[#041b0f]' : 'border-border bg-gray-50'}`}>
                                 <Checkbox 
                                     id="auto-backup" 

@@ -423,6 +423,7 @@ export interface BackupSchedule {
 export interface ApiSettings {
   autoBackupEnabled: boolean;
   backupSchedule?: BackupSchedule;
+  appVersion?: string;
 }
 
 export interface NotificationSettings {

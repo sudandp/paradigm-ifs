@@ -5,8 +5,11 @@ import BottomNav from './BottomNav';
 import { NotificationPanel } from '../notifications/NotificationPanel';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useAuthStore } from '../../store/authStore';
+import { useSettingsStore } from '../../store/settingsStore';
 
 const MobileLayout: React.FC = () => {
+    const store = useSettingsStore();
+    const appVersion = store.apiSettings.appVersion || '1.0.0';
     const location = useLocation();
     const { fetchNotifications, isPanelOpen, setIsPanelOpen } = useNotificationStore();
     const { user } = useAuthStore();
@@ -75,6 +78,14 @@ const MobileLayout: React.FC = () => {
                 }}
             >
                 <Outlet />
+                
+                {/* App Version Footer */}
+                <div className="mt-8 mb-4 py-4 flex flex-col items-center justify-center opacity-30 select-none">
+                    <div className="h-[1px] w-8 bg-gradient-to-r from-transparent via-white/40 to-transparent mb-3" />
+                    <p className="text-[10px] text-white font-semibold tracking-[0.15em] uppercase">
+                        Paradigm v{appVersion}
+                    </p>
+                </div>
             </main>
 
             {/* Bottom Navigation */}

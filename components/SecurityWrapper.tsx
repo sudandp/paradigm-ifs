@@ -7,6 +7,8 @@ import { isAdmin } from '../utils/auth';
 import { getCurrentDevice, registerDevice, getDeviceLimits, createDeviceChangeRequest } from '../services/deviceService';
 import DeviceWarningDialog from './devices/DeviceWarningDialog';
 import { DeviceType } from '../types';
+import DeviceVerificationAnimation from './DeviceVerificationAnimation';
+
 
 interface SecurityWrapperProps {
     children: React.ReactNode;
@@ -183,14 +185,7 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
     
     // While checking device status...
     if (user && deviceStatus === 'checking' && user.role !== 'developer') {
-         return (
-             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-50">
-                 <div className="flex flex-col items-center">
-                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
-                     <p className="text-gray-500 font-medium">Verifying device...</p>
-                 </div>
-             </div>
-         );
+         return <DeviceVerificationAnimation />;
     }
 
     // Otherwise, render children normally

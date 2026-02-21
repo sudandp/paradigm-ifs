@@ -185,7 +185,8 @@ const initialApiSettings: ApiSettings = {
     dayOfWeek: 0,
     dayOfMonth: 1,
     monthOfYear: 1,
-  }
+  },
+  appVersion: '1.0.0'
 };
 
 const initialNotifications: NotificationSettings = {
@@ -250,7 +251,7 @@ export const useSettingsStore = create<SettingsState>()(
             siteHolidays: site, 
             attendance: attendanceSettings, 
             recurringHolidays: recurringHolidays || [],
-            apiSettings: apiSettings || initialApiSettings,
+            apiSettings: apiSettings ? { ...initialApiSettings, ...apiSettings } : initialApiSettings,
             address: addressSettings || initialAddress,
             geminiApi: geminiApiSettings || initialGeminiApi,
             offlineOcr: offlineOcrSettings || initialOfflineOcr,
