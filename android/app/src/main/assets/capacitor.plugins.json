@@ -54,5 +54,9 @@
 	{
 		"pkg": "@capawesome/capacitor-badge",
 		"classpath": "io.capawesome.capacitorjs.plugins.badge.BadgePlugin"
+	},
+	{
+		"pkg": "@capgo/capacitor-updater",
+		"classpath": "ee.forgr.capacitor_updater.CapacitorUpdaterPlugin"
 	}
 ]

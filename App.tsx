@@ -3,6 +3,7 @@
 import React, { useEffect, lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { useThemeStore } from './store/themeStore';
@@ -25,6 +26,8 @@ import { useNotificationStore } from './store/notificationStore';
 import { AlertTriangle } from 'lucide-react';
 import { withTimeout } from './utils/async';
 import { lazyWithRetry } from './utils/lazyLoad';
+import { useAppUpdate } from './hooks/useAppUpdate';
+import { UpdatePromptModal } from './components/UpdatePromptModal';
 
 // Layouts
 import MainLayout from './components/layouts/MainLayout';
@@ -275,10 +278,14 @@ const App: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { setDeferredPrompt } = usePWAStore();
+  const { isUpdateRequired, updateInfo } = useAppUpdate();
 
   // Expose API for testing
   useEffect(() => {
     (window as any).api = apiService;
+    
+    // Notify Capgo that the app has successfully loaded
+    CapacitorUpdater.notifyAppReady();
   }, []);
 
 
@@ -638,6 +645,7 @@ const App: React.FC = () => {
     <>
       <ScrollToTop />
       <ThemeManager />
+      {isUpdateRequired && <UpdatePromptModal updateInfo={updateInfo} />}
       {user && <IdleTimeoutManager />}
       <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div></div>}>
       <Routes>
