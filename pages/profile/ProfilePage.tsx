@@ -11,7 +11,7 @@ import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { api } from '../../services/api';
 import { dispatchNotificationFromRules } from '../../services/notificationService';
-import { User as UserIcon, Loader2, ClipboardList, LogOut, LogIn, Crosshair, CheckCircle, Info, MapPin, AlertTriangle, Clock, Lock } from 'lucide-react';
+import { User as UserIcon, Loader2, ClipboardList, LogOut, LogIn, Crosshair, CheckCircle, Info, MapPin, AlertTriangle, Clock, Lock, Edit, Camera, Mail } from 'lucide-react';
 import { AvatarUpload } from '../../components/onboarding/AvatarUpload';
 import { format } from 'date-fns';
 import Modal from '../../components/ui/Modal';
@@ -649,87 +649,189 @@ const ProfilePage: React.FC = () => {
         <div className="w-full space-y-8 md:space-y-5">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
 
-            <div className="relative overflow-hidden md:bg-white md:p-4 md:rounded-xl md:shadow-sm flex flex-col md:flex-row items-center gap-6 md:gap-4 border border-gray-100">
-                <div className="absolute top-0 left-0 w-full h-32 md:h-20 bg-[#006b3f] border-b-4 border-[#005632] shadow-lg"></div>
-                <div className="relative z-10 md:scale-75 md:origin-left">
-                    <AvatarUpload file={avatarFile} onFileChange={handlePhotoChange} />
-                </div>
-                <div className="text-center md:text-left relative z-10 flex-1 mt-16 md:-mt-4">
-                    <h2 className="text-2xl md:text-xl font-bold text-white md:text-gray-900 md:drop-shadow-none tracking-tight drop-shadow-sm">{user.name}</h2>
-                    <div className="flex items-center justify-center md:justify-start gap-2 mt-2 md:mt-1">
-                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-sm border border-emerald-500 text-xs md:text-[10px] font-bold">
-                            {getRoleName(user.role)}
-                        </span>
+            {/* Full-width Redesigned Web Header (Matching Reference Design) */}
+            <div className="relative overflow-hidden md:bg-white md:rounded-[32px] md:shadow-[0_4px_12px_rgba(0,0,0,0.06)] border border-gray-100 flex flex-col">
+                
+                {/* Dual Tone Background — 55/45 horizontal split (top green, bottom white) */}
+                <div className="absolute top-0 left-0 w-full h-[55%] bg-[#006B3F] pointer-events-none"></div>
+                <div className="absolute bottom-0 left-0 w-full h-[45%] bg-white pointer-events-none"></div>
+
+
+                {/* Content Container */}
+                <div className="relative z-10 flex flex-col md:flex-row items-center md:items-center gap-6 md:gap-8 w-full p-6 md:p-8 md:pt-12">
+                    {/* Squircle Avatar (The squircle shape is now handled inside AvatarUpload) */}
+                    <div className="relative scale-110 md:scale-110 flex-shrink-0">
+                        <AvatarUpload file={avatarFile} onFileChange={handlePhotoChange} />
                     </div>
-                    <p className="text-emerald-50/70 md:text-gray-500 mt-2 md:mt-1 font-medium text-sm md:text-xs">{user.email}</p>
+                    
+                    {/* User Info aligned next to the avatar */}
+                    <div className="text-center md:text-left flex-1 md:pb-0">
+                        <div className="flex flex-col md:flex-row md:items-center gap-3">
+                             <h2 className="text-[24px] md:text-[26px] font-bold text-gray-900 md:text-white tracking-tight">{user.name}</h2>
+                             <span className="inline-flex items-center px-2 py-0.5 rounded bg-white/20 text-white text-[11px] font-bold uppercase tracking-widest shadow-sm">
+                                {getRoleName(user.role)}
+                             </span>
+                        </div>
+                        <p className="mt-1.5 text-[13px] font-normal text-gray-500 md:text-white md:opacity-90 inline-flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5 flex-shrink-0 hidden md:inline-block" />
+                            {user.email}
+                        </p>
+                        
+                        {/* Desktop Avatar Controls — standardized design system */}
+                        <div className="mt-5 hidden md:flex items-center justify-start gap-3">
+                            <label htmlFor="avatar-upload" className="cursor-pointer inline-flex items-center justify-center h-[42px] px-5 rounded-lg border-2 border-transparent bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-sm transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
+                                <Edit className="w-4 h-4 mr-2 flex-shrink-0" />
+                                {avatarFile ? 'Change' : 'Upload'}
+                            </label>
+                            <button 
+                                type="button"
+                                onClick={() => document.getElementById('avatar-hidden-capture-btn')?.click()}
+                                className="inline-flex items-center justify-center h-[42px] px-5 rounded-lg border-2 border-emerald-600 bg-white hover:bg-emerald-50 text-emerald-700 text-sm font-semibold shadow-sm transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                            >
+                                <Camera className="w-4 h-4 mr-2 flex-shrink-0" />
+                                Capture
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Performance Badges — centered on the green/white boundary line (desktop only) */}
+                <div className="hidden md:flex absolute top-[55%] right-8 -translate-y-1/2 z-20 items-center gap-4">
+                    <div className="flex flex-col items-center gap-1.5">
+                        <div className="relative flex justify-center items-center w-12 h-12 transform hover:scale-105 transition-all text-[#F97316] drop-shadow-md" title="Performance Score: 99">
+                            <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
+                                <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
+                            </svg>
+                            <span className="relative z-10 text-white font-bold text-sm tracking-tight">99</span>
+                        </div>
+                        <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Performance</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-1.5">
+                        <div className="relative flex justify-center items-center w-12 h-12 transform hover:scale-105 transition-all text-[#6366f1] drop-shadow-md" title="Attendance: 98%">
+                            <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
+                                <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
+                            </svg>
+                            <span className="relative z-10 text-white font-bold text-sm tracking-tight">98</span>
+                        </div>
+                        <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Attendance</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-1.5">
+                        <div className="relative flex justify-center items-center w-12 h-12 transform hover:scale-105 transition-all text-[#111827] drop-shadow-md" title="Response Time: 99%">
+                            <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
+                                <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
+                            </svg>
+                            <span className="relative z-10 text-white font-bold text-sm tracking-tight">99</span>
+                        </div>
+                        <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Response</span>
+                    </div>
+                </div>
+
+                {/* Mobile-only badges (inside normal flow) */}
+                <div className="md:hidden flex items-center justify-center gap-3 w-full px-6 pb-4">
+                    <div className="flex flex-col items-center gap-1.5">
+                        <div className="relative flex justify-center items-center w-10 h-10 text-[#F97316] drop-shadow-sm">
+                            <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
+                                <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
+                            </svg>
+                            <span className="relative z-10 text-white font-bold text-[13px]">99</span>
+                        </div>
+                        <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Performance</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-1.5">
+                        <div className="relative flex justify-center items-center w-10 h-10 text-[#6366f1] drop-shadow-sm">
+                            <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
+                                <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
+                            </svg>
+                            <span className="relative z-10 text-white font-bold text-[13px]">98</span>
+                        </div>
+                        <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Attendance</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-1.5">
+                        <div className="relative flex justify-center items-center w-10 h-10 text-[#111827] drop-shadow-sm">
+                            <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
+                                <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
+                            </svg>
+                            <span className="relative z-10 text-white font-bold text-[13px]">99</span>
+                        </div>
+                        <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Response</span>
+                    </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-4">
-                <div className="lg:col-span-2 space-y-6 lg:space-y-4">
-                    <div className="md:bg-white md:p-4 md:rounded-xl md:shadow-sm border border-gray-100">
-                        <div className="flex items-center gap-3 mb-5 md:mb-3">
-                            <div className="p-1.5 md:p-1 md:scale-90 bg-blue-50 rounded-lg">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-6">
+                
+                {/* 70% Left Column */}
+                <div className="lg:col-span-8 space-y-6 lg:space-y-6">
+
+                    {/* Side-by-Side: Profile Details & Work Hours Tracking */}
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        
+                    {/* Profile Details */}
+                    <div className="md:bg-white md:p-6 md:rounded-xl md:shadow-[0_4px_12px_rgba(0,0,0,0.06)] border border-gray-100 h-full transition-shadow">
+                        <div className="flex items-center gap-3 mb-5 md:mb-5">
+                            <div className="p-2 bg-blue-50 rounded-lg">
                                 <UserIcon className="h-5 w-5 text-blue-600" />
                             </div>
                             <h3 className="text-lg md:text-base font-bold text-gray-900">Profile Details</h3>
                         </div>
                         <form onSubmit={handleProfileSubmit(onProfileSubmit)} className="space-y-5 md:space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-3">
-                                <div className="md:scale-[0.85] md:origin-top-left md:w-[117%]">
-                                    <Input label="Full Name" id="name" error={profileErrors.name?.message} registration={register('name')} className="bg-gray-50 border-gray-200 focus:bg-white transition-colors" autoComplete="name" />
+                            <div className="grid grid-cols-1 gap-5 md:gap-4">
+                                <div className="w-full">
+                                    <Input label="Full Name" id="name" error={profileErrors.name?.message} registration={register('name')} className="bg-gray-50/50 border-gray-200 focus:bg-white transition-colors" autoComplete="name" />
                                 </div>
-                                <div className="md:scale-[0.85] md:origin-top-left md:w-[117%]">
-                                    <Input label="Phone Number" id="phone" type="tel" error={profileErrors.phone?.message} registration={register('phone')} className="bg-gray-50 border-gray-200 focus:bg-white transition-colors" autoComplete="tel" />
+                                <div className="w-full">
+                                    <Input label="Phone Number" id="phone" type="tel" error={profileErrors.phone?.message} registration={register('phone')} className="bg-gray-50/50 border-gray-200 focus:bg-white transition-colors" autoComplete="tel" />
                                 </div>
-                                <div className="md:col-span-2 md:scale-[0.85] md:origin-top-left md:w-[117%]">
+                                <div className="w-full">
                                     <Input label="Email Address" id="email" type="email" error={profileErrors.email?.message} registration={register('email')} readOnly className="bg-gray-100/50 text-gray-500 cursor-not-allowed border-gray-200" autoComplete="email" />
                                 </div>
                             </div>
-                            <div className="flex justify-end pt-3 md:pt-2 border-t border-gray-100">
-                                <Button type="submit" isLoading={isSaving} disabled={!isDirty} className="px-6 md:!px-4 md:!py-1 md:!h-8 md:!text-xs">Save Changes</Button>
+                            <div className="flex justify-end pt-5 mt-5 border-t border-gray-100">
+                                <Button type="submit" isLoading={isSaving} disabled={!isDirty} className="md:!px-6 md:!py-2 md:!h-[42px] md:!text-sm md:rounded-lg w-full md:w-auto transition-all">Save Changes</Button>
                             </div>
                         </form>
                     </div>
 
-                    {user.role !== 'management' && (
-                        <div className={`relative transition-all duration-500 md:bg-white md:p-4 md:rounded-xl md:shadow-sm border ${isOnBreak ? 'border-rose-500 ring-4 ring-rose-100' : 'border-gray-100'}`}>
+                    {/* Work Hours Tracking */}
+                    {user.role !== 'management' ? (
+                        <div className={`relative transition-all duration-500 md:bg-white md:p-6 md:rounded-xl md:shadow-[0_4px_12px_rgba(0,0,0,0.06)] border ${isOnBreak ? 'border-rose-500 ring-2 ring-rose-100' : 'border-gray-100'} h-full`}>
                             {isOnBreak && (
-                                <div className="absolute -top-3 left-6 z-20 bg-rose-600 text-white text-[10px] md:text-[8px] font-black px-4 md:px-2 py-1 md:py-0.5 rounded-full shadow-lg shadow-rose-600/30 animate-pulse uppercase tracking-widest">
+                                <div className="absolute -top-3 left-6 z-20 bg-rose-600 text-white text-xs font-bold px-3 py-1 rounded-md shadow-sm uppercase tracking-wider">
                                     On Break
                                 </div>
                             )}
-                            <div className="flex items-center gap-3 md:gap-2 mb-5 md:mb-3">
-                                <div className="p-1.5 md:p-1 md:scale-90 bg-purple-50 rounded-lg">
-                                    <ClipboardList className="h-5 w-5 md:h-4 md:w-4 text-purple-600" />
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="p-2 bg-indigo-50 rounded-lg">
+                                    <ClipboardList className="h-5 w-5 text-indigo-600" />
                                 </div>
-                                <h3 className="text-lg md:text-base font-bold text-gray-900">Work Hours Tracking</h3>
+                                <h3 className="text-base font-bold text-gray-900">Work Hours Tracking</h3>
                             </div>
-                            <div className="space-y-5 md:space-y-3">
-                                <div className="grid grid-cols-2 gap-5 md:gap-3">
-                                    <div className="text-center bg-gray-50 p-4 md:p-2 rounded-xl border border-gray-100 shadow-sm">
-                                        <p className="text-xs md:text-[9px] font-semibold text-gray-500 mb-1 md:mb-0.5 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <LogIn className="h-3 w-3 md:h-2.5 md:w-2.5 text-emerald-600" /> First Punch In
+                            <div className="space-y-6">
+                                {/* Small Stat Boxes */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-100 flex flex-col justify-center">
+                                        <p className="text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> First In
                                         </p>
-                                        <p className="text-2xl md:text-lg font-bold text-gray-900 font-mono">{formatTime(lastCheckInTime)}</p>
+                                        <p className="text-xl font-bold text-gray-900 font-mono tracking-tight">{formatTime(lastCheckInTime)}</p>
                                     </div>
-                                    <div className="text-center bg-gray-50 p-4 md:p-2 rounded-xl border border-gray-100 shadow-sm">
-                                        <p className="text-xs md:text-[9px] font-semibold text-gray-500 mb-1 md:mb-0.5 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <LogOut className="h-3 w-3 md:h-2.5 md:w-2.5 text-rose-600" /> Last Punch Out
+                                    <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-100 flex flex-col justify-center">
+                                        <p className="text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-rose-500"></div> Last Out
                                         </p>
-                                        <p className="text-2xl md:text-lg font-bold text-gray-900 font-mono">{formatTime(lastCheckOutTime)}</p>
+                                        <p className="text-xl font-bold text-gray-900 font-mono tracking-tight">{formatTime(lastCheckOutTime)}</p>
                                     </div>
-                                    <div className="text-center bg-gray-50 p-4 md:p-2 rounded-xl border border-gray-100 shadow-sm">
-                                        <p className="text-xs md:text-[9px] font-semibold text-gray-500 mb-1 md:mb-0.5 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <CheckCircle className="h-3 w-3 md:h-2.5 md:w-2.5 text-blue-600" /> First B-In
+                                    <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-100 flex flex-col justify-center">
+                                        <p className="text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div> First B-In
                                         </p>
-                                        <p className="text-2xl md:text-lg font-bold text-gray-900 font-mono">{formatTime(firstBreakInTime)}</p>
+                                        <p className="text-xl font-bold text-gray-900 font-mono tracking-tight">{formatTime(firstBreakInTime)}</p>
                                     </div>
-                                    <div className="text-center bg-gray-50 p-4 md:p-2 rounded-xl border border-gray-100 shadow-sm">
-                                        <p className="text-xs md:text-[9px] font-semibold text-gray-500 mb-1 md:mb-0.5 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <CheckCircle className="h-3 w-3 md:h-2.5 md:w-2.5 text-amber-600" /> Last B-Out
+                                    <div className="bg-gray-50/70 p-4 rounded-xl border border-gray-100 flex flex-col justify-center">
+                                        <p className="text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div> Last B-Out
                                         </p>
-                                        <p className="text-2xl md:text-lg font-bold text-gray-900 font-mono">{formatTime(lastBreakOutTime)}</p>
+                                        <p className="text-xl font-bold text-gray-900 font-mono tracking-tight">{formatTime(lastBreakOutTime)}</p>
                                     </div>
                                 </div>
 
@@ -768,17 +870,17 @@ const ProfilePage: React.FC = () => {
                                                                    navigate('/attendance/check-in');
                                                                }
                                                            }}
-                                                           variant={isPunchBlocked ? 'secondary' : 'primary'}
-                                                           className={`attendance-action-btn md:!py-1 md:!h-8 md:!text-[11px] shadow-lg transition-all ${
-                                                               isPunchBlocked ? '!bg-amber-600 !border-amber-600 !text-white shadow-amber-100/20' : 'shadow-emerald-100/20'
-                                                           } ${isCheckedIn || isOnBreak || isActionInProgress || (isPunchBlocked && unlockRequestStatus === 'pending') ? 'pointer-events-none opacity-50' : ''}`}
+                                                           variant="primary"
+                                                           className={`attendance-action-btn md:!h-[42px] md:!py-0 md:!text-sm md:!rounded-lg transition-all ${
+                                                               isPunchBlocked ? '!bg-amber-600 !text-white' : '!bg-emerald-600 hover:!bg-emerald-700 !text-white shadow-sm'
+                                                           } ${isCheckedIn || isOnBreak || isActionInProgress || (isPunchBlocked && unlockRequestStatus === 'pending') ? '!bg-gray-100 !text-gray-400 !border-gray-200 pointer-events-none opacity-50 shadow-none' : ''}`}
                                                            disabled={isCheckedIn || isOnBreak || isActionInProgress || (isPunchBlocked && unlockRequestStatus === 'pending')}
                                                        >
                                                           {isPunchBlocked ? (
                                                                unlockRequestStatus === 'pending' 
-                                                                 ? <Clock className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> 
-                                                                 : <Lock className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" />
-                                                          ) : <LogIn className={`mr-2 h-4 w-4 md:h-3.5 md:w-3.5 ${!isCheckedIn ? 'animate-pulse' : ''}`} />}
+                                                                 ? <Clock className="mr-2 h-4 w-4" /> 
+                                                                 : <Lock className="mr-2 h-4 w-4" />
+                                                          ) : <LogIn className={`mr-2 h-4 w-4 ${!isCheckedIn ? 'animate-pulse' : ''}`} />}
                                                           {isPunchBlocked 
                                                               ? (unlockRequestStatus === 'pending' 
                                                                   ? 'Pending' 
@@ -789,31 +891,31 @@ const ProfilePage: React.FC = () => {
                                                  <Button
                                                      onClick={() => navigate('/attendance/check-out?workType=office')}
                                                      variant="danger"
-                                                     className={`attendance-action-btn md:!py-1 md:!h-8 md:!text-[11px] shadow-lg shadow-red-100/20 transition-all ${(!isCheckedIn || isFieldCheckedIn || isOnBreak || (isFieldStaff && !isFieldCheckedOut) || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
+                                                     className={`attendance-action-btn md:!h-[42px] md:!py-0 md:!text-sm md:!rounded-lg transition-all !bg-rose-600 hover:!bg-rose-700 !text-white shadow-sm ${(!isCheckedIn || isFieldCheckedIn || isOnBreak || (isFieldStaff && !isFieldCheckedOut) || isPunchBlocked) ? '!bg-gray-100 !text-gray-400 !border-gray-200 pointer-events-none opacity-50 shadow-none' : ''}`}
                                                      disabled={!isCheckedIn || isFieldCheckedIn || isOnBreak || (isFieldStaff && !isFieldCheckedOut) || isActionInProgress || isPunchBlocked}
                                                  >
-                                                     <LogOut className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Punch Out
+                                                     <LogOut className="mr-2 h-4 w-4" /> Punch Out
                                                  </Button>
                                             </div>
 
                                             {/* Field Staff Buttons */}
                                             {user?.role === 'field_staff' && (
-                                                <div className="grid grid-cols-2 gap-4 md:gap-3 mt-4 md:mt-2">
+                                                <div className="grid grid-cols-2 gap-4 mt-4">
                                                      <Button
                                                          onClick={() => navigate('/attendance/check-in?workType=field')}
                                                          variant="primary"
-                                                         className={`attendance-action-btn md:!py-1 md:!h-8 md:!text-[11px] !bg-blue-600 hover:!bg-blue-700 !border-blue-600 shadow-lg shadow-blue-100/20 transition-all ${(!isCheckedIn || isFieldCheckedIn || isOnBreak || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
+                                                         className={`attendance-action-btn md:!h-[42px] md:!py-0 md:!text-sm md:!rounded-lg transition-all ${(!isCheckedIn || isFieldCheckedIn || isOnBreak || isPunchBlocked) ? '!bg-gray-100 !text-gray-400 !border-gray-200 pointer-events-none opacity-50 shadow-none' : '!bg-emerald-600 hover:!bg-emerald-700 !text-white shadow-sm'}`}
                                                          disabled={!isCheckedIn || isFieldCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked}
                                                      >
-                                                         <MapPin className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Site Check In
+                                                         <MapPin className="mr-2 h-4 w-4" /> Site In
                                                      </Button>
                                                      <Button
                                                          onClick={() => navigate('/attendance/check-out?workType=field')}
                                                          variant="secondary"
-                                                         className={`attendance-action-btn md:!py-1 md:!h-8 md:!text-[11px] !bg-amber-600 hover:!bg-amber-700 !border-amber-600 !text-white shadow-lg shadow-amber-100/20 transition-all ${(!isFieldCheckedIn || isOnBreak || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
+                                                         className={`attendance-action-btn md:!h-[42px] md:!py-0 md:!text-sm md:!rounded-lg transition-all ${(!isFieldCheckedIn || isOnBreak || isPunchBlocked) ? '!bg-gray-100 !text-gray-400 !border-gray-200 pointer-events-none opacity-50 shadow-none' : '!bg-transparent hover:!bg-emerald-50 !border-emerald-600 !text-emerald-700'}`}
                                                          disabled={!isFieldCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked}
                                                      >
-                                                         <MapPin className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Site Check Out
+                                                         <MapPin className="mr-2 h-4 w-4" /> Site Out
                                                      </Button>
                                                 </div>
                                             )}
@@ -835,22 +937,22 @@ const ProfilePage: React.FC = () => {
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4 md:gap-3">
+                                            <div className="grid grid-cols-2 gap-4">
                                                  <Button
                                                      onClick={() => navigate('/attendance/break-in')}
-                                                     variant="primary"
-                                                     className={`attendance-action-btn md:!py-1 md:!h-8 md:!text-[11px] !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 shadow-lg shadow-emerald-100/20 transition-all ${((isFieldStaff ? !isFieldCheckedIn : !isCheckedIn) || isOnBreak || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
+                                                     variant="secondary"
+                                                     className={`attendance-action-btn md:!h-[42px] md:!py-0 md:!text-sm md:!rounded-lg transition-all ${((isFieldStaff ? !isFieldCheckedIn : !isCheckedIn) || isOnBreak || isPunchBlocked) ? '!bg-gray-100 !text-gray-400 !border-gray-200 pointer-events-none opacity-50 shadow-none' : '!bg-transparent hover:!bg-emerald-50 !border-emerald-600 !text-emerald-700'}`}
                                                      disabled={(isFieldStaff ? !isFieldCheckedIn : !isCheckedIn) || isOnBreak || isActionInProgress || isPunchBlocked}
                                                  >
-                                                     <CheckCircle className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Break In
+                                                     <CheckCircle className="mr-2 h-4 w-4" /> Break In
                                                  </Button>
                                                  <Button
                                                      onClick={() => navigate('/attendance/break-out')}
-                                                     variant="primary"
-                                                     className={`attendance-action-btn md:!py-1 md:!h-8 md:!text-[11px] !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 shadow-lg shadow-emerald-100/20 transition-all ${(!isOnBreak || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
+                                                     variant="secondary"
+                                                     className={`attendance-action-btn md:!h-[42px] md:!py-0 md:!text-sm md:!rounded-lg transition-all ${(!isOnBreak || isPunchBlocked) ? '!bg-gray-100 !text-gray-400 !border-gray-200 pointer-events-none opacity-50 shadow-none' : '!bg-transparent hover:!bg-emerald-50 !border-emerald-600 !text-emerald-700'}`}
                                                      disabled={!isOnBreak || isActionInProgress || isPunchBlocked}
                                                  >
-                                                     <CheckCircle className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Break Out
+                                                     <CheckCircle className="mr-2 h-4 w-4" /> Break Out
                                                  </Button>
                                             </div>
                                         </div>
@@ -858,15 +960,18 @@ const ProfilePage: React.FC = () => {
                                 )}
                             </div>
                         </div>
-                    )}
+                    ) : <div></div>}
+                    </div> {/* End Side-by-Side Grid */}
                 </div>
 
-                <div className="space-y-6 md:space-y-4">
-                    <div className="md:bg-white md:p-4 md:rounded-xl md:shadow-sm border border-gray-100">
-                        <h3 className="text-lg md:text-base font-bold mb-4 md:mb-3 text-gray-900">Account Actions</h3>
-                        <div className="space-y-3 md:space-y-2">
-                            <Button onClick={() => navigate('/leaves/dashboard')} variant="secondary" className="w-full justify-center py-3 md:!py-1 md:!h-8 md:!text-xs bg-gray-50 hover:bg-gray-100 border-gray-200" title="View your leave history and balances"><Crosshair className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Leave Tracker</Button>
-                            <Button onClick={handleLogoutClick} variant="danger" className="w-full justify-center py-3 md:!py-1 md:!h-8 md:!text-xs" isLoading={isSaving}><LogOut className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Log Out</Button>
+                {/* Hide entirely on desktop using md:hidden as requested */}
+                <div className="lg:col-span-4 space-y-6 md:hidden">
+                    {/* Remove the box styling strictly for web view as requested */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 md:bg-transparent md:p-0 md:rounded-none md:shadow-none md:border-none">
+                        <h3 className="text-base font-bold mb-4 text-gray-900 border-b border-gray-100 md:border-transparent md:pb-0 pb-3">Account Actions</h3>
+                        <div className="space-y-3">
+                            <Button onClick={() => navigate('/leaves/dashboard')} variant="outline" className="w-full justify-start py-2.5 px-4 md:!h-[42px] md:text-sm md:rounded-lg text-gray-700 hover:text-gray-900 md:bg-white border-gray-200 hover:bg-gray-50 transition-colors" title="View your leave history and balances"><Crosshair className="mr-3 h-4 w-4 text-gray-500" /> Leave Tracker</Button>
+                            <Button onClick={handleLogoutClick} variant="outline" className="w-full justify-start py-2.5 px-4 md:!h-[42px] md:text-sm md:rounded-lg text-rose-600 hover:text-rose-700 md:bg-white border-rose-200 hover:bg-rose-50 transition-colors" isLoading={isSaving}><LogOut className="mr-3 h-4 w-4" /> Log Out</Button>
                         </div>
                     </div>
                 </div>

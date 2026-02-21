@@ -72,8 +72,8 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({ file, onFileChange }
       {isCameraOpen && <CameraCaptureModal isOpen={isCameraOpen} onClose={() => setIsCameraOpen(false)} onCapture={handleCapture} captureGuidance="profile" />}
       <div className="relative w-40 h-40 group">
         <div className={`
-          w-full h-full rounded-full bg-page flex items-center justify-center overflow-hidden 
-          border-2 transition-all duration-300 ring-4 ring-white shadow-2xl
+          w-full h-full rounded-[32px] bg-page flex items-center justify-center overflow-hidden 
+          border-2 transition-all duration-300 ring-4 ring-white shadow-xl
           ${error ? 'border-red-500' : 'border-accent/20 group-hover:border-accent/40'}
         `}>
           {isLoading ? (
@@ -92,14 +92,15 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({ file, onFileChange }
             type="button"
             onClick={handleRemove}
             id="avatar-delete-button"
-            className="avatar-delete-btn btn-icon absolute -top-1 -right-1 p-2 rounded-full transition-all !bg-white !text-red-600 shadow-lg hover:!bg-red-50 hover:scale-110 z-10"
+            className="avatar-delete-btn btn-icon absolute -top-2 -right-2 p-2 rounded-full transition-all !bg-white !text-red-600 shadow-lg hover:!bg-red-50 hover:scale-110 z-10"
             aria-label="Remove photo"
           >
             <Trash2 className="w-4 h-4" />
           </button>
         )}
       </div>
-      <div className="flex items-center space-x-2">
+      <button id="avatar-hidden-capture-btn" className="hidden" onClick={() => setIsCameraOpen(true)} type="button"></button>
+      <div className="flex items-center space-x-2 md:hidden">
         <label htmlFor={inputId} className={`cursor-pointer inline-flex items-center justify-center font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 rounded-full bg-accent text-white hover:bg-accent-dark focus:ring-accent px-4 py-2 text-sm ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
           <Edit className="w-4 h-4 mr-2" />
           {file ? 'Change' : 'Upload'}

@@ -126,7 +126,7 @@ const SidebarContent: React.FC<{ isCollapsed: boolean, onLinkClick?: () => void,
                     )}
                 </div>
             )}
-            <nav className="px-3 py-4 space-y-1.5">
+            <nav className="px-3 py-4 space-y-2">
                 {availableNavLinks.map(link => (
                     <NavLink
                         key={link.to}
@@ -136,10 +136,10 @@ const SidebarContent: React.FC<{ isCollapsed: boolean, onLinkClick?: () => void,
                             `group flex items-center px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200 ease-in-out ${isCollapsed ? 'justify-center' : ''} ${mode === 'light'
                                 ? isActive
                                     ? 'text-white shadow-sm border'
-                                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                                    : 'text-gray-500 hover:bg-gray-100/60 hover:text-gray-900'
                                 : isActive
                                     ? 'bg-[#1c3a23] text-white shadow-sm border border-white/5'
-                                    : 'text-white hover:bg-white/5 hover:text-white/90'
+                                    : 'text-white/80 hover:bg-white/10 hover:text-white'
                             }`
                         }
                         style={({ isActive }) => {
@@ -153,9 +153,9 @@ const SidebarContent: React.FC<{ isCollapsed: boolean, onLinkClick?: () => void,
                         {({ isActive }) => (
                             <>
                                 <link.icon
-                                    className={`h-5 w-5 flex-shrink-0 transition-colors duration-200 ${mode === 'light'
-                                        ? isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'
-                                        : isActive ? 'text-white' : 'text-white group-hover:text-white'
+                                    className={`h-5 w-5 flex-shrink-0 transition-all duration-200 ${mode === 'light'
+                                        ? isActive ? 'text-white/90' : 'text-gray-400/80 group-hover:text-gray-500'
+                                        : isActive ? 'text-white/90' : 'text-white/60 group-hover:text-white/90'
                                         } ${isCollapsed ? '' : 'mr-3'}`}
                                 />
                                 {!isCollapsed && <span>{link.label}</span>}
