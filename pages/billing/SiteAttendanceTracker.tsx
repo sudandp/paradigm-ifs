@@ -5,7 +5,7 @@ import { saveAs } from 'file-saver';
 import { api } from '../../services/api';
 import type { SiteInvoiceRecord, SiteInvoiceDefault } from '../../types';
 import { format, differenceInCalendarDays, parseISO, isBefore, isToday, startOfDay, subDays } from 'date-fns';
-import { Loader2, Plus, Trash2, Edit2, ClipboardList, CheckCircle2, Clock, Mail, AlertTriangle, Building, Download, Upload, FileSpreadsheet, X, Search, RotateCcw, ShieldX, Info } from 'lucide-react';
+import { Loader2, Plus, Trash2, Edit2, ClipboardList, CheckCircle2, Clock, Mail, AlertTriangle, Building2, Building, Download, Upload, FileSpreadsheet, X, Search, RotateCcw, ShieldX, Info, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Toast from '../../components/ui/Toast';
 
@@ -425,95 +425,108 @@ const SiteAttendanceTracker: React.FC = () => {
     return (
         <div className="space-y-6 w-full px-4">
             {/* ── Action Bar ── */}
-            <div className="bg-white rounded-xl border border-gray-200/80 shadow-sm p-5">
+            <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-200 shadow-sm p-4 md:p-5">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
                         <button
                             onClick={handleDownloadTemplate}
                             disabled={isExporting}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs font-semibold text-emerald-400 md:text-gray-600 bg-white/5 md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg hover:bg-white/10 md:hover:bg-gray-100 transition-all disabled:opacity-50"
                         >
-                            <Download className="h-3.5 w-3.5 text-emerald-600" />
+                            <Download className="h-3.5 w-3.5" />
                             Template
                         </button>
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98]"
+                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs font-semibold text-emerald-400 md:text-gray-600 bg-white/5 md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg hover:bg-white/10 md:hover:bg-gray-100 transition-all"
                         >
-                            <Upload className="h-3.5 w-3.5 text-emerald-600" />
+                            <Upload className="h-3.5 w-3.5" />
                             Import
                         </button>
                         <button
                             onClick={handleExport}
                             disabled={isExporting}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs font-semibold text-emerald-400 md:text-gray-600 bg-white/5 md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg hover:bg-white/10 md:hover:bg-gray-100 transition-all disabled:opacity-50"
                         >
-                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                            <FileSpreadsheet className="h-3.5 w-3.5" />
                             Export
                         </button>
-                        <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
                     </div>
-                    <button
-                        onClick={() => navigate('/finance/attendance/add')}
-                        className="inline-flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-[#006B3F] rounded-lg hover:bg-[#005632] transition-all duration-150 shadow-sm shadow-emerald-900/10 hover:shadow-md hover:shadow-emerald-900/15 hover:scale-[1.02] active:scale-[0.98]"
-                    >
-                        <Plus className="h-3.5 w-3.5" />
-                        New Entry
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <div className="relative flex-1 md:w-64">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50 md:text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search site..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full h-10 pl-9 pr-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-sm text-white md:text-gray-900 placeholder-emerald-500/30 md:placeholder-gray-400 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 focus:ring-1 focus:ring-[#00D27F] transition-all"
+                            />
+                        </div>
+                        <button
+                            onClick={() => navigate('/finance/attendance/add')}
+                            className="whitespace-nowrap h-10 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-[#041b0f] md:text-white bg-[#00D27F] md:bg-emerald-600 rounded-lg hover:bg-[#00b86e] md:hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 md:shadow-none"
+                        >
+                            <Plus className="h-4 w-4" />
+                            <span className="hidden xs:inline">New Entry</span>
+                            <span className="xs:hidden">Add</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
+
             {/* ── KPI Summary Cards ── */}
             {!isLoading && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-white rounded-xl border border-gray-200/80 p-5 transition-all duration-150 hover:shadow-md hover:-translate-y-0.5">
+                <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-200 p-4 md:p-5 shadow-sm">
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-emerald-600">Total Sites</p>
-                                <h3 className="text-xl font-bold text-gray-900 mt-1.5">{stats.total}</h3>
-                                <p className="text-[10px] font-medium text-gray-400 mt-1">Active site connections</p>
+                                <p className="text-[10px] md:text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Total Sites</p>
+                                <h3 className="text-lg md:text-xl font-bold text-white md:text-gray-900 mt-1.5">{stats.total}</h3>
+                                <p className="text-[9px] md:text-[10px] font-medium text-emerald-400/50 md:text-gray-400 mt-1">Active this month</p>
                             </div>
-                            <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
-                                <Building className="h-5 w-5 text-emerald-600" />
+                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white/5 md:bg-gray-50 flex items-center justify-center border border-white/10 md:border-gray-100">
+                                <Building2 className="h-4 w-4 md:h-5 md:w-5 text-emerald-400/70 md:text-gray-400" />
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-xl border border-gray-200/80 p-5 transition-all duration-150 hover:shadow-md hover:-translate-y-0.5">
+                    <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-200 p-4 md:p-5 shadow-sm">
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-rose-600">Pending Invoices</p>
-                                <h3 className="text-xl font-bold text-gray-900 mt-1.5">{stats.pending}</h3>
-                                <p className="text-[10px] font-medium text-rose-500 mt-1">{stats.due.length} Action required</p>
+                                <p className="text-[10px] md:text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Sent Status</p>
+                                <h3 className="text-lg md:text-xl font-bold text-emerald-400 md:text-emerald-600 mt-1.5">{stats.sent}</h3>
+                                <p className="text-[9px] md:text-[10px] font-medium text-emerald-400 md:text-emerald-600/60 mt-1 font-bold">Ready for billing</p>
                             </div>
-                            <div className="w-10 h-10 rounded-lg bg-rose-50 flex items-center justify-center">
-                                <Clock className="h-5 w-5 text-rose-600" />
+                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white/5 md:bg-emerald-50 flex items-center justify-center border border-white/10 md:border-emerald-100">
+                                <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-emerald-400 md:text-emerald-600" />
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-xl border border-gray-200/80 p-5 transition-all duration-150 hover:shadow-md hover:-translate-y-0.5">
+                    <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-200 p-4 md:p-5 shadow-sm">
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-emerald-600">Successfully Sent</p>
-                                <h3 className="text-xl font-bold text-gray-900 mt-1.5">{stats.sent}</h3>
-                                <p className="text-[10px] font-medium text-emerald-500 mt-1">{Math.round((stats.sent / (stats.total || 1)) * 100)}% Completion</p>
+                                <p className="text-[10px] md:text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Pending</p>
+                                <h3 className="text-lg md:text-xl font-bold text-amber-400 md:text-amber-600 mt-1.5">{stats.pending}</h3>
+                                <p className="text-[9px] md:text-[10px] font-medium text-amber-400/80 md:text-amber-600/60 mt-1 font-bold">In processing</p>
                             </div>
-                            <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
-                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-amber-400/10 md:bg-amber-50 flex items-center justify-center border border-amber-400/20 md:border-amber-100">
+                                <Clock className="h-4 w-4 md:h-5 md:w-5 text-amber-400 md:text-amber-600" />
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-xl border border-gray-200/80 p-5 transition-all duration-150 hover:shadow-md hover:-translate-y-0.5">
+                    <div className="bg-[#FFF1F2] rounded-xl border border-rose-200 p-4 md:p-5 shadow-sm">
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-emerald-600">Mail Dispatched</p>
-                                <h3 className="text-xl font-bold text-gray-900 mt-1.5">{records.filter(r => r.invoiceSentMethodRemarks?.toLowerCase().includes('mail')).length}</h3>
-                                <p className="text-[10px] font-medium text-gray-400 mt-1">Via organizational email</p>
+                                <p className="text-[10px] md:text-[11px] font-semibold text-rose-600 uppercase tracking-wider">Due / Overdue</p>
+                                <h3 className="text-lg md:text-xl font-bold text-rose-700 mt-1.5">{stats.due.length}</h3>
+                                <p className="text-[9px] md:text-[10px] font-medium text-rose-600 mt-1 font-bold">Action required</p>
                             </div>
-                            <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
-                                <Mail className="h-5 w-5 text-emerald-600" />
+                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-rose-100 flex items-center justify-center border border-rose-200 shadow-sm md:shadow-none">
+                                <AlertCircle className="h-4 w-4 md:h-5 md:w-5 text-rose-600" />
                             </div>
                         </div>
                     </div>
@@ -522,17 +535,20 @@ const SiteAttendanceTracker: React.FC = () => {
 
             {/* ── Due Alerts ── */}
             {!isLoading && stats.due.length > 0 && (
-                <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-4 flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center shrink-0">
-                        <AlertTriangle className="h-4 w-4 text-rose-600" />
+                <div className="bg-white/5 md:bg-rose-50 border border-white/10 md:border-rose-100 rounded-xl p-4 flex items-start gap-4 shadow-xl md:shadow-none">
+                    <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
+                        <AlertCircle className="h-5 w-5 text-rose-500" />
                     </div>
-                    <div>
-                        <h4 className="text-sm font-bold text-rose-900">Immediate Action Required</h4>
-                        <p className="text-xs text-rose-700 mt-0.5">The following sites have reached their tentative invoice sharing date:</p>
-                        <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    <div className="flex-1">
+                        <h4 className="text-sm font-bold text-white md:text-rose-900 flex items-center gap-2">
+                            Immediate Action Required
+                            <span className="flex h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+                        </h4>
+                        <p className="text-[11px] text-emerald-400/60 md:text-rose-700 mt-0.5">The following sites have reached their tentative invoice sharing date:</p>
+                        <div className="flex flex-wrap gap-2 mt-3">
                             {stats.due.map(site => (
-                                <span key={site.id} className="inline-flex items-center px-2 py-0.5 rounded-md bg-white border border-rose-200 text-rose-800 text-[10px] font-bold shadow-sm whitespace-nowrap">
-                                    {site.siteName} (Due: {site.invoiceSharingTentativeDate ? format(parseISO(site.invoiceSharingTentativeDate), 'dd MMM') : 'N/A'})
+                                <span key={site.id} className="inline-flex items-center px-3 py-1 rounded-full bg-[#041b0f] md:bg-white border border-white/10 md:border-rose-200 text-rose-400 md:text-rose-700 text-[10px] font-bold shadow-soft">
+                                    {site.siteName} <span className="mx-1.5 text-white/20">•</span> Due: {site.invoiceSharingTentativeDate ? format(parseISO(site.invoiceSharingTentativeDate), 'dd MMM') : 'N/A'}
                                 </span>
                             ))}
                         </div>
@@ -541,16 +557,16 @@ const SiteAttendanceTracker: React.FC = () => {
             )}
 
             {/* ── Main Data Section ── */}
-            <div className="bg-white rounded-xl border border-gray-200/80 shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-200 shadow-sm overflow-hidden min-h-[400px]">
+                <div className="px-5 py-3 border-b border-white/5 md:border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-6">
-                        <div className="flex bg-gray-100/80 p-1 rounded-lg">
+                        <div className="flex bg-[#041b0f] md:bg-gray-100/50 p-1 rounded-lg border border-white/5 md:border-gray-200">
                             <button
                                 onClick={() => setActiveSubTab('active')}
                                 className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
                                     activeSubTab === 'active' 
-                                        ? 'bg-white text-emerald-700 shadow-sm' 
-                                        : 'text-gray-500 hover:text-gray-700'
+                                        ? 'bg-[#00D27F] md:bg-white text-[#041b0f] md:text-emerald-700 shadow-sm' 
+                                        : 'text-emerald-400/50 md:text-gray-500 hover:text-emerald-400 md:hover:text-gray-700'
                                 }`}
                             >
                                 Active Records
@@ -559,13 +575,13 @@ const SiteAttendanceTracker: React.FC = () => {
                                 onClick={() => setActiveSubTab('log')}
                                 className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
                                     activeSubTab === 'log' 
-                                        ? 'bg-white text-rose-700 shadow-sm' 
-                                        : 'text-gray-500 hover:text-gray-700'
+                                        ? 'bg-rose-500 text-white shadow-sm' 
+                                        : 'text-emerald-400/50 md:text-gray-500 hover:text-emerald-400 md:hover:text-gray-700'
                                 }`}
                             >
                                 Deletion Log
                                 {deletedRecords.length > 0 && (
-                                    <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-600 text-[10px]">
+                                    <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] ${activeSubTab === 'log' ? 'bg-white text-rose-600' : 'bg-rose-500/20 text-rose-400'}`}>
                                         {deletedRecords.length}
                                     </span>
                                 )}
@@ -575,34 +591,24 @@ const SiteAttendanceTracker: React.FC = () => {
 
                     {!isLoading && (
                         <div className="flex flex-1 items-center justify-end gap-3 w-full sm:w-auto">
-                            <div className="relative flex-1 max-w-xs">
-                                <input
-                                    type="text"
-                                    placeholder={`Search ${activeSubTab === 'active' ? 'records' : 'deleted ones'}...`}
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full h-8 pl-8 pr-3 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 outline-none transition-all placeholder:text-gray-400"
-                                />
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                            </div>
                         </div>
                     )}
                 </div>
 
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center py-24 gap-3">
-                        <Loader2 className="h-7 w-7 animate-spin text-emerald-500" />
-                        <span className="text-sm text-gray-400 font-medium">Loading records...</span>
+                        <Loader2 className="h-7 w-7 animate-spin text-[#00D27F] md:text-emerald-600" />
+                        <span className="text-sm text-emerald-400/40 font-medium tracking-tight">Loading records...</span>
                     </div>
                 ) : filteredRecords.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-5">
-                            <ClipboardList className="h-7 w-7 text-gray-400" />
+                        <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-5 border border-white/5">
+                            <ClipboardList className="h-7 w-7 text-emerald-500/20" />
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900">
+                        <h3 className="text-lg font-bold text-white">
                             {activeSubTab === 'active' ? 'No attendance records' : 'Deletion log is empty'}
                         </h3>
-                        <p className="text-sm text-gray-500 mt-1.5 max-w-xs">
+                        <p className="text-sm text-emerald-400/40 mt-1.5 max-w-xs leading-relaxed">
                             {activeSubTab === 'active' 
                                 ? 'No records found for the current filter. Add a new entry to get started.' 
                                 : 'Records deleted in the last 7 days will appear here.'}
@@ -610,7 +616,7 @@ const SiteAttendanceTracker: React.FC = () => {
                         {activeSubTab === 'active' && (
                             <button
                                 onClick={() => navigate('/finance/attendance/add')}
-                                className="mt-5 inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold text-white bg-[#006B3F] rounded-lg hover:bg-[#005632] transition-all"
+                                className="mt-5 inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold text-[#041b0f] bg-[#00D27F] rounded-lg hover:bg-[#00b86e] transition-all shadow-lg shadow-emerald-500/20"
                             >
                                 <Plus className="h-4 w-4" />
                                 Add First Entry
@@ -619,39 +625,40 @@ const SiteAttendanceTracker: React.FC = () => {
                     </div>
                 ) : (
                     <>
-                        <div className="overflow-x-auto">
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="bg-gray-50/80 border-b border-gray-200">
+                                    <tr className="bg-[#041b0f] md:bg-gray-50 border-b border-white/5 md:border-gray-200">
                                         <th className="px-5 py-3 text-left w-10">
                                             <input 
                                                 type="checkbox" 
-                                                className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                className="w-4 h-4 rounded border-white/20 md:border-gray-300 bg-white/5 md:bg-white text-[#00D27F] md:text-emerald-600 focus:ring-[#00D27F] cursor-pointer"
                                                 checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))}
                                                 onChange={handleSelectAll}
                                             />
                                         </th>
-                                        <th className="px-5 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Site Information</th>
-                                        <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Incharges (Ops / HR)</th>
+                                        <th className="px-5 py-3 text-left text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Site Information</th>
+                                        <th className="px-4 py-3 text-left text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden md:table-cell">Incharges (Ops / HR)</th>
                                         {activeSubTab === 'active' ? (
                                             <>
-                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Mgr Delay</th>
-                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">HR Delay</th>
-                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Sharing Delay</th>
-                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Mgr Delay</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">HR Delay</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Sharing Delay</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Status</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Date</th>
                                             </>
                                         ) : (
                                             <>
-                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Deleted By</th>
-                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Reason</th>
-                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Deleted At</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Deleted By</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Reason</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Deleted At</th>
                                             </>
                                         )}
-                                        <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-24">Actions</th>
+                                        <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider w-24">Actions</th>
                                     </tr>
                                     {/* Filter Row */}
-                                    <tr className="bg-white border-b border-gray-100">
+                                    <tr className="bg-[#06251c] md:bg-gray-50/50 border-b border-white/5 md:border-gray-100">
                                         <td className="px-5 py-2" />
                                         <td className="px-5 py-2">
                                             <input 
@@ -659,7 +666,7 @@ const SiteAttendanceTracker: React.FC = () => {
                                                 placeholder="Filter Site..."
                                                 value={filters.siteName}
                                                 onChange={(e) => setFilters(prev => ({ ...prev, siteName: e.target.value }))}
-                                                className="w-full text-[10px] px-2 py-1 bg-gray-50 border border-gray-200 rounded focus:border-emerald-500 outline-none transition-all"
+                                                className="w-full text-[10px] px-2 py-1 bg-[#041b0f] md:bg-white border border-white/10 md:border-gray-200 rounded text-white md:text-gray-900 placeholder-emerald-800 md:placeholder-gray-400 focus:border-[#00D27F] md:focus:border-emerald-500 outline-none transition-all"
                                             />
                                         </td>
                                         <td className="px-4 py-2 hidden md:table-cell" />
@@ -672,7 +679,7 @@ const SiteAttendanceTracker: React.FC = () => {
                                                     <select
                                                         value={filters.status}
                                                         onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                                                        className="w-full text-[10px] px-1 py-1 bg-gray-50 border border-gray-200 rounded focus:border-emerald-500 outline-none transition-all font-bold text-gray-600"
+                                                        className="w-full text-[10px] px-1 py-1 bg-[#041b0f] md:bg-white border border-white/10 md:border-gray-200 rounded focus:border-[#00D27F] md:focus:border-emerald-500 outline-none transition-all font-bold text-emerald-400 md:text-gray-600"
                                                     >
                                                         <option value="">All Status</option>
                                                         <option value="sent">Sent</option>
@@ -691,7 +698,7 @@ const SiteAttendanceTracker: React.FC = () => {
                                         <td className="px-4 py-2" />
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-white/5">
                                     {paginatedRecords.map((record, idx) => {
                                         const mgrDelay = calculateDelay(record.managerReceivedDate!, record.managerTentativeDate!);
                                         const hrDelay = calculateDelay(record.hrReceivedDate!, record.hrTentativeDate!);
@@ -699,23 +706,23 @@ const SiteAttendanceTracker: React.FC = () => {
                                         const isSelected = selectedIds.has(record.id);
 
                                         return (
-                                            <tr key={record.id} className={`hover:bg-gray-50/60 transition-all duration-100 group ${isSelected ? 'bg-emerald-50/30' : ''}`}>
+                                            <tr key={record.id} className={`hover:bg-white/5 md:hover:bg-gray-50 transition-colors duration-100 group ${isSelected ? 'bg-emerald-500/10 md:bg-emerald-50' : ''}`}>
                                                 <td className="px-5 py-3.5">
                                                     <input 
                                                         type="checkbox" 
-                                                        className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                        className="w-4 h-4 rounded border-white/20 bg-white/5 text-[#00D27F] focus:ring-[#00D27F] cursor-pointer"
                                                         checked={isSelected}
                                                         onChange={() => handleSelectRow(record.id)}
                                                     />
                                                 </td>
                                                 <td className="px-5 py-3.5">
-                                                    <div className="font-semibold text-gray-900 text-sm">{record.siteName}</div>
-                                                    <div className="text-[11px] text-gray-400 mt-0.5">{record.companyName || '—'}</div>
-                                                    {record.billingCycle && <div className="inline-block mt-1.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-tighter">{record.billingCycle}</div>}
+                                                    <div className="font-bold text-white md:text-gray-900 text-sm">{record.siteName}</div>
+                                                    <div className="text-[11px] text-emerald-400/50 md:text-gray-500 mt-0.5">{record.companyName || '—'}</div>
+                                                    {record.billingCycle && <div className="inline-block mt-1.5 px-1.5 py-0.5 rounded bg-emerald-500/10 md:bg-gray-100 text-[#00D27F] md:text-gray-600 text-[10px] font-black uppercase tracking-tighter border border-emerald-500/20 md:border-gray-200">{record.billingCycle}</div>}
                                                 </td>
                                                 <td className="px-4 py-3.5 hidden md:table-cell">
-                                                    <div className="text-xs text-gray-600 font-medium">Ops: {record.opsIncharge || '—'}</div>
-                                                    <div className="text-[11px] text-gray-400 mt-0.5">HR: {record.hrIncharge || '—'}</div>
+                                                    <div className="text-xs text-emerald-400 md:text-gray-600 font-medium">Ops: {record.opsIncharge || '—'}</div>
+                                                    <div className="text-[11px] text-emerald-400/40 md:text-gray-400 mt-0.5">HR: {record.hrIncharge || '—'}</div>
                                                 </td>
                                                 {activeSubTab === 'active' ? (
                                                     <>
@@ -736,23 +743,23 @@ const SiteAttendanceTracker: React.FC = () => {
                                                         </td>
                                                         <td className="px-4 py-3.5 text-center">
                                                             {record.invoiceSentDate ? (
-                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-[#00D27F] text-[10px] font-black uppercase tracking-tight">
                                                                     <CheckCircle2 className="h-3 w-3" />
                                                                     Sent
                                                                 </span>
                                                             ) : (
-                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold whitespace-nowrap">
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-black uppercase tracking-tight whitespace-nowrap">
                                                                     <Clock className="h-3 w-3" />
                                                                     Pending
                                                                 </span>
                                                             )}
                                                         </td>
                                                         <td className="px-4 py-3.5">
-                                                            <div className="text-[11px] font-medium text-gray-900">{format(parseISO(record.createdAt!), 'dd MMM yyyy')}</div>
+                                                            <div className="text-[11px] font-bold text-white md:text-gray-900">{format(parseISO(record.createdAt!), 'dd MMM yyyy')}</div>
                                                             <div className="flex items-center gap-1 mt-1">
-                                                                <span className="text-[10px] text-gray-400">{record.createdByName || 'System'}</span>
+                                                                <span className="text-[10px] text-emerald-400/40 md:text-gray-400">{record.createdByName || 'System'}</span>
                                                                 {record.createdByRole && (
-                                                                    <span className="px-1 py-0.5 rounded bg-gray-100 text-[10px] font-bold text-gray-500 uppercase border border-gray-200">
+                                                                    <span className="px-1 py-0.5 rounded bg-white/5 md:bg-gray-100 text-[9px] font-black text-emerald-400/60 md:text-gray-500 uppercase border border-white/5 md:border-gray-200 tracking-tighter">
                                                                         {record.createdByRole.replace('_', ' ')}
                                                                     </span>
                                                                 )}
@@ -762,18 +769,18 @@ const SiteAttendanceTracker: React.FC = () => {
                                                 ) : (
                                                     <>
                                                         <td className="px-4 py-3.5">
-                                                            <div className="text-xs font-semibold text-gray-900">{record.deletedByName || 'Unknown'}</div>
-                                                            <div className="text-[10px] text-gray-400 mt-0.5">ID: {record.deletedBy?.slice(0, 8)}...</div>
+                                                            <div className="text-xs font-bold text-white md:text-gray-900">{record.deletedByName || 'Unknown'}</div>
+                                                            <div className="text-[10px] text-emerald-400/40 md:text-gray-400 mt-0.5 font-mono">ID: {record.deletedBy?.slice(0, 8)}...</div>
                                                         </td>
                                                         <td className="px-4 py-3.5">
                                                             <div className="flex items-start gap-1.5">
-                                                                <Info className="h-3 w-3 text-rose-400 mt-0.5 shrink-0" />
-                                                                <p className="text-xs text-rose-600 font-medium leading-relaxed italic">"{record.deletedReason || 'No reason provided'}"</p>
+                                                                <Info className="h-3 w-3 text-rose-400/60 md:text-rose-400 mt-0.5 shrink-0" />
+                                                                <p className="text-[11px] text-rose-400/80 md:text-rose-600 font-medium leading-relaxed italic">"{record.deletedReason || 'No reason provided'}"</p>
                                                             </div>
                                                         </td>
                                                         <td className="px-4 py-3.5">
-                                                            <div className="text-xs font-medium text-gray-900">{record.deletedAt ? format(parseISO(record.deletedAt), 'dd MMM, HH:mm') : '—'}</div>
-                                                            <div className="text-[10px] text-gray-400 mt-0.5">Auto-purge in 7 days</div>
+                                                            <div className="text-[11px] font-bold text-white md:text-gray-900">{record.deletedAt ? format(parseISO(record.deletedAt), 'dd MMM, HH:mm') : '—'}</div>
+                                                            <div className="text-[10px] text-rose-400/40 md:text-rose-400 mt-0.5 uppercase tracking-tighter font-black">Auto-purge in 7 days</div>
                                                         </td>
                                                     </>
                                                 )}
@@ -783,14 +790,14 @@ const SiteAttendanceTracker: React.FC = () => {
                                                             <>
                                                                 <button 
                                                                     onClick={() => navigate(`/finance/attendance/edit/${record.id}`)} 
-                                                                    className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-all h-8 w-8 flex items-center justify-center border border-transparent hover:border-emerald-100"
+                                                                    className="p-1.5 text-emerald-400/40 md:text-gray-400 hover:text-[#00D27F] md:hover:text-emerald-600 hover:bg-white/5 md:hover:bg-gray-100 rounded-md transition-all h-8 w-8 flex items-center justify-center border border-white/5 md:border-gray-100 shadow-sm"
                                                                     title="Edit"
                                                                 >
                                                                     <Edit2 className="h-3.5 w-3.5" />
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => { setRecordToDelete(record); setIsBulkDeleting(false); setShowDeleteModal(true); }} 
-                                                                    className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all h-8 w-8 flex items-center justify-center border border-transparent hover:border-rose-100"
+                                                                    className="p-1.5 text-rose-400/40 md:text-gray-400 hover:text-rose-400 md:hover:text-rose-600 hover:bg-rose-500/10 md:hover:bg-rose-50 rounded-md transition-all h-8 w-8 flex items-center justify-center border border-white/5 md:border-gray-100 shadow-sm"
                                                                     title="Delete"
                                                                 >
                                                                     <Trash2 className="h-3.5 w-3.5" />
@@ -801,7 +808,7 @@ const SiteAttendanceTracker: React.FC = () => {
                                                                 <button 
                                                                     onClick={() => handleRestore(record.id)} 
                                                                     disabled={isRestoring === record.id || !isAdmin}
-                                                                    className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-all h-8 w-8 flex items-center justify-center border border-transparent hover:border-emerald-100 disabled:opacity-50"
+                                                                    className="p-1.5 text-emerald-400/40 hover:text-[#00D27F] hover:bg-white/5 rounded-md transition-all h-8 w-8 flex items-center justify-center border border-white/5 disabled:opacity-50"
                                                                     title="Restore"
                                                                 >
                                                                     {isRestoring === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
@@ -809,7 +816,7 @@ const SiteAttendanceTracker: React.FC = () => {
                                                                 <button 
                                                                     onClick={() => handlePermanentDelete(record.id)} 
                                                                     disabled={!isAdmin}
-                                                                    className="p-1.5 text-gray-400 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-all h-8 w-8 flex items-center justify-center border border-transparent hover:border-rose-100 disabled:opacity-50"
+                                                                    className="p-1.5 text-rose-400/40 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-all h-8 w-8 flex items-center justify-center border border-white/5 disabled:opacity-50"
                                                                     title="Permanent Delete"
                                                                 >
                                                                     <ShieldX className="h-3.5 w-3.5" />
@@ -825,47 +832,180 @@ const SiteAttendanceTracker: React.FC = () => {
                             </table>
                         </div>
 
+                        {/* Mobile Card-Based List View */}
+                        <div className="md:hidden divide-y divide-white/5">
+                            {paginatedRecords.map(record => {
+                                const mgrDelay = calculateDelay(record.managerReceivedDate!, record.managerTentativeDate!);
+                                const hrDelay = calculateDelay(record.hrReceivedDate!, record.hrTentativeDate!);
+                                const sharingDelay = calculateDelay(record.invoiceSentDate!, record.invoiceSharingTentativeDate!);
+                                const isSelected = selectedIds.has(record.id);
+
+                                return (
+                                    <div 
+                                        key={record.id} 
+                                        className={`p-4 transition-all duration-150 border-b border-white/5 ${isSelected ? 'bg-emerald-500/10' : 'active:bg-white/5'}`}
+                                        onClick={(e) => {
+                                            if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
+                                            handleSelectRow(record.id);
+                                        }}
+                                    >
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex items-start gap-3">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="w-4 h-4 mt-1 rounded border-white/20 bg-white/5 text-[#00D27F] focus:ring-[#00D27F] cursor-pointer"
+                                                    checked={isSelected}
+                                                    onChange={() => handleSelectRow(record.id)}
+                                                />
+                                                <div>
+                                                    <h4 className="font-bold text-white leading-tight">{record.siteName}</h4>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <span className="text-[10px] text-emerald-400/40 font-bold uppercase tracking-wider">{record.companyName || '—'}</span>
+                                                        {record.billingCycle && (
+                                                            <span className="px-1.5 py-0.5 bg-emerald-500/10 text-[#00D27F] text-[9px] font-black rounded uppercase tracking-tighter border border-emerald-500/20">
+                                                                {record.billingCycle}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {activeSubTab === 'active' && (
+                                                <div className="text-right">
+                                                    {record.invoiceSentDate ? (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-[#00D27F] text-[9px] font-black uppercase tracking-tight">
+                                                            <CheckCircle2 className="h-2.5 w-2.5" />
+                                                            Sent
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[9px] font-black uppercase tracking-tight whitespace-nowrap">
+                                                            <Clock className="h-2.5 w-2.5" />
+                                                            Pending
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {activeSubTab === 'active' ? (
+                                            <div className="space-y-3">
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <div className="text-center p-2 bg-[#041b0f] rounded-lg border border-white/5">
+                                                        <p className="text-[8px] font-bold text-emerald-400/40 uppercase tracking-widest mb-1">Mgr</p>
+                                                        <p className={`text-xs font-black ${getDelayColor(mgrDelay)}`}>
+                                                            {mgrDelay !== null ? `${mgrDelay}d` : '—'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-center p-2 bg-[#041b0f] rounded-lg border border-white/5">
+                                                        <p className="text-[8px] font-bold text-emerald-400/40 uppercase tracking-widest mb-1">HR</p>
+                                                        <p className={`text-xs font-black ${getDelayColor(hrDelay)}`}>
+                                                            {hrDelay !== null ? `${hrDelay}d` : '—'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-center p-2 bg-[#041b0f] rounded-lg border border-white/5">
+                                                        <p className="text-[8px] font-bold text-emerald-400/40 uppercase tracking-widest mb-1">Share</p>
+                                                        <p className={`text-xs font-black ${getDelayColor(sharingDelay)}`}>
+                                                            {sharingDelay !== null ? `${sharingDelay}d` : '—'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center justify-between pt-2 border-t border-dashed border-white/5">
+                                                    <div className="text-[10px] text-emerald-400/40 font-bold uppercase tracking-tight">
+                                                        {record.createdAt && format(parseISO(record.createdAt), 'dd MMM yyyy')} • <span className="text-white">{record.createdByName?.split(' ')[0] || 'System'}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); navigate(`/finance/attendance/edit/${record.id}`); }} 
+                                                            className="p-2 text-emerald-400/40 hover:text-[#00D27F] hover:bg-white/5 rounded-lg transition-all border border-white/5"
+                                                        >
+                                                            <Edit2 className="h-4 w-4" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setRecordToDelete(record); setIsBulkDeleting(false); setShowDeleteModal(true); }} 
+                                                            className="p-2 text-rose-400/40 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all border border-white/5"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <div className="bg-rose-500/5 rounded-xl p-3 text-[11px] leading-relaxed italic text-rose-400/80 border border-rose-500/10 flex gap-2">
+                                                    <Info className="h-3.5 w-3.5 shrink-0 text-rose-500/50" />
+                                                    <span>"{record.deletedReason || 'No reason provided'}"</span>
+                                                </div>
+                                                <div className="flex items-center justify-between pt-1">
+                                                    <div className="text-[10px] text-emerald-400/40">
+                                                        <span className="font-bold text-white uppercase tracking-tight">{record.deletedByName || '—'}</span> • {record.deletedAt && format(parseISO(record.deletedAt), 'dd MMM, HH:mm')}
+                                                    </div>
+                                                    {isAdmin && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); handleRestore(record.id); }} 
+                                                                disabled={isRestoring === record.id}
+                                                                className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter text-[#041b0f] bg-[#00D27F] rounded-lg hover:bg-[#00b86e] disabled:opacity-50 shadow-lg shadow-emerald-500/10"
+                                                            >
+                                                                Restore
+                                                            </button>
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); handlePermanentDelete(record.id); }} 
+                                                                className="p-1.5 text-emerald-400/30 hover:text-rose-400 transition-colors"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
                         {/* Pagination */}
                         {totalPages > 1 && (
-                            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+                            <div className="px-5 py-4 border-t border-white/5 md:border-border flex flex-col md:flex-row items-center justify-between bg-[#041b0f]/30 md:bg-card gap-4 md:gap-0">
                                 <div className="flex items-center gap-4">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-400">Rows per page:</span>
-                                        <select
-                                            value={rowsPerPage}
-                                            onChange={(e) => {
-                                                setRowsPerPage(Number(e.target.value));
-                                                setCurrentPage(1);
-                                            }}
-                                            className="h-7 px-2 text-[11px] font-bold text-gray-600 bg-gray-50 border border-gray-200 rounded outline-none focus:border-emerald-500 transition-all cursor-pointer"
-                                        >
+                                        <span className="text-[10px] md:text-xs text-emerald-400/40 md:text-muted font-bold md:font-semibold uppercase md:uppercase tracking-widest md:tracking-wide">Rows:</span>
+                                            <select
+                                                value={rowsPerPage}
+                                                onChange={(e) => {
+                                                    setRowsPerPage(Number(e.target.value));
+                                                    setCurrentPage(1);
+                                                }}
+                                                className="h-8 md:h-9 px-2 text-[11px] md:text-xs font-black md:font-bold text-emerald-400 md:text-primary-text bg-[#041b0f] md:bg-page border border-white/10 md:border-border rounded-lg outline-none focus:border-[#00D27F] md:focus:border-emerald-500 transition-all cursor-pointer shadow-sm"
+                                            >
                                             <option value={10}>10</option>
                                             <option value={15}>15</option>
                                             <option value={20}>20</option>
                                             <option value={50}>50</option>
                                         </select>
                                     </div>
-                                    <p className="text-xs text-gray-400">
+                                    <p className="text-[10px] md:text-xs text-emerald-400/40 md:text-muted font-bold md:font-semibold uppercase md:uppercase tracking-tight md:tracking-wide">
                                         Showing {((currentPage - 1) * rowsPerPage) + 1}–{Math.min(currentPage * rowsPerPage, filteredRecords.length)} of {filteredRecords.length}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                        disabled={currentPage === 1}
-                                        className="px-2.5 py-1 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40"
-                                    >Prev</button>
-                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map(page => (
                                         <button
-                                            key={page}
-                                            onClick={() => setCurrentPage(page)}
-                                            className={`w-7 h-7 text-xs font-medium rounded-md transition-all ${page === currentPage ? 'bg-[#006B3F] text-white' : 'text-gray-500 hover:bg-gray-50'}`}
-                                        >{page}</button>
-                                    ))}
+                                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                            disabled={currentPage === 1}
+                                            className="px-3 md:px-4 py-1.5 md:h-9 text-[10px] md:text-xs font-black md:font-bold uppercase tracking-tighter md:tracking-wide text-emerald-400/60 md:text-primary-text bg-white/5 md:bg-page border border-white/5 md:border-border rounded-lg hover:bg-white/10 md:hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                                        >Prev</button>
+                                    <div className="flex items-center gap-1 mx-2">
+                                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map(page => (
+                                                <button
+                                                    key={page}
+                                                    onClick={() => setCurrentPage(page)}
+                                                    className={`w-8 h-8 md:w-9 md:h-9 text-xs font-black rounded-lg transition-all ${page === currentPage ? 'bg-[#00D27F] md:bg-emerald-600 text-[#041b0f] md:text-white shadow-lg md:shadow-sm shadow-emerald-500/20' : 'text-emerald-400/40 md:text-muted hover:text-emerald-400 md:hover:text-primary-text hover:bg-white/5 md:hover:bg-page border border-white/5 md:border-border'}`}
+                                                >{page}</button>
+                                        ))}
+                                    </div>
                                     <button
                                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                         disabled={currentPage === totalPages}
-                                        className="px-2.5 py-1 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40"
+                                        className="px-3 md:px-4 py-1.5 md:h-9 text-[10px] md:text-xs font-black md:font-bold uppercase tracking-tighter md:tracking-wide text-emerald-400/60 md:text-primary-text bg-white/5 md:bg-page border border-white/5 md:border-border rounded-lg hover:bg-white/10 md:hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
                                     >Next</button>
                                 </div>
                             </div>
@@ -876,47 +1016,47 @@ const SiteAttendanceTracker: React.FC = () => {
 
             {/* ── Import Preview Modal ── */}
             {previewData.length > 0 && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl w-full max-w-5xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-gray-200">
-                        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+                    <div className="bg-[#06251c] rounded-2xl w-full max-w-5xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-white/10">
+                        <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between">
                             <div>
-                                <h2 className="text-lg font-bold text-gray-900">Attendance Import Preview</h2>
-                                <p className="text-sm text-gray-500 mt-0.5">{previewData.length} records ready to import</p>
+                                <h2 className="text-lg font-bold text-white">Attendance Import Preview</h2>
+                                <p className="text-sm text-emerald-400/40 mt-0.5">{previewData.length} records ready to import</p>
                             </div>
-                            <button onClick={() => setPreviewData([])} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-                                <X className="h-5 w-5 text-gray-400" />
+                            <button onClick={() => setPreviewData([])} className="p-2 hover:bg-white/5 rounded-xl transition-colors">
+                                <X className="h-5 w-5 text-emerald-400/40" />
                             </button>
                         </div>
-                        <div className="flex-1 overflow-auto">
+                        <div className="flex-1 overflow-auto bg-[#041b0f]/50">
                             <table className="w-full text-sm">
-                                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                                <thead className="bg-[#041b0f] border-b border-white/5 sticky top-0 z-10">
                                     <tr>
-                                        <th className="px-5 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Site Name</th>
-                                        <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Company</th>
-                                        <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Billing</th>
-                                        <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Ops Incharge</th>
-                                        <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">HR Incharge</th>
+                                        <th className="px-5 py-3 text-left text-[11px] font-bold text-emerald-400/60 uppercase tracking-widest">Site Name</th>
+                                        <th className="px-4 py-3 text-left text-[11px] font-bold text-emerald-400/60 uppercase tracking-widest">Company</th>
+                                        <th className="px-4 py-3 text-left text-[11px] font-bold text-emerald-400/60 uppercase tracking-widest">Billing</th>
+                                        <th className="px-4 py-3 text-left text-[11px] font-bold text-emerald-400/60 uppercase tracking-widest">Ops Incharge</th>
+                                        <th className="px-4 py-3 text-left text-[11px] font-bold text-emerald-400/60 uppercase tracking-widest">HR Incharge</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-white/5">
                                     {previewData.map((record, idx) => (
-                                        <tr key={idx} className="hover:bg-gray-50/50">
-                                            <td className="px-5 py-3 font-semibold text-gray-900">{record.siteName}</td>
-                                            <td className="px-4 py-3 text-xs text-gray-600">{record.companyName}</td>
-                                            <td className="px-4 py-3 text-xs text-gray-600">{record.billingCycle}</td>
-                                            <td className="px-4 py-3 text-xs text-gray-600">{record.opsIncharge}</td>
-                                            <td className="px-4 py-3 text-xs text-gray-600">{record.hrIncharge}</td>
+                                        <tr key={idx} className="hover:bg-white/5 transition-colors">
+                                            <td className="px-5 py-3 font-bold text-white">{record.siteName}</td>
+                                            <td className="px-4 py-3 text-xs text-emerald-400/60">{record.companyName}</td>
+                                            <td className="px-4 py-3 text-xs text-emerald-400/60">{record.billingCycle}</td>
+                                            <td className="px-4 py-3 text-xs text-emerald-400/60">{record.opsIncharge}</td>
+                                            <td className="px-4 py-3 text-xs text-emerald-400/60">{record.hrIncharge}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
-                            <button onClick={() => setPreviewData([])} className="px-5 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+                        <div className="px-6 py-4 border-t border-white/5 bg-[#041b0f] flex justify-end gap-3">
+                            <button onClick={() => setPreviewData([])} className="px-5 py-2 text-sm font-bold text-emerald-400/60 hover:text-emerald-400 hover:bg-white/5 rounded-xl transition-all border border-white/10">Cancel</button>
                             <button
                                 onClick={handleConfirmImport}
                                 disabled={isImporting}
-                                className="inline-flex items-center gap-1.5 px-6 py-2 text-sm font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 px-6 py-2 text-sm font-black text-[#041b0f] bg-[#00D27F] rounded-xl hover:bg-[#00b86e] transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                             >
                                 {isImporting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                 Confirm Import
@@ -929,9 +1069,9 @@ const SiteAttendanceTracker: React.FC = () => {
             {/* Bulk Actions Bar */}
             {selectedIds.size > 0 && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <div className="bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6">
-                        <span className="text-sm font-medium border-r border-gray-700 pr-6">
-                            {selectedIds.size} records selected
+                    <div className="bg-[#041b0f] border border-[#00D27F]/20 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-6 backdrop-blur-xl">
+                        <span className="text-sm font-bold text-emerald-400 border-r border-white/10 pr-6 uppercase tracking-wider">
+                            {selectedIds.size} Selected
                         </span>
                         <div className="flex items-center gap-3">
                             {activeSubTab === 'active' ? (
@@ -940,34 +1080,34 @@ const SiteAttendanceTracker: React.FC = () => {
                                         setIsBulkDeleting(true);
                                         setShowDeleteModal(true);
                                     }}
-                                    className="flex items-center gap-2 px-4 py-1.5 bg-red-500 hover:bg-red-600 rounded-full text-xs font-bold transition-all"
+                                    className="flex items-center gap-2 px-5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs font-black uppercase tracking-tight transition-all shadow-lg shadow-rose-500/10"
                                 >
                                     <Trash2 size={14} />
-                                    Delete Selected
+                                    Delete
                                 </button>
                             ) : (
                                 <>
                                     <button
                                         onClick={handleBulkRestore}
                                         disabled={isRestoring === 'bulk'}
-                                        className="flex items-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-full text-xs font-bold transition-all disabled:opacity-50"
+                                        className="flex items-center gap-2 px-5 py-2 bg-[#00D27F] hover:bg-[#00b86e] text-[#041b0f] rounded-xl text-xs font-black uppercase tracking-tight transition-all disabled:opacity-50 shadow-lg shadow-emerald-500/20"
                                     >
                                         <RotateCcw size={14} className={isRestoring === 'bulk' ? 'animate-spin' : ''} />
-                                        Restore Selected
+                                        Restore
                                     </button>
                                     <button
                                         onClick={handleBulkPermanentDelete}
                                         disabled={!isAdmin}
-                                        className="flex items-center gap-2 px-4 py-1.5 bg-rose-600 hover:bg-rose-700 rounded-full text-xs font-bold transition-all disabled:opacity-50"
+                                        className="flex items-center gap-2 px-5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs font-black uppercase tracking-tight transition-all disabled:opacity-50"
                                     >
                                         <ShieldX size={14} />
-                                        Permanently Delete
+                                        Delete Forever
                                     </button>
                                 </>
                             )}
                             <button
                                 onClick={() => setSelectedIds(new Set())}
-                                className="px-4 py-1.5 hover:bg-white/10 rounded-full text-xs font-medium transition-all"
+                                className="px-4 py-2 hover:bg-white/5 rounded-xl text-xs font-bold text-emerald-400/60 hover:text-emerald-400 transition-all uppercase tracking-widest"
                             >
                                 Cancel
                             </button>
@@ -978,65 +1118,65 @@ const SiteAttendanceTracker: React.FC = () => {
 
             {/* Delete Modal */}
             {showDeleteModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="p-6">
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center text-red-600">
-                                    <Trash2 size={24} />
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
+                    <div className="bg-[#06251c] rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200 border border-white/5">
+                        <div className="p-8">
+                            <div className="flex items-center gap-5 mb-8">
+                                <div className="w-14 h-14 bg-rose-500/10 rounded-2xl flex items-center justify-center text-rose-500 border border-rose-500/20">
+                                    <Trash2 size={28} />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold text-gray-900">
+                                    <h3 className="text-xl font-black text-white uppercase tracking-tight leading-none">
                                         {isBulkDeleting ? `Delete ${selectedIds.size} Records` : 'Delete Record'}
                                     </h3>
-                                    <p className="text-sm text-gray-500 mt-1">
-                                        Records will be moved to the Deletion Log.
+                                    <p className="text-xs text-emerald-400/40 mt-2 font-bold uppercase tracking-widest">
+                                        Move to Deletion Log
                                     </p>
                                 </div>
                             </div>
 
                             {!isBulkDeleting && recordToDelete && (
-                                <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-100">
-                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Selected Site</p>
-                                    <p className="text-sm font-semibold text-gray-900">{recordToDelete.siteName}</p>
-                                    <p className="text-xs text-gray-500 mt-0.5">{recordToDelete.companyName}</p>
+                                <div className="bg-[#041b0f] rounded-2xl p-4 mb-8 border border-white/5">
+                                    <p className="text-[10px] font-black text-emerald-400/20 uppercase tracking-widest mb-2">Selected Site</p>
+                                    <p className="text-sm font-bold text-white">{recordToDelete.siteName}</p>
+                                    <p className="text-[10px] text-emerald-400/40 mt-1 font-bold uppercase tracking-wider">{recordToDelete.companyName}</p>
                                 </div>
                             )}
 
-                            <div className="mb-6">
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Reason for Deletion</label>
+                            <div className="mb-8">
+                                <label className="block text-xs font-black text-emerald-400/60 uppercase tracking-widest mb-3">Reason for Deletion</label>
                                 <textarea
                                     value={deleteReason}
                                     onChange={(e) => setDeleteReason(e.target.value)}
-                                    placeholder="Enter reason..."
-                                    className="w-full h-24 px-4 py-3 bg-gray-50 border-2 border-transparent focus:border-red-500 rounded-xl outline-none transition-all resize-none text-sm"
+                                    placeholder="Why are you deleting this?"
+                                    className="w-full h-28 px-4 py-4 bg-[#041b0f] border border-white/10 focus:border-rose-500/50 rounded-2xl outline-none transition-all resize-none text-sm text-white placeholder-emerald-800"
                                 />
                             </div>
 
-                            <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 mb-6 flex items-start gap-3">
-                                <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={16} />
-                                <p className="text-xs text-amber-800 leading-relaxed font-medium">
-                                    Records can be restored from the Deletion Log within 7 days. After 7 days, they will be permanently deleted.
+                            <div className="bg-amber-500/5 rounded-2xl p-4 border border-amber-500/10 mb-8 flex items-start gap-4">
+                                <AlertTriangle className="text-amber-500/40 flex-shrink-0 mt-0.5" size={18} />
+                                <p className="text-[11px] text-amber-200/50 leading-relaxed font-bold uppercase tracking-tight">
+                                    Restorable from Log within 7 days. After that, records purge automatically.
                                 </p>
                             </div>
 
-                            <div className="flex gap-3">
+                            <div className="flex gap-4">
                                 <button
                                     onClick={() => {
                                         setShowDeleteModal(false);
                                         setRecordToDelete(null);
                                         setIsBulkDeleting(false);
                                     }}
-                                    className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-all"
+                                    className="flex-1 py-4 px-4 bg-white/5 hover:bg-white/10 text-emerald-400 font-black uppercase tracking-widest rounded-2xl text-xs transition-all border border-white/5"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={() => handleDelete(deleteReason)}
                                     disabled={!deleteReason.trim() || isDeleting}
-                                    className="flex-2 py-3 px-6 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold shadow-lg shadow-red-200 transition-all flex items-center justify-center gap-2"
+                                    className="flex-[1.5] py-4 px-6 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-[#041b0f] rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-rose-500/20 transition-all flex items-center justify-center gap-2"
                                 >
-                                    {isDeleting ? 'Deleting...' : 'Confirm Deletion'}
+                                    {isDeleting ? 'Processing...' : 'Delete Now'}
                                 </button>
                             </div>
                         </div>

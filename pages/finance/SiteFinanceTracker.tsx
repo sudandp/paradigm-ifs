@@ -8,7 +8,7 @@ import { useAuthStore } from '../../store/authStore';
 import { format, startOfMonth } from 'date-fns';
 import { 
     Loader2, Plus, Edit2, Trash2, IndianRupee, FileSpreadsheet, TrendingUp, TrendingDown, 
-    ClipboardCheck, Building2, Download, Upload, AlertTriangle, RotateCcw, ShieldX, Search, Info 
+    ClipboardCheck, Building2, Download, Upload, AlertTriangle, RotateCcw, ShieldX, Search, Info, X
 } from 'lucide-react';
 import Toast from '../../components/ui/Toast';
 
@@ -448,20 +448,20 @@ const SiteFinanceTracker: React.FC = () => {
         <div className="space-y-6 w-full px-4">
 
             {/* ── Action Bar ── */}
-            <div className="bg-white rounded-xl border border-gray-200/80 shadow-sm p-5">
+            <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-200 shadow-sm p-4 md:p-5">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
                         <button
                             onClick={handleDownloadTemplate}
                             disabled={isExporting}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs font-semibold text-emerald-400 md:text-gray-600 bg-white/5 md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg hover:bg-white/10 md:hover:bg-gray-100 transition-all disabled:opacity-50"
                         >
                             {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                             Template
                         </button>
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98]"
+                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs font-semibold text-emerald-400 md:text-gray-600 bg-white/5 md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg hover:bg-white/10 md:hover:bg-gray-100 transition-all"
                         >
                             <Upload className="h-3.5 w-3.5" />
                             Import
@@ -469,26 +469,35 @@ const SiteFinanceTracker: React.FC = () => {
                         <button
                             onClick={handleExport}
                             disabled={isExporting}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs font-semibold text-emerald-400 md:text-gray-600 bg-white/5 md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg hover:bg-white/10 md:hover:bg-gray-100 transition-all disabled:opacity-50"
                         >
                             <FileSpreadsheet className="h-3.5 w-3.5" />
                             Export
                         </button>
-                        <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                        <div className="relative flex-1 md:w-64">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50" />
+                            <input
+                                type="text"
+                                placeholder="Search site..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full h-10 pl-9 pr-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-sm text-white md:text-gray-900 placeholder-emerald-500/30 md:placeholder-gray-400 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 focus:ring-1 focus:ring-[#00D27F] transition-all"
+                            />
+                        </div>
                         <input
                             type="month"
                             value={billingMonth.substring(0, 7)}
                             onChange={(e) => setBillingMonth(e.target.value + '-01')}
-                            className="h-9 px-3 text-sm bg-white border border-gray-200 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 outline-none transition-all"
+                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 transition-all"
                         />
                         <button
                             onClick={() => navigate('/finance/site-tracker/add')}
-                            className="inline-flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-[#006B3F] rounded-lg hover:bg-[#005632] transition-all duration-150 shadow-sm shadow-emerald-900/10 hover:shadow-md hover:shadow-emerald-900/15 hover:scale-[1.02] active:scale-[0.98]"
+                            className="whitespace-nowrap h-10 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-[#041b0f] md:text-white bg-[#00D27F] md:bg-emerald-600 rounded-lg hover:bg-[#00b86e] md:hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 md:shadow-none"
                         >
-                            <Plus className="h-3.5 w-3.5" />
-                            Add Record
+                            <Plus className="h-4 w-4" />
+                            <span className="hidden xs:inline">Add Site</span>
                         </button>
                     </div>
                 </div>
@@ -496,67 +505,67 @@ const SiteFinanceTracker: React.FC = () => {
 
             {/* ── KPI Summary Cards ── */}
             {!isLoading && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Total Variation */}
-                    <div className={`rounded-xl border p-5 transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 ${totalBillingVariation >= 0 ? 'bg-emerald-50/40 border-emerald-100' : 'bg-rose-50/40 border-rose-100'}`}>
+                    <div className={`rounded-xl border p-4 md:p-5 transition-all duration-150 shadow-sm ${totalBillingVariation >= 0 ? 'bg-emerald-500/10 md:bg-white border-emerald-500/20 md:border-emerald-100' : 'bg-rose-500/10 md:bg-white border-rose-500/20 md:border-rose-100'}`}>
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total Variation</p>
-                                <h3 className={`text-xl font-bold mt-1.5 ${totalBillingVariation >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatCurrency(totalBillingVariation)}</h3>
-                                <p className={`text-[10px] font-medium mt-1 ${totalBillingVariation >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                <p className="text-[10px] md:text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Total Variation</p>
+                                <h3 className={`text-lg md:text-xl font-bold mt-1.5 ${totalBillingVariation >= 0 ? 'text-emerald-400 md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`}>{formatCurrency(totalBillingVariation)}</h3>
+                                <p className={`text-[9px] md:text-[10px] font-medium mt-1 ${totalBillingVariation >= 0 ? 'text-emerald-500/80' : 'text-rose-500/80'}`}>
                                     {totalBillingVariation >= 0 ? '↑' : '↓'} Billing difference
                                 </p>
                             </div>
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${totalBillingVariation >= 0 ? 'bg-emerald-100' : 'bg-rose-100'}`}>
-                                <IndianRupee className={`h-5 w-5 ${totalBillingVariation >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} />
+                            <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center ${totalBillingVariation >= 0 ? 'bg-emerald-500/20 md:bg-emerald-50' : 'bg-rose-500/20 md:bg-rose-50'}`}>
+                                <IndianRupee className={`h-4 w-4 md:h-5 md:w-5 ${totalBillingVariation >= 0 ? 'text-emerald-400 md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`} />
                             </div>
                         </div>
                     </div>
 
                     {/* Fee Variation */}
-                    <div className={`rounded-xl border p-5 transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 ${totalFeeVariation >= 0 ? 'bg-emerald-50/40 border-emerald-100' : 'bg-rose-50/40 border-rose-100'}`}>
+                    <div className={`rounded-xl border p-4 md:p-5 transition-all duration-150 shadow-sm ${totalFeeVariation >= 0 ? 'bg-emerald-500/10 md:bg-white border-emerald-500/20 md:border-emerald-100' : 'bg-rose-500/10 md:bg-white border-rose-500/20 md:border-rose-100'}`}>
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Fee Variation</p>
-                                <h3 className={`text-xl font-bold mt-1.5 ${totalFeeVariation >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatCurrency(totalFeeVariation)}</h3>
-                                <p className={`text-[10px] font-medium mt-1 ${totalFeeVariation >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                <p className="text-[10px] md:text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Fee Variation</p>
+                                <h3 className={`text-lg md:text-xl font-bold mt-1.5 ${totalFeeVariation >= 0 ? 'text-emerald-400 md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`}>{formatCurrency(totalFeeVariation)}</h3>
+                                <p className={`text-[9px] md:text-[10px] font-medium mt-1 ${totalFeeVariation >= 0 ? 'text-emerald-500/80' : 'text-rose-500/80'}`}>
                                     {totalFeeVariation >= 0 ? '↑' : '↓'} Fee difference
                                 </p>
                             </div>
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${totalFeeVariation >= 0 ? 'bg-emerald-100' : 'bg-rose-100'}`}>
-                                {totalFeeVariation >= 0 ? <TrendingUp className="h-5 w-5 text-emerald-600" /> : <TrendingDown className="h-5 w-5 text-rose-600" />}
+                            <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center ${totalFeeVariation >= 0 ? 'bg-emerald-500/20 md:bg-emerald-50' : 'bg-rose-500/20 md:bg-rose-50'}`}>
+                                {totalFeeVariation >= 0 ? <TrendingUp className={`h-4 w-4 md:h-5 md:w-5 ${totalFeeVariation >= 0 ? 'text-emerald-400 md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`} /> : <TrendingDown className={`h-4 w-4 md:h-5 md:w-5 ${totalFeeVariation >= 0 ? 'text-emerald-400 md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`} />}
                             </div>
                         </div>
                     </div>
 
                     {/* Profit Sites */}
-                    <div className="bg-white rounded-xl border border-gray-200/80 p-5 transition-all duration-150 hover:shadow-md hover:-translate-y-0.5">
+                    <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-100 p-4 md:p-5 transition-all duration-150 shadow-sm">
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Profit Sites</p>
-                                <h3 className="text-xl font-bold text-gray-900 mt-1.5">{profitSitesCount} <span className="text-sm font-normal text-gray-400">/ {records.length}</span></h3>
-                                <p className="text-[10px] font-medium text-emerald-600 mt-1">
+                                <p className="text-[10px] md:text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Profit Sites</p>
+                                <h3 className="text-lg md:text-xl font-bold text-white md:text-gray-900 mt-1.5">{profitSitesCount} <span className="text-xs md:text-sm font-normal text-emerald-700">/ {records.length}</span></h3>
+                                <p className="text-[9px] md:text-[10px] font-medium text-emerald-400 md:text-emerald-600/80 mt-1">
                                     {records.length > 0 ? Math.round((profitSitesCount / records.length) * 100) : 0}% profitable
                                 </p>
                             </div>
-                            <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                                <TrendingUp className="h-5 w-5 text-emerald-600" />
+                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-emerald-500/10 md:bg-emerald-50 flex items-center justify-center border border-emerald-500/20 md:border-emerald-100">
+                                <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-emerald-400 md:text-emerald-600" />
                             </div>
                         </div>
                     </div>
 
                     {/* Total Records */}
-                    <div className="bg-white rounded-xl border border-gray-200/80 p-5 transition-all duration-150 hover:shadow-md hover:-translate-y-0.5">
+                    <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-100 p-4 md:p-5 transition-all duration-150 shadow-sm">
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total Records</p>
-                                <h3 className="text-xl font-bold text-gray-900 mt-1.5">{records.length}</h3>
-                                <p className="text-[10px] font-medium text-gray-400 mt-1">
+                                <p className="text-[10px] md:text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Total Records</p>
+                                <h3 className="text-lg md:text-xl font-bold text-white md:text-gray-900 mt-1.5">{records.length}</h3>
+                                <p className="text-[9px] md:text-[10px] font-medium text-emerald-400/50 md:text-gray-400 mt-1">
                                     For {format(new Date(billingMonth), 'MMM yyyy')}
                                 </p>
                             </div>
-                            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                                <Building2 className="h-5 w-5 text-gray-500" />
+                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white/5 md:bg-gray-50 flex items-center justify-center border border-white/10 md:border-gray-100">
+                                <Building2 className="h-4 w-4 md:h-5 md:w-5 text-emerald-400/70 md:text-gray-400" />
                             </div>
                         </div>
                     </div>
@@ -564,23 +573,23 @@ const SiteFinanceTracker: React.FC = () => {
             )}
 
             {/* ── Records Table ── */}
-            <div className="bg-white rounded-xl border border-gray-200/80 shadow-sm overflow-hidden">
+            <div className="bg-[#041b0f] md:bg-white rounded-2xl border border-white/5 md:border-gray-200 shadow-2xl md:shadow-sm overflow-hidden pb-4">
                 {/* Sub-Tabs & Search Bar */}
-                <div className="px-5 py-3 border-b border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center p-1 bg-gray-50 rounded-lg self-start">
+                <div className="px-6 py-4 border-b border-white/5 md:border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#06251c]/50 md:bg-gray-50/50">
+                    <div className="flex items-center p-1.5 bg-[#041b0f] md:bg-gray-100/50 rounded-xl self-start border border-white/5 md:border-gray-200">
                         <button
                             onClick={() => setActiveSubTab('active')}
-                            className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeSubTab === 'active' ? 'bg-white text-emerald-700 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-700'}`}
+                            className={`px-5 py-1.5 text-xs font-black rounded-lg transition-all uppercase tracking-widest ${activeSubTab === 'active' ? 'bg-[#00D27F] md:bg-white text-[#041b0f] md:text-emerald-700 shadow-lg md:shadow-sm shadow-emerald-500/20' : 'text-emerald-400/40 md:text-gray-500 hover:text-emerald-400 md:hover:text-gray-700'}`}
                         >
                             Active Records
                         </button>
                         <button
                             onClick={() => setActiveSubTab('log')}
-                            className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1.5 ${activeSubTab === 'log' ? 'bg-white text-emerald-700 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-700'}`}
+                            className={`px-5 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-2 uppercase tracking-widest ${activeSubTab === 'log' ? 'bg-[#00D27F] md:bg-white text-[#041b0f] md:text-emerald-700 shadow-lg md:shadow-sm shadow-emerald-500/20' : 'text-emerald-400/40 md:text-gray-500 hover:text-emerald-400 md:hover:text-gray-700'}`}
                         >
                             Deletion Log
                             {deletedRecords.length > 0 && (
-                                <span className={`flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] ${activeSubTab === 'log' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>
+                                <span className={`flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-black ${activeSubTab === 'log' ? 'bg-[#041b0f]/50 md:bg-gray-100' : 'bg-[#06251c] md:bg-gray-200 text-emerald-400 md:text-gray-600'}`}>
                                     {deletedRecords.length}
                                 </span>
                             )}
@@ -592,40 +601,43 @@ const SiteFinanceTracker: React.FC = () => {
                             <div className="relative flex-1 max-w-xs">
                                 <input
                                     type="text"
-                                    placeholder="Search..."
+                                    placeholder="Quick search..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full h-8 pl-8 pr-3 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 outline-none transition-all placeholder:text-gray-400"
+                                    className="w-full h-9 pl-9 pr-3 text-sm bg-[#041b0f] md:bg-white border border-white/10 md:border-gray-200 rounded-xl focus:border-[#00D27F] md:focus:border-emerald-500 outline-none transition-all placeholder:text-emerald-800 md:placeholder:text-gray-400 text-white md:text-gray-900"
                                 />
-                                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50 md:text-gray-400" />
                             </div>
-                            <span className="text-xs text-gray-400 font-medium whitespace-nowrap">{filteredRecords.length} found</span>
+                            <span className="text-[10px] text-emerald-400/40 font-black uppercase tracking-widest whitespace-nowrap">{filteredRecords.length} Records</span>
                         </div>
                     )}
                 </div>
 
                 {isLoading ? (
-                    <div className="flex flex-col items-center justify-center py-24 gap-3">
-                        <Loader2 className="h-7 w-7 animate-spin text-emerald-500" />
-                        <span className="text-sm text-gray-400 font-medium">Loading records...</span>
+                    <div className="flex flex-col items-center justify-center py-24 gap-4">
+                        <div className="relative">
+                            <Loader2 className="h-10 w-10 animate-spin text-[#00D27F]" />
+                            <div className="absolute inset-0 blur-lg bg-[#00D27F]/20 animate-pulse" />
+                        </div>
+                        <span className="text-xs text-emerald-400/40 font-black uppercase tracking-[0.2em]">Synchronizing Data...</span>
                     </div>
                 ) : currentRecords.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-5">
-                            <ClipboardCheck className="h-7 w-7 text-gray-400" />
+                        <div className="w-20 h-20 bg-white/5 rounded-[2.5rem] flex items-center justify-center mb-6 border border-white/5 rotate-3">
+                            <ClipboardCheck className="h-8 w-8 text-emerald-500/20" />
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900">
-                            {activeSubTab === 'active' ? 'No finance records found' : 'Deletion Log is empty'}
+                        <h3 className="text-lg font-black text-white uppercase tracking-tight">
+                            {activeSubTab === 'active' ? 'No Records Found' : 'Log is Empty'}
                         </h3>
-                        <p className="text-sm text-gray-500 mt-1.5 max-w-xs">
+                        <p className="text-xs text-emerald-400/40 mt-2 max-w-[240px] font-bold uppercase tracking-tight leading-relaxed">
                             {activeSubTab === 'active' 
-                                ? 'No records found for the selected month. Add your first record to get started.' 
-                                : 'No records have been deleted in the last 7 days.'}
+                                ? 'No finance entries for this period yet.' 
+                                : 'No deletions recorded in the trailing 7 days.'}
                         </p>
                         {activeSubTab === 'active' && (
                             <button
                                 onClick={() => navigate('/finance/site-tracker/add')}
-                                className="mt-5 inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold text-white bg-[#006B3F] rounded-lg hover:bg-[#005632] transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+                                className="mt-8 inline-flex items-center gap-2 px-6 py-3 text-xs font-black text-[#041b0f] bg-[#00D27F] rounded-xl hover:bg-[#00b86e] transition-all shadow-xl shadow-emerald-500/20 uppercase tracking-widest"
                             >
                                 <Plus className="h-4 w-4" />
                                 Add First Record
@@ -634,41 +646,42 @@ const SiteFinanceTracker: React.FC = () => {
                     </div>
                 ) : (
                     <>
-                        <div className="overflow-x-auto">
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="bg-gray-50/80 border-b border-gray-200">
+                                    <tr className="bg-[#041b0f] md:bg-gray-50 border-b border-white/5 md:border-gray-200">
                                         <th className="px-5 py-3 text-left w-10">
                                             <input 
                                                 type="checkbox" 
-                                                className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                className="w-4 h-4 rounded border-white/20 md:border-gray-300 bg-white/5 md:bg-white text-[#00D27F] md:text-emerald-600 focus:ring-[#00D27F] cursor-pointer"
                                                 checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))}
                                                 onChange={handleSelectAll}
                                             />
                                         </th>
-                                        <th className="px-5 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Client Name</th>
+                                        <th className="px-5 py-3 text-left text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Client Name</th>
                                         {activeSubTab === 'active' ? (
                                             <>
-                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Contract</th>
-                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Billed</th>
-                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Mgmt Fee</th>
-                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Billed Fee</th>
-                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Net Variation</th>
-                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Date</th>
+                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Contract</th>
+                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Billed</th>
+                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden md:table-cell">Mgmt Fee</th>
+                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden md:table-cell">Billed Fee</th>
+                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Net Variation</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Status</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden lg:table-cell">Date</th>
                                             </>
                                         ) : (
                                             <>
-                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Deleted By</th>
-                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Reason</th>
-                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Deleted At</th>
-                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Expires In</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Deleted By</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Reason</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Deleted At</th>
+                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Expires In</th>
                                             </>
                                         )}
-                                        <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-24">Actions</th>
+                                        <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider w-24">Actions</th>
                                     </tr>
                                     {/* Filter Row */}
-                                    <tr className="bg-white border-b border-gray-100">
+                                    <tr className="bg-[#06251c] md:bg-gray-50/50 border-b border-white/5 md:border-gray-100">
                                         <td className="px-5 py-2" />
                                         <td className="px-5 py-2">
                                             <input 
@@ -676,7 +689,7 @@ const SiteFinanceTracker: React.FC = () => {
                                                 placeholder="Filter Client..."
                                                 value={filters.siteName}
                                                 onChange={(e) => setFilters(prev => ({ ...prev, siteName: e.target.value }))}
-                                                className="w-full text-[10px] px-2 py-1 bg-gray-50 border border-gray-200 rounded focus:border-emerald-500 outline-none transition-all"
+                                                className="w-full text-[10px] px-2 py-1 bg-[#041b0f] md:bg-white border border-white/10 md:border-gray-200 rounded text-white md:text-gray-900 placeholder-emerald-800 md:placeholder-gray-400 focus:border-[#00D27F] md:focus:border-emerald-500 outline-none transition-all"
                                             />
                                         </td>
                                         {activeSubTab === 'active' ? (
@@ -690,7 +703,7 @@ const SiteFinanceTracker: React.FC = () => {
                                                     <select
                                                         value={filters.status}
                                                         onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                                                        className="w-full text-[10px] px-1 py-1 bg-gray-50 border border-gray-200 rounded focus:border-emerald-500 outline-none transition-all font-bold text-gray-600"
+                                                        className="w-full text-[10px] px-1 py-1 bg-[#041b0f] md:bg-white border border-white/10 md:border-gray-200 rounded focus:border-[#00D27F] md:focus:border-emerald-500 outline-none transition-all font-bold text-emerald-400 md:text-gray-600"
                                                     >
                                                         <option value="">All Status</option>
                                                         <option value="profit">Profit</option>
@@ -710,7 +723,7 @@ const SiteFinanceTracker: React.FC = () => {
                                         <td className="px-4 py-2" />
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-white/5">
                                     {paginatedRecords.map(record => {
                                         const bDiff = (record.billedAmount || 0) - (record.contractAmount || 0);
                                         const fDiff = (record.billedManagementFee || 0) - (record.contractManagementFee || 0);
@@ -727,20 +740,20 @@ const SiteFinanceTracker: React.FC = () => {
                                         }
 
                                         return (
-                                            <tr key={record.id} className={`hover:bg-gray-50/60 transition-colors duration-100 group ${isSelected ? 'bg-emerald-50/30' : ''}`}>
+                                            <tr key={record.id} className={`hover:bg-white/5 md:hover:bg-gray-50 transition-colors duration-100 group ${isSelected ? 'bg-emerald-500/10 md:bg-emerald-50' : ''}`}>
                                                 <td className="px-5 py-3.5">
                                                     <input 
                                                         type="checkbox" 
-                                                        className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                        className="w-4 h-4 rounded border-white/20 bg-white/5 text-[#00D27F] focus:ring-[#00D27F] cursor-pointer"
                                                         checked={isSelected}
                                                         onChange={() => handleSelectRow(record.id)}
                                                     />
                                                 </td>
                                                 <td className="px-5 py-3.5">
-                                                    <div className="font-semibold text-gray-900 text-sm">{record.siteName}</div>
-                                                    <div className="text-[11px] text-gray-400 mt-0.5">{record.companyName || '—'}</div>
+                                                    <div className="font-bold text-white md:text-gray-900 text-sm">{record.siteName}</div>
+                                                    <div className="text-[10px] text-emerald-400/30 md:text-gray-500 mt-1 font-bold uppercase tracking-wider">{record.companyName || '—'}</div>
                                                     {activeSubTab === 'log' && record.billingMonth && (
-                                                        <div className="text-[10px] text-emerald-600 font-bold mt-1 uppercase tracking-tighter">
+                                                        <div className="text-[10px] text-[#00D27F] font-black mt-1.5 uppercase tracking-tighter">
                                                             For {format(new Date(record.billingMonth), 'MMM yyyy')}
                                                         </div>
                                                     )}
@@ -748,56 +761,56 @@ const SiteFinanceTracker: React.FC = () => {
 
                                                 {activeSubTab === 'active' ? (
                                                     <>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-sm text-gray-600">{formatCurrency(record.contractAmount)}</td>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-sm font-semibold text-gray-900">{formatCurrency(record.billedAmount)}</td>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-sm text-gray-600 hidden md:table-cell">{formatCurrency(record.contractManagementFee)}</td>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-sm font-semibold text-gray-900 hidden md:table-cell">{formatCurrency(record.billedManagementFee)}</td>
-                                                        <td className={`px-4 py-3.5 text-right font-mono text-sm font-bold ${isProfit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-sm text-emerald-400/40 md:text-gray-400">{formatCurrency(record.contractAmount)}</td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-sm font-black text-white md:text-gray-900">{formatCurrency(record.billedAmount)}</td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-sm text-emerald-400/40 md:text-gray-400 hidden md:table-cell">{formatCurrency(record.contractManagementFee)}</td>
+                                                        <td className="px-4 py-3.5 text-right font-mono text-sm font-black text-white md:text-gray-900 hidden md:table-cell">{formatCurrency(record.billedManagementFee)}</td>
+                                                        <td className={`px-4 py-3.5 text-right font-mono text-sm font-black ${isProfit ? 'text-[#00D27F] md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`}>
                                                             {isProfit ? '+' : ''}{formatCurrency(bDiff + fDiff)}
                                                         </td>
                                                         <td className="px-4 py-3.5 text-center">
-                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${isProfit ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${isProfit ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight ${isProfit ? 'bg-emerald-500/10 md:bg-emerald-50 text-[#00D27F] md:text-emerald-700' : 'bg-rose-500/10 md:bg-rose-50 text-rose-400 md:text-rose-700'}`}>
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${isProfit ? 'bg-[#00D27F]' : 'bg-rose-400'}`} />
                                                                 {isProfit ? 'Profit' : 'Loss'}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3.5 hidden lg:table-cell">
-                                                            <div className="flex flex-col gap-0.5">
+                                                        <td className="px-4 py-3.5 hidden lg:table-cell text-right">
+                                                            <div className="flex flex-col gap-0.5 items-end">
                                                                 {(record.createdByName || record.createdByRole) && (
                                                                     <div className="flex items-center gap-1.5">
                                                                         {record.createdByName && (
-                                                                            <span className="text-[11px] font-bold text-gray-700">{record.createdByName.split(' ')[0]}</span>
+                                                                            <span className="text-[10px] font-black text-white md:text-gray-900 uppercase tracking-tighter">{record.createdByName.split(' ')[0]}</span>
                                                                         )}
                                                                         {record.createdByRole && (
-                                                                            <span className="text-[9px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-black uppercase tracking-tighter">
+                                                                            <span className="text-[8px] px-1.5 py-0.5 bg-white/5 md:bg-gray-100 text-emerald-400/40 md:text-gray-500 rounded-md font-black uppercase tracking-widest border border-white/5 md:border-gray-200">
                                                                                 {record.createdByRole.replace('_', ' ')}
                                                                             </span>
                                                                         )}
                                                                     </div>
                                                                 )}
-                                                                {record.createdAt && <div className="text-[10px] text-gray-400">{format(new Date(record.createdAt), 'MMM d, h:mm a')}</div>}
+                                                                {record.createdAt && <div className="text-[9px] font-bold text-emerald-400/20 md:text-gray-400 uppercase tracking-widest">{format(new Date(record.createdAt), 'MMM d, h:mm a')}</div>}
                                                             </div>
                                                         </td>
                                                         <td className="px-4 py-3.5 text-right">
-                                                            <div className="flex items-center justify-end gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity duration-150">
-                                                                <button onClick={() => navigate(`/finance/site-tracker/edit/${record.id}`)} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-all" title="Edit">
-                                                                    <Edit2 className="h-3.5 w-3.5" />
+                                                            <div className="flex items-center justify-end gap-1 opacity-20 group-hover:opacity-100 transition-all duration-200">
+                                                                <button onClick={() => navigate(`/finance/site-tracker/edit/${record.id}`)} className="p-2 text-emerald-400/40 md:text-gray-400 hover:text-[#00D27F] md:hover:text-emerald-600 hover:bg-white/5 md:hover:bg-gray-100 rounded-xl transition-all border border-white/5 md:border-gray-100 shadow-sm" title="Edit">
+                                                                    <Edit2 className="h-4 w-4" />
                                                                 </button>
-                                                                <button onClick={() => { setRecordToDelete(record); setIsBulkDeleting(false); setShowDeleteModal(true); }} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all" title="Delete">
-                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                <button onClick={() => { setRecordToDelete(record); setIsBulkDeleting(false); setShowDeleteModal(true); }} className="p-2 text-emerald-400/40 md:text-gray-400 hover:text-rose-400 md:hover:text-rose-600 hover:bg-rose-500/10 md:hover:bg-rose-50 rounded-xl transition-all border border-white/5 md:border-gray-100 shadow-sm" title="Delete">
+                                                                    <Trash2 className="h-4 w-4" />
                                                                 </button>
                                                             </div>
                                                         </td>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <td className="px-4 py-3.5 text-sm text-gray-600">{record.deletedByName || '—'}</td>
-                                                        <td className="px-4 py-3.5 text-[11px] text-gray-500 max-w-[200px] truncate" title={record.deletedReason}>{record.deletedReason || '—'}</td>
-                                                        <td className="px-4 py-3.5 text-[11px] text-gray-400">
+                                                        <td className="px-4 py-3.5 text-sm font-bold text-white md:text-gray-900">{record.deletedByName || '—'}</td>
+                                                        <td className="px-4 py-3.5 text-[11px] text-emerald-400/60 md:text-gray-600 font-medium max-w-[200px] truncate italic" title={record.deletedReason}>"{record.deletedReason || 'No reason'}"</td>
+                                                        <td className="px-4 py-3.5 text-[11px] text-emerald-400/40 md:text-gray-500 font-bold uppercase tracking-tighter">
                                                             {record.deletedAt && format(new Date(record.deletedAt), 'MMM d, h:mm a')}
                                                         </td>
-                                                        <td className="px-4 py-3.5 text-right text-[11px] font-bold text-rose-500">
-                                                            {daysRemaining} days
+                                                        <td className={`px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-widest ${daysRemaining <= 2 ? 'text-rose-400 animate-pulse' : 'text-emerald-400/60'}`}>
+                                                            {daysRemaining}d Left
                                                         </td>
                                                         <td className="px-4 py-3.5 text-right">
                                                             {user?.role === 'admin' ? (
@@ -805,21 +818,21 @@ const SiteFinanceTracker: React.FC = () => {
                                                                     <button 
                                                                         onClick={() => handleRestoreRecord(record.id)} 
                                                                         disabled={isRestoring === record.id}
-                                                                        className="px-2.5 py-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 rounded-md hover:bg-emerald-100 transition-all flex items-center gap-1 disabled:opacity-50"
+                                                                        className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter text-[#041b0f] md:text-white bg-[#00D27F] md:bg-emerald-600 rounded-lg hover:bg-[#00b86e] md:hover:bg-emerald-700 transition-all flex items-center gap-1.5 disabled:opacity-50 shadow-lg md:shadow-none shadow-emerald-500/10"
                                                                     >
                                                                         {isRestoring === record.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <TrendingUp className="h-3 w-3" />}
                                                                         Restore
                                                                     </button>
                                                                     <button 
                                                                         onClick={() => handlePermanentDelete(record.id)} 
-                                                                        className="p-1.5 text-gray-300 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all"
+                                                                        className="p-1.5 text-emerald-400/20 hover:text-rose-400 transition-colors"
                                                                         title="Permanently Delete"
                                                                     >
                                                                         <Trash2 className="h-3.5 w-3.5" />
                                                                     </button>
                                                                 </div>
                                                             ) : (
-                                                                <span className="text-[10px] font-medium text-gray-400 italic">Admin only</span>
+                                                                <span className="text-[10px] font-black text-emerald-400/20 uppercase tracking-widest italic">Admin Controlled</span>
                                                             )}
                                                         </td>
                                                     </>
@@ -831,47 +844,166 @@ const SiteFinanceTracker: React.FC = () => {
                             </table>
                         </div>
 
+                        {/* Mobile Card-Based List View */}
+                        <div className="md:hidden divide-y divide-gray-100">
+                            {paginatedRecords.map(record => {
+                                const bDiff = (record.billedAmount || 0) - (record.contractAmount || 0);
+                                const fDiff = (record.billedManagementFee || 0) - (record.contractManagementFee || 0);
+                                const isProfit = bDiff + fDiff >= 0;
+                                const isSelected = selectedIds.has(record.id);
+
+                                return (
+                                    <div 
+                                        key={record.id} 
+                                        className={`p-4 transition-all duration-150 border-b border-white/5 ${isSelected ? 'bg-emerald-500/10' : 'active:bg-white/5'}`}
+                                        onClick={(e) => {
+                                            // Handle row selection on click as well for mobile accessibility
+                                            if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
+                                            handleSelectRow(record.id);
+                                        }}
+                                    >
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex items-start gap-3">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="w-4 h-4 mt-1 rounded border-white/20 bg-white/5 text-[#00D27F] focus:ring-[#00D27F] cursor-pointer"
+                                                    checked={isSelected}
+                                                    onChange={() => handleSelectRow(record.id)}
+                                                />
+                                                <div>
+                                                    <h4 className="font-bold text-white leading-tight">{record.siteName}</h4>
+                                                    <p className="text-[10px] text-emerald-400/50 font-medium uppercase mt-0.5">{record.companyName || '—'}</p>
+                                                    {activeSubTab === 'log' && record.billingMonth && (
+                                                        <span className="inline-block mt-1 px-1.5 py-0.5 bg-emerald-500/10 text-[#00D27F] text-[9px] font-black rounded tracking-tighter uppercase">
+                                                            {format(new Date(record.billingMonth), 'MMM yyyy')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {activeSubTab === 'active' && (
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${isProfit ? 'bg-emerald-500/10 text-[#00D27F]' : 'bg-rose-500/10 text-rose-400'}`}>
+                                                    {isProfit ? 'Profit' : 'Loss'}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {activeSubTab === 'active' ? (
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="p-3 bg-[#041b0f] rounded-xl border border-white/5">
+                                                        <p className="text-[8px] font-black text-emerald-400/20 uppercase tracking-[0.2em] mb-1">Contract</p>
+                                                        <p className="text-xs font-mono font-bold text-emerald-400/60">
+                                                            {formatCurrency((record.contractAmount || 0) + (record.contractManagementFee || 0))}
+                                                        </p>
+                                                    </div>
+                                                    <div className="p-3 bg-[#041b0f] rounded-xl border border-white/5 text-right">
+                                                        <p className="text-[8px] font-black text-emerald-400/20 uppercase tracking-[0.2em] mb-1">Billed</p>
+                                                        <p className="text-sm font-mono font-black text-white">
+                                                            {formatCurrency((record.billedAmount || 0) + (record.billedManagementFee || 0))}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center justify-between pt-2">
+                                                    <div>
+                                                        <p className="text-[8px] font-black text-emerald-400/20 uppercase tracking-[0.2em] mb-1">Net Variation</p>
+                                                        <p className={`text-sm font-mono font-black ${isProfit ? 'text-[#00D27F]' : 'text-rose-400'}`}>
+                                                            {isProfit ? '+' : ''}{formatCurrency(bDiff + fDiff)}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); navigate(`/finance/site-tracker/edit/${record.id}`); }} 
+                                                            className="p-2.5 text-emerald-400/40 hover:text-[#00D27F] hover:bg-white/5 rounded-xl transition-all border border-white/5"
+                                                        >
+                                                            <Edit2 className="h-4 w-4" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setRecordToDelete(record); setIsBulkDeleting(false); setShowDeleteModal(true); }} 
+                                                            className="p-2.5 text-emerald-400/40 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all border border-white/5"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <div className="bg-rose-500/5 rounded-xl p-3 text-[11px] leading-relaxed italic text-rose-400/80 border border-rose-500/10 flex gap-2">
+                                                    <Info className="h-3.5 w-3.5 shrink-0 text-rose-500/50" />
+                                                    <span>"{record.deletedReason || 'No reason provided'}"</span>
+                                                </div>
+                                                <div className="flex items-center justify-between pt-1">
+                                                    <div className="text-[10px] text-emerald-400/40">
+                                                        <span className="font-bold text-white uppercase tracking-tight">{record.deletedByName || '—'}</span> • {record.deletedAt && format(new Date(record.deletedAt), 'dd MMM, HH:mm')}
+                                                    </div>
+                                                    {user?.role === 'admin' && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); handleRestoreRecord(record.id); }} 
+                                                                disabled={isRestoring === record.id}
+                                                                className="px-3 py-1.5 text-[10px] font-black uppercase tracking-tighter text-[#041b0f] bg-[#00D27F] rounded-lg hover:bg-[#00b86e] disabled:opacity-50 shadow-lg shadow-emerald-500/10"
+                                                            >
+                                                                Restore
+                                                            </button>
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); handlePermanentDelete(record.id); }} 
+                                                                className="p-1.5 text-emerald-400/30 hover:text-rose-400 transition-colors"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
                         {/* Pagination */}
                         {totalPages > 1 && (
-                            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+                            <div className="px-5 py-4 border-t border-white/5 md:border-border flex flex-col md:flex-row items-center justify-between bg-[#041b0f]/30 md:bg-card gap-4 md:gap-0">
                                 <div className="flex items-center gap-4">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-400">Rows per page:</span>
-                                        <select
-                                            value={rowsPerPage}
-                                            onChange={(e) => {
-                                                setRowsPerPage(Number(e.target.value));
-                                                setCurrentPage(1);
-                                            }}
-                                            className="h-7 px-2 text-[11px] font-bold text-gray-600 bg-gray-50 border border-gray-200 rounded outline-none focus:border-emerald-500 transition-all cursor-pointer"
-                                        >
+                                        <span className="text-[10px] md:text-xs text-emerald-400/40 md:text-muted font-bold md:font-semibold uppercase md:uppercase tracking-widest md:tracking-wide">Rows:</span>
+                                            <select
+                                                value={rowsPerPage}
+                                                onChange={(e) => {
+                                                    setRowsPerPage(Number(e.target.value));
+                                                    setCurrentPage(1);
+                                                }}
+                                                className="h-8 md:h-9 px-2 text-[11px] md:text-xs font-black md:font-bold text-emerald-400 md:text-primary-text bg-[#041b0f] md:bg-page border border-white/10 md:border-border rounded-lg outline-none focus:border-[#00D27F] md:focus:border-emerald-500 transition-all cursor-pointer shadow-sm"
+                                            >
                                             <option value={10}>10</option>
                                             <option value={15}>15</option>
                                             <option value={20}>20</option>
                                             <option value={50}>50</option>
                                         </select>
                                     </div>
-                                    <p className="text-xs text-gray-400">
+                                    <p className="text-[10px] md:text-xs text-emerald-400/40 md:text-muted font-bold md:font-semibold uppercase md:uppercase tracking-tight md:tracking-wide">
                                         Showing {((currentPage - 1) * rowsPerPage) + 1}–{Math.min(currentPage * rowsPerPage, filteredRecords.length)} of {filteredRecords.length}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                        disabled={currentPage === 1}
-                                        className="px-2.5 py-1 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                                    >Prev</button>
-                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                                         <button
-                                            key={page}
-                                            onClick={() => setCurrentPage(page)}
-                                            className={`w-7 h-7 text-xs font-medium rounded-md transition-all ${page === currentPage ? 'bg-[#006B3F] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
-                                        >{page}</button>
-                                    ))}
+                                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                            disabled={currentPage === 1}
+                                            className="px-3 md:px-4 py-1.5 md:h-9 text-[10px] md:text-xs font-black md:font-bold uppercase tracking-tighter md:tracking-wide text-emerald-400/60 md:text-primary-text bg-white/5 md:bg-page border border-white/5 md:border-border rounded-lg hover:bg-white/10 md:hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                                        >Prev</button>
+                                    <div className="flex items-center gap-1 mx-2">
+                                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                                <button
+                                                    key={page}
+                                                    onClick={() => setCurrentPage(page)}
+                                                    className={`w-8 h-8 md:w-9 md:h-9 text-xs font-black rounded-lg transition-all ${page === currentPage ? 'bg-[#00D27F] md:bg-emerald-600 text-[#041b0f] md:text-white shadow-lg md:shadow-sm shadow-emerald-500/20' : 'text-emerald-400/40 md:text-muted hover:text-emerald-400 md:hover:text-primary-text hover:bg-white/5 md:hover:bg-page border border-white/5 md:border-border'}`}
+                                                >{page}</button>
+                                        ))}
+                                    </div>
                                     <button
                                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                         disabled={currentPage === totalPages}
-                                        className="px-2.5 py-1 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                        className="px-3 md:px-4 py-1.5 md:h-9 text-[10px] md:text-xs font-black md:font-bold uppercase tracking-tighter md:tracking-wide text-emerald-400/60 md:text-primary-text bg-white/5 md:bg-page border border-white/5 md:border-border rounded-lg hover:bg-white/10 md:hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
                                     >Next</button>
                                 </div>
                             </div>
@@ -884,46 +1016,46 @@ const SiteFinanceTracker: React.FC = () => {
 
             {/* ── Import Preview Modal ── */}
             {previewData.length > 0 && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl w-full max-w-5xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-gray-200">
-                        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+                    <div className="bg-[#06251c] rounded-2xl w-full max-w-5xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-white/10">
+                        <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between">
                             <div>
-                                <h2 className="text-lg font-bold text-gray-900">Import Preview</h2>
-                                <p className="text-sm text-gray-500 mt-0.5">{previewData.length} records ready to import</p>
+                                <h2 className="text-lg font-bold text-white">Financial Import Preview</h2>
+                                <p className="text-sm text-emerald-400/40 mt-0.5">{previewData.length} records ready to import</p>
                             </div>
-                            <button onClick={() => setPreviewData([])} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-                                <Plus className="h-5 w-5 rotate-45 text-gray-400" />
+                            <button onClick={() => setPreviewData([])} className="p-2 hover:bg-white/5 rounded-xl transition-colors">
+                                <X className="h-5 w-5 text-emerald-400/40" />
                             </button>
                         </div>
-                        <div className="flex-1 overflow-auto">
+                        <div className="flex-1 overflow-auto bg-[#041b0f]/50">
                             <table className="w-full text-sm">
-                                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                                <thead className="bg-[#041b0f] border-b border-white/5 sticky top-0 z-10">
                                     <tr>
-                                        <th className="px-5 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Site Name</th>
-                                        <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Contract</th>
-                                        <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Fee</th>
-                                        <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Billed</th>
-                                        <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Billed Fee</th>
-                                        <th className="px-4 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Net Var</th>
+                                        <th className="px-5 py-3 text-left text-[11px] font-bold text-emerald-400/60 uppercase tracking-widest">Site Name</th>
+                                        <th className="px-4 py-3 text-right text-[11px] font-bold text-emerald-400/60 uppercase tracking-widest">Contract</th>
+                                        <th className="px-4 py-3 text-right text-[11px] font-bold text-emerald-400/60 uppercase tracking-widest">Fee</th>
+                                        <th className="px-4 py-3 text-right text-[11px] font-bold text-emerald-400/60 uppercase tracking-widest">Billed</th>
+                                        <th className="px-4 py-3 text-right text-[11px] font-bold text-emerald-400/60 uppercase tracking-widest">Billed Fee</th>
+                                        <th className="px-4 py-3 text-right text-[11px] font-bold text-emerald-400/60 uppercase tracking-widest">Net Var</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-white/5">
                                     {previewData.map((record, idx) => {
                                         const totalContract = (record.contractAmount || 0) + (record.contractManagementFee || 0);
                                         const totalBilled = (record.billedAmount || 0) + (record.billedManagementFee || 0);
                                         const variations = totalBilled - totalContract;
                                         const isProfit = variations >= 0;
                                         return (
-                                            <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                                            <tr key={idx} className="hover:bg-white/5 transition-colors">
                                                 <td className="px-5 py-3">
-                                                    <div className="font-semibold text-gray-900">{record.siteName}</div>
-                                                    <div className="text-[11px] text-gray-400 mt-0.5">{record.companyName}</div>
+                                                    <div className="font-bold text-white">{record.siteName}</div>
+                                                    <div className="text-[10px] text-emerald-400/40 mt-1 font-bold uppercase tracking-wider">{record.companyName}</div>
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-mono text-gray-600">{formatCurrency(record.contractAmount || 0)}</td>
-                                                <td className="px-4 py-3 text-right font-mono text-gray-600">{formatCurrency(record.contractManagementFee || 0)}</td>
-                                                <td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">{formatCurrency(record.billedAmount || 0)}</td>
-                                                <td className="px-4 py-3 text-right font-mono font-semibold text-gray-900">{formatCurrency(record.billedManagementFee || 0)}</td>
-                                                <td className={`px-4 py-3 text-right font-mono font-bold ${isProfit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                <td className="px-4 py-3 text-right font-mono text-emerald-400/60">{formatCurrency(record.contractAmount || 0)}</td>
+                                                <td className="px-4 py-3 text-right font-mono text-emerald-400/60">{formatCurrency(record.contractManagementFee || 0)}</td>
+                                                <td className="px-4 py-3 text-right font-mono font-bold text-white">{formatCurrency(record.billedAmount || 0)}</td>
+                                                <td className="px-4 py-3 text-right font-mono font-bold text-white">{formatCurrency(record.billedManagementFee || 0)}</td>
+                                                <td className={`px-4 py-3 text-right font-mono font-black ${isProfit ? 'text-[#00D27F]' : 'text-rose-400'}`}>
                                                     {isProfit ? '+' : ''}{formatCurrency(variations)}
                                                 </td>
                                             </tr>
@@ -932,12 +1064,12 @@ const SiteFinanceTracker: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
-                        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
-                            <button onClick={() => setPreviewData([])} className="px-5 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all">Cancel</button>
+                        <div className="px-6 py-4 border-t border-white/5 bg-[#041b0f] flex justify-end gap-3">
+                            <button onClick={() => setPreviewData([])} className="px-5 py-2 text-sm font-bold text-emerald-400/60 hover:text-emerald-400 hover:bg-white/5 rounded-xl transition-all border border-white/10">Cancel</button>
                             <button
                                 onClick={handleConfirmImport}
                                 disabled={isImporting}
-                                className="inline-flex items-center gap-1.5 px-6 py-2 text-sm font-bold text-white bg-[#006B3F] rounded-lg hover:bg-[#005632] transition-all shadow-sm disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 px-6 py-2 text-sm font-black text-[#041b0f] bg-[#00D27F] rounded-xl hover:bg-[#00b86e] transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                             >
                                 {isImporting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                 Confirm Import
@@ -950,9 +1082,9 @@ const SiteFinanceTracker: React.FC = () => {
             {/* Bulk Actions Bar */}
             {selectedIds.size > 0 && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <div className="bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6">
-                        <span className="text-sm font-medium border-r border-gray-700 pr-6">
-                            {selectedIds.size} records selected
+                    <div className="bg-[#041b0f] border border-[#00D27F]/20 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-6 backdrop-blur-xl">
+                        <span className="text-sm font-bold text-emerald-400 border-r border-white/10 pr-6 uppercase tracking-wider">
+                            {selectedIds.size} Selected
                         </span>
                         <div className="flex items-center gap-3">
                             {activeSubTab === 'active' ? (
@@ -961,34 +1093,34 @@ const SiteFinanceTracker: React.FC = () => {
                                         setIsBulkDeleting(true);
                                         setShowDeleteModal(true);
                                     }}
-                                    className="flex items-center gap-2 px-4 py-1.5 bg-red-500 hover:bg-red-600 rounded-full text-xs font-bold transition-all"
+                                    className="flex items-center gap-2 px-5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs font-black uppercase tracking-tight transition-all shadow-lg shadow-rose-500/10"
                                 >
                                     <Trash2 size={14} />
-                                    Delete Selected
+                                    Delete
                                 </button>
                             ) : (
                                 <>
                                     <button
                                         onClick={handleBulkRestore}
                                         disabled={isRestoring === 'bulk'}
-                                        className="flex items-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-full text-xs font-bold transition-all disabled:opacity-50"
+                                        className="flex items-center gap-2 px-5 py-2 bg-[#00D27F] hover:bg-[#00b86e] text-[#041b0f] rounded-xl text-xs font-black uppercase tracking-tight transition-all disabled:opacity-50 shadow-lg shadow-emerald-500/20"
                                     >
                                         <RotateCcw size={14} className={isRestoring === 'bulk' ? 'animate-spin' : ''} />
-                                        Restore Selected
+                                        Restore
                                     </button>
                                     <button
                                         onClick={handleBulkPermanentDelete}
                                         disabled={!isAdmin}
-                                        className="flex items-center gap-2 px-4 py-1.5 bg-rose-600 hover:bg-rose-700 rounded-full text-xs font-bold transition-all disabled:opacity-50"
+                                        className="flex items-center gap-2 px-5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs font-black uppercase tracking-tight transition-all disabled:opacity-50"
                                     >
                                         <ShieldX size={14} />
-                                        Permanently Delete
+                                        Delete Forever
                                     </button>
                                 </>
                             )}
                             <button
                                 onClick={() => setSelectedIds(new Set())}
-                                className="px-4 py-1.5 hover:bg-white/10 rounded-full text-xs font-medium transition-all"
+                                className="px-4 py-2 hover:bg-white/5 rounded-xl text-xs font-bold text-emerald-400/60 hover:text-emerald-400 transition-all uppercase tracking-widest"
                             >
                                 Cancel
                             </button>
@@ -999,65 +1131,65 @@ const SiteFinanceTracker: React.FC = () => {
 
             {/* Delete Modal */}
             {showDeleteModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="p-6">
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center text-red-600">
-                                    <Trash2 size={24} />
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+                    <div className="bg-[#06251c] rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200 border border-white/5">
+                        <div className="p-8">
+                            <div className="flex items-center gap-5 mb-8">
+                                <div className="w-14 h-14 bg-rose-500/10 rounded-2xl flex items-center justify-center text-rose-500 border border-rose-500/20">
+                                    <Trash2 size={28} />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold text-gray-900">
+                                    <h3 className="text-xl font-black text-white uppercase tracking-tight leading-none">
                                         {isBulkDeleting ? `Delete ${selectedIds.size} Records` : 'Delete Record'}
                                     </h3>
-                                    <p className="text-sm text-gray-500 mt-1">
-                                        Records will be moved to the Deletion Log.
+                                    <p className="text-xs text-emerald-400/40 mt-2 font-bold uppercase tracking-widest">
+                                        Move to Deletion Log
                                     </p>
                                 </div>
                             </div>
 
                             {!isBulkDeleting && recordToDelete && (
-                                <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-100">
-                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Selected Site</p>
-                                    <p className="text-sm font-semibold text-gray-900">{recordToDelete.siteName}</p>
-                                    <p className="text-xs text-gray-500 mt-0.5">{recordToDelete.companyName}</p>
+                                <div className="bg-[#041b0f] rounded-2xl p-4 mb-8 border border-white/5">
+                                    <p className="text-[10px] font-black text-emerald-400/20 uppercase tracking-widest mb-2">Selected Site</p>
+                                    <p className="text-sm font-bold text-white">{recordToDelete.siteName}</p>
+                                    <p className="text-[10px] text-emerald-400/40 mt-1 font-bold uppercase tracking-wider">{recordToDelete.companyName}</p>
                                 </div>
                             )}
 
-                            <div className="mb-6">
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Reason for Deletion</label>
+                            <div className="mb-8">
+                                <label className="block text-xs font-black text-emerald-400/60 uppercase tracking-widest mb-3">Reason for Deletion</label>
                                 <textarea
                                     value={deleteReason}
                                     onChange={(e) => setDeleteReason(e.target.value)}
-                                    placeholder="Enter reason..."
-                                    className="w-full h-24 px-4 py-3 bg-gray-50 border-2 border-transparent focus:border-red-500 rounded-xl outline-none transition-all resize-none text-sm"
+                                    placeholder="Why are you deleting this?"
+                                    className="w-full h-28 px-4 py-4 bg-[#041b0f] border border-white/10 focus:border-rose-500/50 rounded-2xl outline-none transition-all resize-none text-sm text-white placeholder-emerald-800"
                                 />
                             </div>
 
-                            <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 mb-6 flex items-start gap-3">
-                                <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={16} />
-                                <p className="text-xs text-amber-800 leading-relaxed font-medium">
-                                    Records can be restored from the Deletion Log within 7 days. After 7 days, they will be permanently deleted.
+                            <div className="bg-amber-500/5 rounded-2xl p-4 border border-amber-500/10 mb-8 flex items-start gap-4">
+                                <AlertTriangle className="text-amber-500/40 flex-shrink-0 mt-0.5" size={18} />
+                                <p className="text-[11px] text-amber-200/50 leading-relaxed font-bold uppercase tracking-tight">
+                                    Restorable from Log within 7 days. After that, records purge automatically.
                                 </p>
                             </div>
 
-                            <div className="flex gap-3">
+                            <div className="flex gap-4">
                                 <button
                                     onClick={() => {
                                         setShowDeleteModal(false);
                                         setRecordToDelete(null);
                                         setIsBulkDeleting(false);
                                     }}
-                                    className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-all"
+                                    className="flex-1 py-4 px-4 bg-white/5 hover:bg-white/10 text-emerald-400 font-black uppercase tracking-widest rounded-2xl text-xs transition-all border border-white/5"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={() => handleDelete(deleteReason)}
                                     disabled={!deleteReason.trim() || isDeleting}
-                                    className="flex-2 py-3 px-6 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold shadow-lg shadow-red-200 transition-all flex items-center justify-center gap-2"
+                                    className="flex-[1.5] py-4 px-6 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-[#041b0f] rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-rose-500/20 transition-all flex items-center justify-center gap-2"
                                 >
-                                    {isDeleting ? 'Deleting...' : 'Confirm Deletion'}
+                                    {isDeleting ? 'Processing...' : 'Delete Now'}
                                 </button>
                             </div>
                         </div>
