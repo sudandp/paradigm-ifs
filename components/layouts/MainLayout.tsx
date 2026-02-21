@@ -342,9 +342,15 @@ const MainLayout: React.FC = () => {
 
             {/* Notification Sidebar - Desktop (> 1024px) */}
             {isDesktop && isPanelOpen && (
-                <aside className="w-[400px] flex-shrink-0 bg-white border-l border-gray-200/60 rounded-3xl overflow-hidden shadow-sm animate-slide-in-right">
-                    <NotificationPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} isMobile={false} />
-                </aside>
+                <>
+                    <div
+                        className="fixed inset-0 bg-black/50 z-[95] transition-opacity duration-300"
+                        onClick={() => setIsPanelOpen(false)}
+                    />
+                    <aside className="fixed inset-y-0 right-0 z-[100] w-[400px] flex-shrink-0 bg-white shadow-xl animate-slide-in-right">
+                        <NotificationPanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} isMobile={false} />
+                    </aside>
+                </>
             )}
 
             {/* Notification Overlay - Mobile & Tablet */}

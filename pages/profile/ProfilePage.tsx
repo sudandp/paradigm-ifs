@@ -646,109 +646,113 @@ const ProfilePage: React.FC = () => {
     }
 
     return (
-        <div className="w-full space-y-8">
+        <div className="w-full space-y-8 md:space-y-5">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
 
-            <div className="relative overflow-hidden md:bg-white md:p-6 md:rounded-2xl md:shadow-lg flex flex-col md:flex-row items-center gap-6 border border-gray-100">
-                <div className="absolute top-0 left-0 w-full h-32 bg-[#006b3f] border-b-4 border-[#005632] shadow-lg"></div>
-                <div className="relative z-10">
+            <div className="relative overflow-hidden md:bg-white md:p-4 md:rounded-xl md:shadow-sm flex flex-col md:flex-row items-center gap-6 md:gap-4 border border-gray-100">
+                <div className="absolute top-0 left-0 w-full h-32 md:h-20 bg-[#006b3f] border-b-4 border-[#005632] shadow-lg"></div>
+                <div className="relative z-10 md:scale-75 md:origin-left">
                     <AvatarUpload file={avatarFile} onFileChange={handlePhotoChange} />
                 </div>
-                <div className="text-center md:text-left relative z-10 flex-1 mt-16 md:mt-0">
-                    <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight drop-shadow-sm">{user.name}</h2>
-                    <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
-                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-sm border border-emerald-500 text-xs md:text-sm font-bold">
+                <div className="text-center md:text-left relative z-10 flex-1 mt-16 md:-mt-4">
+                    <h2 className="text-2xl md:text-xl font-bold text-white md:text-gray-900 md:drop-shadow-none tracking-tight drop-shadow-sm">{user.name}</h2>
+                    <div className="flex items-center justify-center md:justify-start gap-2 mt-2 md:mt-1">
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-sm border border-emerald-500 text-xs md:text-[10px] font-bold">
                             {getRoleName(user.role)}
                         </span>
                     </div>
-                    <p className="text-emerald-50/70 mt-2 font-medium text-sm md:text-base">{user.email}</p>
+                    <p className="text-emerald-50/70 md:text-gray-500 mt-2 md:mt-1 font-medium text-sm md:text-xs">{user.email}</p>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="md:bg-white md:p-6 md:rounded-2xl md:shadow-lg border border-gray-100">
-                        <div className="flex items-center gap-3 mb-5">
-                            <div className="p-1.5 bg-blue-50 rounded-lg">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-4">
+                <div className="lg:col-span-2 space-y-6 lg:space-y-4">
+                    <div className="md:bg-white md:p-4 md:rounded-xl md:shadow-sm border border-gray-100">
+                        <div className="flex items-center gap-3 mb-5 md:mb-3">
+                            <div className="p-1.5 md:p-1 md:scale-90 bg-blue-50 rounded-lg">
                                 <UserIcon className="h-5 w-5 text-blue-600" />
                             </div>
-                            <h3 className="text-lg md:text-xl font-bold text-gray-900">Profile Details</h3>
+                            <h3 className="text-lg md:text-base font-bold text-gray-900">Profile Details</h3>
                         </div>
-                        <form onSubmit={handleProfileSubmit(onProfileSubmit)} className="space-y-5">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <Input label="Full Name" id="name" error={profileErrors.name?.message} registration={register('name')} className="bg-gray-50 border-gray-200 focus:bg-white transition-colors" autoComplete="name" />
-                                <Input label="Phone Number" id="phone" type="tel" error={profileErrors.phone?.message} registration={register('phone')} className="bg-gray-50 border-gray-200 focus:bg-white transition-colors" autoComplete="tel" />
-                                <div className="md:col-span-2">
+                        <form onSubmit={handleProfileSubmit(onProfileSubmit)} className="space-y-5 md:space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-3">
+                                <div className="md:scale-[0.85] md:origin-top-left md:w-[117%]">
+                                    <Input label="Full Name" id="name" error={profileErrors.name?.message} registration={register('name')} className="bg-gray-50 border-gray-200 focus:bg-white transition-colors" autoComplete="name" />
+                                </div>
+                                <div className="md:scale-[0.85] md:origin-top-left md:w-[117%]">
+                                    <Input label="Phone Number" id="phone" type="tel" error={profileErrors.phone?.message} registration={register('phone')} className="bg-gray-50 border-gray-200 focus:bg-white transition-colors" autoComplete="tel" />
+                                </div>
+                                <div className="md:col-span-2 md:scale-[0.85] md:origin-top-left md:w-[117%]">
                                     <Input label="Email Address" id="email" type="email" error={profileErrors.email?.message} registration={register('email')} readOnly className="bg-gray-100/50 text-gray-500 cursor-not-allowed border-gray-200" autoComplete="email" />
                                 </div>
                             </div>
-                            <div className="flex justify-end pt-3 border-t border-gray-100">
-                                <Button type="submit" isLoading={isSaving} disabled={!isDirty} className="px-6">Save Changes</Button>
+                            <div className="flex justify-end pt-3 md:pt-2 border-t border-gray-100">
+                                <Button type="submit" isLoading={isSaving} disabled={!isDirty} className="px-6 md:!px-4 md:!py-1 md:!h-8 md:!text-xs">Save Changes</Button>
                             </div>
                         </form>
                     </div>
 
                     {user.role !== 'management' && (
-                        <div className={`relative transition-all duration-500 md:bg-white md:p-6 md:rounded-2xl md:shadow-lg border ${isOnBreak ? 'border-rose-500 ring-4 ring-rose-100' : 'border-gray-100'}`}>
+                        <div className={`relative transition-all duration-500 md:bg-white md:p-4 md:rounded-xl md:shadow-sm border ${isOnBreak ? 'border-rose-500 ring-4 ring-rose-100' : 'border-gray-100'}`}>
                             {isOnBreak && (
-                                <div className="absolute -top-3 left-6 z-20 bg-rose-600 text-white text-xs font-black px-4 py-1 rounded-full shadow-lg shadow-rose-600/30 animate-pulse uppercase tracking-widest">
+                                <div className="absolute -top-3 left-6 z-20 bg-rose-600 text-white text-[10px] md:text-[8px] font-black px-4 md:px-2 py-1 md:py-0.5 rounded-full shadow-lg shadow-rose-600/30 animate-pulse uppercase tracking-widest">
                                     On Break
                                 </div>
                             )}
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="p-1.5 bg-purple-50 rounded-lg">
-                                    <ClipboardList className="h-5 w-5 text-purple-600" />
+                            <div className="flex items-center gap-3 md:gap-2 mb-5 md:mb-3">
+                                <div className="p-1.5 md:p-1 md:scale-90 bg-purple-50 rounded-lg">
+                                    <ClipboardList className="h-5 w-5 md:h-4 md:w-4 text-purple-600" />
                                 </div>
-                                <h3 className="text-lg md:text-xl font-bold text-gray-900">Work Hours Tracking</h3>
+                                <h3 className="text-lg md:text-base font-bold text-gray-900">Work Hours Tracking</h3>
                             </div>
-                            <div className="space-y-5">
-                                <div className="grid grid-cols-2 gap-5">
-                                    <div className="text-center bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
-                                        <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <LogIn className="h-3 w-3 text-emerald-600" /> First Punch In
+                            <div className="space-y-5 md:space-y-3">
+                                <div className="grid grid-cols-2 gap-5 md:gap-3">
+                                    <div className="text-center bg-gray-50 p-4 md:p-2 rounded-xl border border-gray-100 shadow-sm">
+                                        <p className="text-xs md:text-[9px] font-semibold text-gray-500 mb-1 md:mb-0.5 uppercase tracking-wider flex items-center justify-center gap-1">
+                                            <LogIn className="h-3 w-3 md:h-2.5 md:w-2.5 text-emerald-600" /> First Punch In
                                         </p>
-                                        <p className="text-2xl font-bold text-gray-900 font-mono">{formatTime(lastCheckInTime)}</p>
+                                        <p className="text-2xl md:text-lg font-bold text-gray-900 font-mono">{formatTime(lastCheckInTime)}</p>
                                     </div>
-                                    <div className="text-center bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
-                                        <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <LogOut className="h-3 w-3 text-rose-600" /> Last Punch Out
+                                    <div className="text-center bg-gray-50 p-4 md:p-2 rounded-xl border border-gray-100 shadow-sm">
+                                        <p className="text-xs md:text-[9px] font-semibold text-gray-500 mb-1 md:mb-0.5 uppercase tracking-wider flex items-center justify-center gap-1">
+                                            <LogOut className="h-3 w-3 md:h-2.5 md:w-2.5 text-rose-600" /> Last Punch Out
                                         </p>
-                                        <p className="text-2xl font-bold text-gray-900 font-mono">{formatTime(lastCheckOutTime)}</p>
+                                        <p className="text-2xl md:text-lg font-bold text-gray-900 font-mono">{formatTime(lastCheckOutTime)}</p>
                                     </div>
-                                    <div className="text-center bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
-                                        <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <CheckCircle className="h-3 w-3 text-blue-600" /> First B-In
+                                    <div className="text-center bg-gray-50 p-4 md:p-2 rounded-xl border border-gray-100 shadow-sm">
+                                        <p className="text-xs md:text-[9px] font-semibold text-gray-500 mb-1 md:mb-0.5 uppercase tracking-wider flex items-center justify-center gap-1">
+                                            <CheckCircle className="h-3 w-3 md:h-2.5 md:w-2.5 text-blue-600" /> First B-In
                                         </p>
-                                        <p className="text-2xl font-bold text-gray-900 font-mono">{formatTime(firstBreakInTime)}</p>
+                                        <p className="text-2xl md:text-lg font-bold text-gray-900 font-mono">{formatTime(firstBreakInTime)}</p>
                                     </div>
-                                    <div className="text-center bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
-                                        <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider flex items-center justify-center gap-1">
-                                            <CheckCircle className="h-3 w-3 text-amber-600" /> Last B-Out
+                                    <div className="text-center bg-gray-50 p-4 md:p-2 rounded-xl border border-gray-100 shadow-sm">
+                                        <p className="text-xs md:text-[9px] font-semibold text-gray-500 mb-1 md:mb-0.5 uppercase tracking-wider flex items-center justify-center gap-1">
+                                            <CheckCircle className="h-3 w-3 md:h-2.5 md:w-2.5 text-amber-600" /> Last B-Out
                                         </p>
-                                        <p className="text-2xl font-bold text-gray-900 font-mono">{formatTime(lastBreakOutTime)}</p>
+                                        <p className="text-2xl md:text-lg font-bold text-gray-900 font-mono">{formatTime(lastBreakOutTime)}</p>
                                     </div>
                                 </div>
 
                                 {isAttendanceLoading ? (
-                                    <div className="flex items-center justify-center h-[56px] bg-gray-50 rounded-xl"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
+                                    <div className="flex items-center justify-center h-[56px] md:h-[40px] bg-gray-50 rounded-xl"><Loader2 className="h-6 w-6 md:h-4 md:w-4 animate-spin text-gray-400" /></div>
                                 ) : (
-                                    <div className="space-y-6">
-                                            <div className="flex flex-col space-y-3">
+                                    <div className="space-y-6 md:space-y-3">
+                                            <div className="flex flex-col space-y-3 md:space-y-1.5">
                                                 <div className="flex items-center gap-2 px-0.5">
                                                     <button 
                                                         onClick={() => handleToggleHint('punch')}
                                                         className="focus:outline-none hover:scale-110 transition-all active:scale-95 !bg-transparent !border-none !p-0 !shadow-none !ring-0 flex items-center justify-center"
                                                         title="Click for hint"
                                                     >
-                                                        <Info className="h-5 w-5 text-emerald-600" />
+                                                        <Info className="h-5 w-5 md:h-3.5 md:w-3.5 text-emerald-600" />
                                                     </button>
                                                     {showPunchHint && (
-                                                        <span className="text-base italic text-emerald-700 font-medium animate-in fade-in slide-in-from-left-2 duration-300">
+                                                        <span className="text-base md:text-xs italic text-emerald-700 font-medium animate-in fade-in slide-in-from-left-2 duration-300">
                                                             Punch in is required when starting the day, and Punch out when the day ends
                                                         </span>
                                                     )}
                                                 </div>
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-2 gap-4 md:gap-3">
                                                 <div className="relative group">
                                                        <Button
                                                            onClick={() => {
@@ -765,16 +769,16 @@ const ProfilePage: React.FC = () => {
                                                                }
                                                            }}
                                                            variant={isPunchBlocked ? 'secondary' : 'primary'}
-                                                           className={`attendance-action-btn shadow-lg transition-all ${
+                                                           className={`attendance-action-btn md:!py-1 md:!h-8 md:!text-[11px] shadow-lg transition-all ${
                                                                isPunchBlocked ? '!bg-amber-600 !border-amber-600 !text-white shadow-amber-100/20' : 'shadow-emerald-100/20'
                                                            } ${isCheckedIn || isOnBreak || isActionInProgress || (isPunchBlocked && unlockRequestStatus === 'pending') ? 'pointer-events-none opacity-50' : ''}`}
                                                            disabled={isCheckedIn || isOnBreak || isActionInProgress || (isPunchBlocked && unlockRequestStatus === 'pending')}
                                                        >
                                                           {isPunchBlocked ? (
                                                                unlockRequestStatus === 'pending' 
-                                                                 ? <Clock className="mr-2 h-4 w-4" /> 
-                                                                 : <Lock className="mr-2 h-4 w-4" />
-                                                          ) : <LogIn className={`mr-2 h-4 w-4 ${!isCheckedIn ? 'animate-pulse' : ''}`} />}
+                                                                 ? <Clock className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> 
+                                                                 : <Lock className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" />
+                                                          ) : <LogIn className={`mr-2 h-4 w-4 md:h-3.5 md:w-3.5 ${!isCheckedIn ? 'animate-pulse' : ''}`} />}
                                                           {isPunchBlocked 
                                                               ? (unlockRequestStatus === 'pending' 
                                                                   ? 'Pending' 
@@ -785,68 +789,68 @@ const ProfilePage: React.FC = () => {
                                                  <Button
                                                      onClick={() => navigate('/attendance/check-out?workType=office')}
                                                      variant="danger"
-                                                     className={`attendance-action-btn shadow-lg shadow-red-100/20 transition-all ${(!isCheckedIn || isFieldCheckedIn || isOnBreak || (isFieldStaff && !isFieldCheckedOut) || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
+                                                     className={`attendance-action-btn md:!py-1 md:!h-8 md:!text-[11px] shadow-lg shadow-red-100/20 transition-all ${(!isCheckedIn || isFieldCheckedIn || isOnBreak || (isFieldStaff && !isFieldCheckedOut) || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
                                                      disabled={!isCheckedIn || isFieldCheckedIn || isOnBreak || (isFieldStaff && !isFieldCheckedOut) || isActionInProgress || isPunchBlocked}
                                                  >
-                                                     <LogOut className="mr-2 h-4 w-4" /> Punch Out
+                                                     <LogOut className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Punch Out
                                                  </Button>
                                             </div>
 
                                             {/* Field Staff Buttons */}
                                             {user?.role === 'field_staff' && (
-                                                <div className="grid grid-cols-2 gap-4 mt-4">
+                                                <div className="grid grid-cols-2 gap-4 md:gap-3 mt-4 md:mt-2">
                                                      <Button
                                                          onClick={() => navigate('/attendance/check-in?workType=field')}
                                                          variant="primary"
-                                                         className={`attendance-action-btn !bg-blue-600 hover:!bg-blue-700 !border-blue-600 shadow-lg shadow-blue-100/20 transition-all ${(!isCheckedIn || isFieldCheckedIn || isOnBreak || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
+                                                         className={`attendance-action-btn md:!py-1 md:!h-8 md:!text-[11px] !bg-blue-600 hover:!bg-blue-700 !border-blue-600 shadow-lg shadow-blue-100/20 transition-all ${(!isCheckedIn || isFieldCheckedIn || isOnBreak || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
                                                          disabled={!isCheckedIn || isFieldCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked}
                                                      >
-                                                         <MapPin className="mr-2 h-4 w-4" /> Site Check In
+                                                         <MapPin className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Site Check In
                                                      </Button>
                                                      <Button
                                                          onClick={() => navigate('/attendance/check-out?workType=field')}
                                                          variant="secondary"
-                                                         className={`attendance-action-btn !bg-amber-600 hover:!bg-amber-700 !border-amber-600 !text-white shadow-lg shadow-amber-100/20 transition-all ${(!isFieldCheckedIn || isOnBreak || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
+                                                         className={`attendance-action-btn md:!py-1 md:!h-8 md:!text-[11px] !bg-amber-600 hover:!bg-amber-700 !border-amber-600 !text-white shadow-lg shadow-amber-100/20 transition-all ${(!isFieldCheckedIn || isOnBreak || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
                                                          disabled={!isFieldCheckedIn || isOnBreak || isActionInProgress || isPunchBlocked}
                                                      >
-                                                         <MapPin className="mr-2 h-4 w-4" /> Site Check Out
+                                                         <MapPin className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Site Check Out
                                                      </Button>
                                                 </div>
                                             )}
                                         </div>
 
 
-                                        <div className="flex flex-col space-y-3">
+                                        <div className="flex flex-col space-y-3 md:space-y-1.5">
                                             <div className="flex items-center gap-2 px-0.5">
                                                 <button 
                                                     onClick={() => handleToggleHint('break')}
                                                     className="focus:outline-none hover:scale-110 transition-all active:scale-95 !bg-transparent !border-none !p-0 !shadow-none !ring-0 flex items-center justify-center"
                                                     title="Click for hint"
                                                 >
-                                                    <Info className="h-5 w-5 text-blue-600" />
+                                                    <Info className="h-5 w-5 md:h-3.5 md:w-3.5 text-blue-600" />
                                                 </button>
                                                 {showBreakHint && (
-                                                    <span className="text-base italic text-blue-700 font-medium animate-in fade-in slide-in-from-left-2 duration-300">
+                                                    <span className="text-base md:text-xs italic text-blue-700 font-medium animate-in fade-in slide-in-from-left-2 duration-300">
                                                         Break in when user goes for lunch is mandatory, or it will be a violation
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-2 gap-4 md:gap-3">
                                                  <Button
                                                      onClick={() => navigate('/attendance/break-in')}
                                                      variant="primary"
-                                                     className={`attendance-action-btn !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 shadow-lg shadow-emerald-100/20 transition-all ${((isFieldStaff ? !isFieldCheckedIn : !isCheckedIn) || isOnBreak || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
+                                                     className={`attendance-action-btn md:!py-1 md:!h-8 md:!text-[11px] !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 shadow-lg shadow-emerald-100/20 transition-all ${((isFieldStaff ? !isFieldCheckedIn : !isCheckedIn) || isOnBreak || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
                                                      disabled={(isFieldStaff ? !isFieldCheckedIn : !isCheckedIn) || isOnBreak || isActionInProgress || isPunchBlocked}
                                                  >
-                                                     <CheckCircle className="mr-2 h-4 w-4" /> Break In
+                                                     <CheckCircle className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Break In
                                                  </Button>
                                                  <Button
                                                      onClick={() => navigate('/attendance/break-out')}
                                                      variant="primary"
-                                                     className={`attendance-action-btn !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 shadow-lg shadow-emerald-100/20 transition-all ${(!isOnBreak || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
+                                                     className={`attendance-action-btn md:!py-1 md:!h-8 md:!text-[11px] !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 shadow-lg shadow-emerald-100/20 transition-all ${(!isOnBreak || isPunchBlocked) ? 'pointer-events-none opacity-50' : ''}`}
                                                      disabled={!isOnBreak || isActionInProgress || isPunchBlocked}
                                                  >
-                                                     <CheckCircle className="mr-2 h-4 w-4" /> Break Out
+                                                     <CheckCircle className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Break Out
                                                  </Button>
                                             </div>
                                         </div>
@@ -857,12 +861,12 @@ const ProfilePage: React.FC = () => {
                     )}
                 </div>
 
-                <div className="space-y-6">
-                    <div className="md:bg-white md:p-6 md:rounded-2xl md:shadow-lg border border-gray-100">
-                        <h3 className="text-lg font-bold mb-4 text-gray-900">Account Actions</h3>
-                        <div className="space-y-3">
-                            <Button onClick={() => navigate('/leaves/dashboard')} variant="secondary" className="w-full justify-center py-3 bg-gray-50 hover:bg-gray-100 border-gray-200" title="View your leave history and balances"><Crosshair className="mr-2 h-4 w-4" /> Leave Tracker</Button>
-                            <Button onClick={handleLogoutClick} variant="danger" className="w-full justify-center py-3" isLoading={isSaving}><LogOut className="mr-2 h-4 w-4" /> Log Out</Button>
+                <div className="space-y-6 md:space-y-4">
+                    <div className="md:bg-white md:p-4 md:rounded-xl md:shadow-sm border border-gray-100">
+                        <h3 className="text-lg md:text-base font-bold mb-4 md:mb-3 text-gray-900">Account Actions</h3>
+                        <div className="space-y-3 md:space-y-2">
+                            <Button onClick={() => navigate('/leaves/dashboard')} variant="secondary" className="w-full justify-center py-3 md:!py-1 md:!h-8 md:!text-xs bg-gray-50 hover:bg-gray-100 border-gray-200" title="View your leave history and balances"><Crosshair className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Leave Tracker</Button>
+                            <Button onClick={handleLogoutClick} variant="danger" className="w-full justify-center py-3 md:!py-1 md:!h-8 md:!text-xs" isLoading={isSaving}><LogOut className="mr-2 h-4 w-4 md:h-3.5 md:w-3.5" /> Log Out</Button>
                         </div>
                     </div>
                 </div>

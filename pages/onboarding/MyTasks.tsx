@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import type { Task, Notification, TaskStatus } from '../../types';
 import { Loader2, ListTodo, Bell } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
+import LoadingScreen from '../../components/ui/LoadingScreen';
 
 const TaskStatusChip: React.FC<{ status: TaskStatus }> = ({ status }) => {
     const styles: Record<TaskStatus, string> = {
@@ -73,10 +74,10 @@ const Tasks: React.FC = () => {
                 </div>
             </div>
 
-            <main className="p-4">
+            <main className="p-4 flex-grow flex flex-col">
                 {isLoading ? (
-                    <div className="flex justify-center items-center h-full">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted" />
+                    <div className="flex-grow flex items-center justify-center">
+                        <LoadingScreen message="Fetching your tasks..." fullScreen={false} />
                     </div>
                 ) : activeTab === 'tasks' ? (
                     tasks.length > 0 ? (
