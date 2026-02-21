@@ -29,7 +29,7 @@
     "@capacitor/splash-screen": "^7.0.3",
     "@capacitor/status-bar": "^7.0.3",
     "@capawesome/capacitor-badge": "^7.0.1",
-    "@capgo/capacitor-updater": "^8.43.8",
+    "@capgo/capacitor-updater": "^7.43.3",
     "@google/genai": "^0.15.0",
     "@hookform/resolvers": "^3.3.4",
     "@ionic/pwa-elements": "^3.3.0",
