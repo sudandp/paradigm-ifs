@@ -7,7 +7,7 @@ import { isAdmin } from '../utils/auth';
 import { getCurrentDevice, registerDevice, getDeviceLimits, createDeviceChangeRequest } from '../services/deviceService';
 import DeviceWarningDialog from './devices/DeviceWarningDialog';
 import { DeviceType } from '../types';
-import DeviceVerificationAnimation from './DeviceVerificationAnimation';
+import LoadingScreen from './ui/LoadingScreen';
 
 
 interface SecurityWrapperProps {
@@ -185,7 +185,7 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
     
     // While checking device status...
     if (user && deviceStatus === 'checking' && user.role !== 'developer') {
-         return <DeviceVerificationAnimation />;
+         return <LoadingScreen message="Establishing secure uplink..." />;
     }
 
     // Otherwise, render children normally
