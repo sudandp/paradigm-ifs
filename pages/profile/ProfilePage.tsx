@@ -5,7 +5,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useAuthStore } from '../../store/authStore';
 import { usePermissionsStore } from '../../store/permissionsStore';
-import type { User, UploadedFile } from '../../types';
+import type { User, UploadedFile, EmployeeScore } from '../../types';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
@@ -18,6 +18,7 @@ import Modal from '../../components/ui/Modal';
 
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { isAdmin } from '../../utils/auth';
+import { calculateEmployeeScores, getEmployeeScore } from '../../services/employeeScoring';
 
 // --- Profile Section ---
 const profileValidationSchema = yup.object({
@@ -65,6 +66,10 @@ const ProfilePage: React.FC = () => {
     
     // Unlock Request State
     const [unlockRequestStatus, setUnlockRequestStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+
+    // Employee Scores State
+    const [employeeScores, setEmployeeScores] = useState<EmployeeScore | null>(null);
+    const [isScoresLoading, setIsScoresLoading] = useState(true);
 
     // Punch Restriction: 1 punch-in per day, unlimited unlock requests (1st=duty, 2nd+=OT)
     const hasPunchedToday = (dailyPunchCount || 0) >= 1;
@@ -128,6 +133,26 @@ const ProfilePage: React.FC = () => {
             });
         }
     }, [isPunchBlocked, unlockRequestStatus, isNextRequestOT]);
+
+    // Fetch or calculate employee scores on mount
+    useEffect(() => {
+        if (!user) return;
+        let cancelled = false;
+        const loadScores = async () => {
+            setIsScoresLoading(true);
+            try {
+                // Always calculate fresh scores from live data
+                const scores = await calculateEmployeeScores(user.id, user.role || 'office');
+                if (!cancelled) setEmployeeScores(scores);
+            } catch (err) {
+                console.error('Failed to load employee scores:', err);
+            } finally {
+                if (!cancelled) setIsScoresLoading(false);
+            }
+        };
+        loadScores();
+        return () => { cancelled = true; };
+    }, [user?.id, user?.role]);
 
     const isMobile = useMediaQuery('(max-width: 767px)');
     const isMobileView = isMobile; // Apply mobile view for all users on mobile
@@ -702,7 +727,7 @@ const ProfilePage: React.FC = () => {
                             <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
                                 <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
                             </svg>
-                            <span className="relative z-10 text-white font-bold text-sm tracking-tight">99</span>
+                            <span className="relative z-10 text-white font-bold text-sm tracking-tight">{isScoresLoading ? '—' : (employeeScores?.performanceScore ?? '—')}</span>
                         </div>
                         <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Performance</span>
                     </div>
@@ -711,7 +736,7 @@ const ProfilePage: React.FC = () => {
                             <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
                                 <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
                             </svg>
-                            <span className="relative z-10 text-white font-bold text-sm tracking-tight">98</span>
+                            <span className="relative z-10 text-white font-bold text-sm tracking-tight">{isScoresLoading ? '—' : (employeeScores?.attendanceScore ?? '—')}</span>
                         </div>
                         <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Attendance</span>
                     </div>
@@ -720,7 +745,7 @@ const ProfilePage: React.FC = () => {
                             <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
                                 <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
                             </svg>
-                            <span className="relative z-10 text-white font-bold text-sm tracking-tight">99</span>
+                            <span className="relative z-10 text-white font-bold text-sm tracking-tight">{isScoresLoading ? '—' : (employeeScores?.responseScore ?? '—')}</span>
                         </div>
                         <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Response</span>
                     </div>
@@ -733,7 +758,7 @@ const ProfilePage: React.FC = () => {
                             <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
                                 <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
                             </svg>
-                            <span className="relative z-10 text-white font-bold text-[13px]">99</span>
+                            <span className="relative z-10 text-white font-bold text-[13px]">{isScoresLoading ? '—' : (employeeScores?.performanceScore ?? '—')}</span>
                         </div>
                         <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Performance</span>
                     </div>
@@ -742,7 +767,7 @@ const ProfilePage: React.FC = () => {
                             <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
                                 <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
                             </svg>
-                            <span className="relative z-10 text-white font-bold text-[13px]">98</span>
+                            <span className="relative z-10 text-white font-bold text-[13px]">{isScoresLoading ? '—' : (employeeScores?.attendanceScore ?? '—')}</span>
                         </div>
                         <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Attendance</span>
                     </div>
@@ -751,7 +776,7 @@ const ProfilePage: React.FC = () => {
                             <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
                                 <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
                             </svg>
-                            <span className="relative z-10 text-white font-bold text-[13px]">99</span>
+                            <span className="relative z-10 text-white font-bold text-[13px]">{isScoresLoading ? '—' : (employeeScores?.responseScore ?? '—')}</span>
                         </div>
                         <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Response</span>
                     </div>

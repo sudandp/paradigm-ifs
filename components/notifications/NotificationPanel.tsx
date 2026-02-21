@@ -80,9 +80,91 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         general: false,
         violations: false
     });
+    const [expandedDetails, setExpandedDetails] = React.useState<Record<string, boolean>>({});
 
     const toggleSection = (section: 'unlocks' | 'leaves' | 'claims' | 'finance' | 'invoices' | 'general' | 'violations') => {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+    };
+
+    const toggleDetails = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setExpandedDetails(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const getSeverityStyles = (severity?: string) => {
+        switch (severity) {
+            case 'High': return {
+                bg: isMobile ? 'bg-red-950/40' : 'bg-red-50',
+                border: isMobile ? 'border-red-500/40' : 'border-red-100',
+                text: isMobile ? 'text-red-400' : 'text-red-700',
+                badge: isMobile ? 'bg-red-500 text-white' : 'bg-red-100 text-red-700'
+            };
+            case 'Medium': return {
+                bg: isMobile ? 'bg-orange-950/40' : 'bg-orange-50',
+                border: isMobile ? 'border-orange-500/40' : 'border-orange-100',
+                text: isMobile ? 'text-orange-400' : 'text-orange-700',
+                badge: isMobile ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-700'
+            };
+            case 'Low': return {
+                bg: isMobile ? 'bg-yellow-950/40' : 'bg-yellow-50',
+                border: isMobile ? 'border-yellow-500/40' : 'border-yellow-100',
+                text: isMobile ? 'text-yellow-400' : 'text-yellow-700',
+                badge: isMobile ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-700'
+            };
+            default: return {
+                bg: isMobile ? 'bg-gray-900/40' : 'bg-gray-50',
+                border: isMobile ? 'border-gray-500/40' : 'border-gray-100',
+                text: isMobile ? 'text-gray-400' : 'text-gray-700',
+                badge: isMobile ? 'bg-gray-500 text-white' : 'bg-gray-100 text-gray-700'
+            };
+        }
+    };
+
+    const extractEmployeeName = (message: string) => {
+        // More permissive UUID regex to catch truncated IDs (e.g. from UI truncation)
+        const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}/i;
+
+        // Pattern 1: URGENT: [Violation] for user [Name] on [Date]
+        const urgentMatch = message.match(/URGENT: .*? for user (.*?) on/i);
+        if (urgentMatch) {
+            const nameCandidate = urgentMatch[1].trim();
+            if (!uuidRegex.test(nameCandidate)) return nameCandidate;
+        }
+
+        // Pattern 2: [Name] has [Action]
+        if (message.includes('has')) {
+            const part = message.split('has')[0].trim();
+            // Don't return long phrases OR UUIDs as names
+            if (part.length < 50 && !uuidRegex.test(part)) return part;
+        }
+
+        const firstWord = message.split(' ')[0];
+        return uuidRegex.test(firstWord) ? 'Employee' : firstWord;
+    };
+
+    const cleanMessage = (message: string) => {
+        const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}/i;
+
+        // Remove "URGENT:" prefix
+        let cleaned = message.replace(/^URGENT: /i, '');
+
+        // Pattern 1: [Violation Type] for user [Name] on [Date] has been escalated...
+        if (cleaned.includes('for user') && cleaned.includes('escalated')) {
+            const typePart = cleaned.split('for user')[0].trim();
+            return `${typePart} escalated to HR Operation & Admin`;
+        }
+
+        // If it starts with a name or UUID followed by "has"
+        if (cleaned.includes('has')) {
+            const parts = cleaned.split('has');
+            const namePart = parts[0].trim();
+            // If the part before "has" looked like a name/UUID
+            if (namePart.length < 50) {
+                return `has ${parts.slice(1).join('has').trim()}`;
+            }
+        }
+
+        return cleaned;
     };
     const [isActionLoading, setIsActionLoading] = React.useState<string | null>(null);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -291,6 +373,12 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         return groups.filter(g => g.items.length > 0);
     }, [notifications, currentPage, pageSize]);
 
+    const securityViolations = useMemo(() => {
+        return notifications.filter(n => 
+            (!n.isRead) && (n.type === 'security' || n.message.includes('Field attendance violation'))
+        );
+    }, [notifications]);
+
     const filteredNotifCount = notifications.filter(notif => 
         notif.type !== 'security' && !notif.message.includes('Field attendance violation')
     ).length;
@@ -356,7 +444,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
 
                         <div className="px-4 pb-4 space-y-3">
                             {/* Security Violations (Violations found in Notification table) */}
-                            {notifications.some(n => n.type === 'security' || n.message.includes('Field attendance violation')) && (
+                            {securityViolations.length > 0 && (
                                 <div className={`group rounded-2xl overflow-hidden transition-all duration-300 border ${isMobile ? 'border-red-500/30 bg-red-500/5' : 'border-red-100 bg-red-50/10 hover:shadow-md'}`}>
                                     <button 
                                         onClick={() => toggleSection('violations')}
@@ -373,7 +461,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                         </div>
                                         <div className="flex items-center gap-3">
                                             <span className={`flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full text-[10px] font-bold ${isMobile ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.4)]' : 'bg-red-100 text-red-700'}`}>
-                                                {notifications.filter(n => n.type === 'security' || n.message.includes('Field attendance violation')).length}
+                                                {securityViolations.length}
                                             </span>
                                             {expandedSections.violations ? <ChevronUp className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} /> : <ChevronDown className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} />}
                                         </div>
@@ -381,37 +469,124 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
 
                                     {expandedSections.violations && (
                                         <div className={`p-3 space-y-3 border-t ${isMobile ? 'border-red-500/10' : 'border-red-100'}`}>
-                                            <div className="flex items-center gap-2 px-1 py-1">
-                                                <AlertTriangle className="w-3.5 h-3.5 text-red-500 animate-pulse" />
-                                                <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-red-400' : 'text-red-700'}`}>
-                                                    Priority Warning: Escalated Violations
-                                                </span>
-                                            </div>
-                                            {notifications.filter(n => n.type === 'security' || n.message.includes('Field attendance violation')).map(notif => (
-                                                <div 
-                                                    key={notif.id} 
-                                                    onClick={() => handleNotificationClick(notif)}
-                                                    className={`rounded-xl p-3 border cursor-pointer transition-all hover:scale-[1.02] ${isMobile ? 'bg-red-950/20 border-red-500/20' : 'bg-white border-red-100 shadow-sm'}`}
+                                            <div className="flex items-center justify-between px-1 py-1">
+                                                <div className="flex items-center gap-2">
+                                                    <AlertTriangle className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+                                                    <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-red-400' : 'text-red-700'}`}>
+                                                        Priority Warning: Attendance Violations
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        securityViolations.forEach(n => markAsRead(n.id));
+                                                    }}
+                                                    className={`text-[9px] font-bold px-2 py-1 rounded-lg transition-colors ${isMobile ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
                                                 >
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="p-1.5 rounded-lg bg-red-100 text-red-600">
-                                                            <Shield className="w-3 h-3" />
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className={`text-[11px] leading-relaxed mb-2 ${isMobile ? 'text-white/90' : 'text-gray-800'}`}>
-                                                                {notif.message}
-                                                            </p>
-                                                            <div className="flex items-center justify-between">
-                                                                <span className={`text-[9px] flex items-center gap-1 ${isMobile ? 'text-white/40' : 'text-red-700/60'}`}>
-                                                                    <Clock className="h-2.5 w-2.5" />
-                                                                    {formatDistanceToNow(parseISO(notif.createdAt), { addSuffix: true })}
-                                                                </span>
-                                                                {!notif.isRead && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />}
+                                                    Mark All Read
+                                                </button>
+                                            </div>
+                                            {securityViolations.map(notif => {
+                                                const sevStyles = getSeverityStyles(notif.severity);
+                                                const metadata = notif.metadata || {};
+                                                const isExpanded = expandedDetails[notif.id];
+                                                
+                                                return (
+                                                    <div 
+                                                        key={notif.id} 
+                                                        onClick={() => handleNotificationClick(notif)}
+                                                        className={`rounded-xl overflow-hidden border cursor-pointer transition-all hover:scale-[1.01] ${sevStyles.bg} ${sevStyles.border} shadow-sm group/card`}
+                                                    >
+                                                        <div className="p-3">
+                                                            <div className="flex items-start gap-3">
+                                                                <div className={`p-2 rounded-lg ${sevStyles.badge}`}>
+                                                                    <Shield className="w-4 h-4" />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center justify-between mb-1">
+                                                                        <span className={`text-[10px] font-black uppercase tracking-tight ${sevStyles.text}`}>
+                                                                            {metadata.violationType?.replace(/_/g, ' ') || 'Attendance Violation'}
+                                                                        </span>
+                                                                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${sevStyles.badge}`}>
+                                                                            {notif.severity || 'Medium'}
+                                                                        </span>
+                                                                    </div>
+                                                                    
+                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                        <div className={`p-1 rounded-lg ${isMobile ? 'bg-white/10' : 'bg-gray-100'}`}>
+                                                                            <UserPlus className="w-3.5 h-3.5 opacity-50" />
+                                                                        </div>
+                                                                        <p className={`text-xs font-bold truncate ${isMobile ? 'text-white' : 'text-gray-900'}`}>
+                                                                            {metadata.employeeName || extractEmployeeName(notif.message)}
+                                                                        </p>
+                                                                    </div>
+                                                                    
+                                                                    <p className={`text-[11px] leading-relaxed mb-3 ${isMobile ? 'text-white/70' : 'text-gray-600'}`}>
+                                                                        {cleanMessage(notif.message)}
+                                                                    </p>
+                                                                    
+                                                                    <div className="grid grid-cols-2 gap-2 mb-3">
+                                                                        <div className={`rounded-lg p-2 ${isMobile ? 'bg-black/20' : 'bg-white/50 border border-white/20'}`}>
+                                                                            <p className={`text-[8px] uppercase font-bold mb-0.5 ${isMobile ? 'text-white/40' : 'text-gray-400'}`}>Violation Date</p>
+                                                                            <p className={`text-[10px] font-bold ${isMobile ? 'text-white/80' : 'text-gray-700'}`}>
+                                                                                {metadata.date ? format(parseISO(metadata.date), 'dd MMM yyyy') : format(parseISO(notif.createdAt), 'dd MMM yyyy')}
+                                                                            </p>
+                                                                        </div>
+                                                                        <div className={`rounded-lg p-2 ${isMobile ? 'bg-black/20' : 'bg-white/50 border border-white/20'}`}>
+                                                                            <p className={`text-[8px] uppercase font-bold mb-0.5 ${isMobile ? 'text-white/40' : 'text-gray-400'}`}>Escalated To</p>
+                                                                            <p className={`text-[10px] font-bold ${isMobile ? 'text-white/80' : 'text-gray-700'}`}>
+                                                                                HR Operation & Admin
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-2 mb-3">
+                                                                        <Button 
+                                                                            size="sm" 
+                                                                            variant="outline"
+                                                                            className={`flex-1 h-7 text-[9px] uppercase font-bold py-0 ${isMobile ? 'border-white/20 text-white hover:bg-white/5' : 'border-gray-200 text-gray-600'}`}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                markAsRead(notif.id);
+                                                                            }}
+                                                                        >
+                                                                            <Check className="w-3 h-3 mr-1" /> Mark Resolved
+                                                                        </Button>
+                                                                        {metadata.details && (
+                                                                            <button 
+                                                                                onClick={(e) => toggleDetails(notif.id, e)}
+                                                                                className={`text-[9px] font-bold h-7 px-2 flex items-center gap-1 transition-colors ${sevStyles.text} hover:underline`}
+                                                                            >
+                                                                                {isExpanded ? 'Hide Details' : 'View Details'}
+                                                                                {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {isExpanded && metadata.details && (
+                                                                        <div className="mb-3">
+                                                                            <div className={`p-2 rounded-lg text-[9px] font-mono whitespace-pre overflow-x-auto ${isMobile ? 'bg-black/40 text-green-400/80' : 'bg-gray-900 text-green-400'}`}>
+                                                                                {JSON.stringify(metadata.details, null, 2)}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    <div className="flex items-center justify-between mt-1">
+                                                                        <span className={`text-[9px] flex items-center gap-1 ${isMobile ? 'text-white/40' : 'text-gray-400'}`}>
+                                                                            <Clock className="h-2.5 w-2.5" />
+                                                                            {formatDistanceToNow(parseISO(notif.createdAt), { addSuffix: true })}
+                                                                        </span>
+                                                                        {!notif.isRead && <span className={`w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.5)] ${
+                                                                            notif.severity === 'High' ? 'bg-red-500' : 
+                                                                            notif.severity === 'Medium' ? 'bg-orange-500' : 'bg-yellow-500'
+                                                                        }`} />}
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
@@ -451,7 +626,9 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                             {unlockRequests.map(req => (
                                                 <div key={req.id} className={`rounded-xl p-3 border ${isMobile ? 'bg-black/20 border-white/5' : 'bg-emerald-50/30 border-emerald-100'}`}>
                                                     <div className="flex items-center gap-3 mb-3">
-                                                        <ProfilePlaceholder photoUrl={req.userPhoto} seed={req.userId} className="absolute inset-0 w-8 h-8 rounded-lg" />
+                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isMobile ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'}`}>
+                                                            <UserPlus className="w-4 h-4" />
+                                                        </div>
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center justify-between">
                                                                 <p className={`text-xs font-bold truncate ${isMobile ? 'text-white' : 'text-gray-900'}`}>{req.userName}</p>

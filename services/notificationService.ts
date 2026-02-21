@@ -5,6 +5,7 @@ export interface NotificationActor {
     name: string;
     reportingManagerId?: string;
     role: string;
+    photoUrl?: string;
 }
 
 export interface NotificationData {
@@ -14,6 +15,8 @@ export interface NotificationData {
     title?: string;
     link?: string;
     actor: NotificationActor;
+    severity?: 'Low' | 'Medium' | 'High';
+    metadata?: any;
 }
 
 /**
@@ -82,7 +85,14 @@ export const dispatchNotificationFromRules = async (eventType: string, data: Not
                 user_id: userId,
                 message,
                 type: sendAlert ? 'security' : getNotificationTypeForEvent(eventType),
-                link_to: data.link
+                link_to: data.link,
+                severity: data.severity || (sendAlert ? 'High' : (eventType === 'violation' ? 'Medium' : 'Low')),
+                metadata: {
+                    ...data.metadata,
+                    employeeName: data.actor.name,
+                    employeePhoto: data.actor.photoUrl,
+                    employeeId: data.actor.id
+                }
             }));
             
             await supabase.from('notifications').insert(notifications);

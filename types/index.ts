@@ -812,7 +812,10 @@ export interface AttendanceViolation {
   id: string;
   userId: string;
   violationDate: string; // ISO String
-  type: string;
+  type: string; // Legacy field
+  violationType?: string; // e.g. 'LATE_PUNCH_IN', 'GEO_FENCE_VIOLATION'
+  violationDetails?: any; // JSONB for expected vs actual
+  severity?: 'Low' | 'Medium' | 'High';
   reason?: string;
   locationName?: string | null;
   attemptedLatitude?: number | null;
@@ -862,7 +865,9 @@ export interface FieldAttendanceViolation {
   siteVisits?: number;
   
   // Violation details
-  violationType: 'site_time_low' | 'insufficient_hours';
+  violationType: 'site_time_low' | 'insufficient_hours' | string;
+  violationDetails?: any; // JSONB for breakdown, expected vs actual
+  severity?: 'Low' | 'Medium' | 'High';
   requiredSitePercentage: number;
   
   // Workflow
@@ -1156,6 +1161,8 @@ export interface Notification {
   createdAt: string; // ISO String
   linkTo?: string; // e.g., '/tasks'
   link?: string; // Alternative property name for link
+  severity?: 'Low' | 'Medium' | 'High';
+  metadata?: any;
 }
 
 export interface NotificationRule {
@@ -1798,4 +1805,29 @@ export interface SiteFinanceRecord {
   deletedBy?: string;
   deletedByName?: string;
   deletedReason?: string;
+}
+
+// =============================================
+// Employee Scoring System Types
+// =============================================
+
+export type RoleCategory = 'office_staff' | 'field_staff' | 'support';
+
+export interface RoleWeights {
+  performance: number; // 0-1
+  attendance: number;  // 0-1
+  response: number;    // 0-1
+}
+
+export interface EmployeeScore {
+  id: string;
+  userId: string;
+  month: string; // YYYY-MM-01
+  performanceScore: number; // 0-100
+  attendanceScore: number;  // 0-100
+  responseScore: number;    // 0-100
+  overallScore: number;     // 0-100 (weighted)
+  roleCategory: RoleCategory;
+  calculatedAt: string; // ISO timestamp
+  createdAt: string;
 }

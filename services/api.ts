@@ -4233,6 +4233,15 @@ export const api = {
 
       if (!validation.isValid) {
         const violationType = validation.violations.includes('site_time_low') ? 'site_time_low' : 'insufficient_hours';
+        const violationDetails = {
+          expectedPercentage: rules.minimumSitePercentage || 75,
+          actualPercentage: breakdown.sitePercentage,
+          siteVisits: breakdown.siteVisits,
+          totalHours: breakdown.totalHours,
+          requiredFullDayHours: rules.dailyWorkingHours?.max || 9,
+          requiredHalfDayHours: rules.dailyWorkingHours?.min || 7,
+        };
+        const severity = breakdown.sitePercentage < 40 || breakdown.totalHours < 4 ? 'High' : (breakdown.sitePercentage < 60 || breakdown.totalHours < 6 ? 'Medium' : 'Low');
         
         if (existingForDay) {
           if (existingForDay.status === 'pending') {
@@ -4243,6 +4252,8 @@ export const api = {
                 ...breakdown,
                 violationType,
                 requiredSitePercentage: rules.minimumSitePercentage || 75,
+                violationDetails,
+                severity,
               }))
               .eq('id', existingForDay.id);
           }
@@ -4254,6 +4265,8 @@ export const api = {
             ...breakdown,
             violationType,
             requiredSitePercentage: rules.minimumSitePercentage || 75,
+            violationDetails,
+            severity,
             status: 'pending',
             affectsSalary: true,
             affectsPerformance: true,
@@ -4261,15 +4274,28 @@ export const api = {
 
           // Send notification via rules
           if (user.reportingManagerId) {
+            const violationTypeNames: Record<string, string> = {
+              'site_time_low': 'LESS WORKED AT SITE',
+              'insufficient_hours': 'INSUFFICIENT WORK HOURS'
+            };
+            const typeLabel = violationTypeNames[violationType] || violationType;
+
             await dispatchNotificationFromRules('violation', {
               actorName: user.name,
-              actionText: `has a site time violation for ${format(new Date(date), 'MMM dd')}. Site percentage: ${breakdown.sitePercentage.toFixed(1)}%`,
+              actionText: `has a ${typeLabel} violation for ${format(new Date(date), 'MMM dd')}. Site percentage: ${breakdown.sitePercentage.toFixed(1)}%`,
               locString: '',
+              severity,
+              metadata: {
+                violationType,
+                details: violationDetails,
+                date: date
+              },
               actor: {
                 id: user.id,
                 name: user.name,
                 reportingManagerId: user.reportingManagerId,
-                role: user.role
+                role: user.role,
+                photoUrl: user.photoUrl
               }
             });
           }

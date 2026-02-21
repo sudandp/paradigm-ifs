@@ -1,7 +1,8 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { Avatars } from './Avatars';
+import { supabase } from '../../services/supabase';
 
 interface ProfilePlaceholderProps {
     className?: string;
@@ -12,10 +13,37 @@ interface ProfilePlaceholderProps {
 export const ProfilePlaceholder: React.FC<ProfilePlaceholderProps> = ({ className, photoUrl, seed }) => {
     const { user } = useAuthStore();
 
-    const isValidPhoto = photoUrl && (photoUrl.startsWith('http') || photoUrl.startsWith('https') || photoUrl.startsWith('data:'));
+    const resolvedPhotoUrl = useMemo(() => {
+        if (!photoUrl) return null;
+        
+        // If it's already a full URL, return it
+        if (photoUrl.startsWith('http') || photoUrl.startsWith('https') || photoUrl.startsWith('data:')) {
+            return photoUrl;
+        }
 
-    if (isValidPhoto) {
-        return <img src={photoUrl} alt="Profile" className={`object-cover ${className || ''}`} onError={(e) => (e.currentTarget.style.display = 'none')} />;
+        // Handle storage paths (e.g., 'avatars/xyz.jpg' or '123/documents/...')
+        try {
+            const isAvatar = photoUrl.startsWith('avatars/');
+            const bucket = isAvatar ? 'avatars' : 'onboarding-documents';
+            const path = isAvatar ? photoUrl.replace('avatars/', '') : photoUrl;
+            
+            const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+            return data.publicUrl;
+        } catch (err) {
+            console.warn('Failed to resolve photo URL path:', photoUrl, err);
+            return null;
+        }
+    }, [photoUrl]);
+
+    if (resolvedPhotoUrl) {
+        return (
+            <img 
+                src={resolvedPhotoUrl} 
+                alt="Profile" 
+                className={`object-cover ${className || ''}`} 
+                onError={(e) => (e.currentTarget.style.display = 'none')} 
+            />
+        );
     }
 
     const effectiveSeed = seed || user?.id;

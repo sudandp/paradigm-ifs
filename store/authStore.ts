@@ -704,6 +704,13 @@ export const useAuthStore = create<AuthState>()(
                             userId: user.id,
                             violationDate: now.toISOString(),
                             violationMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+                            violationType: 'GEO_FENCE_VIOLATION',
+                            violationDetails: {
+                                attemptedLatitude: latitude,
+                                attemptedLongitude: longitude,
+                                locationName: locationName,
+                            },
+                            severity: 'Medium',
                             attemptedLatitude: latitude,
                             attemptedLongitude: longitude,
                             locationName: locationName,
@@ -718,11 +725,22 @@ export const useAuthStore = create<AuthState>()(
                                 locString: ` outside their assigned geofence at ${locationName}`,
                                 title: '📍 Geofencing Violation',
                                 link: '/hr/field-staff-tracking',
+                                severity: 'Medium',
+                                metadata: {
+                                    violationType: 'GEO_FENCE_VIOLATION',
+                                    details: {
+                                        latitude,
+                                        longitude,
+                                        locationName
+                                    },
+                                    date: now.toISOString()
+                                },
                                 actor: {
                                     id: user.id,
                                     name: user.name,
                                     role: user.role,
-                                    reportingManagerId: user.reportingManagerId
+                                    reportingManagerId: user.reportingManagerId,
+                                    photoUrl: user.photoUrl
                                 }
                             }
                         );

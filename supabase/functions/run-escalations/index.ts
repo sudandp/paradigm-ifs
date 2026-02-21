@@ -57,7 +57,7 @@ Deno.serve(async (req: Request) => {
     
     const { data: violationsToEscalate, error: fetchError } = await supabaseClient
       .from('field_attendance_violations')
-      .select('id, user_id, date, users(name)')
+      .select('id, user_id, date, violation_type, violation_details, users(name, photo_url)')
       .eq('status', 'pending')
       .lt('created_at', fortyEightHoursAgo);
 
@@ -65,7 +65,7 @@ Deno.serve(async (req: Request) => {
 
     let escalatedCount = 0;
     if (violationsToEscalate && violationsToEscalate.length > 0) {
-      const violations = violationsToEscalate as Violation[];
+      const violations = violationsToEscalate as any[];
       const { error: updateError } = await supabaseClient
         .from('field_attendance_violations')
         .update({
@@ -87,15 +87,32 @@ Deno.serve(async (req: Request) => {
       const recipients = recipientsData as Recipient[] | null;
 
       if (recipients && recipients.length > 0) {
-        const notifications: NotificationInsert[] = violations.flatMap((v: Violation) => {
-          // Robustly get user name from join (might be object or array)
+        const notifications = violations.flatMap((v: any) => {
+          // Robustly get user name and photo from join (might be object or array)
           const userData = Array.isArray(v.users) ? v.users[0] : v.users;
           const userName = userData?.name || v.user_id;
+          const userPhoto = userData?.photo_url || null;
+          
+          // Format violation type for display
+          const violationTypeMap: Record<string, string> = {
+            'site_time_low': 'LESS WORKED AT SITE',
+            'insufficient_hours': 'INSUFFICIENT WORK HOURS',
+          };
+          const displayViolationType = violationTypeMap[v.violation_type] || (v.violation_type || 'Attendance Violation').replace(/_/g, ' ').toUpperCase();
           
           return recipients.map((r: Recipient) => ({
             user_id: r.id,
-            message: `URGENT: Field attendance violation for user ${userName} on ${v.date} has been escalated to Admin.`,
+            message: `URGENT: ${displayViolationType} for user ${userName} on ${v.date} has been escalated to HR Operation & Admin.`,
             type: 'security',
+            metadata: {
+                employeeName: userName,
+                employeePhoto: userPhoto,
+                employeeId: v.user_id,
+                violationType: v.violation_type || 'ESCALATED_VIOLATION',
+                violationDetails: v.violation_details,
+                severity: 'High',
+                date: v.date
+            }
           }));
         });
 
