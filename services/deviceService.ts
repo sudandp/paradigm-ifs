@@ -798,7 +798,11 @@ async function notifyDeviceChangeRequest(requestId: string, userId: string): Pro
       title: '📱 Device Access Request',
       message: `${user.name} has exceeded their device limit and requested access for a new device.`,
       type: 'approval_request',
-      link: '/user-management' // Or a specific device approval page if it exists
+      link: '/user-management',
+      metadata: {
+        employeeName: user.name,
+        requestId
+      }
     });
   } catch (error) {
     console.error('Error notifying device change request:', error);
@@ -815,7 +819,10 @@ async function notifyDeviceApproved(
       userId: userId,
       title: '✅ Device Approved',
       message: `Your device "${deviceName}" has been approved for use.`,
-      type: 'info'
+      type: 'info',
+      metadata: {
+        deviceName
+      }
     });
   } catch (error) {
     console.error('Error notifying device approved:', error);
@@ -832,7 +839,11 @@ async function notifyDeviceRejected(
       userId: userId,
       title: '❌ Device Request Rejected',
       message: `Your request for device "${deviceName}" was rejected. Reason: ${reason}`,
-      type: 'security'
+      type: 'security',
+      metadata: {
+        deviceName,
+        reason
+      }
     });
   } catch (error) {
     console.error('Error notifying device rejected:', error);

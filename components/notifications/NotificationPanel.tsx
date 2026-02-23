@@ -126,34 +126,49 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         // More permissive UUID regex to catch truncated IDs (e.g. from UI truncation)
         const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}/i;
 
-        // Pattern 1: URGENT: [Violation] for user [Name] on [Date]
-        const urgentMatch = message.match(/URGENT: .*? for user (.*?) on/i);
-        if (urgentMatch) {
-            const nameCandidate = urgentMatch[1].trim();
+        // Pattern 1: [Optional URGENT:] [Violation] for user [Name] on [Date]
+        const userMatch = message.match(/(?:URGENT:\s*)?.*?for user\s+(.*?)\s+on/i);
+        if (userMatch) {
+            const nameCandidate = userMatch[1].trim();
             if (!uuidRegex.test(nameCandidate)) return nameCandidate;
         }
 
         // Pattern 2: [Name] has [Action]
         if (message.includes('has')) {
             const part = message.split('has')[0].trim();
-            // Don't return long phrases OR UUIDs as names
-            if (part.length < 50 && !uuidRegex.test(part)) return part;
+            // Remove "URGENT:" from start if present
+            const nameCandidate = part.replace(/^URGENT:\s*/i, '').trim();
+            // Don't return long phrases, violation types, OR UUIDs as names
+            const isViolationType = ['LESS WORKED AT SITE', 'INSUFFICIENT WORK HOURS', 'ATTENDANCE VIOLATION'].some(t => nameCandidate.toUpperCase().includes(t));
+            if (nameCandidate.length < 50 && !uuidRegex.test(nameCandidate) && !isViolationType) return nameCandidate;
         }
 
-        const firstWord = message.split(' ')[0];
-        return uuidRegex.test(firstWord) ? 'Employee' : firstWord;
+        const words = message.replace(/^URGENT:\s*/i, '').split(' ');
+        const firstWord = words[0];
+        
+        // List of words that should never be considered a "Name"
+        const blacklistedNames = ['FIELD', 'ATTENDANCE', 'VIOLATION', 'SYSTEM', 'SECURITY', 'URGENT', 'NEW', 'TASK', 'DEVICE', 'LESS', 'INSUFFICIENT'];
+        
+        if (uuidRegex.test(firstWord) || blacklistedNames.includes(firstWord.toUpperCase().replace(':', ''))) {
+            return 'Employee';
+        }
+        
+        return firstWord;
     };
 
     const cleanMessage = (message: string) => {
-        const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}/i;
-
         // Remove "URGENT:" prefix
-        let cleaned = message.replace(/^URGENT: /i, '');
+        let cleaned = message.replace(/^URGENT:\s*/i, '');
 
         // Pattern 1: [Violation Type] for user [Name] on [Date] has been escalated...
-        if (cleaned.includes('for user') && cleaned.includes('escalated')) {
-            const typePart = cleaned.split('for user')[0].trim();
+        if (cleaned.toLowerCase().includes('for user') && cleaned.toLowerCase().includes('escalated')) {
+            const typePart = cleaned.split(/for user/i)[0].trim();
             return `${typePart} escalated to HR Operation & Admin`;
+        }
+
+        // Pattern 2: [Violation Type] for user [Name] on [Date]
+        if (cleaned.toLowerCase().includes('for user') && cleaned.toLowerCase().includes('on')) {
+            return cleaned.split(/for user/i)[0].trim();
         }
 
         // If it starts with a name or UUID followed by "has"
@@ -515,11 +530,15 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                                                     </div>
                                                                     
                                                                     <div className="flex items-center gap-2 mb-2">
-                                                                        <div className={`p-1 rounded-lg ${isMobile ? 'bg-white/10' : 'bg-gray-100'}`}>
-                                                                            <UserPlus className="w-3.5 h-3.5 opacity-50" />
+                                                                        <div className={`overflow-hidden rounded-lg ${isMobile ? 'bg-white/10' : 'bg-gray-100'}`}>
+                                                                            <ProfilePlaceholder 
+                                                                                className="w-8 h-8"
+                                                                                photoUrl={metadata.employeePhoto}
+                                                                                seed={metadata.employeeId}
+                                                                            />
                                                                         </div>
                                                                         <p className={`text-xs font-bold truncate ${isMobile ? 'text-white' : 'text-gray-900'}`}>
-                                                                            {metadata.employeeName || extractEmployeeName(notif.message)}
+                                                                            {metadata.employeeName && !/[0-9a-f]{8}-[0-9a-f]{4}/i.test(metadata.employeeName) ? metadata.employeeName : extractEmployeeName(notif.message)}
                                                                         </p>
                                                                     </div>
                                                                     
@@ -573,15 +592,18 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                                                         </div>
                                                                     )}
 
-                                                                    <div className="flex items-center justify-between mt-1">
+                                                                    <div className="flex items-center justify-between mt-1 pt-2 border-t border-white/5">
                                                                         <span className={`text-[9px] flex items-center gap-1 ${isMobile ? 'text-white/40' : 'text-gray-400'}`}>
                                                                             <Clock className="h-2.5 w-2.5" />
                                                                             {formatDistanceToNow(parseISO(notif.createdAt), { addSuffix: true })}
                                                                         </span>
-                                                                        {!notif.isRead && <span className={`w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.5)] ${
-                                                                            notif.severity === 'High' ? 'bg-red-500' : 
-                                                                            notif.severity === 'Medium' ? 'bg-orange-500' : 'bg-yellow-500'
-                                                                        }`} />}
+                                                                        <div className="flex items-center gap-2">
+                                                                            {notif.isRead && <span className="text-[8px] font-bold text-green-500 flex items-center gap-0.5"><Check className="w-2 h-2" /> Resolved</span>}
+                                                                            {!notif.isRead && <span className={`w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.5)] ${
+                                                                                notif.severity === 'High' ? 'bg-red-500 animate-pulse' : 
+                                                                                notif.severity === 'Medium' ? 'bg-orange-500' : 'bg-yellow-500'
+                                                                            }`} />}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>

@@ -3837,7 +3837,12 @@ export const api = {
       title: '🔒 Security Alert',
       message: `${userName} ${violationMessage}${deviceText}. Access was blocked for security reasons.`,
       type: 'security',
-      link: `/user-management`, // Link to user management or security dashboard
+      link: `/user-management`,
+      metadata: {
+        employeeName: userName,
+        violationType,
+        deviceInfo
+      }
     });
   },
 
@@ -3865,6 +3870,11 @@ export const api = {
       message: `${name} logged in from a new device. Previous device: ${oldDevice}, New device: ${newDevice}`,
       type: 'info',
       link: `/user-management`,
+      metadata: {
+        employeeName: name,
+        oldDevice,
+        newDevice
+      }
     });
   },
   getBiometricDevices: async (): Promise<BiometricDevice[]> => {

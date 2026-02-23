@@ -44,12 +44,8 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseClient = createClient(
-      // @ts-ignore: Deno is available in Edge Function environment
       Deno.env.get('SUPABASE_URL') ?? '',
-      // @ts-ignore: Deno is available in Edge Function environment
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      // Create client with Auth context of the user that called the function.
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     )
 
     // 1. Escalate Field Attendance Violations
