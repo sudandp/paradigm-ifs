@@ -199,8 +199,10 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests =
         });
 
         // Priority Logic:
-        // 1. If it's a holiday (recurring, fixed, or Sunday) AND the user checked in -> Holiday Present (comp-off earned)
-        if ((isRecurringHoliday || isCompanyHoliday || isSunday) && hasCheckIn) {
+        // 1. If it's a valid holiday (active recurring, company holiday, or Sunday) AND the user checked in -> Holiday Present (comp-off earned)
+        const validRecurringHoliday = isRecurringHoliday && !isFloatingExpired;
+
+        if ((validRecurringHoliday || isCompanyHoliday || isSunday) && hasCheckIn) {
             return 'holiday-present';
         }
 

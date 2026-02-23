@@ -96,6 +96,7 @@ const MyTasks = lazyWithRetry(() => import('./pages/onboarding/MyTasks'));
 const UniformRequests = lazyWithRetry(() => import('./pages/onboarding/UniformRequests'));
 const SupportDashboard = lazyWithRetry(() => import('./pages/support/SupportDashboard'));
 const TicketDetail = lazyWithRetry(() => import('./pages/support/TicketDetail'));
+const Alerts = lazyWithRetry(() => import('./pages/support/Alerts'));
 const MyTeam = lazyWithRetry(() => import('./pages/my-team/MyTeamPage'));
 const FieldReports = lazyWithRetry(() => import('./pages/my-team/FieldReports'));
 const Tasks = lazyWithRetry(() => import('./pages/tasks/TaskManagement'));
@@ -853,6 +854,7 @@ const App: React.FC = () => {
           {/* Support */}
           <Route element={<ProtectedRoute requiredPermission="access_support_desk" />}>
             <Route path="support" element={<SupportDashboard />} />
+            <Route path="support/alerts" element={<Alerts />} />
             <Route path="support/ticket/new" element={<NewTicketPage />} />
             <Route path="support/ticket/:id" element={<TicketDetail />} />
           </Route>

@@ -1149,7 +1149,8 @@ export type NotificationType =
   | 'info'
   | 'warning'
   | 'greeting'
-  | 'approval_request';
+  | 'approval_request'
+  | 'emergency_broadcast';
 
 export interface Notification {
   id: string;

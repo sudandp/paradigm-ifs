@@ -1,0 +1,34 @@
+﻿components/auth/PermissionGuard.tsx(249,23): error TS2339: Property 'openAppSettings' does not exist on type 'AppPlugin'.
+components/developer/PageInterfaceSettingsModal.tsx(179,33): error TS2322: Type '(value: boolean) => void' is not assignable to type 'ChangeEventHandler<HTMLInputElement>'.
+  Types of parameters 'value' and 'event' are incompatible.
+    Type 'ChangeEvent<HTMLInputElement>' is not assignable to type 'boolean'.
+components/developer/PageInterfaceSettingsModal.tsx(186,33): error TS2322: Type '(value: boolean) => void' is not assignable to type 'ChangeEventHandler<HTMLInputElement>'.
+  Types of parameters 'value' and 'event' are incompatible.
+    Type 'ChangeEvent<HTMLInputElement>' is not assignable to type 'boolean'.
+components/notifications/NotificationBell.tsx(23,11): error TS2739: Type '{ task_assigned: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; ... 4 more ...; greeting: ForwardRefExoticComponent<...>; }' is missing the following properties from type 'Record<NotificationType, ElementType<any, keyof IntrinsicElements>>': warning, approval_request, emergency_broadcast
+components/notifications/NotificationBell.tsx(32,11): error TS2739: Type '{ task_assigned: string; task_escalated: string; provisional_site_reminder: string; security: string; info: string; greeting: string; }' is missing the following properties from type 'Record<NotificationType, string>': warning, approval_request, emergency_broadcast
+mocks/userData.ts(6,3): error TS2741: Property 'roleId' is missing in type '{ id: string; name: string; email: string; role: string; }' but required in type 'User'.
+mocks/userData.ts(12,3): error TS2741: Property 'roleId' is missing in type '{ id: string; name: string; email: string; role: string; phone: string; photoUrl: string; }' but required in type 'User'.
+mocks/userData.ts(20,3): error TS2741: Property 'roleId' is missing in type '{ id: string; name: string; email: string; role: string; phone: string; }' but required in type 'User'.
+mocks/userData.ts(27,3): error TS2741: Property 'roleId' is missing in type '{ id: string; name: string; email: string; role: string; phone: string; reportingManagerId: string; }' but required in type 'User'.
+mocks/userData.ts(35,3): error TS2741: Property 'roleId' is missing in type '{ id: string; name: string; email: string; role: string; organizationId: string; organizationName: string; phone: string; reportingManagerId: string; }' but required in type 'User'.
+mocks/userData.ts(45,3): error TS2741: Property 'roleId' is missing in type '{ id: string; name: string; email: string; role: string; phone: string; reportingManagerId: string; photoUrl: string; }' but required in type 'User'.
+mocks/userData.ts(54,5): error TS2741: Property 'roleId' is missing in type '{ id: string; name: string; email: string; role: string; phone: string; reportingManagerId: string; photoUrl: string; }' but required in type 'User'.
+mocks/userData.ts(63,3): error TS2741: Property 'roleId' is missing in type '{ id: string; name: string; email: string; role: string; phone: string; reportingManagerId: string; photoUrl: string; }' but required in type 'User'.
+mocks/userData.ts(72,3): error TS2741: Property 'roleId' is missing in type '{ id: string; name: string; email: string; role: string; phone: string; reportingManagerId: string; photoUrl: string; }' but required in type 'User'.
+pages/admin/SiteStaffFormModal.tsx(7,20): error TS2307: Cannot find module '../ui/Button' or its corresponding type declarations.
+pages/admin/SiteStaffFormModal.tsx(8,19): error TS2307: Cannot find module '../ui/Input' or its corresponding type declarations.
+pages/admin/SiteStaffFormModal.tsx(9,20): error TS2307: Cannot find module '../ui/Select' or its corresponding type declarations.
+pages/forms/AddSiteAttendanceRecord.tsx(146,53): error TS2339: Property 'billingCycle' does not exist on type 'SiteInvoiceDefault'.
+pages/forms/AddSiteAttendanceRecord.tsx(147,52): error TS2339: Property 'opsIncharge' does not exist on type 'SiteInvoiceDefault'.
+pages/forms/AddSiteAttendanceRecord.tsx(148,51): error TS2339: Property 'hrIncharge' does not exist on type 'SiteInvoiceDefault'.
+pages/forms/AddSiteAttendanceRecord.tsx(149,56): error TS2339: Property 'invoiceIncharge' does not exist on type 'SiteInvoiceDefault'.
+pages/forms/AddSiteAttendanceRecord.tsx(169,87): error TS2339: Property 'managerTentativeDate' does not exist on type 'SiteInvoiceDefault'.
+pages/forms/AddSiteAttendanceRecord.tsx(170,82): error TS2339: Property 'hrTentativeDate' does not exist on type 'SiteInvoiceDefault'.
+pages/forms/AddSiteAttendanceRecord.tsx(171,94): error TS2339: Property 'invoiceSharingTentativeDate' does not exist on type 'SiteInvoiceDefault'.
+pages/hr/LeaveManagement.tsx(376,22): error TS2552: Cannot find name 'isHRAdmin'. Did you mean 'isAdmin'?
+pages/hr/LeaveManagement.tsx(390,56): error TS2552: Cannot find name 'isHRAdmin'. Did you mean 'isAdmin'?
+pages/onboarding/GmcDetails.tsx(166,91): error TS2345: Argument of type 'ChangeEvent<HTMLInputElement>' is not assignable to parameter of type 'boolean'.
+pages/onboarding/GmcDetails.tsx(234,95): error TS2345: Argument of type 'ChangeEvent<HTMLInputElement>' is not assignable to parameter of type 'boolean'.
+pages/settings/PermissionsPage.tsx(3,20): error TS2307: Cannot find module '../components/ui/Button' or its corresponding type declarations.
+pages/settings/PermissionsPage.tsx(9,8): error TS2307: Cannot find module '../utils/permissions' or its corresponding type declarations.

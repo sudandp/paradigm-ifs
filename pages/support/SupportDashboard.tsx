@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { SupportTicket, User } from '../../types';
 import { useAuthStore } from '../../store/authStore';
-import { Loader2, Plus, LifeBuoy, Users, Phone, MessageSquare, Video, Search, Filter, UserCheck } from 'lucide-react';
+import { Loader2, Plus, LifeBuoy, Users, Phone, MessageSquare, Video, Search, Filter, UserCheck, AlertTriangle } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { formatDistanceToNow } from 'date-fns';
@@ -259,6 +259,15 @@ const SupportDashboard: React.FC = () => {
                                 className="flex-1 lg:flex-none bg-gray-100 text-gray-900 hover:bg-gray-200 border-none shadow-none p-0 text-sm transition-colors"
                             >
                                 <UserCheck className="mr-1.5 h-3.5 w-3.5" /> Nearby
+                            </Button>
+                        )}
+                        {(user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'hr' || user?.role === 'hr_ops' || user?.role === 'developer') && (
+                            <Button
+                                onClick={() => navigate('/support/alerts')}
+                                variant="secondary"
+                                className="flex-1 lg:flex-none bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border-red-200"
+                            >
+                                <AlertTriangle className="mr-1.5 h-3.5 w-3.5" /> Broadcast Alert
                             </Button>
                         )}
                         <Button

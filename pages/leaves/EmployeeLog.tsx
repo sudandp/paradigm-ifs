@@ -289,9 +289,9 @@ const EmployeeLog: React.FC = () => {
                                                     </div>
                                                 </div>
                                                 {(event.locationName || (event.latitude && event.longitude)) && (
-                                                    <div className="flex items-start gap-2 text-sm bg-white px-3 py-1.5 rounded-lg border border-gray-200 max-w-md">
-                                                        <MapPin className="h-4 w-4 text-indigo-400 md:text-indigo-600 flex-shrink-0 mt-0.5" />
-                                                        <span className="text-xs break-words text-gray-700">
+                                                    <div className="flex items-start gap-2 text-sm bg-white max-md:bg-[#041b0f] px-3 py-1.5 rounded-lg border border-gray-200 max-md:border-white/10 max-w-md">
+                                                        <MapPin className="h-4 w-4 text-indigo-400 max-md:text-emerald-400 md:text-indigo-600 flex-shrink-0 mt-0.5" />
+                                                        <span className="text-xs break-words text-gray-700 max-md:text-gray-200">
                                                             {event.locationName || `${event.latitude?.toFixed(4)}, ${event.longitude?.toFixed(4)}`}
                                                         </span>
                                                     </div>

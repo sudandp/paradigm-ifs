@@ -2538,6 +2538,28 @@ export const api = {
     // Filter out 'title' if present, as the table does not support it
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { title, ...validData } = data;
+
+    if (validData.userId === 'ALL_USERS_BROADCAST') {
+      // Fetch all users to broadcast to
+      const { data: users, error: userError } = await supabase.from('users').select('id');
+      if (userError) throw userError;
+
+      const payload = (users || []).map(u => ({
+        ...toSnakeCase(validData),
+        user_id: u.id
+      }));
+
+      // Insert in chunks to avoid payload limits
+      const chunkSize = 500;
+      for (let i = 0; i < payload.length; i += chunkSize) {
+        const chunk = payload.slice(i, i + chunkSize);
+        const { error } = await supabase.from('notifications').insert(chunk);
+        if (error) throw error;
+      }
+      
+      return { ...data, id: 'broadcast', createdAt: new Date().toISOString(), isRead: false } as Notification;
+    }
+
     const { data: inserted, error } = await supabase.from('notifications').insert(toSnakeCase(validData)).select().single();
     if (error) throw error;
     return toCamelCase(inserted);

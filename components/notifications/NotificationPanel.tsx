@@ -36,6 +36,7 @@ const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({
         warning: AlertTriangle,
         greeting: Sun,
         approval_request: ClipboardCheck,
+        emergency_broadcast: AlertTriangle,
     };
 
     const bgMap: Record<NotificationType, string> = {
@@ -47,6 +48,7 @@ const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({
         warning: 'bg-amber-50 text-amber-600 border-amber-100',
         greeting: 'bg-emerald-50 text-emerald-600 border-emerald-100',
         approval_request: 'bg-orange-50 text-orange-600 border-orange-100 shadow-[0_0_10px_rgba(249,115,22,0.1)]',
+        emergency_broadcast: 'bg-red-50 text-red-600 border-red-100 shadow-[0_0_10px_rgba(239,68,68,0.2)]',
     };
 
     const Icon = iconMap[type] || Bell;
