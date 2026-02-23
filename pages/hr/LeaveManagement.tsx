@@ -349,6 +349,7 @@ const LeaveManagement: React.FC = () => {
 
         // HR/Admin can edit leave type for any request that is not rejected/withdrawn/cancelled
         const isSuperAdmin = ['admin', 'super_admin'].includes(user.role);
+        const isHRAdmin = ['admin', 'super_admin', 'hr'].includes(user.role);
         const isMyTurn = request.currentApproverId === user.id || isSuperAdmin;
 
         if (isSuperAdmin || isMyTurn) {

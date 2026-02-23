@@ -111,7 +111,7 @@ BEGIN
                 WHERE id = NEW.user_id;
 
                 -- 8. Notify User
-                INSERT INTO public.notifications (user_id, message, type, link)
+                INSERT INTO public.notifications (user_id, message, type, link_to)
                 VALUES (
                     NEW.user_id, 
                     format('Congratulations! You earned %s Comp Off(s) from accumulated Overtime.', compoff_count),
@@ -121,7 +121,7 @@ BEGIN
 
                 -- 9. Notify Manager
                 IF u_manager_id IS NOT NULL THEN
-                    INSERT INTO public.notifications (user_id, message, type, link)
+                    INSERT INTO public.notifications (user_id, message, type, link_to)
                     VALUES (
                         u_manager_id,
                         format('%s has earned %s Comp Off(s) via automatic OT conversion.', u_name, compoff_count),

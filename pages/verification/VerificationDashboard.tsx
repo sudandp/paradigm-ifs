@@ -147,103 +147,168 @@ const VerificationDashboard: React.FC = () => {
     const filterTabs = ['all', 'pending', 'verified', 'rejected'];
     const colSpan = statusFilter === 'verified' ? 4 : 5;
 
-    return (
-        <div className="p-4 border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card">
-            {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
-            <h2 className="text-2xl font-semibold text-primary-text mb-6">Onboarding Forms</h2>
+    // Calculate counts for each status
+    const counts = useMemo(() => {
+        return {
+            all: submissions.length,
+            pending: submissions.filter(s => s.status === 'pending').length,
+            verified: submissions.filter(s => s.status === 'verified').length,
+            rejected: submissions.filter(s => s.status === 'rejected').length
+        };
+    }, [submissions]);
 
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                <div className="w-full sm:w-auto border-b border-border">
-                    <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                        {filterTabs.map(tab => (
-                            <button
-                                key={tab}
-                                onClick={() => setStatusFilter(tab)}
-                                className={`${statusFilter === tab
-                                    ? 'border-accent text-accent-dark'
-                                    : 'border-transparent text-muted hover:text-accent-dark hover:border-accent'
-                                    } whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm capitalize`}
-                            >
-                                {tab}
-                            </button>
-                        ))}
-                    </nav>
-                </div>
-                <div className="relative w-full sm:w-auto sm:max-w-xs">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Search className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                        id="onboarding-search"
-                        name="onboardingSearch"
-                        type="text"
-                        placeholder="Search by name, ID, site..."
-                        aria-label="Search onboarding forms"
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                        className="form-input block w-full !pl-10 pr-3 py-2 border-border rounded-lg leading-5 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-accent focus:border-accent sm:text-sm"
-                    />
-                </div>
+    return (
+        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+            {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
+            
+            <div className="mb-10">
+                <h2 className="text-3xl font-bold text-gray-900 tracking-tight mb-1">Onboarding Forms</h2>
+                <p className="text-gray-500 text-sm">Manage and verify employee onboarding submissions across organizations</p>
             </div>
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-border responsive-table">
-                    <thead className="bg-page">
-                        <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Employee</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Site</th>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 bg-gray-50/30">
+                    <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+                        <div className="bg-gray-100/80 p-1 rounded-xl w-full lg:w-auto self-start">
+                            <nav className="flex space-x-1" aria-label="Tabs">
+                                {filterTabs.map(tab => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setStatusFilter(tab)}
+                                        className={`${statusFilter === tab
+                                            ? 'bg-white text-emerald-700 shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                                            } whitespace-nowrap py-2 px-4 rounded-lg font-semibold text-sm capitalize transition-all duration-200 flex items-center gap-2`}
+                                    >
+                                        {tab}
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                                            statusFilter === tab ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-200 text-gray-600'
+                                        }`}>
+                                            {counts[tab as keyof typeof counts]}
+                                        </span>
+                                    </button>
+                                ))}
+                            </nav>
+                        </div>
+                        <div className="relative w-full lg:max-w-md">
+                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                <Search className="h-4.5 w-4.5 text-gray-400" />
+                            </div>
+                            <input
+                                id="onboarding-search"
+                                name="onboardingSearch"
+                                type="text"
+                                placeholder="Search by name, ID, or site..."
+                                aria-label="Search onboarding forms"
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                className="block w-full bg-white border border-gray-200 rounded-xl py-2.5 pl-11 pr-4 text-sm placeholder-gray-400 text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+            <div className="overflow-x-auto overflow-y-hidden">
+                <table className="min-w-full border-separate border-spacing-0 responsive-table">
+                    <thead>
+                        <tr className="bg-gray-50/50">
+                            <th scope="col" className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Employee</th>
+                            <th scope="col" className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Site</th>
                             {statusFilter !== 'verified' && (
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Status</th>
+                                <th scope="col" className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Status</th>
                             )}
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Portal Verification</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Actions</th>
+                            <th scope="col" className="px-6 py-4 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Portal Verification</th>
+                            <th scope="col" className="px-6 py-4 text-right text-[11px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-card md:divide-y-0">
+                    <tbody className="divide-y divide-gray-50">
                         {isLoading ? (
                             isMobile
                                 ? <tr><td colSpan={colSpan}><TableSkeleton rows={3} cols={4} isMobile /></td></tr>
                                 : <TableSkeleton rows={5} cols={colSpan} />
                         ) : filteredSubmissions.length === 0 ? (
-                            <tr><td colSpan={colSpan} className="text-center py-10 text-muted">No submissions found.</td></tr>
+                            <tr><td colSpan={colSpan} className="text-center py-16">
+                                <div className="flex flex-col items-center justify-center text-gray-400">
+                                    <Search className="h-10 w-10 mb-3 opacity-20" />
+                                    <p className="text-sm font-medium">No submissions found.</p>
+                                    <p className="text-xs">Try adjusting your search or filters</p>
+                                </div>
+                            </td></tr>
                         ) : (
                             filteredSubmissions.map((s) => (
-                                <tr key={s.id} className={s.requiresManualVerification ? 'bg-orange-50' : ''}>
-                                    <td data-label="Employee" className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center">
-                                            {s.requiresManualVerification && (
-                                                <span title="Manual verification required due to data mismatch.">
-                                                    <AlertTriangle className="h-4 w-4 text-orange-500 mr-2 flex-shrink-0" />
-                                                </span>
-                                            )}
-                                            <div>
-                                                <div className="text-sm font-medium text-primary-text">{s.personal.firstName} {s.personal.lastName}</div>
-                                                <div className="text-sm text-muted">{s.personal.employeeId}</div>
+                                <tr key={s.id} className={`group hover:bg-emerald-50/30 transition-colors duration-150 ${s.requiresManualVerification ? 'bg-orange-50/50' : ''}`}>
+                                    <td data-label="Employee" className="px-6 py-5 whitespace-nowrap">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm border-2 border-white shadow-sm flex-shrink-0">
+                                                {s.personal.firstName?.[0]}{s.personal.lastName?.[0]}
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-semibold text-gray-900">{s.personal.firstName} {s.personal.lastName}</span>
+                                                    {s.requiresManualVerification && (
+                                                        <span title="Manual verification required">
+                                                            <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-xs font-medium text-gray-500">{s.personal.employeeId}</div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td data-label="Site" className="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary-text">{s.organizationName}</td>
+                                    <td data-label="Site" className="px-6 py-5 whitespace-nowrap">
+                                        <div className="text-sm font-medium text-gray-700">{s.organizationName}</div>
+                                    </td>
                                     {statusFilter !== 'verified' && (
-                                        <td data-label="Status" className="px-6 py-4 whitespace-nowrap">
+                                        <td data-label="Status" className="px-6 py-5 whitespace-nowrap">
                                             <StatusChip status={s.status} />
                                         </td>
                                     )}
-                                    <td data-label="Portal Verification" className="px-6 py-4 whitespace-nowrap">
+                                    <td data-label="Portal Verification" className="px-6 py-5 whitespace-nowrap">
                                         <VerificationChecks submission={s} isSyncing={syncingId === s.id} />
                                     </td>
-                                    <td data-label="Actions" className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <div className="flex items-center gap-2">
-                                            <Button variant="icon" size="sm" onClick={() => navigate(`/onboarding/add/personal?id=${s.id}`)} title="View Details" aria-label={`View details for ${s.personal.firstName}`}><Eye className="h-4 w-4" /></Button>
-                                            <Button variant="icon" size="sm" onClick={() => navigate(`/onboarding/pdf/${s.id}`)} title="Download Forms" aria-label={`Download forms for ${s.personal.firstName}`}><FileText className="h-4 w-4" /></Button>
+                                    <td data-label="Actions" className="px-6 py-5 whitespace-nowrap text-right">
+                                        <div className="flex items-center justify-end gap-1">
+                                            <button 
+                                                onClick={() => navigate(`/onboarding/add/personal?id=${s.id}`)}
+                                                className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200"
+                                                title="View Details"
+                                            >
+                                                <Eye className="h-4.5 w-4.5" />
+                                            </button>
+                                            <button 
+                                                onClick={() => navigate(`/onboarding/pdf/${s.id}`)}
+                                                className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200"
+                                                title="Download Forms"
+                                            >
+                                                <FileText className="h-4.5 w-4.5" />
+                                            </button>
                                             {s.status === 'pending' && (
-                                                <>
-                                                    <Button variant="icon" size="sm" onClick={() => handleAction('approve', s.id!)} title="Verify" aria-label={`Verify submission for ${s.personal.firstName}`}><CheckSquare className="h-4 w-4 text-green-600" /></Button>
-                                                    <Button variant="icon" size="sm" onClick={() => handleAction('reject', s.id!)} title="Request Changes" aria-label={`Request changes for ${s.personal.firstName}`}><XSquare className="h-4 w-4 text-red-600" /></Button>
-                                                </>
+                                                <div className="flex items-center gap-1 border-l border-gray-100 ml-1 pl-1">
+                                                    <button 
+                                                        onClick={() => handleAction('approve', s.id!)}
+                                                        className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200"
+                                                        title="Verify"
+                                                    >
+                                                        <CheckSquare className="h-4.5 w-4.5" />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleAction('reject', s.id!)}
+                                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+                                                        title="Request Changes"
+                                                    >
+                                                        <XSquare className="h-4.5 w-4.5" />
+                                                    </button>
+                                                </div>
                                             )}
                                             {s.status === 'verified' && (s.portalSyncStatus === 'pending_sync' || s.portalSyncStatus === 'failed') && (
-                                                <Button variant="outline" size="sm" onClick={() => handleSync(s.id!)} isLoading={syncingId === s.id} title="Push data to government portals">
-                                                    {syncingId !== s.id && <Send className="h-4 w-4 mr-1" />}
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    onClick={() => handleSync(s.id!)} 
+                                                    isLoading={syncingId === s.id}
+                                                    className="ml-2 !rounded-lg border-gray-200 text-gray-600 hover:text-emerald-700 hover:border-emerald-200 hover:bg-emerald-50"
+                                                >
+                                                    {syncingId !== s.id && <Send className="h-3.5 w-3.5 mr-1.5" />}
                                                     Sync Portals
                                                 </Button>
                                             )}
@@ -256,6 +321,7 @@ const VerificationDashboard: React.FC = () => {
                 </table>
             </div>
         </div>
+    </div>
     );
 };
 

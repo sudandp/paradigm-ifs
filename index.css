@@ -5,14 +5,14 @@
 
 @media (min-width: 768px) {
     body {
-        zoom: 80%;
-        min-height: 125vh;
+        zoom: 75%;
+        min-height: 133.34vh;
     }
     .min-h-screen {
-        min-height: 125vh !important;
+        min-height: 133.34vh !important;
     }
     .h-screen {
-        height: 125vh !important;
+        height: 133.34vh !important;
     }
 }
 
@@ -385,7 +385,8 @@ body {
     }
 }
 .animate-slide-in-right {
-    animation: slide-in-from-right 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    animation: slide-in-from-right 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+        forwards;
 }
 @media print {
     .no-print {
@@ -741,9 +742,9 @@ body {
         font-size: 15px !important;
     }
 
-.pro-dark-theme input[type="date"]::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-}
+    .pro-dark-theme input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+    }
     h1 {
         font-size: 1.75rem !important;
         font-weight: 700 !important;

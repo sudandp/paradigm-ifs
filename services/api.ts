@@ -2540,22 +2540,14 @@ export const api = {
     const { title, ...validData } = data;
 
     if (validData.userId === 'ALL_USERS_BROADCAST') {
-      // Fetch all users to broadcast to
-      const { data: users, error: userError } = await supabase.from('users').select('id');
-      if (userError) throw userError;
-
-      const payload = (users || []).map(u => ({
-        ...toSnakeCase(validData),
-        user_id: u.id
-      }));
-
-      // Insert in chunks to avoid payload limits
-      const chunkSize = 500;
-      for (let i = 0; i < payload.length; i += chunkSize) {
-        const chunk = payload.slice(i, i + chunkSize);
-        const { error } = await supabase.from('notifications').insert(chunk);
-        if (error) throw error;
-      }
+      const { error } = await supabase.rpc('broadcast_notification', {
+        p_message: validData.message,
+        p_type: validData.type || 'info',
+        p_severity: (validData as any).severity || 'Low',
+        p_metadata: (validData as any).metadata || {},
+        p_link_to: validData.linkTo || (validData as any).link || null
+      });
+      if (error) throw error;
       
       return { ...data, id: 'broadcast', createdAt: new Date().toISOString(), isRead: false } as Notification;
     }
@@ -2595,8 +2587,21 @@ export const api = {
     if (error) throw error;
   },
 
-  broadcastNotification: async (data: { role?: string; userIds?: string[]; message: string; title?: string; type?: NotificationType }): Promise<void> => {
+  broadcastNotification: async (data: { role?: string; userIds?: string[]; message: string; title?: string; type?: NotificationType; link?: string; severity?: 'Low' | 'Medium' | 'High' }): Promise<void> => {
     let finalUserIds: string[] = data.userIds || [];
+    
+    // Check for "all" role or no specific targets
+    if (data.role === 'all' || (finalUserIds.length === 0 && !data.role)) {
+      const { error } = await supabase.rpc('broadcast_notification', {
+        p_message: data.message,
+        p_type: data.type || 'info',
+        p_severity: data.severity || 'Low',
+        p_metadata: {},
+        p_link_to: data.link || null
+      });
+      if (error) throw error;
+      return;
+    }
     
     if (data.role) {
       const { data: users, error } = await supabase.from('users').select('id').eq('role', data.role);
@@ -2604,19 +2609,13 @@ export const api = {
       finalUserIds = [...new Set([...finalUserIds, ...users.map(u => u.id)])];
     }
 
-    if (finalUserIds.length === 0 && !data.role) {
-      // Broadcast to all if no role/userIds specified? Or maybe just error out. 
-      // Let's assume broadcasting to all if nothing is provided.
-      const { data: allUsers, error } = await supabase.from('users').select('id');
-      if (error) throw error;
-      finalUserIds = allUsers.map(u => u.id);
-    }
-
     const notifications = finalUserIds.map(userId => toSnakeCase({
       userId,
       message: data.message,
       // title: data.title, // Table does not support title
       type: data.type || 'info',
+      linkTo: data.link,
+      severity: data.severity || 'Low',
     }));
 
     const { error: insertError } = await supabase.from('notifications').insert(notifications);
