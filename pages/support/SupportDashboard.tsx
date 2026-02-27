@@ -632,35 +632,56 @@ const SupportDashboard: React.FC = () => {
             </div>
         </div>
 
-        {/* Score Information Modal */}
-        <Modal
-            isOpen={isScoreInfoModalOpen}
-            onClose={() => setIsScoreInfoModalOpen(false)}
-            title="Score Calculation System"
-            hideFooter={true}
-        >
-            <div className="space-y-4">
-                <div>
-                    <h4 className="font-bold text-primary-text mb-1 flex items-center gap-2"><Trophy className="w-4 h-4 text-accent" /> Overall Score</h4>
-                    <p className="text-sm">The overall score is a metric out of 100, calculated as a weighted average across three separate categories:</p>
-                    <ul className="list-disc list-inside mt-2 space-y-1 ml-1 mb-2">
-                        <li><strong>Performance:</strong> Evaluated based on the ratio of completed vs. assigned tasks and tickets.</li>
-                        <li><strong>Attendance:</strong> Evaluated based on present days, dropping points for late check-ins.</li>
-                        <li><strong>Response:</strong> Evaluated based on acknowledgment times on system broadcasts and alerts.</li>
-                    </ul>
-                </div>
-                
-                <div className="pt-4 border-t border-border">
-                    <h4 className="font-bold text-primary-text mb-1 flex items-center gap-2"><Award className="w-4 h-4 text-amber-500" /> Leaderboard Tiebreaker</h4>
-                    <p className="text-sm">If multiple team members achieve the precise same overall score (for instance, a perfect 100), the system determines the ultimate rank using a <strong>Punctuality Tiebreaker</strong>.</p>
-                    <p className="text-sm mt-2 text-muted">The precise number of minutes an employee has spent clocked-in and working throughout the entire month is tracked. The employee with the highest cumulative logged duration is automatically rewarded with the higher ranking on the dashboard.</p>
-                </div>
-                
-                <div className="pt-2 flex justify-end">
-                    <Button onClick={() => setIsScoreInfoModalOpen(false)}>Close</Button>
+        {/* Score Information Fixed Dialog */}
+        {isScoreInfoModalOpen && (
+            <div 
+                className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm shadow-2xl transition-opacity animate-in fade-in duration-200" 
+                onClick={() => setIsScoreInfoModalOpen(false)}
+            >
+                <div 
+                    className="bg-card w-full max-w-sm sm:max-w-md rounded-2xl shadow-xl overflow-hidden animate-fade-in-scale transform" 
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div className="px-5 py-4 border-b border-border flex justify-between items-center bg-accent/5">
+                        <h3 className="text-base sm:text-lg font-bold text-primary-text flex items-center gap-2">
+                            <Info className="w-5 h-5 text-accent" /> Score System
+                        </h3>
+                        <button 
+                            onClick={() => setIsScoreInfoModalOpen(false)} 
+                            className="text-muted hover:text-primary-text transition-colors p-1"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                    <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                        <div>
+                            <h4 className="font-bold text-primary-text mb-2 flex items-center gap-2">
+                                <Trophy className="w-4 h-4 text-accent" /> Overall Score
+                            </h4>
+                            <p className="text-sm text-muted">A 100-point metric weighted across three categories:</p>
+                            <ul className="list-disc list-inside mt-2 space-y-1.5 ml-1 text-sm text-muted mb-2">
+                                <li><strong>Performance:</strong> Completed vs. assigned tasks.</li>
+                                <li><strong>Attendance:</strong> Present days, minus late remarks.</li>
+                                <li><strong>Response:</strong> Average broadcast response speed.</li>
+                            </ul>
+                        </div>
+                        
+                        <div className="pt-4 border-t border-border">
+                            <h4 className="font-bold text-primary-text mb-2 flex items-center gap-2">
+                                <Award className="w-4 h-4 text-amber-500" /> Tiebreaker
+                            </h4>
+                            <p className="text-sm text-muted">
+                                If members tie with an identical overall score, the system breaks the tie using <strong>Punctuality</strong>.<br/><br/>
+                                Staff who have accrued the most total clocked-in minutes throughout the month rank higher.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="px-5 py-4 border-t border-border bg-gray-50/50 dark:bg-black/20 flex justify-end">
+                        <Button onClick={() => setIsScoreInfoModalOpen(false)} className="w-full sm:w-auto">Got it</Button>
+                    </div>
                 </div>
             </div>
-        </Modal>
+        )}
 
         </>
     );
