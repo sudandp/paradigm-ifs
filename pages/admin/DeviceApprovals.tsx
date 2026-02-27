@@ -27,6 +27,7 @@ const DeviceApprovals: React.FC = () => {
   const [requests, setRequests] = useState<DeviceChangeRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [approveDialog, setApproveDialog] = useState<{ id: string, name: string } | null>(null);
   const [rejectDialog, setRejectDialog] = useState<{ id: string, name: string } | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -50,17 +51,22 @@ const DeviceApprovals: React.FC = () => {
     }
   };
 
-  const handleApprove = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to approve the device "${name}"?`)) return;
+  const handleApproveInit = (id: string, name: string) => {
+    setApproveDialog({ id, name });
+  };
+
+  const handleApproveConfirm = async () => {
+    if (!approveDialog) return;
     if (!user) return;
 
     try {
-      setProcessingId(id);
-      await approveDeviceRequest(id, user.id); 
+      setProcessingId(approveDialog.id);
+      await approveDeviceRequest(approveDialog.id, user.id); 
       
       setToast({ message: 'Device approved successfully', type: 'success' });
       // Remove from list
-      setRequests(prev => prev.filter(r => r.id !== id));
+      setRequests(prev => prev.filter(r => r.id !== approveDialog.id));
+      setApproveDialog(null);
     } catch (error) {
       console.error('Error approving device:', error);
       setToast({ message: 'Failed to approve device', type: 'error' });
@@ -163,7 +169,7 @@ const DeviceApprovals: React.FC = () => {
                     <X className="w-4 h-4 mr-2" /> Reject
                   </Button>
                   <Button 
-                    onClick={() => handleApprove(request.id, request.deviceName)}
+                    onClick={() => handleApproveInit(request.id, request.deviceName)}
                     className="bg-primary hover:bg-primary-dark text-white flex-1 md:flex-none"
                     isLoading={processingId === request.id}
                     disabled={!!processingId}
@@ -183,6 +189,39 @@ const DeviceApprovals: React.FC = () => {
             onPageSizeChange={setPageSize}
             pageSizeOptions={[12, 24, 48, 96]}
           />
+        </div>
+      )}
+
+      {/* Approval Confirmation Modal */}
+      {approveDialog && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                <Check className="w-5 h-5 text-green-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Approve Device</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to approve the device <strong>{approveDialog.name}</strong>? The user will be able to access the system from this device.
+            </p>
+            
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setApproveDialog(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <Button 
+                onClick={handleApproveConfirm}
+                className="bg-primary hover:bg-primary-dark text-white border-none"
+                isLoading={processingId === approveDialog.id}
+              >
+                <Check className="w-4 h-4 mr-2" /> Approve Device
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 

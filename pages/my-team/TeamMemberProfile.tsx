@@ -11,7 +11,8 @@ import {
   parseISO, isSameDay, addDays, subDays 
 } from 'date-fns';
 import { api } from '../../services/api';
-import { User, AttendanceEvent, LeaveRequest } from '../../types';
+import { User, AttendanceEvent, LeaveRequest, EmployeeScore } from '../../types';
+import { calculateEmployeeScores } from '../../services/employeeScoring';
 import { calculateDistanceMeters, reverseGeocode } from '../../utils/locationUtils';
 import UserDeviceList from '../../components/devices/UserDeviceList';
 import { ProfilePlaceholder } from '../../components/ui/ProfilePlaceholder';
@@ -81,6 +82,8 @@ const TeamMemberProfile: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'activity' | 'leaves' | 'devices' | 'violations'>('activity');
+  const [employeeScores, setEmployeeScores] = useState<EmployeeScore | null>(null);
+  const [isScoresLoading, setIsScoresLoading] = useState(true);
   const { user: currentUser } = useAuthStore();
 
   const isManager = useMemo(() => {
@@ -98,6 +101,25 @@ const TeamMemberProfile: React.FC = () => {
       fetchMemberDetails();
     }
   }, [id]);
+
+  // Fetch employee scores when member is loaded
+  useEffect(() => {
+    if (!member) return;
+    let cancelled = false;
+    const loadScores = async () => {
+      setIsScoresLoading(true);
+      try {
+        const scores = await calculateEmployeeScores(member.id, member.role || 'office');
+        if (!cancelled) setEmployeeScores(scores);
+      } catch (err) {
+        console.error('Failed to load employee scores:', err);
+      } finally {
+        if (!cancelled) setIsScoresLoading(false);
+      }
+    };
+    loadScores();
+    return () => { cancelled = true; };
+  }, [member?.id, member?.role]);
 
   useEffect(() => {
     if (id) {
@@ -296,6 +318,37 @@ const TeamMemberProfile: React.FC = () => {
                       <span className="text-muted text-xs">•</span>
                       <span className="text-muted text-xs font-medium">{member.email}</span>
                     </div>
+                  </div>
+                </div>
+
+                {/* Performance Score Badges */}
+                <div className="flex items-center gap-3 ml-auto">
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="relative flex justify-center items-center w-11 h-11 text-[#F97316] drop-shadow-md" title="Performance Score">
+                      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
+                        <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
+                      </svg>
+                      <span className="relative z-10 text-white font-bold text-xs">{isScoresLoading ? '—' : (employeeScores?.performanceScore ?? '—')}</span>
+                    </div>
+                    <span className="text-[9px] uppercase font-bold text-muted tracking-widest">Performance</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="relative flex justify-center items-center w-11 h-11 text-[#6366f1] drop-shadow-md" title="Attendance Score">
+                      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
+                        <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
+                      </svg>
+                      <span className="relative z-10 text-white font-bold text-xs">{isScoresLoading ? '—' : (employeeScores?.attendanceScore ?? '—')}</span>
+                    </div>
+                    <span className="text-[9px] uppercase font-bold text-muted tracking-widest">Attendance</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="relative flex justify-center items-center w-11 h-11 text-[#111827] drop-shadow-md" title="Response Score">
+                      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
+                        <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
+                      </svg>
+                      <span className="relative z-10 text-white font-bold text-xs">{isScoresLoading ? '—' : (employeeScores?.responseScore ?? '—')}</span>
+                    </div>
+                    <span className="text-[9px] uppercase font-bold text-muted tracking-widest">Response</span>
                   </div>
                 </div>
               </div>

@@ -644,7 +644,8 @@ export const useAuthStore = create<AuthState>()(
                         cancelNotification('BREAK_END');
                     }
 
-                    return { success: true, message: `Successfully ${newType === 'punch-in' ? 'punch in' : newType === 'punch-out' ? 'punch out' : newType.replace('-', ' ')}!` };
+                    const successVerb = workType === 'field' ? 'check' : 'punch';
+                    return { success: true, message: `Successfully ${newType === 'punch-in' ? `${successVerb} in` : newType === 'punch-out' ? `${successVerb} out` : newType.replace('-', ' ')}!` };
                 };
 
                 if (!position || !position.coords) {
@@ -760,9 +761,10 @@ export const useAuthStore = create<AuthState>()(
                 const result = await finalizeAttendance(latitude, longitude, locationId, locationName);
                 
                 if (isViolation) {
+                    const violationVerb = workType === 'field' ? 'check' : 'punch';
                     return { 
                         success: true, 
-                        message: `Successfully ${newType === 'punch-in' ? 'punch in' : newType === 'punch-out' ? 'punch out' : newType.replace('-', ' ')}! (Note: Recorded as geofencing violation)` 
+                        message: `Successfully ${newType === 'punch-in' ? `${violationVerb} in` : newType === 'punch-out' ? `${violationVerb} out` : newType.replace('-', ' ')}! (Note: Recorded as geofencing violation)` 
                     };
                 }
                 

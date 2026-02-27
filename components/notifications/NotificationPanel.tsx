@@ -16,7 +16,9 @@ import {
     ChevronLeft,
     ChevronRight,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    UserX,
+    Trash2
 } from 'lucide-react';
 import { format, formatDistanceToNow, isToday, isYesterday, parseISO } from 'date-fns';
 import type { Notification, NotificationType, AttendanceUnlockRequest, LeaveRequest, ExtraWorkLog, SiteFinanceRecord, SiteInvoiceRecord } from '../../types';
@@ -25,6 +27,7 @@ import { api } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { CheckCircle, XCircle, Calendar, FileText, MapPin, IndianRupee } from 'lucide-react';
 import { ProfilePlaceholder } from '../ui/ProfilePlaceholder';
+import { calculateAllEmployeeScores, type EmployeeScoreWithUser } from '../../services/employeeScoring';
 
 const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({ type, size = "h-5 w-5" }) => {
     const iconMap: Record<NotificationType, React.ElementType> = {
@@ -80,11 +83,14 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         finance: false,
         invoices: false,
         general: false,
-        violations: false
+        violations: false,
+        inactive: false
     });
     const [expandedDetails, setExpandedDetails] = React.useState<Record<string, boolean>>({});
 
-    const toggleSection = (section: 'unlocks' | 'leaves' | 'claims' | 'finance' | 'invoices' | 'general' | 'violations') => {
+    const [inactiveEmployees, setInactiveEmployees] = React.useState<EmployeeScoreWithUser[]>([]);
+
+    const toggleSection = (section: 'unlocks' | 'leaves' | 'claims' | 'finance' | 'invoices' | 'general' | 'violations' | 'inactive') => {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
@@ -287,6 +293,19 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         } catch (err) {
             console.error('Error fetching pending approvals:', err);
         }
+
+        // Fetch inactive (zero-score) employees
+        try {
+            const allScores = await calculateAllEmployeeScores();
+            const zeroScore = allScores.filter(
+                e => e.scores.performanceScore === 0 &&
+                     e.scores.attendanceScore === 0 &&
+                     e.scores.responseScore === 0
+            );
+            setInactiveEmployees(zeroScore);
+        } catch (err) {
+            console.error('Error fetching inactive employees:', err);
+        }
     }, [user]);
 
     React.useEffect(() => {
@@ -344,6 +363,23 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         } finally {
             setIsActionLoading(null);
         }
+    };
+
+    const handleRemoveInactiveEmployee = async (emp: EmployeeScoreWithUser) => {
+        if (!confirm(`Are you sure you want to remove ${emp.userName} from the system? This action cannot be undone.`)) return;
+        setIsActionLoading(emp.userId);
+        try {
+            await api.deleteUser(emp.userId);
+            setInactiveEmployees(prev => prev.filter(e => e.userId !== emp.userId));
+        } catch (err) {
+            console.error('Error removing user:', err);
+        } finally {
+            setIsActionLoading(null);
+        }
+    };
+
+    const handleDenyInactive = (emp: EmployeeScoreWithUser) => {
+        setInactiveEmployees(prev => prev.filter(e => e.userId !== emp.userId));
     };
 
     React.useEffect(() => {
@@ -443,7 +479,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                 className={`flex-1 overflow-y-auto custom-scrollbar ${isMobile ? 'bg-[#0A3D2E]' : 'bg-white'}`}
             >
                 {/* Pending Approvals Section */}
-                {(unlockRequests.length > 0 || leaveRequests.length > 0 || extraWorkClaims.length > 0 || financeRequests.length > 0) && (
+                {(unlockRequests.length > 0 || leaveRequests.length > 0 || extraWorkClaims.length > 0 || financeRequests.length > 0 || inactiveEmployees.length > 0) && (
                     <div className={`border-b ${isMobile ? 'border-white/10 bg-gradient-to-b from-white/5 to-transparent' : 'border-gray-100 bg-amber-50/30'}`}>
                         <div className="px-6 py-4 flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -455,7 +491,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                 </h5>
                             </div>
                             <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${isMobile ? 'bg-white/10 text-white border border-white/5' : 'bg-amber-100 text-amber-700'}`}>
-                                {unlockRequests.length + leaveRequests.length + extraWorkClaims.length + financeRequests.length}
+                                {unlockRequests.length + leaveRequests.length + extraWorkClaims.length + financeRequests.length + inactiveEmployees.length}
                             </span>
                         </div>
 
@@ -988,6 +1024,82 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                                             onClick={() => handleRespondToFinance(req.id, 'rejected')}
                                                         >
                                                             <XCircle className="w-3 h-3 mr-1" /> Reject
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Inactive Employees */}
+                            {inactiveEmployees.length > 0 && (
+                                <div className={`group rounded-2xl overflow-hidden transition-all duration-300 border ${isMobile ? 'border-red-500/30 bg-red-500/5' : 'border-red-200 bg-white hover:shadow-md'}`}>
+                                    <button 
+                                        onClick={() => toggleSection('inactive')}
+                                        className="w-full p-3 flex items-center justify-between bg-transparent"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-xl flex items-center justify-center ${isMobile ? 'bg-red-500/20 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'bg-red-100 text-red-600'}`}>
+                                                <UserX className="w-4 h-4" />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className={`text-xs font-bold ${isMobile ? 'text-white' : 'text-gray-900'}`}>Inactive Employees</p>
+                                                <p className={`text-[10px] ${isMobile ? 'text-red-400' : 'text-red-500'}`}>Zero activity - may have left</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full text-[10px] font-bold ${isMobile ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.4)]' : 'bg-red-100 text-red-700'}`}>
+                                                {inactiveEmployees.length}
+                                            </span>
+                                            {expandedSections.inactive ? <ChevronUp className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} /> : <ChevronDown className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} />}
+                                        </div>
+                                    </button>
+
+                                    {expandedSections.inactive && (
+                                        <div className={`p-3 space-y-3 border-t ${isMobile ? 'border-red-500/10' : 'border-red-100'}`}>
+                                            <div className="flex items-center gap-2 px-1 py-1">
+                                                <AlertTriangle className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+                                                <span className={`text-[10px] font-black uppercase tracking-wider ${isMobile ? 'text-red-400' : 'text-red-700'}`}>
+                                                    All scores are zero — review for removal
+                                                </span>
+                                            </div>
+                                            {inactiveEmployees.map(emp => (
+                                                <div key={emp.userId} className={`rounded-xl p-3 border ${isMobile ? 'bg-black/20 border-white/5' : 'bg-red-50/30 border-red-100'}`}>
+                                                    <div className="flex items-center gap-3 mb-3">
+                                                        <ProfilePlaceholder photoUrl={emp.userPhotoUrl} seed={emp.userId} className="w-8 h-8 rounded-lg" />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between">
+                                                                <p className={`text-xs font-bold truncate ${isMobile ? 'text-white' : 'text-gray-900'}`}>{emp.userName}</p>
+                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/20`}>Inactive</span>
+                                                            </div>
+                                                            <p className={`text-[9px] ${isMobile ? 'text-white/50' : 'text-red-700/60'}`}>
+                                                                {emp.userRole.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`rounded-lg p-2.5 border mb-3 ${isMobile ? 'bg-black/20 border-white/5' : 'bg-white border-red-100/50'}`}>
+                                                        <p className={`text-[11px] leading-relaxed ${isMobile ? 'text-white/70' : 'text-gray-600'}`}>
+                                                            Performance: <strong>0</strong> · Attendance: <strong>0</strong> · Response: <strong>0</strong>
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <Button 
+                                                            size="sm" 
+                                                            disabled={isActionLoading === emp.userId}
+                                                            className="flex-1 bg-red-600 hover:bg-red-700 border-none text-[9px] uppercase font-bold h-8 shadow-lg shadow-red-900/20"
+                                                            onClick={() => handleRemoveInactiveEmployee(emp)}
+                                                        >
+                                                            <Trash2 className="w-3 h-3 mr-1" /> Approve Removal
+                                                        </Button>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="outline"
+                                                            className={`flex-1 text-[9px] uppercase font-bold h-8 ${isMobile ? 'border-white/10 text-white hover:bg-white/5' : 'border-red-200 text-red-700 hover:bg-red-50'}`}
+                                                            onClick={() => handleDenyInactive(emp)}
+                                                        >
+                                                            <XCircle className="w-3 h-3 mr-1" /> Deny
                                                         </Button>
                                                     </div>
                                                 </div>

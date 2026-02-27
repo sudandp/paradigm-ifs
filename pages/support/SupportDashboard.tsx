@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { SupportTicket, User } from '../../types';
 import { useAuthStore } from '../../store/authStore';
-import { Loader2, Plus, LifeBuoy, Users, Phone, MessageSquare, Video, Search, Filter, UserCheck, AlertTriangle } from 'lucide-react';
+import { Loader2, Plus, LifeBuoy, Users, Phone, MessageSquare, Video, Search, Filter, UserCheck, AlertTriangle, Download, Trophy, Award } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { formatDistanceToNow } from 'date-fns';
@@ -12,6 +12,8 @@ import { ProfilePlaceholder } from '../../components/ui/ProfilePlaceholder';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Modal from '../../components/ui/Modal';
+import { getAllPreComputedScores, calculateAllEmployeeScores, type EmployeeScoreWithUser } from '../../services/employeeScoring';
+import { isAdmin } from '../../utils/auth';
 
 const PriorityIndicator: React.FC<{ priority: SupportTicket['priority'] }> = ({ priority }) => {
     const styles = {
@@ -130,6 +132,13 @@ const SupportDashboard: React.FC = () => {
     const [isNearbyModalOpen, setIsNearbyModalOpen] = useState(false);
     const isMobile = useMediaQuery('(max-width: 767px)');
 
+    // Top Performers state
+    const [allScores, setAllScores] = useState<EmployeeScoreWithUser[]>([]);
+    const [scoresLoading, setScoresLoading] = useState(true);
+    const [roleFilter, setRoleFilter] = useState<string>('all');
+    const [showAllScores, setShowAllScores] = useState<boolean>(false);
+    const [hasSetDefaultRole, setHasSetDefaultRole] = useState(false);
+
     const [filters, setFilters] = useState({
         status: 'all',
         priority: 'all',
@@ -155,6 +164,92 @@ const SupportDashboard: React.FC = () => {
         };
         fetchData();
     }, [user]);
+
+    // Fetch all employee scores — instant load from pre-computed, then background refresh
+    useEffect(() => {
+        const fetchScores = async () => {
+            setScoresLoading(true);
+            try {
+                // Step 1: Load pre-computed scores instantly (fast path)
+                const cachedScores = await getAllPreComputedScores();
+                setAllScores(cachedScores);
+                setScoresLoading(false);
+
+                // Step 2: Background refresh (silent, won't block UI)
+                if (isAdmin(user?.role)) {
+                    calculateAllEmployeeScores().then(freshScores => {
+                        if (freshScores && freshScores.length > 0) {
+                            setAllScores(freshScores);
+                        }
+                    }).catch(err => {
+                        console.error('Background score refresh failed:', err);
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to load employee scores:', err);
+                setScoresLoading(false);
+            }
+        };
+        fetchScores();
+    }, []);
+
+    // Group scores by role — top 3 per role for all users
+    const userIsAdmin = isAdmin(user?.role);
+
+    // Unique roles from scores
+    const uniqueRoles = useMemo(() => {
+        const roles = new Set(allScores.map(s => s.userRole));
+        return Array.from(roles).sort();
+    }, [allScores]);
+
+    useEffect(() => {
+        if (!hasSetDefaultRole && user?.role && uniqueRoles.length > 0) {
+            if (uniqueRoles.includes(user.role)) {
+                setRoleFilter(user.role);
+            }
+            setHasSetDefaultRole(true);
+        }
+    }, [user, uniqueRoles, hasSetDefaultRole]);
+
+    // Grouped: { roleName: top3Employees[] }
+    const scoresByRole = useMemo(() => {
+        const roles = roleFilter !== 'all' ? [roleFilter] : uniqueRoles;
+        const grouped: { role: string; label: string; employees: EmployeeScoreWithUser[] }[] = [];
+        for (const role of roles) {
+            let employees = allScores.filter(s => s.userRole === role);
+            if (!showAllScores) {
+                employees = employees.slice(0, 3);
+            }
+            if (employees.length > 0) {
+                grouped.push({
+                    role,
+                    label: role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    employees: employees,
+                });
+            }
+        }
+        return grouped;
+    }, [allScores, uniqueRoles, roleFilter, showAllScores]);
+
+    // Flat list for CSV download
+    const filteredScores = useMemo(() => scoresByRole.flatMap(g => g.employees), [scoresByRole]);
+
+    // CSV download (admin only)
+    const downloadReport = () => {
+        const header = 'Rank,Name,Role,Performance,Attendance,Response,Overall';
+        const rows = filteredScores.map((s, i) =>
+            `${i + 1},"${s.userName}","${s.userRole.replace(/_/g, ' ')}",${s.scores.performanceScore},${s.scores.attendanceScore},${s.scores.responseScore},${s.scores.overallScore}`
+        );
+        const csv = [header, ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Top_Performers_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     const filteredTickets = useMemo(() => {
         return tickets.filter(ticket => {
@@ -300,6 +395,135 @@ const SupportDashboard: React.FC = () => {
                     icon={<UserCheck className="h-6 w-6" />}
                     colorClass="text-amber-500"
                 />
+            </div>
+
+
+            {/* ─── Top Performers Section ─── */}
+            <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-amber-50 rounded-xl">
+                            <Trophy className="h-6 w-6 text-amber-600" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-primary-text">Team Performance</h3>
+                            <p className="text-xs text-muted">{showAllScores ? 'All employees' : 'Top 3 per department'} · Monthly scorecard</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <div className="flex items-center gap-2 mr-2">
+                            <label className="text-sm font-medium text-muted cursor-pointer flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    checked={showAllScores}
+                                    onChange={(e) => setShowAllScores(e.target.checked)}
+                                    className="w-4 h-4 rounded border-border text-accent focus:ring-accent"
+                                />
+                                Show All
+                            </label>
+                        </div>
+                        <select
+                            value={roleFilter}
+                            onChange={e => setRoleFilter(e.target.value)}
+                            className="px-3 py-2 rounded-lg border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent/30"
+                        >
+                            <option value="all">All Roles</option>
+                            {uniqueRoles.map(r => (
+                                <option key={r} value={r}>{r.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+                            ))}
+                        </select>
+                        {isAdmin(user?.role) && (
+                            <button
+                                onClick={downloadReport}
+                                className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-all font-bold text-sm shadow-sm"
+                            >
+                                <Download className="w-4 h-4" />
+                                Download Report
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {scoresLoading ? (
+                    <div className="flex justify-center items-center h-40">
+                        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+                    </div>
+                ) : scoresByRole.length === 0 ? (
+                    <div className="text-center py-12 text-muted">
+                        <Award className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p>No scores available yet.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        {scoresByRole.map(group => (
+                            <div key={group.role}>
+                                <h4 className="text-sm font-bold text-muted uppercase tracking-wider mb-3 flex items-center gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-accent inline-block"></span>
+                                    {group.label}
+                                </h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {group.employees.map((emp, index) => {
+                                        const rank = index + 1;
+                                        const medalColor = rank === 1 ? 'from-amber-400 to-yellow-500' : rank === 2 ? 'from-gray-300 to-gray-400' : 'from-orange-400 to-amber-600';
+                                        return (
+                                            <div
+                                                key={emp.userId}
+                                                className="relative bg-background rounded-xl border border-amber-300/50 shadow-md p-4 hover:shadow-lg transition-all duration-300 group"
+                                            >
+                                                {/* Rank Badge */}
+                                                <div className={`absolute -top-2.5 -left-2.5 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-md z-10 bg-gradient-to-br ${medalColor} text-white`}>
+                                                    {rank}
+                                                </div>
+
+                                                {/* User Info */}
+                                                <div className="flex items-center gap-3 mb-4">
+                                                    <ProfilePlaceholder photoUrl={emp.userPhotoUrl} seed={emp.userId} className="w-10 h-10 rounded-full shadow-sm" />
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-bold text-primary-text truncate">{emp.userName}</p>
+                                                        <p className="text-[10px] text-muted uppercase tracking-wider font-medium truncate">{emp.userRole.replace(/_/g, ' ')}</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Score Badges */}
+                                                <div className="flex items-center justify-between gap-1 mb-3">
+                                                    {[
+                                                        { label: 'Perf', value: emp.scores.performanceScore, color: 'text-[#F97316]' },
+                                                        { label: 'Attend', value: emp.scores.attendanceScore, color: 'text-[#6366f1]' },
+                                                        { label: 'Resp', value: emp.scores.responseScore, color: 'text-[#111827]' },
+                                                    ].map(badge => (
+                                                        <div key={badge.label} className="flex flex-col items-center gap-0.5">
+                                                            <div className={`relative flex justify-center items-center w-9 h-9 ${badge.color} drop-shadow-sm`}>
+                                                                <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full fill-current z-0">
+                                                                    <path d="M50 0L58.8 11.5L73.5 7.6L78.4 21.6L92.4 24.3L91.2 38.6L100 50L91.2 61.4L92.4 75.7L78.4 78.4L73.5 92.4L58.8 88.5L50 100L41.2 88.5L26.5 92.4L21.6 78.4L7.6 75.7L8.8 61.4L0 50L8.8 38.6L7.6 24.3L21.6 21.6L26.5 7.6L41.2 11.5Z" />
+                                                                </svg>
+                                                                <span className="relative z-10 text-white font-bold text-[11px]">{badge.value}</span>
+                                                            </div>
+                                                            <span className="text-[8px] uppercase font-bold text-muted tracking-wider">{badge.label}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Overall Score Bar */}
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all duration-500 ${
+                                                                emp.scores.overallScore >= 80 ? 'bg-green-500' :
+                                                                emp.scores.overallScore >= 60 ? 'bg-amber-500' : 'bg-red-500'
+                                                            }`}
+                                                            style={{ width: `${emp.scores.overallScore}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className="text-xs font-black text-primary-text min-w-[28px] text-right">{emp.scores.overallScore}</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             <div className="lg:grid lg:grid-cols-3 lg:gap-8">
