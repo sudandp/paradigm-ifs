@@ -23,7 +23,7 @@ export interface SiteTravelBreakdown {
 export function calculateSiteTravelTime(events: AttendanceEvent[]): SiteTravelBreakdown {
   // Filter only check-in and check-out events, sort by time
   const checkEvents = events
-    .filter(e => e.type === 'check-in' || e.type === 'check-out')
+    .filter(e => e.type === 'punch-in' || e.type === 'punch-out')
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
   let totalSiteMinutes = 0;
@@ -35,7 +35,7 @@ export function calculateSiteTravelTime(events: AttendanceEvent[]): SiteTravelBr
   for (const event of checkEvents) {
     const eventTime = new Date(event.timestamp);
 
-    if (event.type === 'check-in') {
+    if (event.type === 'punch-in') {
       // If there was a previous checkout, calculate travel time
       if (lastCheckout) {
         const travelMinutes = differenceInMinutes(eventTime, lastCheckout);
@@ -43,7 +43,7 @@ export function calculateSiteTravelTime(events: AttendanceEvent[]): SiteTravelBr
       }
       lastCheckin = eventTime;
       siteVisits++;
-    } else if (event.type === 'check-out') {
+    } else if (event.type === 'punch-out') {
       // If there was a matching checkin, calculate site time
       if (lastCheckin) {
         const siteMinutes = differenceInMinutes(eventTime, lastCheckin);

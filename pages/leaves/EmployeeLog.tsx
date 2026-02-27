@@ -83,9 +83,9 @@ const EmployeeLog: React.FC = () => {
                 };
             }
             groups[dateKey].events.push(event);
-            if (event.type === 'check-in') {
+            if (event.type === 'punch-in') {
                 groups[dateKey].checkIns.push(event);
-            } else if (event.type === 'check-out') {
+            } else if (event.type === 'punch-out') {
                 groups[dateKey].checkOuts.push(event);
             }
         });
@@ -249,8 +249,8 @@ const EmployeeLog: React.FC = () => {
                                         <div
                                             key={`${event.timestamp}-${index}`}
                                             className={`p-3 rounded-lg border-l-4 ${
-                                                event.type === 'check-in' ? 'bg-emerald-50 border-emerald-500' :
-                                                event.type === 'check-out' ? 'bg-rose-50 border-rose-500' :
+                                                event.type === 'punch-in' ? 'bg-emerald-50 border-emerald-500' :
+                                                event.type === 'punch-out' ? 'bg-rose-50 border-rose-500' :
                                                 event.type === 'break-in' ? 'bg-amber-50 border-amber-500' :
                                                 'bg-sky-50 border-sky-500'
                                             }`}
@@ -259,8 +259,8 @@ const EmployeeLog: React.FC = () => {
                                                 <div className="flex items-center gap-3">
                                                     <div
                                                         className={`p-2 rounded-lg ${
-                                                            event.type === 'check-in' ? 'bg-emerald-100 text-emerald-700' :
-                                                            event.type === 'check-out' ? 'bg-rose-100 text-rose-700' :
+                                                            event.type === 'punch-in' ? 'bg-emerald-100 text-emerald-700' :
+                                                            event.type === 'punch-out' ? 'bg-rose-100 text-rose-700' :
                                                             event.type === 'break-in' ? 'bg-amber-100 text-amber-700' :
                                                             'bg-sky-100 text-sky-700'
                                                         }`}
@@ -269,18 +269,18 @@ const EmployeeLog: React.FC = () => {
                                                     </div>
                                                     <div>
                                                         <div className={`font-semibold capitalize ${
-                                                            event.type === 'check-in' ? 'text-emerald-900' :
-                                                            event.type === 'check-out' ? 'text-rose-900' :
+                                                            event.type === 'punch-in' ? 'text-emerald-900' :
+                                                            event.type === 'punch-out' ? 'text-rose-900' :
                                                             event.type === 'break-in' ? 'text-amber-900' :
                                                             'text-sky-900'
                                                         }`}>
-                                                            {event.type === 'check-in' ? (event.workType === 'field' ? 'Check In' : 'Punch In') :
-                                                             event.type === 'check-out' ? (event.workType === 'field' ? 'Check Out' : 'Punch Out') :
+                                                            {event.type === 'punch-in' ? (event.workType === 'field' ? 'Check In' : 'Punch In') :
+                                                             event.type === 'punch-out' ? (event.workType === 'field' ? 'Check Out' : 'Punch Out') :
                                                              event.type.replace('-', ' ')}
                                                         </div>
                                                         <div className={`text-sm font-medium ${
-                                                            event.type === 'check-in' ? 'text-emerald-700' :
-                                                            event.type === 'check-out' ? 'text-rose-700' :
+                                                            event.type === 'punch-in' ? 'text-emerald-700' :
+                                                            event.type === 'punch-out' ? 'text-rose-700' :
                                                             event.type === 'break-in' ? 'text-amber-700' :
                                                             'text-sky-700'
                                                         }`}>

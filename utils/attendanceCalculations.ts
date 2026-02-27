@@ -40,10 +40,10 @@ export function calculateWorkingHours(
     const eventTime = new Date(event.timestamp);
     
     switch (event.type) {
-      case 'check-in':
+      case 'punch-in':
         if (!workStartTime) workStartTime = eventTime;
         break;
-      case 'check-out':
+      case 'punch-out':
         if (workStartTime) {
           totalGrossWorkMinutes += differenceInMinutes(eventTime, workStartTime);
           workStartTime = null;
@@ -234,8 +234,8 @@ export function processDailyEvents(events: AttendanceEvent[]): {
   // Sort events chronologically
   const sortedEvents = [...events].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   
-  const firstCheckIn = sortedEvents.find(e => e.type === 'check-in');
-  const lastCheckOut = [...sortedEvents].reverse().find(e => e.type === 'check-out');
+  const firstCheckIn = sortedEvents.find(e => e.type === 'punch-in');
+  const lastCheckOut = [...sortedEvents].reverse().find(e => e.type === 'punch-out');
   
   const result = calculateWorkingHours(events);
   

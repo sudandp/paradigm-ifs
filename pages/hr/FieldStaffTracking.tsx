@@ -18,8 +18,8 @@ import Pagination from '../../components/ui/Pagination';
 const getEventLabel = (type: string, workType?: 'office' | 'field'): string => {
     if (workType === 'field') {
         const fieldLabels: Record<string, string> = {
-            'check-in': 'Check In',
-            'check-out': 'Check Out',
+            'punch-in': 'Check In',
+            'punch-out': 'Check Out',
             'break-in': 'Break In',
             'break-out': 'Break Out',
         };
@@ -27,8 +27,8 @@ const getEventLabel = (type: string, workType?: 'office' | 'field'): string => {
     }
     // Default (office / undefined workType) → "Punch In" / "Punch Out"
     const officeLabels: Record<string, string> = {
-        'check-in': 'Punch In',
-        'check-out': 'Punch Out',
+        'punch-in': 'Punch In',
+        'punch-out': 'Punch Out',
         'break-in': 'Break In',
         'break-out': 'Break Out',
     };

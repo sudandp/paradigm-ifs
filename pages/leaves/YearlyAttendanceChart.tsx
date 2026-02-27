@@ -77,7 +77,7 @@ const YearlyAttendanceChart: React.FC = () => {
 
         const workedDaysSet = new Set<string>();
         events.forEach(e => {
-            if (e.type.toLowerCase().includes('check-in')) {
+            if (e.type.toLowerCase().includes('punch-in')) {
                 workedDaysSet.add(format(new Date(e.timestamp), 'yyyy-MM-dd'));
             }
         });

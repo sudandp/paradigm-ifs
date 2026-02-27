@@ -1009,9 +1009,9 @@ const AttendanceDashboard: React.FC = () => {
                     if (hasActivity) {
                         // Sort events
                         dayEvents.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-                        const checkInEvent = dayEvents.find(e => e.type === 'check-in');
+                        const checkInEvent = dayEvents.find(e => e.type === 'punch-in');
                         // Use the last check-out of the day to capture full duration
-                        const checkOutEvent = [...dayEvents].reverse().find(e => e.type === 'check-out');
+                        const checkOutEvent = [...dayEvents].reverse().find(e => e.type === 'punch-out');
 
                         if (checkInEvent) checkIn = format(new Date(checkInEvent.timestamp), 'hh:mm a');
                         if (checkOutEvent) {
@@ -1173,8 +1173,8 @@ const AttendanceDashboard: React.FC = () => {
 
                 Object.values(userEvents).forEach(ue => {
                     ue.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-                    const checkIn = ue.find(e => e.type === 'check-in');
-                    const checkOut = [...ue].reverse().find(e => e.type === 'check-out');
+                    const checkIn = ue.find(e => e.type === 'punch-in');
+                    const checkOut = [...ue].reverse().find(e => e.type === 'punch-out');
 
                     if (checkIn && checkOut) {
                         const diff = differenceInMinutes(new Date(checkOut.timestamp), new Date(checkIn.timestamp));
@@ -1383,9 +1383,9 @@ const AttendanceDashboard: React.FC = () => {
                     // Sort events by time
                     const sortedEvents = [...dayEvents].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-                    const checkInEvent = sortedEvents.find(e => e.type === 'check-in');
+                    const checkInEvent = sortedEvents.find(e => e.type === 'punch-in');
                     // Use the last check-out of the day
-                    const checkOutEvent = [...sortedEvents].reverse().find(e => e.type === 'check-out');
+                    const checkOutEvent = [...sortedEvents].reverse().find(e => e.type === 'punch-out');
 
                     if (isRecurringHoliday) {
                         status = 'H/P';
@@ -1671,8 +1671,8 @@ const AttendanceDashboard: React.FC = () => {
                 } else if (hasActivity) {
                     // Calculate worked hours
                     const sortedEvents = dayEvents.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-                    const checkInEvent = sortedEvents.find(e => e.type === 'check-in');
-                    const checkOutEvent = [...sortedEvents].reverse().find(e => e.type === 'check-out');
+                    const checkInEvent = sortedEvents.find(e => e.type === 'punch-in');
+                    const checkOutEvent = [...sortedEvents].reverse().find(e => e.type === 'punch-out');
                     
                     let workedMinutes = 0;
                     if (checkInEvent && checkOutEvent) {
@@ -2045,11 +2045,11 @@ const AttendanceDashboard: React.FC = () => {
                         <div className="flex justify-between items-start mb-3">
                              <div className="font-bold text-white">{row.userName || 'Unknown'}</div>
                              <div className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                 row.status === 'P' || row.type === 'check-in' ? 'bg-green-500/20 text-green-400' : 
-                                 row.status === 'A' || row.type === 'check-out' ? 'bg-red-500/20 text-red-400' : 
+                                 row.status === 'P' || row.type === 'punch-in' ? 'bg-green-500/20 text-green-400' : 
+                                 row.status === 'A' || row.type === 'punch-out' ? 'bg-red-500/20 text-red-400' : 
                                  'bg-blue-500/20 text-blue-400'
                              }`}>
-                                 {row.status || (row.type === 'check-in' ? 'In' : row.type === 'check-out' ? 'Out' : 'Log')}
+                                 {row.status || (row.type === 'punch-in' ? 'In' : row.type === 'punch-out' ? 'Out' : 'Log')}
                              </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3 text-xs">

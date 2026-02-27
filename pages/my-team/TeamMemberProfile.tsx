@@ -150,9 +150,9 @@ const TeamMemberProfile: React.FC = () => {
     let activeIn: AttendanceEvent | null = null;
     for (let i = 0; i < sorted.length; i++) {
       const evt = sorted[i];
-      if (evt.type === 'check-in') {
+      if (evt.type === 'punch-in') {
         if (!activeIn) activeIn = evt;
-      } else if (evt.type === 'check-out') {
+      } else if (evt.type === 'punch-out') {
         if (activeIn) {
           const start = parseISO(activeIn.timestamp);
           const end = parseISO(evt.timestamp);
@@ -202,8 +202,8 @@ const TeamMemberProfile: React.FC = () => {
       const start = parseISO(current.endTime);
       const end = parseISO(next.startTime);
       const durationMin = Math.max(0, differenceInMinutes(end, start));
-      const outEvt = sorted.find(e => e.timestamp === current.endTime && e.type === 'check-out');
-      const inEvt = sorted.find(e => e.timestamp === next.startTime && e.type === 'check-in');
+      const outEvt = sorted.find(e => e.timestamp === current.endTime && e.type === 'punch-out');
+      const inEvt = sorted.find(e => e.timestamp === next.startTime && e.type === 'punch-in');
       let dist = 0;
       if (outEvt?.latitude && outEvt?.longitude && inEvt?.latitude && inEvt?.longitude) {
         dist = calculateDistanceMeters(outEvt.latitude, outEvt.longitude, inEvt.latitude, inEvt.longitude) / 1000;
@@ -363,7 +363,7 @@ const TeamMemberProfile: React.FC = () => {
                 Day Insights
               </h3>
               <div className="space-y-3">
-                <InsightItem label="First Check-in" value={safeFormatISO(events.find(e => e.type === 'check-in')?.timestamp, 'hh:mm a')} />
+                <InsightItem label="First Check-in" value={safeFormatISO(events.find(e => e.type === 'punch-in')?.timestamp, 'hh:mm a')} />
                 <InsightItem label="Last Event" value={safeFormatISO(events[events.length - 1]?.timestamp, 'hh:mm a')} />
                 <InsightItem label="Sites Visited" value={new Set(timeline.filter(s => s.type === 'Work').map(s => s.locationName)).size.toString()} />
               </div>

@@ -57,8 +57,8 @@ const getFriendlyAuthError = (errorMessage: string): string => {
 
 const getActionTextForType = (type: string): string => {
     switch (type) {
-        case 'check-in': return 'punched in';
-        case 'check-out': return 'punched out';
+        case 'punch-in': return 'punched in';
+        case 'punch-out': return 'punched out';
         case 'break-in': return 'started a break ☕';
         case 'break-out': return 'ended a break 🏁';
         default: return 'updated attendance';
@@ -407,16 +407,16 @@ export const useAuthStore = create<AuthState>()(
                 
                 // --- INDEPENDENT FLOW LOGIC ---
                 // 1. Daily Punch Session (Office/General)
-                // A user is punched in for the day if their last 'office' check-in/out event was a check-in.
+                // A user is punched in for the day if their last 'office' punch-in/out event was a punch-in.
                 const officeEvents = events.filter(e => !e.workType || e.workType === 'office');
-                const lastOfficePunchEvent = officeEvents.filter(e => e.type === 'check-in' || e.type === 'check-out').pop();
-                const currentlyCheckedIn = lastOfficePunchEvent ? (lastOfficePunchEvent.type === 'check-in') : false;
+                const lastOfficePunchEvent = officeEvents.filter(e => e.type === 'punch-in' || e.type === 'punch-out').pop();
+                const currentlyCheckedIn = lastOfficePunchEvent ? (lastOfficePunchEvent.type === 'punch-in') : false;
                 
                 // 2. Site/Work Session (Field)
-                // A user is on a site visit if their last 'field' check-in/out event was a check-in.
+                // A user is on a site visit if their last 'field' punch-in/out event was a punch-in.
                 const fieldEvents = events.filter(e => e.workType === 'field');
-                const lastFieldPunchEvent = fieldEvents.filter(e => e.type === 'check-in' || e.type === 'check-out').pop();
-                const isFieldCheckedIn = lastFieldPunchEvent ? (lastFieldPunchEvent.type === 'check-in') : false;
+                const lastFieldPunchEvent = fieldEvents.filter(e => e.type === 'punch-in' || e.type === 'punch-out').pop();
+                const isFieldCheckedIn = lastFieldPunchEvent ? (lastFieldPunchEvent.type === 'punch-in') : false;
 
                 // 3. Break Session
                 // A user is on break if their last break event was a break-in.
@@ -425,7 +425,7 @@ export const useAuthStore = create<AuthState>()(
                 const isOnBreak = lastBreakEvent ? (lastBreakEvent.type === 'break-in') : false;
 
                 // Count daily primary punches (only office/general sessions)
-                const dailyPunchCount = events.filter(e => e.type === 'check-in' && (!e.workType || e.workType === 'office')).length;
+                const dailyPunchCount = events.filter(e => e.type === 'punch-in' && (!e.workType || e.workType === 'office')).length;
 
                 // approvedUnlockCount & dailyUnlockRequestCount already fetched above
 
@@ -439,7 +439,7 @@ export const useAuthStore = create<AuthState>()(
                     isCheckedIn: currentlyCheckedIn,
                     isOnBreak: isOnBreak,
                     lastCheckInTime: checkIn,
-                    lastCheckOutTime: lastEvent?.type === 'check-out' ? checkOut : null,
+                    lastCheckOutTime: lastEvent?.type === 'punch-out' ? checkOut : null,
                     firstBreakInTime: firstBreakIn,
                     lastBreakInTime: lastBreakIn,
                     lastBreakOutTime: breakOut,
@@ -451,7 +451,7 @@ export const useAuthStore = create<AuthState>()(
                     dailyUnlockRequestCount,
                     isPunchUnlocked,
                     isFieldCheckedIn,
-                    isFieldCheckedOut: lastFieldPunchEvent ? (lastFieldPunchEvent.type === 'check-out') : false
+                    isFieldCheckedOut: lastFieldPunchEvent ? (lastFieldPunchEvent.type === 'punch-out') : false
                 });
             } catch (error) {
                 console.error("Failed to check attendance status:", error);
@@ -467,10 +467,10 @@ export const useAuthStore = create<AuthState>()(
             if (!user) return { success: false, message: 'User not found' };
             
             // Explicitly determine the type. If forcedType is missing, use toggle logic.
-            const newType = (forcedType || (isCheckedIn ? 'check-out' : 'check-in')) as 'check-in' | 'check-out' | 'break-in' | 'break-out';
+            const newType = (forcedType || (isCheckedIn ? 'punch-out' : 'punch-in')) as 'punch-in' | 'punch-out' | 'break-in' | 'break-out';
 
             // Check field staff restriction for office punch-in
-            if (user.role === 'field_staff' && newType === 'check-in' && (!workType || workType === 'office')) {
+            if (user.role === 'field_staff' && newType === 'punch-in' && (!workType || workType === 'office')) {
                 // If they have already punched in today (count >= 1), block unless overrides exist
                 // The current request is to allow "based on request to reporting manager", implying an approval workflow.
                 // For now, allow subsequent punches ONLY if explicitly requested (e.g., manual override flag, or maybe we enforce the limit here).
@@ -525,7 +525,7 @@ export const useAuthStore = create<AuthState>()(
                 const finalizeAttendance = async (lat?: number, lng?: number, locId?: string | null, locName?: string | null) => {
                     // Mark as OT if this is a 2nd+ punch cycle (user already punched in earlier today)
                     const currentDailyPunchCount = get().dailyPunchCount;
-                    const isOtCycle = currentDailyPunchCount >= 1 && newType === 'check-in' && workType !== 'field';
+                    const isOtCycle = currentDailyPunchCount >= 1 && newType === 'punch-in' && workType !== 'field';
 
                     await api.addAttendanceEvent({
                         userId: user.id,
@@ -535,25 +535,25 @@ export const useAuthStore = create<AuthState>()(
                         longitude: lng,
                         locationId: locId,
                         locationName: locName,
-                        checkoutNote: newType === 'check-out' ? note : undefined,
-                        attachmentUrl: newType === 'check-out' ? (attachmentUrl || undefined) : undefined,
+                        checkoutNote: newType === 'punch-out' ? note : undefined,
+                        attachmentUrl: newType === 'punch-out' ? (attachmentUrl || undefined) : undefined,
                         workType,
-                        fieldReportId: newType === 'check-out' ? fieldReportId : undefined,
+                        fieldReportId: newType === 'punch-out' ? fieldReportId : undefined,
                         isOt: isOtCycle || undefined
                     });
                     await get().checkAttendanceStatus();
 
                     // Send notification to the USER themselves
                     try {
-                        const isFirstAction = dailyPunchCount === 0 && newType === 'check-in';
+                        const isFirstAction = dailyPunchCount === 0 && newType === 'punch-in';
                         const greeting = isFirstAction ? `${getTimeBasedGreeting()}, ` : '';
                         
                         // Use 'punched' for office, 'checked' for field
                         const verb = workType === 'field' ? 'checked' : 'punched';
                         
                         const actionText = 
-                            newType === 'check-in' ? `${verb} in` : 
-                            newType === 'check-out' ? `${verb} out` : 
+                            newType === 'punch-in' ? `${verb} in` : 
+                            newType === 'punch-out' ? `${verb} out` : 
                             newType === 'break-in' ? 'started your break ☕' : 'ended your break 🏁';
                         
                         const timeStr = format(new Date(), 'hh:mm a');
@@ -606,7 +606,7 @@ export const useAuthStore = create<AuthState>()(
                     );
 
                     // Additional dispatch for OT punches
-                    if (isOtCycle && newType === 'check-in') {
+                    if (isOtCycle && newType === 'punch-in') {
                         dispatchNotificationFromRules('ot_punch', {
                             actorName: user.name || 'An employee',
                             actionText: 'has started an overtime (OT) punch cycle',
@@ -626,11 +626,11 @@ export const useAuthStore = create<AuthState>()(
                         api.processFieldAttendance(user.id, today).catch(e => console.error('Violation check failed:', e));
                     }
 
-                    if (newType === 'check-in') {
+                    if (newType === 'punch-in') {
                         // Schedule Shift End Reminder (9 hours)
                         // If user has specific shift duration settings, we could use that. defaulting to 9h.
                         scheduleShiftEndReminder(new Date(), 9);
-                    } else if (newType === 'check-out') {
+                    } else if (newType === 'punch-out') {
                         // Cancel shift end reminder
                         cancelNotification('SHIFT_END');
                         // Also ensure break reminder is cancelled just in case
@@ -644,7 +644,7 @@ export const useAuthStore = create<AuthState>()(
                         cancelNotification('BREAK_END');
                     }
 
-                    return { success: true, message: `Successfully ${newType === 'check-in' ? 'punch in' : newType === 'check-out' ? 'punch out' : newType.replace('-', ' ')}!` };
+                    return { success: true, message: `Successfully ${newType === 'punch-in' ? 'punch in' : newType === 'punch-out' ? 'punch out' : newType.replace('-', ' ')}!` };
                 };
 
                 if (!position || !position.coords) {
@@ -762,7 +762,7 @@ export const useAuthStore = create<AuthState>()(
                 if (isViolation) {
                     return { 
                         success: true, 
-                        message: `Successfully ${newType === 'check-in' ? 'punch in' : newType === 'check-out' ? 'punch out' : newType.replace('-', ' ')}! (Note: Recorded as geofencing violation)` 
+                        message: `Successfully ${newType === 'punch-in' ? 'punch in' : newType === 'punch-out' ? 'punch out' : newType.replace('-', ' ')}! (Note: Recorded as geofencing violation)` 
                     };
                 }
                 

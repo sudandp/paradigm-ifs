@@ -644,7 +644,7 @@ export interface Agreement {
 
 
 // Types for Attendance
-export type AttendanceEventType = 'check-in' | 'check-out' | 'break-in' | 'break-out';
+export type AttendanceEventType = 'punch-in' | 'punch-out' | 'break-in' | 'break-out';
 
 export interface AttendanceEvent {
   id: string;

@@ -143,7 +143,7 @@ Deno.serve(async (req: Request) => {
           
           // Mapping: Status 1 is often check-in, 0 is check-out for some configurations
           // User requested: 1=CheckIn, 0=CheckOut
-          const eventType = status === '1' ? 'check-in' : 'check-out';
+          const eventType = status === '1' ? 'punch-in' : 'punch-out';
 
           const { error: attError } = await supabaseAdmin
             .from('attendance_events')
@@ -265,7 +265,7 @@ async function edgeNotifySync(
 ) {
   try {
     const greeting = new Date().getHours() < 12 ? 'Good Morning' : (new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening');
-    const actionText = eventType === 'check-in' ? 'checked in' : 'checked out';
+    const actionText = eventType === 'punch-in' ? 'punched in' : 'punched out';
     
     // User Self Notification
     await supabaseAdmin.from('notifications').insert({

@@ -167,7 +167,7 @@ Deno.serve(async (req: Request) => {
         const lastEvent = events[0];
         
         // Robust check: Is the user still active? (i.e., not checked out)
-        if (lastEvent.type !== 'check-out') {
+        if (lastEvent.type !== 'punch-out') {
             const eventDate = new Date(lastEvent.timestamp);
             const hoursDiff = (now.getTime() - eventDate.getTime()) / (1000 * 60 * 60);
 
@@ -184,7 +184,7 @@ Deno.serve(async (req: Request) => {
                     .insert({
                         user_id: user.id,
                         timestamp: targetUTC.toISOString(),
-                        type: 'check-out',
+                        type: 'punch-out',
                         location_name: 'Auto Check-out',
                         reason: 'Auto-checkout: Shift End',
                         is_manual: true,

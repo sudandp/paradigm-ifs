@@ -75,10 +75,10 @@ const OTCalendar: React.FC = () => {
 
         sortedEvents.forEach(event => {
             const eventTime = new Date(event.timestamp);
-            if (event.type === 'check-in') {
+            if (event.type === 'punch-in') {
                 checkInTime = eventTime;
                 if (event.isOt) hasOtPunch = true;
-            } else if (event.type === 'check-out' && checkInTime) {
+            } else if (event.type === 'punch-out' && checkInTime) {
                 totalMinutes += differenceInMinutes(eventTime, checkInTime);
                 checkInTime = null;
             }

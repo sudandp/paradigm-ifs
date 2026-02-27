@@ -48,7 +48,12 @@ function clamp(value: number, min: number, max: number): number {
  */
 function isCheckInEvent(type: string): boolean {
   const normalized = (type || '').toLowerCase().replace(/[-_\s]/g, '');
-  return normalized === 'checkin';
+  return normalized === 'checkin' || normalized === 'punchin';
+}
+
+function isCheckOutEvent(type: string): boolean {
+  const normalized = (type || '').toLowerCase().replace(/[-_\s]/g, '');
+  return normalized === 'checkout' || normalized === 'punchout';
 }
 
 // ─── Performance Score ──────────────────────────────────────────────
