@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { SupportTicket, User } from '../../types';
 import { useAuthStore } from '../../store/authStore';
-import { Loader2, Plus, LifeBuoy, Users, Phone, MessageSquare, Video, Search, Filter, UserCheck, AlertTriangle, Download, Trophy, Award } from 'lucide-react';
+import { Loader2, Plus, LifeBuoy, Users, Phone, MessageSquare, Video, Search, Filter, UserCheck, AlertTriangle, Download, Trophy, Award, Info } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { formatDistanceToNow } from 'date-fns';
@@ -138,6 +138,7 @@ const SupportDashboard: React.FC = () => {
     const [roleFilter, setRoleFilter] = useState<string>('all');
     const [showAllScores, setShowAllScores] = useState<boolean>(false);
     const [hasSetDefaultRole, setHasSetDefaultRole] = useState(false);
+    const [isScoreInfoModalOpen, setIsScoreInfoModalOpen] = useState(false);
 
     const [filters, setFilters] = useState({
         status: 'all',
@@ -305,7 +306,8 @@ const SupportDashboard: React.FC = () => {
     );
 
     return (
-        <div className="w-full p-4 lg:p-8 space-y-8">
+        <>
+            <div className="w-full p-4 lg:p-8 space-y-8">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
 
             {/* Modals */}
@@ -406,7 +408,16 @@ const SupportDashboard: React.FC = () => {
                             <Trophy className="h-6 w-6 text-amber-600" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-primary-text">Team Performance</h3>
+                            <h3 className="text-lg font-bold text-primary-text flex items-center gap-2">
+                                Team Performance
+                                <button
+                                    onClick={() => setIsScoreInfoModalOpen(true)}
+                                    className="p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted transition-colors"
+                                    title="How are scores calculated?"
+                                >
+                                    <Info className="w-4 h-4" />
+                                </button>
+                            </h3>
                             <p className="text-xs text-muted">{showAllScores ? 'All employees' : 'Top 3 per department'} · Monthly scorecard</p>
                         </div>
                     </div>
@@ -620,6 +631,38 @@ const SupportDashboard: React.FC = () => {
                 </aside>
             </div>
         </div>
+
+        {/* Score Information Modal */}
+        <Modal
+            isOpen={isScoreInfoModalOpen}
+            onClose={() => setIsScoreInfoModalOpen(false)}
+            title="Score Calculation System"
+            hideFooter={true}
+        >
+            <div className="space-y-4">
+                <div>
+                    <h4 className="font-bold text-primary-text mb-1 flex items-center gap-2"><Trophy className="w-4 h-4 text-accent" /> Overall Score</h4>
+                    <p className="text-sm">The overall score is a metric out of 100, calculated as a weighted average across three separate categories:</p>
+                    <ul className="list-disc list-inside mt-2 space-y-1 ml-1 mb-2">
+                        <li><strong>Performance:</strong> Evaluated based on the ratio of completed vs. assigned tasks and tickets.</li>
+                        <li><strong>Attendance:</strong> Evaluated based on present days, dropping points for late check-ins.</li>
+                        <li><strong>Response:</strong> Evaluated based on acknowledgment times on system broadcasts and alerts.</li>
+                    </ul>
+                </div>
+                
+                <div className="pt-4 border-t border-border">
+                    <h4 className="font-bold text-primary-text mb-1 flex items-center gap-2"><Award className="w-4 h-4 text-amber-500" /> Leaderboard Tiebreaker</h4>
+                    <p className="text-sm">If multiple team members achieve the precise same overall score (for instance, a perfect 100), the system determines the ultimate rank using a <strong>Punctuality Tiebreaker</strong>.</p>
+                    <p className="text-sm mt-2 text-muted">The precise number of minutes an employee has spent clocked-in and working throughout the entire month is tracked. The employee with the highest cumulative logged duration is automatically rewarded with the higher ranking on the dashboard.</p>
+                </div>
+                
+                <div className="pt-2 flex justify-end">
+                    <Button onClick={() => setIsScoreInfoModalOpen(false)}>Close</Button>
+                </div>
+            </div>
+        </Modal>
+
+        </>
     );
 };
 

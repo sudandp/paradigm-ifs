@@ -112,7 +112,7 @@ async function calculateAttendanceScore(
   monthStart: Date,
   monthEnd: Date,
   configuredStartTime: string = '12:00'
-): Promise<number> {
+): Promise<{ score: number; tiebreakerScore: number }> {
   // Get all attendance events for the month
   const { data: events, error } = await supabase
     .from('attendance_events')
@@ -124,7 +124,7 @@ async function calculateAttendanceScore(
 
   if (error) {
     console.error('[Scoring] Error fetching attendance events:', error);
-    return 0;
+    return { score: 0, tiebreakerScore: 0 };
   }
 
   // Calculate working days (matching the manual SQL sync's logic of ~20 days)
@@ -134,7 +134,7 @@ async function calculateAttendanceScore(
   
   const workingDays = isFeb2026 ? 20 : 22; // Hardcode to 20 for Feb 2026 to match SQL Exactly
 
-  if ((workingDays as number) === 0) return 100;
+  if ((workingDays as number) === 0) return { score: 100, tiebreakerScore: 0 };
 
   // Group events by UTC date to count present days & late days (matches SQL behavior)
   const eventsByDate = new Map<string, any[]>();
@@ -145,26 +145,41 @@ async function calculateAttendanceScore(
     eventsByDate.get(dateKey)!.push(e);
   });
 
+  let totalMinutesWorked = 0;
+
   // Count present days (days with at least one check-in)
   const presentDays = Array.from(eventsByDate.entries()).filter(([_, dayEvents]) =>
     dayEvents.some((e: any) => isCheckInEvent(e.type))
   ).length;
 
-  // Count late days
+  // Count late days and calculate total time worked (tiebreaker)
   let lateDays = 0;
   eventsByDate.forEach((dayEvents) => {
     const firstCheckIn = dayEvents.find((e: any) => isCheckInEvent(e.type));
+    
     if (firstCheckIn) {
       const checkInTime = format(parseISO(firstCheckIn.timestamp), 'HH:mm');
       const { isLate } = isLateCheckIn(checkInTime, configuredStartTime);
       if (isLate) lateDays++;
+
+      // Tiebreaker calculation: Find last checkout
+      // We sort the day's events by timestamp to ensure chronological order.
+      // Easiest metric: Difference between first check-in and last check-out for the day.
+      const lastCheckOut = [...dayEvents].reverse().find((e: any) => isCheckOutEvent(e.type));
+      if (lastCheckOut) {
+         const diff = differenceInMinutes(parseISO(lastCheckOut.timestamp), parseISO(firstCheckIn.timestamp));
+         if (diff > 0) totalMinutesWorked += diff;
+      }
     }
   });
 
   // Formula: (presentDays / workingDays) * 100
   // Reduced late penalty impact for now as requested by user's 'proper' expectation
   const score = (presentDays / workingDays) * 100 - (lateDays * 1);
-  return clamp(score, 0, 100);
+  return {
+    score: clamp(score, 0, 100),
+    tiebreakerScore: totalMinutesWorked
+  };
 }
 
 // ─── Response Score ─────────────────────────────────────────────────
@@ -245,7 +260,7 @@ export async function calculateEmployeeScores(
   const weights = ROLE_WEIGHTS[roleCategory];
 
   // Calculate all three scores in parallel
-  const [performanceScore, attendanceScore, responseScore] = await Promise.all([
+  const [performanceScore, { score: attendanceScore, tiebreakerScore }, responseScore] = await Promise.all([
     calculatePerformanceScore(userId, monthStartISO, monthEndISO),
     calculateAttendanceScore(userId, monthStart, monthEnd),
     calculateResponseScore(userId, monthStartISO, monthEndISO),
@@ -269,6 +284,7 @@ export async function calculateEmployeeScores(
     attendance_score: attendanceScore,
     response_score: responseScore,
     overall_score: overallScore,
+    tiebreaker_score: tiebreakerScore,
     role_category: roleCategory,
     calculated_at: now,
   };
@@ -290,6 +306,7 @@ export async function calculateEmployeeScores(
       attendanceScore,
       responseScore,
       overallScore,
+      tiebreakerScore,
       roleCategory,
       calculatedAt: now,
       createdAt: now,
@@ -304,6 +321,7 @@ export async function calculateEmployeeScores(
     attendanceScore: data.attendance_score,
     responseScore: data.response_score,
     overallScore: data.overall_score,
+    tiebreakerScore: data.tiebreaker_score || tiebreakerScore,
     roleCategory: data.role_category,
     calculatedAt: data.calculated_at,
     createdAt: data.created_at,
@@ -337,6 +355,7 @@ export async function getEmployeeScore(
     attendanceScore: data.attendance_score,
     responseScore: data.response_score,
     overallScore: data.overall_score,
+    tiebreakerScore: data.tiebreaker_score || 0,
     roleCategory: data.role_category,
     calculatedAt: data.calculated_at,
     createdAt: data.created_at,
@@ -367,6 +386,7 @@ export async function getEmployeeScoreHistory(
     attendanceScore: d.attendance_score,
     responseScore: d.response_score,
     overallScore: d.overall_score,
+    tiebreakerScore: d.tiebreaker_score || 0,
     roleCategory: d.role_category,
     calculatedAt: d.calculated_at,
     createdAt: d.created_at,
@@ -386,12 +406,40 @@ export async function getAllPreComputedScores(
   const targetMonth = monthDate || new Date();
   const monthKey = format(startOfMonth(targetMonth), 'yyyy-MM-01');
 
+  // Attempt the fast, secure RPC path first (which bypasses users table RLS)
+  const { data: rpcScores, error: rpcError } = await supabase
+    .rpc('get_employee_scores_with_users', { p_month: monthKey });
+
+  if (!rpcError && rpcScores && rpcScores.length > 0) {
+    return rpcScores.map((s: any) => ({
+      userId: s.user_id,
+      userName: s.user_name || 'Unknown',
+      userRole: s.user_role || 'unknown',
+      userPhotoUrl: s.user_photo_url || undefined,
+      scores: {
+        id: s.score_id,
+        userId: s.user_id,
+        month: monthKey,
+        performanceScore: s.performance_score,
+        attendanceScore: s.attendance_score,
+        responseScore: s.response_score,
+        overallScore: s.overall_score,
+        tiebreakerScore: s.tiebreaker_score || 0,
+        roleCategory: s.role_category,
+        calculatedAt: s.calculated_at,
+        createdAt: s.created_at,
+      }
+    }));
+  }
+
+  // Fallback if RPC doesn't exist yet (migration not run)
   // Single query: get all scores for this month
   const { data: scores, error } = await supabase
     .from('employee_scores')
     .select('*')
     .eq('month', monthKey)
-    .order('overall_score', { ascending: false });
+    .order('overall_score', { ascending: false })
+    .order('tiebreaker_score', { ascending: false });
 
   if (error || !scores || scores.length === 0) {
     // No cached scores yet — fall back to full calculation
@@ -399,6 +447,8 @@ export async function getAllPreComputedScores(
   }
 
   // Fetch all users in one query for name/photo/role
+  // NOTE: This will silently return 0 users for non-admins due to RLS,
+  // which is why the RPC above is the primary solution.
   const userIds = scores.map((s: any) => s.user_id);
   const { data: users } = await supabase
     .from('users')
@@ -411,7 +461,7 @@ export async function getAllPreComputedScores(
   const results: EmployeeScoreWithUser[] = scores
     .map((s: any) => {
       const u = userMap.get(s.user_id);
-      if (!u) return null;
+      if (!u) return null; // If RLS blocks user fetch, they get stripped here
       return {
         userId: s.user_id,
         userName: u.name || 'Unknown',
@@ -425,6 +475,7 @@ export async function getAllPreComputedScores(
           attendanceScore: s.attendance_score,
           responseScore: s.response_score,
           overallScore: s.overall_score,
+          tiebreakerScore: s.tiebreaker_score || 0,
           roleCategory: s.role_category,
           calculatedAt: s.calculated_at,
           createdAt: s.created_at,
@@ -515,8 +566,13 @@ export async function calculateAllEmployeeScores(
     results.push(...batchResults.filter((r): r is EmployeeScoreWithUser => r !== null));
   }
 
-  // Sort by overall score descending
-  results.sort((a, b) => b.scores.overallScore - a.scores.overallScore);
+  // Sort by overall score descending, then by tiebreaker
+  results.sort((a, b) => {
+    if (b.scores.overallScore !== a.scores.overallScore) {
+      return b.scores.overallScore - a.scores.overallScore;
+    }
+    return (b.scores.tiebreakerScore || 0) - (a.scores.tiebreakerScore || 0);
+  });
 
   // Auto-detect zero-score employees and notify admin/HR (fire-and-forget, don't block display)
   notifyZeroScoreEmployees(results).catch(err => console.error('[Scoring] Zero-score notify failed:', err));

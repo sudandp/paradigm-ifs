@@ -1828,6 +1828,7 @@ export interface EmployeeScore {
   attendanceScore: number;  // 0-100
   responseScore: number;    // 0-100
   overallScore: number;     // 0-100 (weighted)
+  tiebreakerScore: number;  // Total clocked-in minutes per month
   roleCategory: RoleCategory;
   calculatedAt: string; // ISO timestamp
   createdAt: string;
