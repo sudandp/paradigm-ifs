@@ -69,7 +69,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
     const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationStore();
     const navigate = useNavigate();
     const [currentPage, setCurrentPage] = React.useState(1);
-    const [pageSize, setPageSize] = React.useState(5);
+    const [pageSize, setPageSize] = React.useState(20);
     const [unlockRequests, setUnlockRequests] = React.useState<AttendanceUnlockRequest[]>([]);
     const [leaveRequests, setLeaveRequests] = React.useState<LeaveRequest[]>([]);
     const [extraWorkClaims, setExtraWorkClaims] = React.useState<ExtraWorkLog[]>([]);
@@ -221,7 +221,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                 });
             }
 
-            const financeManagerId = (isSuperAdmin || isFinance) ? undefined : user.id;
+            const financeManagerId = user.id;
 
             const [unlocksResult, leavesResult, claimsResult, financeResult, invoicesResult] = await Promise.allSettled([
                 api.getAttendanceUnlockRequests(isSuperAdmin ? undefined : user.id),
@@ -295,16 +295,20 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         }
 
         // Fetch inactive (zero-score) employees
-        try {
-            const allScores = await calculateAllEmployeeScores();
-            const zeroScore = allScores.filter(
-                e => e.scores.performanceScore === 0 &&
-                     e.scores.attendanceScore === 0 &&
-                     e.scores.responseScore === 0
-            );
-            setInactiveEmployees(zeroScore);
-        } catch (err) {
-            console.error('Error fetching inactive employees:', err);
+        if (isSuperAdmin || isHR) {
+            try {
+                const allScores = await calculateAllEmployeeScores();
+                const zeroScore = allScores.filter(
+                    e => e.scores.performanceScore === 0 &&
+                         e.scores.attendanceScore === 0 &&
+                         e.scores.responseScore === 0
+                );
+                setInactiveEmployees(zeroScore);
+            } catch (err) {
+                console.error('Error fetching inactive employees:', err);
+            }
+        } else {
+            setInactiveEmployees([]);
         }
     }, [user]);
 
@@ -406,9 +410,9 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         ];
 
         const startIndex = (currentPage - 1) * pageSize;
-        // Filter out security violations from the general list
+        // Filter out security violations and already read notifications
         const filteredNotifs = notifications.filter(notif => 
-            notif.type !== 'security' && !notif.message.includes('Field attendance violation')
+            notif.type !== 'security' && !notif.message.includes('Field attendance violation') && !notif.isRead
         );
         const pagedNotifs = filteredNotifs.slice(startIndex, startIndex + pageSize);
 
@@ -433,9 +437,17 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
     }, [notifications]);
 
     const filteredNotifCount = notifications.filter(notif => 
-        notif.type !== 'security' && !notif.message.includes('Field attendance violation')
+        notif.type !== 'security' && !notif.message.includes('Field attendance violation') && !notif.isRead
     ).length;
     const totalPages = Math.ceil(filteredNotifCount / pageSize);
+
+    const isManagerRole = useMemo(() => {
+        if (!user) return false;
+        const role = (user.role || '').toLowerCase();
+        return ['admin', 'super_admin', 'developer', 'management', 'hr', 'hr_ops', 'finance_manager'].includes(role) || role.includes('manager');
+    }, [user]);
+
+    const pendingCount = isManagerRole ? (unlockRequests.length + leaveRequests.length + extraWorkClaims.length + financeRequests.length + inactiveEmployees.length + securityViolations.length + invoiceAlerts.length) : (securityViolations.length + invoiceAlerts.length);
 
     if (!isOpen) return null;
 
@@ -479,7 +491,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                 className={`flex-1 overflow-y-auto custom-scrollbar ${isMobile ? 'bg-[#0A3D2E]' : 'bg-white'}`}
             >
                 {/* Pending Approvals Section */}
-                {(unlockRequests.length > 0 || leaveRequests.length > 0 || extraWorkClaims.length > 0 || financeRequests.length > 0 || inactiveEmployees.length > 0) && (
+                {(pendingCount > 0) && isManagerRole && (
                     <div className={`border-b ${isMobile ? 'border-white/10 bg-gradient-to-b from-white/5 to-transparent' : 'border-gray-100 bg-amber-50/30'}`}>
                         <div className="px-6 py-4 flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -491,7 +503,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                 </h5>
                             </div>
                             <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${isMobile ? 'bg-white/10 text-white border border-white/5' : 'bg-amber-100 text-amber-700'}`}>
-                                {unlockRequests.length + leaveRequests.length + extraWorkClaims.length + financeRequests.length + inactiveEmployees.length}
+                                {pendingCount}
                             </span>
                         </div>
 

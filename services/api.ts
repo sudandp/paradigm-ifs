@@ -343,20 +343,26 @@ export const api = {
   },
 
   getSiteInvoiceRecords: async (managerId?: string): Promise<SiteInvoiceRecord[]> => {
-    let query = supabase
-      .from('site_invoice_tracker')
-      .select('*')
-      .is('deleted_at', null)
-      .order('site_name');
-      
-    if (managerId) {
-        query = query.eq('created_by', managerId);
-    }
-    
-    const { data, error } = await query;
-    if (error) throw error;
-    return (data || []).map(toCamelCase);
-  },
+  let query = supabase
+    .from('site_invoice_tracker')
+    .select('*, creator:created_by(reporting_manager_id, reporting_manager_2_id, reporting_manager_3_id)')
+    .is('deleted_at', null)
+    .order('site_name');
+  
+  const { data, error } = await query;
+  if (error) throw error;
+
+  let filteredData = data || [];
+  if (managerId) {
+      filteredData = filteredData.filter((row: any) => 
+          row.creator?.reporting_manager_id === managerId ||
+          row.creator?.reporting_manager_2_id === managerId ||
+          row.creator?.reporting_manager_3_id === managerId
+      );
+  }
+
+  return filteredData.map(toCamelCase);
+},
 
   getDeletedSiteInvoiceRecords: async (managerId?: string): Promise<SiteInvoiceRecord[]> => {
     let query = supabase
