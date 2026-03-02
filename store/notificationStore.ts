@@ -17,6 +17,7 @@ interface NotificationState {
   fetchNotifications: () => Promise<void>;
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  acknowledgeNotification: (notificationId: string) => Promise<void>;
   subscribeToNotifications: () => () => void;
   updateBadgeCount: () => Promise<void>;
 }
@@ -80,6 +81,21 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
       get().updateBadgeCount();
     } catch (err) {
       console.error("Failed to mark all notifications as read:", err);
+    }
+  },
+  
+  acknowledgeNotification: async (notificationId: string) => {
+    try {
+      await api.acknowledgeNotification(notificationId);
+      set((state) => ({
+        notifications: state.notifications.map(n =>
+          n.id === notificationId ? { ...n, acknowledgedAt: new Date().toISOString(), isRead: true } : n
+        ),
+        unreadCount: Math.max(0, state.unreadCount - (state.notifications.find(n => n.id === notificationId)?.isRead ? 0 : 1)),
+      }));
+      get().updateBadgeCount();
+    } catch (err) {
+      console.error("Failed to acknowledge notification:", err);
     }
   },
 

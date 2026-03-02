@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { SupportTicket, User } from '../../types';
 import { useAuthStore } from '../../store/authStore';
-import { Loader2, Plus, LifeBuoy, Users, Phone, MessageSquare, Video, Search, Filter, UserCheck, AlertTriangle, Download, Trophy, Award, Info } from 'lucide-react';
+import { Loader2, Plus, LifeBuoy, Users, Phone, MessageSquare, MessageCircle, Video, Search, Filter, UserCheck, AlertTriangle, Download, Trophy, Award, Info } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { formatDistanceToNow } from 'date-fns';
@@ -71,16 +71,27 @@ const TicketCard: React.FC<{ ticket: SupportTicket, onClick: () => void }> = ({ 
     </div>
 );
 
-const NearbyUserItem: React.FC<{ user: User, onAction: (phone?: string) => void }> = ({ user, onAction }) => (
-    <div className="flex items-center gap-4 p-3 rounded-xl bg-card border border-border hover:border-accent/50 transition-colors">
-        <div className="relative">
+const NearbyUserItem: React.FC<{ 
+    user: User, 
+    onAction: (targetUser: User, type: 'call' | 'sms' | 'whatsapp') => void,
+    onPing: (user: User) => void
+}> = ({ user, onAction, onPing }) => (
+    <div className={`flex items-center gap-4 p-3 rounded-xl bg-card border transition-colors ${user.isNearby ? 'border-accent/40 bg-accent/5' : 'border-border hover:border-accent/50'}`}>
+        <div className="relative flex-shrink-0">
             <ProfilePlaceholder photoUrl={user.photoUrl} seed={user.id} className="w-12 h-12 rounded-full shadow-sm" />
-            {/* Larger, more visible status indicator: bright green if checked in, red if not */}
             <span className={`absolute -bottom-0.5 -right-0.5 block h-4 w-4 rounded-full ${user.isAvailable ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.8)]' : 'bg-rose-600 shadow-[0_0_6px_rgba(225,29,72,0.6)]'} ring-2 ring-white`}></span>
         </div>
         <div className="flex-grow min-w-0">
-            <p className="text-sm font-bold text-primary-text truncate">{user.name}</p>
-            <p className="text-xs text-muted truncate">{user.role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+            <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-primary-text truncate">{user.name}</p>
+                {user.isNearby && (
+                    <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter">Nearby</span>
+                )}
+            </div>
+            <p className="text-xs text-muted truncate">
+                {user.locationName && <span className="text-accent/80 font-medium">{user.locationName} • </span>}
+                {user.role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </p>
         </div>
         <div className="flex items-center gap-1">
             <Button
@@ -88,8 +99,18 @@ const NearbyUserItem: React.FC<{ user: User, onAction: (phone?: string) => void 
                 size="sm"
                 className="hover:opacity-90 transition-opacity border"
                 style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }}
+                title="Ping (Internal)"
+                onClick={() => onPing(user)}
+            >
+                <AlertTriangle className="h-4 w-4" />
+            </Button>
+            <Button
+                variant="icon"
+                size="sm"
+                className="hover:opacity-90 transition-opacity border"
+                style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }}
                 title="Call"
-                onClick={() => onAction(user.phone)}
+                onClick={() => onAction(user, 'call')}
             >
                 <Phone className="h-4 w-4" />
             </Button>
@@ -98,20 +119,20 @@ const NearbyUserItem: React.FC<{ user: User, onAction: (phone?: string) => void 
                 size="sm"
                 className="hover:opacity-90 transition-opacity border"
                 style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }}
-                title="Message"
-                onClick={() => onAction(user.phone)}
+                title="SMS"
+                onClick={() => onAction(user, 'sms')}
             >
-                <MessageSquare className="h-4 w-4" />
+                <MessageCircle className="h-4 w-4" />
             </Button>
             <Button
                 variant="icon"
                 size="sm"
                 className="hover:opacity-90 transition-opacity border"
                 style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }}
-                title="Video"
-                onClick={() => onAction(user.phone)}
+                title="WhatsApp"
+                onClick={() => onAction(user, 'whatsapp')}
             >
-                <Video className="h-4 w-4" />
+                <MessageSquare className="h-4 w-4" />
             </Button>
         </div>
     </div>
@@ -153,10 +174,11 @@ const SupportDashboard: React.FC = () => {
             try {
                 const [ticketsData, usersData] = await Promise.all([
                     api.getSupportTickets(),
-                    api.getNearbyUsers()
+                    api.getNearbyUsers(user.id)
                 ]);
                 setTickets(ticketsData);
-                setNearbyUsers(usersData.filter(nu => nu.id !== user.id));
+                // Show only online users near the logged-in user's location
+                setNearbyUsers(usersData.nearbyOnline);
             } catch (error) {
                 setToast({ message: 'Failed to load support data.', type: 'error' });
             } finally {
@@ -279,18 +301,66 @@ const SupportDashboard: React.FC = () => {
         navigate(`/support/ticket/${newTicket.id}`);
     };
 
-    const openWhatsAppChat = (phone?: string) => {
-        if (!phone) {
+    const handleCommunication = async (targetUser: User, type: 'call' | 'sms' | 'whatsapp') => {
+        if (!targetUser.phone) {
             setToast({ message: 'User does not have a phone number.', type: 'error' });
             return;
         }
-        let numberToCall = phone.replace(/\D/g, '');
+
+        let numberToCall = targetUser.phone.replace(/\D/g, '');
         if (numberToCall.length > 10) numberToCall = numberToCall.slice(-10);
+        
         if (numberToCall.length !== 10) {
             setToast({ message: 'Invalid phone number format.', type: 'error' });
             return;
         }
-        window.open(`https://wa.me/91${numberToCall}`, '_blank');
+
+        // Log the communication
+        if (user) {
+            try {
+                await api.logCommunication({
+                    senderId: user.id,
+                    receiverId: targetUser.id,
+                    type,
+                    metadata: {
+                        targetPhone: numberToCall,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            } catch (err) {
+                console.error('Failed to log communication:', err);
+                // Continue with the action even if logging fails
+            }
+        }
+
+        if (type === 'whatsapp') {
+            window.open(`https://wa.me/91${numberToCall}`, '_blank');
+        } else if (type === 'call') {
+            window.location.href = `tel:+91${numberToCall}`;
+        } else if (type === 'sms') {
+            window.location.href = `sms:+91${numberToCall}`;
+        }
+    };
+
+    const handlePing = async (targetUser: User) => {
+        if (!user) return;
+        try {
+            await api.createNotification({
+                userId: targetUser.id,
+                type: 'direct_ping',
+                title: 'Nearby Support Request',
+                message: `${user.name} is requesting support nearby.`,
+                metadata: {
+                    senderId: user.id,
+                    senderName: user.name,
+                    locationName: user.locationName || 'Nearby Location'
+                }
+            });
+            setToast({ message: `Sent a ping to ${targetUser.name}!`, type: 'success' });
+        } catch (error) {
+            console.error('Failed to send ping:', error);
+            setToast({ message: 'Failed to send ping.', type: 'error' });
+        }
     };
 
     const StatCard: React.FC<{ title: string, value: number, icon: React.ReactNode, colorClass: string }> = ({ title, value, icon, colorClass }) => (
@@ -322,7 +392,7 @@ const SupportDashboard: React.FC = () => {
                 <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
                     {nearbyUsers.length > 0 ? (
                         nearbyUsers.map(u => (
-                            <NearbyUserItem key={u.id} user={u} onAction={openWhatsAppChat} />
+                            <NearbyUserItem key={u.id} user={u} onAction={handleCommunication} onPing={handlePing} />
                         ))
                     ) : (
                         <div className="text-center py-8 text-muted">
@@ -619,7 +689,7 @@ const SupportDashboard: React.FC = () => {
                         <div className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto pr-1 custom-scrollbar">
                             {nearbyUsers.length > 0 ? (
                                 nearbyUsers.map(u => (
-                                    <NearbyUserItem key={u.id} user={u} onAction={openWhatsAppChat} />
+                                    <NearbyUserItem key={u.id} user={u} onAction={handleCommunication} onPing={handlePing} />
                                 ))
                             ) : (
                                 <div className="text-center py-8 text-muted">

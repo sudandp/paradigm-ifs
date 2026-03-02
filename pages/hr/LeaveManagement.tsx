@@ -103,9 +103,10 @@ const LeaveManagement: React.FC = () => {
         };
         const fetchUsers = async () => {
             try {
+                const isFullAccess = ['admin', 'super_admin', 'hr', 'management'].includes(user?.role || '');
                 let users;
-                if (['admin', 'super_admin'].includes(user?.role || '')) {
-                    users = await api.getUsers();
+                if (isFullAccess) {
+                    users = await api.getUsers({ fetchAll: true });
                 } else {
                     users = await api.getTeamMembers(user?.id || '');
                 }

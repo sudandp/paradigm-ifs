@@ -50,11 +50,9 @@ function clamp(value: number, min: number, max: number): number {
  * We normalize to lowercase with no separators: 'checkin', 'checkout', 'breakin', 'breakout'
  */
 function isCheckInEvent(type: string): boolean {
-  // Broader check for any activity event
+  // Only match actual check-in / punch-in events (NOT checkout/punchout)
   const normalized = (type || '').toLowerCase().replace(/[-_\s]/g, '');
-  return normalized === 'checkin' || normalized === 'punchin' || normalized === 'signin' || 
-         normalized === 'punchout' || normalized === 'checkout' || normalized === 'signout' ||
-         normalized === 'breakin' || normalized === 'breakout';
+  return normalized === 'checkin' || normalized === 'punchin' || normalized === 'signin';
 }
 
 function isCheckOutEvent(type: string): boolean {
@@ -78,8 +76,8 @@ async function calculatePerformanceScore(
     .lte('created_at', monthEnd);
 
   if (error || !tasks || tasks.length === 0) {
-    // No tasks assigned → return 100 (No news is good news, don't penalize for lack of assignments)
-    return 100;
+    // No tasks assigned → return neutral score (don't reward or penalize)
+    return 50;
   }
 
   const totalTasks = tasks.length;
@@ -111,7 +109,7 @@ async function calculateAttendanceScore(
   userId: string,
   monthStart: Date,
   monthEnd: Date,
-  configuredStartTime: string = '12:00'
+  configuredStartTime: string = '09:30'
 ): Promise<{ score: number; tiebreakerScore: number }> {
   // Get all attendance events for the month
   const { data: events, error } = await supabase
@@ -127,14 +125,14 @@ async function calculateAttendanceScore(
     return { score: 0, tiebreakerScore: 0 };
   }
 
-  // Calculate working days (matching the manual SQL sync's logic of ~20 days)
+  // Dynamically calculate working days (Mon-Sat, exclude Sundays)
   const today = new Date();
-  const monthString = format(monthStart, 'yyyy-MM');
-  const isFeb2026 = monthString === '2026-02';
-  
-  const workingDays = isFeb2026 ? 20 : 22; // Hardcode to 20 for Feb 2026 to match SQL Exactly
+  // If current month, only count days up to today; otherwise count entire month
+  const effectiveEnd = monthEnd > today ? today : monthEnd;
+  const allDays = eachDayOfInterval({ start: monthStart, end: effectiveEnd });
+  const workingDays = allDays.filter(d => getDay(d) !== 0).length; // Exclude Sundays
 
-  if ((workingDays as number) === 0) return { score: 100, tiebreakerScore: 0 };
+  if (workingDays === 0) return { score: 100, tiebreakerScore: 0 };
 
   // Group events by UTC date to count present days & late days (matches SQL behavior)
   const eventsByDate = new Map<string, any[]>();
@@ -231,9 +229,13 @@ async function calculateResponseScore(
       .map((e: any) => e.timestamp.split('T')[0]) // Use UTC date string
   );
 
-  const monthString = format(parseISO(monthStart), 'yyyy-MM');
-  const isFeb2026 = monthString === '2026-02';
-  const workingDays = isFeb2026 ? 20 : 22;
+  // Dynamically calculate working days (Mon-Sat, exclude Sundays)
+  const mStart = parseISO(monthStart);
+  const mEnd = parseISO(monthEnd);
+  const responseToday = new Date();
+  const effectiveEnd2 = mEnd > responseToday ? responseToday : mEnd;
+  const allDays2 = eachDayOfInterval({ start: mStart, end: effectiveEnd2 });
+  const workingDays = allDays2.filter(d => getDay(d) !== 0).length;
   const compliance = workingDays > 0 ? (uniqueDays.size / workingDays) * 50 : 25;
 
   return clamp(taskAcceptance + compliance, 0, 100);

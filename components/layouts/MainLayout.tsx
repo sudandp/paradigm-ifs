@@ -17,6 +17,7 @@ import Header from './Header';
 import { NotificationPanel } from '../notifications/NotificationPanel';
 import BreakTrackingMonitor from '../attendance/BreakTrackingMonitor';
 import { useSettingsStore } from '../../store/settingsStore';
+import { PingAlarmOverlay } from '../notifications/PingAlarmOverlay';
 
 export interface NavLinkConfig {
     to: string;
@@ -339,6 +340,8 @@ const MainLayout: React.FC = () => {
                 </main>
 
             </div>
+
+            <PingAlarmOverlay />
 
             {/* Notification Sidebar - Desktop (> 1024px) */}
             {isDesktop && isPanelOpen && (

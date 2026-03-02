@@ -3,8 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { SupportTicket, TicketPost, User } from '../../types';
 import { useAuthStore } from '../../store/authStore';
-// FIX: Add missing `Star` icon to the import from lucide-react.
-import { Loader2, ArrowLeft, Send, Users, Phone, MessageSquare, Video, Paperclip, Star } from 'lucide-react';
+import { 
+    Clock, Tag, MessageSquare, Paperclip, Send, CheckCircle2, AlertCircle, Clock3, 
+    Search, Filter, Loader2, ArrowLeft, MoreVertical, XCircle, Users, Phone, Video, Star, AlertTriangle, MessageCircle
+} from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { format } from 'date-fns';
@@ -55,7 +57,7 @@ const TicketDetail: React.FC = () => {
             try {
                 const [ticketData, usersData] = await Promise.all([
                     api.getSupportTicketById(id),
-                    api.getNearbyUsers()
+                    api.getNearbyUsers(user?.id)
                 ]);
                 if (ticketData) {
                     setTicket(ticketData);
@@ -63,7 +65,8 @@ const TicketDetail: React.FC = () => {
                     setToast({ message: 'Ticket not found.', type: 'error' });
                     navigate('/support');
                 }
-                setNearbyUsers(usersData);
+                // Show only online users near the logged-in user's location
+                setNearbyUsers(usersData.nearbyOnline);
             } catch (error) {
                 setToast({ message: 'Failed to load ticket data.', type: 'error' });
             } finally {
@@ -109,26 +112,70 @@ const TicketDetail: React.FC = () => {
         setIsCloseModalOpen(false);
     };
     
-    const openWhatsAppChat = (phone?: string) => {
-        if (!phone) {
+    const handleCommunication = async (targetUser: User, type: 'call' | 'sms' | 'whatsapp') => {
+        if (!targetUser.phone) {
             setToast({ message: 'User does not have a phone number.', type: 'error' });
             return;
         }
-        // Remove all non-digit characters to normalize.
-        let numberToCall = phone.replace(/\D/g, '');
-        
-        // Take the last 10 digits to ensure we have a standard mobile number.
-        if (numberToCall.length > 10) {
-            numberToCall = numberToCall.slice(-10);
-        }
 
+        let numberToCall = targetUser.phone.replace(/\D/g, '');
+        if (numberToCall.length > 10) numberToCall = numberToCall.slice(-10);
+        
         if (numberToCall.length !== 10) {
             setToast({ message: 'Invalid phone number format.', type: 'error' });
             return;
         }
-        
-        // Prepend the Indian country code.
-        window.open(`https://wa.me/91${numberToCall}`, '_blank');
+
+        // Log the communication
+        if (user) {
+            try {
+                await api.logCommunication({
+                    senderId: user.id,
+                    receiverId: targetUser.id,
+                    type,
+                    metadata: {
+                        targetPhone: numberToCall,
+                        ticketId: ticket.id,
+                        ticketNumber: ticket.ticketNumber,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            } catch (err) {
+                console.error('Failed to log communication:', err);
+                // Continue with the action even if logging fails
+            }
+        }
+
+        if (type === 'whatsapp') {
+            window.open(`https://wa.me/91${numberToCall}`, '_blank');
+        } else if (type === 'call') {
+            window.location.href = `tel:+91${numberToCall}`;
+        } else if (type === 'sms') {
+            window.location.href = `sms:+91${numberToCall}`;
+        }
+    };
+
+    const handlePing = async (targetUser: User) => {
+        if (!user) return;
+        try {
+            await api.createNotification({
+                userId: targetUser.id,
+                type: 'direct_ping',
+                title: 'Nearby Support Request',
+                message: `${user.name} is requesting support nearby for Ticket #${ticket.ticketNumber}.`,
+                metadata: {
+                    senderId: user.id,
+                    senderName: user.name,
+                    ticketId: ticket.id,
+                    ticketNumber: ticket.ticketNumber,
+                    locationName: user.locationName || 'Nearby Location'
+                }
+            });
+            setToast({ message: `Sent a ping to ${targetUser.name}!`, type: 'success' });
+        } catch (error) {
+            console.error('Failed to send ping:', error);
+            setToast({ message: 'Failed to send ping.', type: 'error' });
+        }
     };
 
     if (isLoading) return <div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-accent"/></div>;
@@ -248,29 +295,68 @@ const TicketDetail: React.FC = () => {
                         <h3 className="font-semibold text-primary-text mb-3 flex items-center gap-2"><Users className="h-5 w-5 text-muted"/> Nearby Users</h3>
                         <div className="space-y-3">
                             {nearbyUsers.map(u => (
-                                <div key={u.id} className="flex items-center gap-3">
-                                    <div className="relative">
+                                <div key={u.id} className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${u.isNearby ? 'bg-accent/5 ring-1 ring-accent/20' : ''}`}>
+                                    <div className="relative flex-shrink-0">
                                         <ProfilePlaceholder photoUrl={u.photoUrl} seed={u.id} className="w-10 h-10 rounded-full" />
-                                        <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-400 ring-2 ring-card"></span>
+                                        <span className={`absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ${u.isAvailable ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]' : 'bg-gray-400'} ring-2 ring-card`}></span>
                                     </div>
-                                    <div className="flex-grow">
-                                        <p className="text-sm font-semibold">{u.name}</p>
-                                        <p className="text-xs text-muted">{u.role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                                    <div className="flex-grow min-w-0">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <p className="text-sm font-semibold truncate">{u.name}</p>
+                                            {u.isNearby && <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-accent" title="Nearby"></span>}
+                                        </div>
+                                        <p className="text-[10px] text-muted truncate">
+                                            {u.locationName && <span className="text-accent/70">{u.locationName} • </span>}
+                                            {u.role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                        </p>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <Button variant="icon" size="sm" title="WhatsApp Chat" onClick={() => openWhatsAppChat(u.phone)}><Phone className="h-4 w-4"/></Button>
-                                        <Button variant="icon" size="sm" title="WhatsApp Chat" onClick={() => openWhatsAppChat(u.phone)}><MessageSquare className="h-4 w-4"/></Button>
                                         <Button 
                                             variant="icon" 
                                             size="sm" 
-                                            title="WhatsApp Chat" 
-                                            onClick={() => openWhatsAppChat(u.phone)}
+                                            className="hover:opacity-90 transition-opacity border"
+                                            style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }}
+                                            title="Ping (Internal)" 
+                                            onClick={() => handlePing(u)}
                                         >
-                                            <Video className="h-4 w-4"/>
+                                            <AlertTriangle className="h-3.5 w-3.5"/>
+                                        </Button>
+                                        <Button 
+                                            variant="icon" 
+                                            size="sm" 
+                                            className="hover:opacity-90 transition-opacity border"
+                                            style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }}
+                                            title="Call" 
+                                            onClick={() => handleCommunication(u, 'call')}
+                                        >
+                                            <Phone className="h-3.5 w-3.5"/>
+                                        </Button>
+                                        <Button 
+                                            variant="icon" 
+                                            size="sm" 
+                                            className="hover:opacity-90 transition-opacity border"
+                                            style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }}
+                                            title="SMS" 
+                                            onClick={() => handleCommunication(u, 'sms')}
+                                        >
+                                            <MessageCircle className="h-3.5 w-3.5"/>
+                                        </Button>
+                                        <Button 
+                                            variant="icon" 
+                                            size="sm" 
+                                            className="hover:opacity-90 transition-opacity border"
+                                            style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }}
+                                            title="WhatsApp" 
+                                            onClick={() => handleCommunication(u, 'whatsapp')}
+                                        >
+                                            <MessageSquare className="h-3.5 w-3.5"/>
                                         </Button>
                                     </div>
                                 </div>
                             ))}
+                            {nearbyUsers.length === 0 && (
+                                <p className="text-center py-4 text-xs text-muted">No staff found nearby.</p>
+                            )}
                         </div>
                     </div>
                 </aside>

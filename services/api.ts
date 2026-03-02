@@ -10,7 +10,8 @@ import type {
   ExtraWorkLog, PerfiosVerificationData, HolidayListItem, UniformRequestItem, IssuedTool, RecurringHolidayRule,
   BiometricDevice, ChecklistTemplate, FieldReport, FieldAttendanceViolation,
   NotificationRule, NotificationType, Company, GmcPolicySettings, StaffAttendanceRules,
-  GmcSubmission, UserHoliday, AttendanceUnlockRequest, LeaveType, SiteAttendanceRecord, SiteInvoiceRecord, SiteInvoiceDefault, SiteFinanceRecord
+  GmcSubmission, UserHoliday, AttendanceUnlockRequest, LeaveType, SiteAttendanceRecord, SiteInvoiceRecord, SiteInvoiceDefault, SiteFinanceRecord,
+  CommunicationLog
 } from '../types';
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { 
@@ -873,8 +874,42 @@ export const api = {
 
 
   // --- Users & Orgs ---
-  getUsers: async (filter?: { page?: number, pageSize?: number, search?: string, sortBy?: string, sortAscending?: boolean }): Promise<any> => {
-    let query = supabase.from('users').select('*, role_id', { count: 'exact' });
+  getUsers: async (filter?: { page?: number, pageSize?: number, search?: string, sortBy?: string, sortAscending?: boolean, fetchAll?: boolean }): Promise<any> => {
+    if (filter?.fetchAll) {
+      let allData: any[] = [];
+      let page = 1;
+      const pageSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*, role:roles(display_name)')
+          .range((page - 1) * pageSize, page * pageSize - 1)
+          .order(filter?.sortBy || 'created_at', { ascending: filter?.sortAscending ?? false });
+
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          hasMore = false;
+        } else {
+          allData = [...allData, ...data];
+          if (data.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        }
+      }
+
+      return allData.map(u => {
+        const roleData = u.role;
+        const rawRoleName = (Array.isArray(roleData) ? roleData[0]?.display_name : (roleData as any)?.display_name) || u.role_id;
+        const roleName = typeof rawRoleName === 'string' ? rawRoleName.toLowerCase().replace(/\s+/g, '_') : rawRoleName;
+        return toCamelCase({ ...u, role: roleName });
+      });
+    }
+
+    let query = supabase.from('users').select('*, role:roles(display_name)', { count: 'exact' });
     
     if (filter?.search) {
       query = query.or(`name.ilike.%${filter.search}%,email.ilike.%${filter.search}%`);
@@ -895,7 +930,12 @@ export const api = {
     const { data, count, error } = await query;
     if (error) throw error;
     
-    const formattedData = (data || []).map(u => toCamelCase({ ...u, role: u.role_id }));
+    const formattedData = (data || []).map(u => {
+      const roleData = u.role;
+      const rawRoleName = (Array.isArray(roleData) ? roleData[0]?.display_name : (roleData as any)?.display_name) || u.role_id;
+      const roleName = typeof rawRoleName === 'string' ? rawRoleName.toLowerCase().replace(/\s+/g, '_') : rawRoleName;
+      return toCamelCase({ ...u, role: roleName });
+    });
     
     if (isPaginated) {
       return { data: formattedData, total: count || 0 };
@@ -1141,41 +1181,72 @@ export const api = {
    * This allows the app to notify the appropriate stakeholders when a
    * field staff checks in or out.
    */
-  getNearbyUsers: async () => {
+  getNearbyUsers: async (currentUserId?: string): Promise<{ nearbyOnline: any[]; allUsers: any[] }> => {
     const allUsers = await api.getUsers();
-    // Determine availability based on today's attendance events.  We fetch
-    // all events from the beginning of the current day until now and then
-    // look at the most recent event per user.  If the latest event is a
-    // check‑in (type === 'check in' or 'check-in'), the user is marked
-    // available; otherwise, unavailable.  Errors while fetching events
-    // will be silently ignored and all users will default to available.
     let availability: Record<string, boolean> = {};
+    let latestLocationsMap: Record<string, { locationName: string }> = {};
+
     try {
       const start = new Date();
       start.setHours(0, 0, 0, 0);
       const end = new Date();
       const events = await api.getAllAttendanceEvents(start.toISOString(), end.toISOString());
+      
       const latest: Record<string, { type: string; timestamp: string }> = {};
+      
       events.forEach(evt => {
-        const { userId, type, timestamp } = evt as any;
+        const { userId, type, timestamp, locationName } = evt as any;
         if (!userId) return;
         if (!latest[userId] || new Date(timestamp) > new Date(latest[userId].timestamp)) {
           latest[userId] = { type: type.toLowerCase(), timestamp };
+          if (locationName) {
+            latestLocationsMap[userId] = { locationName };
+          }
         }
       });
+
       availability = Object.fromEntries(Object.entries(latest).map(([userId, info]) => {
-        // Normalize the type string: remove underscores, hyphens, convert to lowercase
         const normalizedType = info.type.toLowerCase().replace(/[-_\s]/g, '');
-        // User is available only if their latest event is check-in
-        const isCheckIn = normalizedType === 'checkin';
-        console.log(`User ${userId}: latest event type = "${info.type}", normalized = "${normalizedType}", isCheckIn = ${isCheckIn}`);
+        const isCheckIn = normalizedType === 'checkin' || normalizedType === 'punchin' || normalizedType === 'signin';
         return [userId, isCheckIn];
       }));
     } catch (e) {
       console.warn('Failed to compute user availability:', e);
     }
-    return allUsers
-      .map(u => ({ ...u, isAvailable: availability[u.id] ?? false }));
+
+    // Map availability and locations onto users
+    const usersWithAvailability = allUsers
+      .map(u => ({ 
+        ...u, 
+        isAvailable: availability[u.id] ?? false,
+        locationName: latestLocationsMap[u.id]?.locationName || ''
+      }))
+      .filter(u => u.id !== currentUserId);
+
+    const onlineUsers = usersWithAvailability.filter(u => u.isAvailable);
+    const currentUser = allUsers.find(u => u.id === currentUserId);
+    const currentUserLocation = currentUser ? (latestLocationsMap[currentUser.id]?.locationName || '') : '';
+
+    const nearbyOnline = onlineUsers.map(u => {
+      const sameOrg = currentUser?.organizationId && u.organizationId === currentUser.organizationId;
+      const sameLocation = currentUserLocation && u.locationName === currentUserLocation;
+      
+      return { 
+        ...u, 
+        isNearby: sameLocation || sameOrg
+      };
+    }).sort((a, b) => {
+      // Sort: same location first, then same org, then alphabetical
+      if (a.locationName === currentUserLocation && b.locationName !== currentUserLocation) return -1;
+      if (a.locationName !== currentUserLocation && b.locationName === currentUserLocation) return 1;
+      if (currentUser?.organizationId) {
+        if (a.organizationId === currentUser.organizationId && b.organizationId !== currentUser.organizationId) return -1;
+        if (a.organizationId !== currentUser.organizationId && b.organizationId === currentUser.organizationId) return 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    return { nearbyOnline, allUsers: usersWithAvailability };
   },
 
   updateUser: async (id: string, updates: Partial<User>) => {
@@ -2567,6 +2638,17 @@ export const api = {
   },
   markAllNotificationsAsRead: async (userId: string): Promise<void> => {
     await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false);
+  },
+  acknowledgeNotification: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('notifications').update({ 
+      acknowledged_at: new Date().toISOString(),
+      is_read: true 
+    }).eq('id', id);
+    if (error) throw error;
+  },
+  logCommunication: async (log: Omit<CommunicationLog, 'id' | 'createdAt'>): Promise<void> => {
+    const { error } = await supabase.from('communication_logs').insert(toSnakeCase(log));
+    if (error) throw error;
   },
 
   getNotificationRules: async (): Promise<NotificationRule[]> => {

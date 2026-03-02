@@ -106,6 +106,14 @@ export interface User {
   floatingLeaveOpeningDate?: string; // YYYY-MM-DD
   otHoursBank?: number;
   monthlyOtHours?: number;
+  /**
+   * Optional human-readable location name for proximity logic.
+   */
+  locationName?: string;
+  /**
+   * Flag indicating if the user is considered "nearby" the current user.
+   */
+  isNearby?: boolean;
 }
 
 export interface BiometricDevice {
@@ -1150,7 +1158,8 @@ export type NotificationType =
   | 'warning'
   | 'greeting'
   | 'approval_request'
-  | 'emergency_broadcast';
+  | 'emergency_broadcast'
+  | 'direct_ping';
 
 export interface Notification {
   id: string;
@@ -1164,6 +1173,16 @@ export interface Notification {
   link?: string; // Alternative property name for link
   severity?: 'Low' | 'Medium' | 'High';
   metadata?: any;
+  acknowledgedAt?: string | null;
+}
+
+export interface CommunicationLog {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  type: 'call' | 'sms' | 'whatsapp' | 'ping';
+  metadata?: any;
+  createdAt: string;
 }
 
 export interface NotificationRule {

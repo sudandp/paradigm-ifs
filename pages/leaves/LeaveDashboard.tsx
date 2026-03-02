@@ -214,14 +214,32 @@ const LeaveDashboard: React.FC = () => {
                     }
                 });
                 setCalculatedOTHours(parseFloat(totalOT.toFixed(1)));
+            }
+            
+            // Universal Holiday Selection logic (outside role specific blocks)
+            const settings = await api.getAttendanceSettings();
+            let staffCategory: keyof AttendanceSettings = 'field';
+            const userRole = user.role.toLowerCase();
+            if ([
+                'admin', 'hr', 'finance', 'developer', 'management', 'office_staff', 
+                'back_office_staff', 'bd', 'operation_manager', 'field_staff',
+                'finance_manager', 'hr_ops', 'business developer', 'unverified',
+                'operation manager', 'field staff', 'finance manager', 'hr ops'
+            ].includes(userRole)) {
+                staffCategory = 'office';
+            } else if (['site_manager', 'site_supervisor', 'site manager', 'site supervisor'].includes(userRole)) {
+                staffCategory = 'site';
+            } else {
+                staffCategory = 'field';
+            }
+            const userRules = settings[staffCategory];
 
-                setIsHolidaySelectionEnabled(userRules?.enableCustomHolidays || false);
-                setActiveHolidayPool(userRules?.holidayPool || HOLIDAY_SELECTION_POOL);
-                
-                if (userRules?.enableCustomHolidays) {
-                    const selections = await api.getUserHolidays(user.id);
-                    setUserHolidays(selections);
-                }
+            setIsHolidaySelectionEnabled(userRules?.enableCustomHolidays || false);
+            setActiveHolidayPool(userRules?.holidayPool || HOLIDAY_SELECTION_POOL);
+            
+            if (userRules?.enableCustomHolidays) {
+                const selections = await api.getUserHolidays(user.id);
+                setUserHolidays(selections);
             }
 
         } catch (error: any) {
