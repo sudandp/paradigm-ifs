@@ -14,12 +14,12 @@ import type {
     DailyAttendanceStatus,
     User,
     LeaveRequest,
-    Holiday,
     AttendanceSettings,
     OnboardingData,
     Organization,
     CompOffLog,
-    UserHoliday
+    UserHoliday,
+    StaffAttendanceRules
 } from '../../types';
 import ManualAttendanceModal from '../../components/attendance/ManualAttendanceModal';
 import AttendanceAuditReport from '../../components/attendance/AttendanceAuditReport';
