@@ -769,7 +769,7 @@ const AttendanceDashboard: React.FC = () => {
     const { user } = useAuthStore();
     const currentUserRole = user?.role;
     const { permissions } = usePermissionsStore();
-    const { recurringHolidays, officeHolidays, fieldHolidays } = useSettingsStore();
+    const { attendance, recurringHolidays, officeHolidays, fieldHolidays } = useSettingsStore();
 
     const [users, setUsers] = useState<User[]>([]);
     const usersRef = useRef<User[]>([]);
@@ -964,7 +964,17 @@ const AttendanceDashboard: React.FC = () => {
                         if (rule.day.toLowerCase() !== dayName.toLowerCase()) return false;
                         const occurrence = Math.ceil(day.getDate() / 7);
                         const userRoleType = isOfficeRole ? 'office' : 'field'; 
-                        return rule.n === occurrence && (rule.type || 'office') === userRoleType;
+                        if (rule.n === occurrence && (rule.type || 'office') === userRoleType) {
+                            const categorySettings = attendance[userRoleType as keyof AttendanceSettings] as StaffAttendanceRules;
+                            if (categorySettings && categorySettings.floatingLeavesExpiryDate) {
+                                const expiryDate = startOfDay(new Date(categorySettings.floatingLeavesExpiryDate));
+                                if (startOfDay(day) > expiryDate) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        }
+                        return false;
                     });
 
                     // 2. Fixed
@@ -1328,7 +1338,17 @@ const AttendanceDashboard: React.FC = () => {
                     const dayDate = day.getDate();
                     const occurrence = Math.ceil(dayDate / 7);
                     const ruleType = rule.type || 'office';
-                    return rule.n === occurrence && ruleType === userCategory;
+                    if (rule.n === occurrence && ruleType === userCategory) {
+                        const categorySettings = attendance[userCategory as keyof AttendanceSettings] as StaffAttendanceRules;
+                        if (categorySettings && categorySettings.floatingLeavesExpiryDate) {
+                            const expiryDate = startOfDay(new Date(categorySettings.floatingLeavesExpiryDate));
+                            if (startOfDay(day) > expiryDate) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    }
+                    return false;
                 });
 
                 // Check for fixed holidays
@@ -1591,7 +1611,17 @@ const AttendanceDashboard: React.FC = () => {
                     const dayDate = day.getDate();
                     const occurrence = Math.ceil(dayDate / 7);
                     const ruleType = rule.type || 'office';
-                    return rule.n === occurrence && ruleType === userCategory;
+                    if (rule.n === occurrence && ruleType === userCategory) {
+                        const categorySettings = attendance[userCategory as keyof AttendanceSettings] as StaffAttendanceRules;
+                        if (categorySettings && categorySettings.floatingLeavesExpiryDate) {
+                            const expiryDate = startOfDay(new Date(categorySettings.floatingLeavesExpiryDate));
+                            if (startOfDay(day) > expiryDate) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    }
+                    return false;
                 });
 
                 // 2. Check FIXED holidays

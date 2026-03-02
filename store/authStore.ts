@@ -590,8 +590,12 @@ export const useAuthStore = create<AuthState>()(
                     }
 
                     // Send notifications via Dynamic Rules
+                    let mappedType = newType.replace('-', '_');
+                    if (mappedType === 'punch_in') mappedType = 'check_in';
+                    if (mappedType === 'punch_out') mappedType = 'check_out';
+                    
                     dispatchNotificationFromRules(
-                        newType.replace('-', '_'),
+                        mappedType,
                         {
                             actorName: user.name || 'An employee',
                             actionText: getActionTextForType(newType),
