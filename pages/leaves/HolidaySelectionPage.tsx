@@ -14,7 +14,7 @@ import type { UserHoliday, Holiday, StaffAttendanceRules } from '../../types';
 const HolidaySelectionPage: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuthStore();
-    const { attendance } = useSettingsStore();
+    const { attendance, officeHolidays, fieldHolidays, siteHolidays } = useSettingsStore();
     const { isMobile } = useDevice();
     
     const [isLoading, setIsLoading] = useState(true);
@@ -98,6 +98,8 @@ const HolidaySelectionPage: React.FC = () => {
         );
     }
 
+    const storeHolidays = category === 'field' ? fieldHolidays : category === 'site' ? siteHolidays : officeHolidays;
+    
     // Prepare holidays for calendar view
     const adminHolidays: Holiday[] = [
         ...FIXED_HOLIDAYS.map(fh => ({
@@ -105,7 +107,8 @@ const HolidaySelectionPage: React.FC = () => {
             name: fh.name,
             date: `${currentYear}-${fh.date}`,
             type: category as any
-        }))
+        })),
+        ...storeHolidays.filter(h => !FIXED_HOLIDAYS.some(fh => fh.name === h.name))
     ];
 
     const calendarUserHolidays = selectedHolidays.map(h => ({
@@ -121,9 +124,11 @@ const HolidaySelectionPage: React.FC = () => {
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             
             <div className="flex items-center gap-4 mb-8">
+            {isMobile && (
                 <Button variant="secondary" size="md" onClick={() => navigate('/leaves/dashboard')} className="p-2 rounded-full h-10 w-10 flex items-center justify-center">
                     <ChevronLeft className="h-6 w-6" />
                 </Button>
+            )}
                 <div>
                     <h1 className="text-2xl font-bold text-primary-text">Holiday Selection</h1>
                     <p className="text-muted">Pick your optional holidays for {currentYear}</p>
@@ -145,7 +150,7 @@ const HolidaySelectionPage: React.FC = () => {
                         </div>
 
                         <div className="grid grid-cols-1 gap-3">
-                            {holidayPool.map((holiday, index) => {
+                            {[...holidayPool].sort((a, b) => a.date.localeCompare(b.date)).map((holiday, index) => {
                                 const isSelected = selectedHolidays.some(h => h.name === holiday.name);
                                 const dateObj = new Date(`${currentYear}${holiday.date}`);
                                 const formattedDate = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', weekday: 'short' });

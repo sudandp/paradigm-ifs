@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { api } from '../../services/api';
 import type { SiteFinanceRecord, SiteInvoiceDefault } from '../../types';
 import { useAuthStore } from '../../store/authStore';
-import { format, startOfMonth } from 'date-fns';
+import { format, startOfMonth, startOfDay, parseISO } from 'date-fns';
 import { 
     Loader2, Plus, Edit2, Trash2, IndianRupee, FileSpreadsheet, TrendingUp, TrendingDown, 
-    ClipboardCheck, Building2, Download, Upload, AlertTriangle, RotateCcw, ShieldX, Search, Info, X
+    ClipboardCheck, Building2, Download, Upload, AlertTriangle, RotateCcw, ShieldX, Search, Info, FilterX, X, Clock
 } from 'lucide-react';
 import Toast from '../../components/ui/Toast';
+import RevisionHistoryModal from '../../components/modals/RevisionHistoryModal';
 
 const SiteFinanceTracker: React.FC = () => {
     const navigate = useNavigate();
@@ -19,11 +20,22 @@ const SiteFinanceTracker: React.FC = () => {
     const [isExporting, setIsExporting] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const [previewData, setPreviewData] = useState<Partial<SiteFinanceRecord>[]>([]);
-    const [billingMonth, setBillingMonth] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [siteDefaults, setSiteDefaults] = useState<SiteInvoiceDefault[]>([]);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const { user } = useAuthStore();
+    const [revisionModal, setRevisionModal] = useState<{ isOpen: boolean; recordId: string; siteName: string }>({ isOpen: false, recordId: '', siteName: '' });
+
+    // Filter & Pagination State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filters, setFilters] = useState({ 
+        siteName: '', 
+        status: '',
+        year: new Date().getFullYear().toString(),
+        month: (new Date().getMonth() + 1).toString(),
+        startDate: '',
+        endDate: ''
+    });
     
     // Deletion State
     const [deletedRecords, setDeletedRecords] = useState<SiteFinanceRecord[]>([]);
@@ -42,7 +54,7 @@ const SiteFinanceTracker: React.FC = () => {
             const managerId = isSuperAdmin ? undefined : user.id;
 
             const [recordsData, defaultsData, deletedData] = await Promise.all([
-                api.getSiteFinanceRecords(billingMonth, managerId),
+                api.getSiteFinanceRecords(undefined, managerId),
                 api.getSiteInvoiceDefaults(managerId),
                 api.getDeletedSiteFinanceRecords(managerId)
             ]);
@@ -71,7 +83,7 @@ const SiteFinanceTracker: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [billingMonth]);
+    }, [user]);
 
     useEffect(() => {
         fetchData();
@@ -117,7 +129,12 @@ const SiteFinanceTracker: React.FC = () => {
 
             const buffer = await workbook.xlsx.writeBuffer();
             const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            saveAs(blob, `Site_Finance_Template_${billingMonth.substring(0, 7)}.xlsx`);
+            
+            const uploadYearStr = filters.year === 'all' ? new Date().getFullYear().toString() : filters.year;
+            const uploadMonthStr = filters.month === 'all' ? (new Date().getMonth() + 1).toString() : filters.month;
+            const templateMonth = format(new Date(Number(uploadYearStr), Number(uploadMonthStr) - 1, 1), 'yyyy-MM');
+            
+            saveAs(blob, `Site_Finance_Template_${templateMonth}.xlsx`);
             setToast({ message: 'Template downloaded!', type: 'success' });
         } catch (error) {
             console.error('Template error:', error);
@@ -138,6 +155,11 @@ const SiteFinanceTracker: React.FC = () => {
             const ws = workbook.getWorksheet(1);
 
             const parsed: Partial<SiteFinanceRecord>[] = [];
+            
+            const uploadYearStr = filters.year === 'all' ? new Date().getFullYear().toString() : filters.year;
+            const uploadMonthStr = filters.month === 'all' ? (new Date().getMonth() + 1).toString() : filters.month;
+            const effectiveBillingMonth = format(new Date(Number(uploadYearStr), Number(uploadMonthStr) - 1, 1), 'yyyy-MM-dd');
+
             ws?.eachRow((row, rowNumber) => {
                 if (rowNumber === 1) return;
 
@@ -161,7 +183,7 @@ const SiteFinanceTracker: React.FC = () => {
                     contractManagementFee: Number(row.getCell(4).value) || 0,
                     billedAmount: bAmount,
                     billedManagementFee: bFee,
-                    billingMonth,
+                    billingMonth: effectiveBillingMonth,
                     totalBilledAmount: bAmount + bFee,
                     status: 'pending'
                 });
@@ -250,7 +272,10 @@ const SiteFinanceTracker: React.FC = () => {
             });
 
             const buffer = await workbook.xlsx.writeBuffer();
-            saveAs(new Blob([buffer]), `Finance_Export_${billingMonth.substring(0, 7)}.xlsx`);
+            const exportYear = filters.year === 'all' ? new Date().getFullYear().toString() : filters.year;
+            const exportMonth = filters.month === 'all' ? (new Date().getMonth() + 1).toString() : filters.month;
+            const exportDate = format(new Date(Number(exportYear), Number(exportMonth) - 1, 1), 'yyyy-MM');
+            saveAs(new Blob([buffer]), `Finance_Export_${exportDate}.xlsx`);
         } catch (error) {
             console.error('Export error:', error);
             setToast({ message: 'Failed to export data', type: 'error' });
@@ -386,8 +411,6 @@ const SiteFinanceTracker: React.FC = () => {
         if (bDiff + fDiff >= 0) profitSitesCount++;
     });
 
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filters, setFilters] = useState({ siteName: '', status: '' });
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -403,14 +426,53 @@ const SiteFinanceTracker: React.FC = () => {
         const matchesSiteName = !filters.siteName || 
             r.siteName.toLowerCase().includes(filters.siteName.toLowerCase());
             
-        const matchesStatus = !filters.status || (() => {
+        const matchesStatus = filters.status === '' || (() => {
             const variations = ((r.billedAmount || 0) + (r.billedManagementFee || 0)) - ((r.contractAmount || 0) + (r.contractManagementFee || 0));
             const isProfit = variations >= 0;
             return filters.status === 'profit' ? isProfit : !isProfit;
         })();
 
-        return matchesSearch && matchesSiteName && matchesStatus;
+        let matchesYear = true;
+        let matchesMonth = true;
+        let matchesCustomRange = true;
+
+        const recordDateStr = r.billingMonth || r.createdAt;
+        if (recordDateStr) {
+            const recordDate = parseISO(recordDateStr);
+            if (filters.year !== 'all') {
+                matchesYear = format(recordDate, 'yyyy') === filters.year;
+            }
+            if (filters.month !== 'all') {
+                const recordMonth = format(recordDate, 'M');
+                matchesMonth = recordMonth === filters.month;
+            }
+            
+            if (filters.startDate && filters.endDate) {
+                const dateOnly = startOfDay(recordDate);
+                matchesCustomRange = (dateOnly >= startOfDay(parseISO(filters.startDate)) && dateOnly <= startOfDay(parseISO(filters.endDate)));
+            }
+        }
+
+        return matchesSearch && matchesSiteName && matchesStatus && matchesYear && matchesMonth && matchesCustomRange;
     });
+
+    const clearFilters = () => {
+        setFilters({ 
+            siteName: '', 
+            status: '',
+            year: new Date().getFullYear().toString(),
+            month: 'all',
+            startDate: '',
+            endDate: ''
+        });
+        setSearchQuery('');
+    };
+
+    const siteOptions = useMemo(() => {
+        const sites = new Set(records.map(r => r.siteName));
+        siteDefaults.forEach(s => sites.add(s.siteName));
+        return Array.from(sites).sort();
+    }, [records, siteDefaults]);
 
     const totalPages = Math.ceil(filteredRecords.length / rowsPerPage);
     const paginatedRecords = filteredRecords.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
@@ -422,7 +484,14 @@ const SiteFinanceTracker: React.FC = () => {
 
     // Clear column filters and selection when switching sub-tabs
     useEffect(() => {
-        setFilters({ siteName: '', status: '' });
+        setFilters({ 
+            siteName: '', 
+            status: '',
+            year: new Date().getFullYear().toString(),
+            month: 'all',
+            startDate: '',
+            endDate: ''
+        });
         setSelectedIds(new Set());
     }, [activeSubTab]);
 
@@ -448,20 +517,107 @@ const SiteFinanceTracker: React.FC = () => {
         <div className="space-y-6 w-full px-4">
 
             {/* ── Action Bar ── */}
-            <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-200 shadow-sm p-4 md:p-5">
+            <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-200 shadow-sm p-4 md:p-5 space-y-4">
+                {/* Row 1: Primary Search & Site Selector */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+                    <div className="flex flex-1 items-center gap-3 w-full">
+                        <div className="relative flex-1 md:max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50 md:text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search site or company..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full h-11 pl-10 pr-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-xl text-sm text-white md:text-gray-900 placeholder-emerald-500/30 md:placeholder-gray-400 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 focus:ring-2 focus:ring-[#00D27F]/20 transition-all shadow-sm"
+                            />
+                        </div>
+                        <select
+                            value={filters.siteName}
+                            onChange={(e) => setFilters(prev => ({ ...prev, siteName: e.target.value }))}
+                            className="h-11 px-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-xl text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 transition-all font-semibold min-w-[140px] md:min-w-[180px] shadow-sm cursor-pointer"
+                        >
+                            <option value="">All Sites</option>
+                            {siteOptions.map(site => (
+                                <option key={site} value={site}>{site}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <button
+                        onClick={() => navigate('/finance/site-tracker/add')}
+                        className="whitespace-nowrap h-11 inline-flex items-center justify-center gap-2 px-6 py-2 text-sm font-bold text-[#041b0f] md:text-white bg-[#00D27F] md:bg-emerald-600 rounded-xl hover:bg-[#00b86e] md:hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 w-full md:w-auto"
+                    >
+                        <Plus className="h-4 w-4" />
+                        <span>Add Site</span>
+                    </button>
+                </div>
+
+                {/* Row 2: Secondary Filters & Utilities */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-4 border-t border-white/5 md:border-gray-100">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <select
+                            value={filters.year}
+                            onChange={(e) => setFilters(prev => ({ ...prev, year: e.target.value }))}
+                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-xs md:text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] transition-all font-semibold cursor-pointer"
+                        >
+                            <option value="all">All Years</option>
+                            {Array.from({ length: 5 }, (_, i) => {
+                                const year = new Date().getFullYear() - i;
+                                return <option key={year} value={year.toString()}>{year}</option>;
+                            })}
+                        </select>
+
+                        <select
+                            value={filters.month}
+                            onChange={(e) => setFilters(prev => ({ ...prev, month: e.target.value }))}
+                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-xs md:text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] transition-all font-semibold cursor-pointer"
+                        >
+                            <option value="all">All Months</option>
+                            {Array.from({ length: 12 }, (_, i) => {
+                                const date = new Date(2000, i, 1);
+                                return <option key={i + 1} value={(i + 1).toString()}>{format(date, 'MMMM')}</option>;
+                            })}
+                        </select>
+
+                        <div className="flex items-center gap-1 bg-[#041b0f] md:bg-gray-50 p-1 rounded-lg border border-white/10 md:border-gray-200">
+                            <input
+                                type="date"
+                                value={filters.startDate}
+                                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                                className="h-8 px-2 bg-transparent text-[10px] text-white md:text-gray-900 focus:outline-none font-semibold cursor-pointer"
+                                title="Start Date"
+                            />
+                            <span className="text-white/30 md:text-gray-400 text-xs">-</span>
+                            <input
+                                type="date"
+                                value={filters.endDate}
+                                onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                                className="h-8 px-2 bg-transparent text-[10px] text-white md:text-gray-900 focus:outline-none font-semibold cursor-pointer"
+                                title="End Date"
+                            />
+                        </div>
+                        
+                        <button
+                            onClick={clearFilters}
+                            className="h-10 w-10 flex items-center justify-center text-rose-400 hover:text-rose-500 bg-white/5 md:bg-rose-50 border border-white/10 md:border-rose-100 rounded-lg transition-all hover:scale-105 active:scale-95"
+                            title="Clear All Filters"
+                        >
+                            <FilterX className="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 scrollbar-hide">
                         <button
                             onClick={handleDownloadTemplate}
                             disabled={isExporting}
-                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs font-semibold text-emerald-400 md:text-gray-600 bg-white/5 md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg hover:bg-white/10 md:hover:bg-gray-100 transition-all disabled:opacity-50"
+                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-emerald-400 md:text-emerald-700 bg-emerald-500/10 md:bg-emerald-50 border border-emerald-500/20 md:border-emerald-100 rounded-lg hover:bg-emerald-500/20 md:hover:bg-emerald-100 transition-all disabled:opacity-50"
                         >
                             {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                             Template
                         </button>
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs font-semibold text-emerald-400 md:text-gray-600 bg-white/5 md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg hover:bg-white/10 md:hover:bg-gray-100 transition-all"
+                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-amber-400 md:text-amber-700 bg-amber-500/10 md:bg-amber-50 border border-amber-500/20 md:border-amber-100 rounded-lg hover:bg-amber-500/20 md:hover:bg-amber-100 transition-all"
                         >
                             <Upload className="h-3.5 w-3.5" />
                             Import
@@ -469,35 +625,10 @@ const SiteFinanceTracker: React.FC = () => {
                         <button
                             onClick={handleExport}
                             disabled={isExporting}
-                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs font-semibold text-emerald-400 md:text-gray-600 bg-white/5 md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg hover:bg-white/10 md:hover:bg-gray-100 transition-all disabled:opacity-50"
+                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-blue-400 md:text-blue-700 bg-blue-500/10 md:bg-blue-50 border border-blue-500/20 md:border-blue-100 rounded-lg hover:bg-blue-500/20 md:hover:bg-blue-100 transition-all disabled:opacity-50"
                         >
                             <FileSpreadsheet className="h-3.5 w-3.5" />
                             Export
-                        </button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="relative flex-1 md:w-64">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50" />
-                            <input
-                                type="text"
-                                placeholder="Search site..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full h-10 pl-9 pr-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-sm text-white md:text-gray-900 placeholder-emerald-500/30 md:placeholder-gray-400 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 focus:ring-1 focus:ring-[#00D27F] transition-all"
-                            />
-                        </div>
-                        <input
-                            type="month"
-                            value={billingMonth.substring(0, 7)}
-                            onChange={(e) => setBillingMonth(e.target.value + '-01')}
-                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 transition-all"
-                        />
-                        <button
-                            onClick={() => navigate('/finance/site-tracker/add')}
-                            className="whitespace-nowrap h-10 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-[#041b0f] md:text-white bg-[#00D27F] md:bg-emerald-600 rounded-lg hover:bg-[#00b86e] md:hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 md:shadow-none"
-                        >
-                            <Plus className="h-4 w-4" />
-                            <span className="hidden xs:inline">Add Site</span>
                         </button>
                     </div>
                 </div>
@@ -561,7 +692,7 @@ const SiteFinanceTracker: React.FC = () => {
                                 <p className="text-[10px] md:text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Total Records</p>
                                 <h3 className="text-lg md:text-xl font-bold text-white md:text-gray-900 mt-1.5">{records.length}</h3>
                                 <p className="text-[9px] md:text-[10px] font-medium text-emerald-400/50 md:text-gray-400 mt-1">
-                                    For {format(new Date(billingMonth), 'MMM yyyy')}
+                                    For {format(new Date(Number(filters.year), Number(filters.month) - 1, 1), 'MMM yyyy')}
                                 </p>
                             </div>
                             <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white/5 md:bg-gray-50 flex items-center justify-center border border-white/10 md:border-gray-100">
@@ -752,11 +883,26 @@ const SiteFinanceTracker: React.FC = () => {
                                                 <td className="px-5 py-3.5">
                                                     <div className="font-bold text-white md:text-gray-900 text-sm">{record.siteName}</div>
                                                     <div className="text-[10px] text-emerald-400/30 md:text-gray-500 mt-1 font-bold uppercase tracking-wider">{record.companyName || '—'}</div>
-                                                    {activeSubTab === 'log' && record.billingMonth && (
-                                                        <div className="text-[10px] text-[#00D27F] font-black mt-1.5 uppercase tracking-tighter">
-                                                            For {format(new Date(record.billingMonth), 'MMM yyyy')}
-                                                        </div>
-                                                    )}
+                                                    
+                                                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                                        {activeSubTab === 'log' && record.billingMonth && (
+                                                            <div className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 md:bg-emerald-50 border border-emerald-500/20 md:border-emerald-100 text-[#00D27F] md:text-emerald-700 font-black uppercase tracking-tighter">
+                                                                For {format(parseISO(record.billingMonth), 'MMM yyyy')}
+                                                            </div>
+                                                        )}
+                                                        {record.revisionCount && record.revisionCount > 0 ? (
+                                                            <button 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setRevisionModal({ isOpen: true, recordId: record.id, siteName: record.siteName });
+                                                                }}
+                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/10 md:bg-blue-50 text-blue-400 md:text-blue-600 border border-blue-500/20 md:border-blue-100 text-[10px] font-bold uppercase tracking-tighter hover:bg-blue-500/20 md:hover:bg-blue-100 transition-colors cursor-pointer"
+                                                            >
+                                                                <RotateCcw className="h-2.5 w-2.5" />
+                                                                Revised ({record.revisionCount})
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
                                                 </td>
 
                                                 {activeSubTab === 'active' ? (
@@ -1014,6 +1160,13 @@ const SiteFinanceTracker: React.FC = () => {
 
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
 
+            <RevisionHistoryModal
+                isOpen={revisionModal.isOpen}
+                onClose={() => setRevisionModal({ ...revisionModal, isOpen: false })}
+                recordId={revisionModal.recordId}
+                siteName={revisionModal.siteName}
+                trackerType="finance"
+            />
             {/* ── Import Preview Modal ── */}
             {previewData.length > 0 && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">

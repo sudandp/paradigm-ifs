@@ -1782,6 +1782,17 @@ export interface SiteInvoiceRecord {
   deletedBy?: string;
   deletedByName?: string;
   deletedReason?: string;
+  revisionCount?: number;
+}
+
+export interface RevisionLog {
+  id: string;
+  recordId: string;
+  revisedBy?: string;
+  revisedByName?: string;
+  revisedAt: string;
+  diff: Record<string, { old: any; new: any }>;
+  revisionNumber: number;
 }
 
 export interface SiteInvoiceDefault {
@@ -1825,6 +1836,7 @@ export interface SiteFinanceRecord {
   deletedBy?: string;
   deletedByName?: string;
   deletedReason?: string;
+  revisionCount?: number;
 }
 
 // =============================================

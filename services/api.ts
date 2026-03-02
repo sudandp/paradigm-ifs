@@ -11,8 +11,9 @@ import type {
   BiometricDevice, ChecklistTemplate, FieldReport, FieldAttendanceViolation,
   NotificationRule, NotificationType, Company, GmcPolicySettings, StaffAttendanceRules,
   GmcSubmission, UserHoliday, AttendanceUnlockRequest, LeaveType, SiteAttendanceRecord, SiteInvoiceRecord, SiteInvoiceDefault, SiteFinanceRecord,
-  CommunicationLog
+  CommunicationLog, RevisionLog
 } from '../types';
+import { getObjectDiff } from '../utils/diff';
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { 
   differenceInCalendarDays, format, startOfMonth, endOfMonth, 
@@ -382,17 +383,41 @@ export const api = {
   },
 
   saveSiteInvoiceRecord: async (record: Partial<SiteInvoiceRecord>): Promise<SiteInvoiceRecord> => {
-    const { id, sNo, createdAt, updatedAt, ...rest } = record;
+    const { id, sNo, createdAt, updatedAt, revisionCount, ...rest } = record;
     const dbData = toSnakeCase(rest);
     let query;
     if (id) {
+      // Fetch the existing record for diff comparison
+      const { data: existingRaw } = await supabase.from('site_invoice_tracker').select('*').eq('id', id).single();
+      const existingRecord = existingRaw ? toCamelCase(existingRaw) : null;
+
       query = supabase.from('site_invoice_tracker').update(dbData).eq('id', id);
+      const { data, error } = await query.select().single();
+      if (error) throw error;
+
+      // Log revision if there are differences
+      if (existingRecord) {
+        const diff = getObjectDiff(existingRecord, toCamelCase(data));
+        if (Object.keys(diff).length > 0) {
+          const newRevisionNumber = (existingRecord.revisionCount || 0) + 1;
+          await supabase.from('site_invoice_revisions').insert({
+            record_id: id,
+            revised_by: record.createdBy || null,
+            revised_by_name: record.createdByName || 'Unknown',
+            diff: diff,
+            revision_number: newRevisionNumber
+          });
+          // Update revision count on the main record
+          await supabase.from('site_invoice_tracker').update({ revision_count: newRevisionNumber }).eq('id', id);
+        }
+      }
+      return toCamelCase(data);
     } else {
       query = supabase.from('site_invoice_tracker').insert(dbData);
+      const { data, error } = await query.select().single();
+      if (error) throw error;
+      return toCamelCase(data);
     }
-    const { data, error } = await query.select().single();
-    if (error) throw error;
-    return toCamelCase(data);
   },
 
   softDeleteSiteInvoiceRecord: async (id: string, reason: string, userId: string, userName: string): Promise<void> => {
@@ -455,6 +480,27 @@ export const api = {
   bulkPermanentlyDeleteSiteInvoiceRecords: async (ids: string[]): Promise<void> => {
     const { error } = await supabase.from('site_invoice_tracker').delete().in('id', ids);
     if (error) throw error;
+  },
+
+  // --- Revision History ---
+  getSiteInvoiceRevisions: async (recordId: string): Promise<RevisionLog[]> => {
+    const { data, error } = await supabase
+      .from('site_invoice_revisions')
+      .select('*')
+      .eq('record_id', recordId)
+      .order('revision_number', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
+
+  getSiteFinanceRevisions: async (recordId: string): Promise<RevisionLog[]> => {
+    const { data, error } = await supabase
+      .from('site_finance_revisions')
+      .select('*')
+      .eq('record_id', recordId)
+      .order('revision_number', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
   },
 
   // --- Site Invoice Defaults (Auto-fill templates) ---
@@ -4535,6 +4581,14 @@ export const api = {
     const dbRecord = toSnakeCase(record);
     // Omit generated columns before upsert
     delete dbRecord.total_billed_amount;
+    delete dbRecord.revision_count;
+
+    // Check if this is an update (has id) for revision tracking
+    let existingRecord: any = null;
+    if (record.id) {
+      const { data: existingRaw } = await supabase.from('site_finance_tracker').select('*').eq('id', record.id).single();
+      existingRecord = existingRaw ? toCamelCase(existingRaw) : null;
+    }
     
     const { data, error } = await supabase
       .from('site_finance_tracker')
@@ -4543,6 +4597,23 @@ export const api = {
       .single();
 
     if (error) throw error;
+
+    // Log revision if updating and there are differences
+    if (existingRecord && record.id) {
+      const diff = getObjectDiff(existingRecord, toCamelCase(data));
+      if (Object.keys(diff).length > 0) {
+        const newRevisionNumber = (existingRecord.revisionCount || 0) + 1;
+        await supabase.from('site_finance_revisions').insert({
+          record_id: record.id,
+          revised_by: record.updatedBy || record.createdBy || null,
+          revised_by_name: record.updatedByName || record.createdByName || 'Unknown',
+          diff: diff,
+          revision_number: newRevisionNumber
+        });
+        await supabase.from('site_finance_tracker').update({ revision_count: newRevisionNumber }).eq('id', record.id);
+      }
+    }
+
     return toCamelCase(data);
   },
 

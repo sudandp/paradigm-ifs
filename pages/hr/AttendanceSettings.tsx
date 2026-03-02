@@ -151,17 +151,39 @@ const AttendanceSettings: React.FC = () => {
 
         const pool = [...(currentRules.holidayPool || HOLIDAY_SELECTION_POOL)];
         pool.push({ name: newPoolHolidayName, date: datePart });
+        pool.sort((a, b) => a.date.localeCompare(b.date));
         
-        handleSettingChange('holidayPool', pool);
-        setNewPoolHolidayName('');
-        setNewPoolHolidayDate('');
-    };
-
-    const handleRemovePoolHoliday = (index: number) => {
-        const pool = [...(currentRules.holidayPool || HOLIDAY_SELECTION_POOL)];
-        pool.splice(index, 1);
-        handleSettingChange('holidayPool', pool);
-    };
+            // Apply changes globaly to all categories so the pool is synced everywhere
+            setLocalAttendance(prev => {
+                const updated = { ...prev };
+                const categories = ['office', 'field', 'site', 'admin', 'management'] as const;
+                categories.forEach(cat => {
+                    if (updated[cat]) {
+                        updated[cat] = { ...updated[cat], holidayPool: pool };
+                    }
+                });
+                return updated;
+            });
+            
+            setNewPoolHolidayName('');
+            setNewPoolHolidayDate('');
+        };
+    
+        const handleRemovePoolHoliday = (index: number) => {
+            const pool = [...(currentRules.holidayPool || HOLIDAY_SELECTION_POOL)];
+            pool.splice(index, 1);
+            
+            setLocalAttendance(prev => {
+                const updated = { ...prev };
+                const categories = ['office', 'field', 'site', 'admin', 'management'] as const;
+                categories.forEach(cat => {
+                    if (updated[cat]) {
+                        updated[cat] = { ...updated[cat], holidayPool: pool };
+                    }
+                });
+                return updated;
+            });
+        };
 
     const handleEditPoolHoliday = (index: number) => {
         const pool = [...(currentRules.holidayPool || HOLIDAY_SELECTION_POOL)];
@@ -178,8 +200,19 @@ const AttendanceSettings: React.FC = () => {
 
         const pool = [...(currentRules.holidayPool || HOLIDAY_SELECTION_POOL)];
         pool[editingPoolIndex] = { name: newPoolHolidayName, date: dateStr };
+        pool.sort((a, b) => a.date.localeCompare(b.date));
         
-        handleSettingChange('holidayPool', pool);
+        setLocalAttendance(prev => {
+            const updated = { ...prev };
+            const categories = ['office', 'field', 'site', 'admin', 'management'] as const;
+            categories.forEach(cat => {
+                if (updated[cat]) {
+                    updated[cat] = { ...updated[cat], holidayPool: pool };
+                }
+            });
+            return updated;
+        });
+
         setNewPoolHolidayName('');
         setNewPoolHolidayDate('');
         setEditingPoolIndex(null);

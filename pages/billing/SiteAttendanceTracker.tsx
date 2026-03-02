@@ -5,9 +5,10 @@ import { saveAs } from 'file-saver';
 import { api } from '../../services/api';
 import type { SiteInvoiceRecord, SiteInvoiceDefault } from '../../types';
 import { format, differenceInCalendarDays, parseISO, isBefore, isToday, startOfDay, subDays } from 'date-fns';
-import { Loader2, Plus, Trash2, Edit2, ClipboardList, CheckCircle2, Clock, Mail, AlertTriangle, Building2, Building, Download, Upload, FileSpreadsheet, X, Search, RotateCcw, ShieldX, Info, AlertCircle } from 'lucide-react';
+import { Loader2, Plus, Trash2, Edit2, ClipboardList, CheckCircle2, Clock, Mail, AlertTriangle, Building2, Building, Download, Upload, FileSpreadsheet, X, Search, RotateCcw, ShieldX, Info, AlertCircle, FilterX } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Toast from '../../components/ui/Toast';
+import RevisionHistoryModal from '../../components/modals/RevisionHistoryModal';
 
 const SiteAttendanceTracker: React.FC = () => {
     const navigate = useNavigate();
@@ -19,10 +20,30 @@ const SiteAttendanceTracker: React.FC = () => {
     const [isImporting, setIsImporting] = useState(false);
     const [siteDefaults, setSiteDefaults] = useState<SiteInvoiceDefault[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [revisionModal, setRevisionModal] = useState<{ isOpen: boolean; recordId: string; siteName: string }>({ isOpen: false, recordId: '', siteName: '' });
 
     // Filter & Pagination State
     const [searchQuery, setSearchQuery] = useState('');
-    const [filters, setFilters] = useState({ siteName: '', status: '' });
+    const [filters, setFilters] = useState({ 
+        siteName: '', 
+        status: '',
+        year: new Date().getFullYear().toString(),
+        month: 'all',
+        startDate: '',
+        endDate: ''
+    });
+
+    const clearFilters = () => {
+        setFilters({ 
+            siteName: '', 
+            status: '',
+            year: new Date().getFullYear().toString(),
+            month: 'all',
+            startDate: '',
+            endDate: ''
+        });
+        setSearchQuery('');
+    };
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -361,6 +382,12 @@ const SiteAttendanceTracker: React.FC = () => {
     // --- Filter & Stats ---
     const currentRecords = activeSubTab === 'active' ? records : deletedRecords;
 
+    const siteOptions = useMemo(() => {
+        const sites = new Set(records.map(r => r.siteName));
+        siteDefaults.forEach(s => sites.add(s.siteName));
+        return Array.from(sites).sort();
+    }, [records, siteDefaults]);
+
     const filteredRecords = useMemo(() => {
         return currentRecords.filter(r => {
             const matchesSearch = r.siteName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -374,7 +401,26 @@ const SiteAttendanceTracker: React.FC = () => {
                 return filters.status === 'sent' ? isSent : !isSent;
             })();
 
-            return matchesSearch && matchesSiteName && matchesStatus;
+            // Date filtering (based on createdAt)
+            const recordDate = r.createdAt ? parseISO(r.createdAt) : null;
+            const matchesYear = filters.year === 'all' || (recordDate && recordDate.getFullYear().toString() === filters.year);
+            const matchesMonth = filters.month === 'all' || (recordDate && (recordDate.getMonth() + 1).toString() === filters.month);
+
+            // Custom Date Range
+            let matchesCustomRange = true;
+            if (recordDate) {
+                const dateOnly = startOfDay(recordDate);
+                if (filters.startDate) {
+                    matchesCustomRange = matchesCustomRange && (dateOnly >= startOfDay(parseISO(filters.startDate)));
+                }
+                if (filters.endDate) {
+                    matchesCustomRange = matchesCustomRange && (dateOnly <= startOfDay(parseISO(filters.endDate)));
+                }
+            } else if (filters.startDate || filters.endDate) {
+                matchesCustomRange = false;
+            }
+
+            return matchesSearch && matchesSiteName && matchesStatus && matchesYear && matchesMonth && matchesCustomRange;
         });
     }, [currentRecords, searchQuery, filters]);
 
@@ -416,7 +462,14 @@ const SiteAttendanceTracker: React.FC = () => {
     }, [searchQuery, filters, activeSubTab]);
 
     useEffect(() => {
-        setFilters({ siteName: '', status: '' });
+        setFilters({ 
+            siteName: '', 
+            status: '',
+            year: new Date().getFullYear().toString(),
+            month: 'all',
+            startDate: '',
+            endDate: ''
+        });
         setSelectedIds(new Set());
     }, [activeSubTab]);
 
@@ -425,20 +478,107 @@ const SiteAttendanceTracker: React.FC = () => {
     return (
         <div className="space-y-6 w-full px-4">
             {/* ── Action Bar ── */}
-            <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-200 shadow-sm p-4 md:p-5">
+            <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-200 shadow-sm p-4 md:p-5 space-y-4">
+                {/* Row 1: Primary Search & Site Selector */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+                    <div className="flex flex-1 items-center gap-3 w-full">
+                        <div className="relative flex-1 md:max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50 md:text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search site or company..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full h-11 pl-10 pr-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-xl text-sm text-white md:text-gray-900 placeholder-emerald-500/30 md:placeholder-gray-400 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 focus:ring-2 focus:ring-[#00D27F]/20 transition-all shadow-sm"
+                            />
+                        </div>
+                        <select
+                            value={filters.siteName}
+                            onChange={(e) => setFilters(prev => ({ ...prev, siteName: e.target.value }))}
+                            className="h-11 px-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-xl text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 transition-all font-semibold min-w-[140px] md:min-w-[180px] shadow-sm cursor-pointer"
+                        >
+                            <option value="">All Sites</option>
+                            {siteOptions.map(site => (
+                                <option key={site} value={site}>{site}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <button
+                        onClick={() => navigate('/finance/attendance/add')}
+                        className="whitespace-nowrap h-11 inline-flex items-center justify-center gap-2 px-6 py-2 text-sm font-bold text-[#041b0f] md:text-white bg-[#00D27F] md:bg-emerald-600 rounded-xl hover:bg-[#00b86e] md:hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 w-full md:w-auto"
+                    >
+                        <Plus className="h-4 w-4" />
+                        <span>New Entry</span>
+                    </button>
+                </div>
+
+                {/* Row 2: Advanced Filters & Utilities */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-4 border-t border-white/5 md:border-gray-100">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <select
+                            value={filters.year}
+                            onChange={(e) => setFilters(prev => ({ ...prev, year: e.target.value }))}
+                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-xs md:text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] transition-all font-semibold cursor-pointer"
+                        >
+                            <option value="all">All Years</option>
+                            {Array.from({ length: 5 }, (_, i) => {
+                                const year = new Date().getFullYear() - i;
+                                return <option key={year} value={year.toString()}>{year}</option>;
+                            })}
+                        </select>
+
+                        <select
+                            value={filters.month}
+                            onChange={(e) => setFilters(prev => ({ ...prev, month: e.target.value }))}
+                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-xs md:text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] transition-all font-semibold cursor-pointer"
+                        >
+                            <option value="all">All Months</option>
+                            {Array.from({ length: 12 }, (_, i) => {
+                                const date = new Date(2000, i, 1);
+                                return <option key={i + 1} value={(i + 1).toString()}>{format(date, 'MMMM')}</option>;
+                            })}
+                        </select>
+
+                        <div className="flex items-center gap-1 bg-[#041b0f] md:bg-gray-50 p-1 rounded-lg border border-white/10 md:border-gray-200">
+                            <input
+                                type="date"
+                                value={filters.startDate}
+                                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                                className="h-8 px-2 bg-transparent text-[10px] text-white md:text-gray-900 focus:outline-none font-semibold cursor-pointer"
+                                title="Start Date"
+                            />
+                            <span className="text-white/30 md:text-gray-400 text-xs">-</span>
+                            <input
+                                type="date"
+                                value={filters.endDate}
+                                onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                                className="h-8 px-2 bg-transparent text-[10px] text-white md:text-gray-900 focus:outline-none font-semibold cursor-pointer"
+                                title="End Date"
+                            />
+                        </div>
+
+                        <button
+                            onClick={clearFilters}
+                            className="h-10 w-10 flex items-center justify-center text-rose-400 hover:text-rose-500 bg-white/5 md:bg-rose-50 border border-white/10 md:border-rose-100 rounded-lg transition-all hover:scale-105 active:scale-95"
+                            title="Clear All Filters"
+                        >
+                            <FilterX className="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 scrollbar-hide">
                         <button
                             onClick={handleDownloadTemplate}
                             disabled={isExporting}
-                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs font-semibold text-emerald-400 md:text-gray-600 bg-white/5 md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg hover:bg-white/10 md:hover:bg-gray-100 transition-all disabled:opacity-50"
+                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-emerald-400 md:text-emerald-700 bg-emerald-500/10 md:bg-emerald-50 border border-emerald-500/20 md:border-emerald-100 rounded-lg hover:bg-emerald-500/20 md:hover:bg-emerald-100 transition-all disabled:opacity-50"
                         >
                             <Download className="h-3.5 w-3.5" />
                             Template
                         </button>
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs font-semibold text-emerald-400 md:text-gray-600 bg-white/5 md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg hover:bg-white/10 md:hover:bg-gray-100 transition-all"
+                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-amber-400 md:text-amber-700 bg-amber-500/10 md:bg-amber-50 border border-amber-500/20 md:border-amber-100 rounded-lg hover:bg-amber-500/20 md:hover:bg-amber-100 transition-all"
                         >
                             <Upload className="h-3.5 w-3.5" />
                             Import
@@ -446,30 +586,10 @@ const SiteAttendanceTracker: React.FC = () => {
                         <button
                             onClick={handleExport}
                             disabled={isExporting}
-                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-3 md:px-4 py-2 text-xs font-semibold text-emerald-400 md:text-gray-600 bg-white/5 md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg hover:bg-white/10 md:hover:bg-gray-100 transition-all disabled:opacity-50"
+                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-blue-400 md:text-blue-700 bg-blue-500/10 md:bg-blue-50 border border-blue-500/20 md:border-blue-100 rounded-lg hover:bg-blue-500/20 md:hover:bg-blue-100 transition-all disabled:opacity-50"
                         >
                             <FileSpreadsheet className="h-3.5 w-3.5" />
                             Export
-                        </button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="relative flex-1 md:w-64">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50 md:text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search site..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full h-10 pl-9 pr-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-sm text-white md:text-gray-900 placeholder-emerald-500/30 md:placeholder-gray-400 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 focus:ring-1 focus:ring-[#00D27F] transition-all"
-                            />
-                        </div>
-                        <button
-                            onClick={() => navigate('/finance/attendance/add')}
-                            className="whitespace-nowrap h-10 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-[#041b0f] md:text-white bg-[#00D27F] md:bg-emerald-600 rounded-lg hover:bg-[#00b86e] md:hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 md:shadow-none"
-                        >
-                            <Plus className="h-4 w-4" />
-                            <span className="hidden xs:inline">New Entry</span>
-                            <span className="xs:hidden">Add</span>
                         </button>
                     </div>
                 </div>
@@ -718,7 +838,21 @@ const SiteAttendanceTracker: React.FC = () => {
                                                 <td className="px-5 py-3.5">
                                                     <div className="font-bold text-white md:text-gray-900 text-sm">{record.siteName}</div>
                                                     <div className="text-[11px] text-emerald-400/50 md:text-gray-500 mt-0.5">{record.companyName || '—'}</div>
-                                                    {record.billingCycle && <div className="inline-block mt-1.5 px-1.5 py-0.5 rounded bg-emerald-500/10 md:bg-gray-100 text-[#00D27F] md:text-gray-600 text-[10px] font-black uppercase tracking-tighter border border-emerald-500/20 md:border-gray-200">{record.billingCycle}</div>}
+                                                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                                        {record.billingCycle && <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-500/10 md:bg-gray-100 text-[#00D27F] md:text-gray-600 text-[10px] font-black uppercase tracking-tighter border border-emerald-500/20 md:border-gray-200">{record.billingCycle}</span>}
+                                                        {record.revisionCount && record.revisionCount > 0 ? (
+                                                            <button 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setRevisionModal({ isOpen: true, recordId: record.id, siteName: record.siteName });
+                                                                }}
+                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/10 md:bg-blue-50 text-blue-400 md:text-blue-600 border border-blue-500/20 md:border-blue-100 text-[10px] font-bold uppercase tracking-tighter hover:bg-blue-500/20 md:hover:bg-blue-100 transition-colors cursor-pointer"
+                                                            >
+                                                                <RotateCcw className="h-2.5 w-2.5" />
+                                                                Revised ({record.revisionCount})
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-3.5 hidden md:table-cell">
                                                     <div className="text-xs text-emerald-400 md:text-gray-600 font-medium">Ops: {record.opsIncharge || '—'}</div>
@@ -1185,6 +1319,14 @@ const SiteAttendanceTracker: React.FC = () => {
             )}
 
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
+
+            <RevisionHistoryModal
+                isOpen={revisionModal.isOpen}
+                onClose={() => setRevisionModal({ ...revisionModal, isOpen: false })}
+                recordId={revisionModal.recordId}
+                siteName={revisionModal.siteName}
+                trackerType="attendance"
+            />
         </div>
     );
 };
