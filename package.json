@@ -78,7 +78,7 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "vite": "^7.2.4",
-    "vite-plugin-pwa": "^0.19.8",
+    "vite-plugin-pwa": "^1.2.0",
     "yargs": "^18.0.0"
   },
   "overrides": {
@@ -106,6 +106,7 @@
     "jake": "^10.9.4",
     "replace": "^1.2.2",
     "readdir-glob": "^2.0.1",
-    "filelist": "^1.0.4"
+    "filelist": "^1.0.4",
+    "serialize-javascript": "^7.0.3"
   }
 }
