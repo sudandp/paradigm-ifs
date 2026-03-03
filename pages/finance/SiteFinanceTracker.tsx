@@ -518,42 +518,8 @@ const SiteFinanceTracker: React.FC = () => {
 
             {/* ── Action Bar ── */}
             <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-200 shadow-sm p-4 md:p-5 space-y-4">
-                {/* Row 1: Primary Search & Site Selector */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex flex-1 items-center gap-3 w-full">
-                        <div className="relative flex-1 md:max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50 md:text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search site or company..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full h-11 pl-10 pr-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-xl text-sm text-white md:text-gray-900 placeholder-emerald-500/30 md:placeholder-gray-400 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 focus:ring-2 focus:ring-[#00D27F]/20 transition-all shadow-sm"
-                            />
-                        </div>
-                        <select
-                            value={filters.siteName}
-                            onChange={(e) => setFilters(prev => ({ ...prev, siteName: e.target.value }))}
-                            className="h-11 px-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-xl text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 transition-all font-semibold min-w-[140px] md:min-w-[180px] shadow-sm cursor-pointer"
-                        >
-                            <option value="">All Sites</option>
-                            {siteOptions.map(site => (
-                                <option key={site} value={site}>{site}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <button
-                        onClick={() => navigate('/finance/site-tracker/add')}
-                        className="whitespace-nowrap h-11 inline-flex items-center justify-center gap-2 px-6 py-2 text-sm font-bold text-[#041b0f] md:text-white bg-[#00D27F] md:bg-emerald-600 rounded-xl hover:bg-[#00b86e] md:hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 w-full md:w-auto"
-                    >
-                        <Plus className="h-4 w-4" />
-                        <span>Add Site</span>
-                    </button>
-                </div>
-
-                {/* Row 2: Secondary Filters & Utilities */}
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-4 border-t border-white/5 md:border-gray-100">
+                {/* Row 1: Primary Filters & Utilities */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div className="flex flex-wrap items-center gap-2">
                         <select
                             value={filters.year}
@@ -577,6 +543,16 @@ const SiteFinanceTracker: React.FC = () => {
                                 const date = new Date(2000, i, 1);
                                 return <option key={i + 1} value={(i + 1).toString()}>{format(date, 'MMMM')}</option>;
                             })}
+                        </select>
+
+                        <select
+                            value={filters.status}
+                            onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-xs md:text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] transition-all font-semibold cursor-pointer"
+                        >
+                            <option value="">All Status</option>
+                            <option value="profit">Profit</option>
+                            <option value="loss">Loss</option>
                         </select>
 
                         <div className="flex items-center gap-1 bg-[#041b0f] md:bg-gray-50 p-1 rounded-lg border border-white/10 md:border-gray-200">
@@ -632,16 +608,50 @@ const SiteFinanceTracker: React.FC = () => {
                         </button>
                     </div>
                 </div>
+
+                {/* Row 2: Search, Site Selector & Add Button */}
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-white/5 md:border-gray-100">
+                    <div className="flex flex-1 items-center gap-3 min-w-[300px]">
+                        <div className="relative flex-1 md:max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50 md:text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search site or company..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full h-11 pl-10 pr-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-xl text-sm text-white md:text-gray-900 placeholder-emerald-500/30 md:placeholder-gray-400 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 focus:ring-2 focus:ring-[#00D27F]/20 transition-all shadow-sm"
+                            />
+                        </div>
+                        <select
+                            value={filters.siteName}
+                            onChange={(e) => setFilters(prev => ({ ...prev, siteName: e.target.value }))}
+                            className="h-11 px-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-xl text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 transition-all font-semibold min-w-[140px] md:min-w-[180px] shadow-sm cursor-pointer"
+                        >
+                            <option value="">All Sites</option>
+                            {siteOptions.map(site => (
+                                <option key={site} value={site}>{site}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <button
+                        onClick={() => navigate('/finance/site-tracker/add')}
+                        className="whitespace-nowrap h-11 inline-flex items-center justify-center gap-2 px-6 py-2 text-sm font-bold text-[#041b0f] md:text-white bg-[#00D27F] md:bg-emerald-600 rounded-xl hover:bg-[#00b86e] md:hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 w-full md:w-auto"
+                    >
+                        <Plus className="h-4 w-4" />
+                        <span>Add Site</span>
+                    </button>
+                </div>
             </div>
 
             {/* ── KPI Summary Cards ── */}
             {!isLoading && (
-                <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Total Variation */}
                     <div className={`rounded-xl border p-4 md:p-5 transition-all duration-150 shadow-sm ${totalBillingVariation >= 0 ? 'bg-emerald-500/10 md:bg-white border-emerald-500/20 md:border-emerald-100' : 'bg-rose-500/10 md:bg-white border-rose-500/20 md:border-rose-100'}`}>
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-[10px] md:text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Total Variation</p>
+                                <p className="text-[10px] md:text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Turnover variations</p>
                                 <h3 className={`text-lg md:text-xl font-bold mt-1.5 ${totalBillingVariation >= 0 ? 'text-emerald-400 md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`}>{formatCurrency(totalBillingVariation)}</h3>
                                 <p className={`text-[9px] md:text-[10px] font-medium mt-1 ${totalBillingVariation >= 0 ? 'text-emerald-500/80' : 'text-rose-500/80'}`}>
                                     {totalBillingVariation >= 0 ? '↑' : '↓'} Billing difference
@@ -657,7 +667,7 @@ const SiteFinanceTracker: React.FC = () => {
                     <div className={`rounded-xl border p-4 md:p-5 transition-all duration-150 shadow-sm ${totalFeeVariation >= 0 ? 'bg-emerald-500/10 md:bg-white border-emerald-500/20 md:border-emerald-100' : 'bg-rose-500/10 md:bg-white border-rose-500/20 md:border-rose-100'}`}>
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-[10px] md:text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Fee Variation</p>
+                                <p className="text-[10px] md:text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Management fee variations</p>
                                 <h3 className={`text-lg md:text-xl font-bold mt-1.5 ${totalFeeVariation >= 0 ? 'text-emerald-400 md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`}>{formatCurrency(totalFeeVariation)}</h3>
                                 <p className={`text-[9px] md:text-[10px] font-medium mt-1 ${totalFeeVariation >= 0 ? 'text-emerald-500/80' : 'text-rose-500/80'}`}>
                                     {totalFeeVariation >= 0 ? '↑' : '↓'} Fee difference
@@ -729,21 +739,7 @@ const SiteFinanceTracker: React.FC = () => {
                         </button>
                     </div>
 
-                    {!isLoading && currentRecords.length > 0 && (
-                        <div className="flex flex-1 items-center justify-end gap-3 w-full sm:w-auto">
-                            <div className="relative flex-1 max-w-xs">
-                                <input
-                                    type="text"
-                                    placeholder="Quick search..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full h-9 pl-9 pr-3 text-sm bg-[#041b0f] md:bg-white border border-white/10 md:border-gray-200 rounded-xl focus:border-[#00D27F] md:focus:border-emerald-500 outline-none transition-all placeholder:text-emerald-800 md:placeholder:text-gray-400 text-white md:text-gray-900"
-                                />
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50 md:text-gray-400" />
-                            </div>
-                            <span className="text-[10px] text-emerald-400/40 font-black uppercase tracking-widest whitespace-nowrap">{filteredRecords.length} Records</span>
-                        </div>
-                    )}
+
                 </div>
 
                 {isLoading ? (
@@ -795,13 +791,15 @@ const SiteFinanceTracker: React.FC = () => {
                                         <th className="px-5 py-3 text-left text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Client Name</th>
                                         {activeSubTab === 'active' ? (
                                             <>
-                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Contract</th>
-                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Billed</th>
-                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden md:table-cell">Mgmt Fee</th>
-                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden md:table-cell">Billed Fee</th>
-                                                <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Net Variation</th>
-                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Status</th>
-                                                <th className="px-4 py-3 text-left text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden lg:table-cell">Date</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider whitespace-nowrap">Contract Value</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider whitespace-nowrap">Billed Value</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider whitespace-nowrap">Billing Diff</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden md:table-cell whitespace-nowrap">Mgmt Fee</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden md:table-cell whitespace-nowrap">Billed Fee</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden md:table-cell whitespace-nowrap">Fee Diff</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider whitespace-nowrap font-black border-l border-white/5 md:border-gray-100">Net Variation</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider whitespace-nowrap">Status</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden lg:table-cell whitespace-nowrap">Date</th>
                                             </>
                                         ) : (
                                             <>
@@ -812,48 +810,6 @@ const SiteFinanceTracker: React.FC = () => {
                                             </>
                                         )}
                                         <th className="px-4 py-3 text-right text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider w-24">Actions</th>
-                                    </tr>
-                                    {/* Filter Row */}
-                                    <tr className="bg-[#06251c] md:bg-gray-50/50 border-b border-white/5 md:border-gray-100">
-                                        <td className="px-5 py-2" />
-                                        <td className="px-5 py-2">
-                                            <input 
-                                                type="text"
-                                                placeholder="Filter Client..."
-                                                value={filters.siteName}
-                                                onChange={(e) => setFilters(prev => ({ ...prev, siteName: e.target.value }))}
-                                                className="w-full text-[10px] px-2 py-1 bg-[#041b0f] md:bg-white border border-white/10 md:border-gray-200 rounded text-white md:text-gray-900 placeholder-emerald-800 md:placeholder-gray-400 focus:border-[#00D27F] md:focus:border-emerald-500 outline-none transition-all"
-                                            />
-                                        </td>
-                                        {activeSubTab === 'active' ? (
-                                            <>
-                                                <td className="px-4 py-2" />
-                                                <td className="px-4 py-2" />
-                                                <td className="px-4 py-2 hidden md:table-cell" />
-                                                <td className="px-4 py-2 hidden md:table-cell" />
-                                                <td className="px-4 py-2" />
-                                                <td className="px-4 py-2">
-                                                    <select
-                                                        value={filters.status}
-                                                        onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                                                        className="w-full text-[10px] px-1 py-1 bg-[#041b0f] md:bg-white border border-white/10 md:border-gray-200 rounded focus:border-[#00D27F] md:focus:border-emerald-500 outline-none transition-all font-bold text-emerald-400 md:text-gray-600"
-                                                    >
-                                                        <option value="">All Status</option>
-                                                        <option value="profit">Profit</option>
-                                                        <option value="loss">Loss</option>
-                                                    </select>
-                                                </td>
-                                                <td className="px-4 py-2 hidden lg:table-cell" />
-                                            </>
-                                        ) : (
-                                            <>
-                                                <td className="px-4 py-2" />
-                                                <td className="px-4 py-2" />
-                                                <td className="px-4 py-2" />
-                                                <td className="px-4 py-2" />
-                                            </>
-                                        )}
-                                        <td className="px-4 py-2" />
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -909,11 +865,17 @@ const SiteFinanceTracker: React.FC = () => {
 
                                                 {activeSubTab === 'active' ? (
                                                     <>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-sm text-emerald-400/40 md:text-gray-400">{formatCurrency(record.contractAmount)}</td>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-sm font-black text-white md:text-gray-900">{formatCurrency(record.billedAmount)}</td>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-sm text-emerald-400/40 md:text-gray-400 hidden md:table-cell">{formatCurrency(record.contractManagementFee)}</td>
-                                                        <td className="px-4 py-3.5 text-right font-mono text-sm font-black text-white md:text-gray-900 hidden md:table-cell">{formatCurrency(record.billedManagementFee)}</td>
-                                                        <td className={`px-4 py-3.5 text-right font-mono text-sm font-black ${isProfit ? 'text-[#00D27F] md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`}>
+                                                        <td className="px-4 py-3.5 text-center font-mono text-xs text-emerald-400/40 md:text-gray-400">{formatCurrency(record.contractAmount)}</td>
+                                                        <td className="px-4 py-3.5 text-center font-mono text-xs font-black text-white md:text-gray-900">{formatCurrency(record.billedAmount)}</td>
+                                                        <td className={`px-4 py-3.5 text-center font-mono text-xs font-black ${bDiff >= 0 ? 'text-[#00D27F] md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`}>
+                                                            {bDiff >= 0 ? '+' : ''}{formatCurrency(bDiff)}
+                                                        </td>
+                                                        <td className="px-4 py-3.5 text-center font-mono text-xs text-emerald-400/40 md:text-gray-400 hidden md:table-cell">{formatCurrency(record.contractManagementFee)}</td>
+                                                        <td className="px-4 py-3.5 text-center font-mono text-xs font-black text-white md:text-gray-900 hidden md:table-cell">{formatCurrency(record.billedManagementFee)}</td>
+                                                        <td className={`px-4 py-3.5 text-center font-mono text-xs font-black hidden md:table-cell ${fDiff >= 0 ? 'text-[#00D27F] md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`}>
+                                                            {fDiff >= 0 ? '+' : ''}{formatCurrency(fDiff)}
+                                                        </td>
+                                                        <td className={`px-4 py-3.5 text-center font-mono text-sm font-black border-l border-white/5 md:border-gray-100 ${isProfit ? 'text-[#00D27F] md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`}>
                                                             {isProfit ? '+' : ''}{formatCurrency(bDiff + fDiff)}
                                                         </td>
                                                         <td className="px-4 py-3.5 text-center">
@@ -922,8 +884,8 @@ const SiteFinanceTracker: React.FC = () => {
                                                                 {isProfit ? 'Profit' : 'Loss'}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3.5 hidden lg:table-cell text-right">
-                                                            <div className="flex flex-col gap-0.5 items-end">
+                                                        <td className="px-4 py-3.5 hidden lg:table-cell text-center">
+                                                            <div className="flex flex-col gap-0.5 items-center">
                                                                 {(record.createdByName || record.createdByRole) && (
                                                                     <div className="flex items-center gap-1.5">
                                                                         {record.createdByName && (
@@ -939,12 +901,12 @@ const SiteFinanceTracker: React.FC = () => {
                                                                 {record.createdAt && <div className="text-[9px] font-bold text-emerald-400/20 md:text-gray-400 uppercase tracking-widest">{format(new Date(record.createdAt), 'MMM d, h:mm a')}</div>}
                                                             </div>
                                                         </td>
-                                                        <td className="px-4 py-3.5 text-right">
-                                                            <div className="flex items-center justify-end gap-1 opacity-20 group-hover:opacity-100 transition-all duration-200">
-                                                                <button onClick={() => navigate(`/finance/site-tracker/edit/${record.id}`)} className="p-2 text-emerald-400/40 md:text-gray-400 hover:text-[#00D27F] md:hover:text-emerald-600 hover:bg-white/5 md:hover:bg-gray-100 rounded-xl transition-all border border-white/5 md:border-gray-100 shadow-sm" title="Edit">
+                                                        <td className="px-4 py-3.5 text-center">
+                                                            <div className="flex items-center justify-center gap-1 transition-all duration-200">
+                                                                <button onClick={() => navigate(`/finance/site-tracker/edit/${record.id}`)} className="p-2 text-emerald-500 md:text-gray-500 hover:text-[#00D27F] md:hover:text-emerald-600 hover:bg-white/5 md:hover:bg-gray-100 rounded-xl transition-all border border-white/5 md:border-gray-100 shadow-sm" title="Edit">
                                                                     <Edit2 className="h-4 w-4" />
                                                                 </button>
-                                                                <button onClick={() => { setRecordToDelete(record); setIsBulkDeleting(false); setShowDeleteModal(true); }} className="p-2 text-emerald-400/40 md:text-gray-400 hover:text-rose-400 md:hover:text-rose-600 hover:bg-rose-500/10 md:hover:bg-rose-50 rounded-xl transition-all border border-white/5 md:border-gray-100 shadow-sm" title="Delete">
+                                                                <button onClick={() => { setRecordToDelete(record); setIsBulkDeleting(false); setShowDeleteModal(true); }} className="p-2 text-rose-500 md:text-gray-500 hover:text-rose-400 md:hover:text-rose-600 hover:bg-rose-500/10 md:hover:bg-rose-50 rounded-xl transition-all border border-white/5 md:border-gray-100 shadow-sm" title="Delete">
                                                                     <Trash2 className="h-4 w-4" />
                                                                 </button>
                                                             </div>
@@ -1161,6 +1123,15 @@ const SiteFinanceTracker: React.FC = () => {
             </div>
 
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
+
+            {/* Hidden File Input */}
+            <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                className="hidden"
+                accept=".xlsx,.xls"
+            />
 
             <RevisionHistoryModal
                 isOpen={revisionModal.isOpen}
