@@ -18,7 +18,8 @@ import {
     ChevronDown,
     ChevronUp,
     UserX,
-    Trash2
+    Trash2,
+    MessageSquare
 } from 'lucide-react';
 import { format, formatDistanceToNow, isToday, isYesterday, parseISO } from 'date-fns';
 import type { Notification, NotificationType, AttendanceUnlockRequest, LeaveRequest, ExtraWorkLog, SiteFinanceRecord, SiteInvoiceRecord } from '../../types';
@@ -40,6 +41,7 @@ const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({
         greeting: Sun,
         approval_request: ClipboardCheck,
         emergency_broadcast: AlertTriangle,
+        direct_ping: MessageSquare,
     };
 
     const bgMap: Record<NotificationType, string> = {
@@ -52,6 +54,7 @@ const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({
         greeting: 'bg-emerald-50 text-emerald-600 border-emerald-100',
         approval_request: 'bg-orange-50 text-orange-600 border-orange-100 shadow-[0_0_10px_rgba(249,115,22,0.1)]',
         emergency_broadcast: 'bg-red-50 text-red-600 border-red-100 shadow-[0_0_10px_rgba(239,68,68,0.2)]',
+        direct_ping: 'bg-blue-50 text-blue-600 border-blue-100',
     };
 
     const Icon = iconMap[type] || Bell;
@@ -84,13 +87,20 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         invoices: false,
         general: false,
         violations: false,
-        inactive: false
+        inactive: false,
+        team: true
     });
     const [expandedDetails, setExpandedDetails] = React.useState<Record<string, boolean>>({});
 
     const [inactiveEmployees, setInactiveEmployees] = React.useState<EmployeeScoreWithUser[]>([]);
 
-    const toggleSection = (section: 'unlocks' | 'leaves' | 'claims' | 'finance' | 'invoices' | 'general' | 'violations' | 'inactive') => {
+    const isManagerRole = useMemo(() => {
+        if (!user) return false;
+        const role = (user.role || '').toLowerCase();
+        return ['admin', 'super_admin', 'developer', 'management', 'hr', 'hr_ops', 'finance_manager'].includes(role) || role.includes('manager');
+    }, [user]);
+
+    const toggleSection = (section: 'unlocks' | 'leaves' | 'claims' | 'finance' | 'invoices' | 'general' | 'violations' | 'inactive' | 'team') => {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
@@ -129,66 +139,42 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
     };
 
     const extractEmployeeName = (message: string) => {
-        // More permissive UUID regex to catch truncated IDs (e.g. from UI truncation)
         const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}/i;
-
-        // Pattern 1: [Optional URGENT:] [Violation] for user [Name] on [Date]
         const userMatch = message.match(/(?:URGENT:\s*)?.*?for user\s+(.*?)\s+on/i);
         if (userMatch) {
             const nameCandidate = userMatch[1].trim();
             if (!uuidRegex.test(nameCandidate)) return nameCandidate;
         }
-
-        // Pattern 2: [Name] has [Action]
         if (message.includes('has')) {
             const part = message.split('has')[0].trim();
-            // Remove "URGENT:" from start if present
             const nameCandidate = part.replace(/^URGENT:\s*/i, '').trim();
-            // Don't return long phrases, violation types, OR UUIDs as names
             const isViolationType = ['LESS WORKED AT SITE', 'INSUFFICIENT WORK HOURS', 'ATTENDANCE VIOLATION'].some(t => nameCandidate.toUpperCase().includes(t));
             if (nameCandidate.length < 50 && !uuidRegex.test(nameCandidate) && !isViolationType) return nameCandidate;
         }
-
         const words = message.replace(/^URGENT:\s*/i, '').split(' ');
         const firstWord = words[0];
-        
-        // List of words that should never be considered a "Name"
         const blacklistedNames = ['FIELD', 'ATTENDANCE', 'VIOLATION', 'SYSTEM', 'SECURITY', 'URGENT', 'NEW', 'TASK', 'DEVICE', 'LESS', 'INSUFFICIENT'];
-        
-        if (uuidRegex.test(firstWord) || blacklistedNames.includes(firstWord.toUpperCase().replace(':', ''))) {
-            return 'Employee';
-        }
-        
+        if (uuidRegex.test(firstWord) || blacklistedNames.includes(firstWord.toUpperCase().replace(':', ''))) return 'Employee';
         return firstWord;
     };
 
     const cleanMessage = (message: string) => {
-        // Remove "URGENT:" prefix
         let cleaned = message.replace(/^URGENT:\s*/i, '');
-
-        // Pattern 1: [Violation Type] for user [Name] on [Date] has been escalated...
         if (cleaned.toLowerCase().includes('for user') && cleaned.toLowerCase().includes('escalated')) {
             const typePart = cleaned.split(/for user/i)[0].trim();
             return `${typePart} escalated to HR Operation & Admin`;
         }
-
-        // Pattern 2: [Violation Type] for user [Name] on [Date]
         if (cleaned.toLowerCase().includes('for user') && cleaned.toLowerCase().includes('on')) {
             return cleaned.split(/for user/i)[0].trim();
         }
-
-        // If it starts with a name or UUID followed by "has"
         if (cleaned.includes('has')) {
             const parts = cleaned.split('has');
             const namePart = parts[0].trim();
-            // If the part before "has" looked like a name/UUID
-            if (namePart.length < 50) {
-                return `has ${parts.slice(1).join('has').trim()}`;
-            }
+            if (namePart.length < 50) return `has ${parts.slice(1).join('has').trim()}`;
         }
-
         return cleaned;
     };
+
     const [isActionLoading, setIsActionLoading] = React.useState<string | null>(null);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -198,11 +184,9 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
             const role = (user.role || '').toLowerCase();
             const isSuperAdmin = ['admin', 'super_admin', 'developer', 'management'].includes(role);
             const isHR = ['hr', 'hr_ops'].includes(role);
-            const isFinance = ['finance_manager'].includes(role);
 
-            console.log('[Approvals] Fetching for role:', role, '| isSuperAdmin:', isSuperAdmin, '| isHR:', isHR, '| isFinance:', isFinance, '| userId:', user.id);
+            console.log('[Approvals] Fetching for role:', role, '| isSuperAdmin:', isSuperAdmin, '| isHR:', isHR, '| userId:', user.id);
 
-            // --- Leave Requests ---
             let leavesPromise;
             if (isSuperAdmin) {
                 leavesPromise = Promise.all([
@@ -234,83 +218,37 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                 api.getSiteInvoiceRecords(financeManagerId)
             ]);
 
-            console.log('[Approvals] Results:', {
-                unlocks: unlocksResult.status === 'fulfilled' ? `${unlocksResult.value.length} items` : `FAILED: ${unlocksResult.reason}`,
-                leaves: leavesResult.status === 'fulfilled' ? `${leavesResult.value.data.length} items` : `FAILED: ${leavesResult.reason}`,
-                claims: claimsResult.status === 'fulfilled' ? `${claimsResult.value.data.length} items` : `FAILED: ${claimsResult.reason}`,
-                finance: financeResult.status === 'fulfilled' ? `${financeResult.value.length} items` : `FAILED: ${financeResult.reason}`,
-                invoices: invoicesResult.status === 'fulfilled' ? `${invoicesResult.value.length} items` : `FAILED: ${invoicesResult.reason}`
-            });
-
-            let finalUnlocks: AttendanceUnlockRequest[] = [];
-            let finalLeaves: LeaveRequest[] = [];
-            let finalClaims: ExtraWorkLog[] = [];
-            let finalFinance: SiteFinanceRecord[] = [];
-            let finalInvoices: SiteInvoiceRecord[] = [];
-
-            if (unlocksResult.status === 'fulfilled') {
-                finalUnlocks = unlocksResult.value.filter(r => r.userId !== user.id);
-                setUnlockRequests(finalUnlocks);
-            }
-
-            if (leavesResult.status === 'fulfilled') {
-                finalLeaves = leavesResult.value.data.filter((r: any) => r.userId !== user.id);
-                setLeaveRequests(finalLeaves);
-            }
-
-            if (claimsResult.status === 'fulfilled') {
-                finalClaims = claimsResult.value.data.filter((c: any) => c.userId !== user.id);
-                setExtraWorkClaims(finalClaims);
-            }
-
-            if (financeResult.status === 'fulfilled') {
-                finalFinance = financeResult.value.filter(f => f.createdBy !== user.id);
-                setFinanceRequests(finalFinance);
-            }
-
+            if (unlocksResult.status === 'fulfilled') setUnlockRequests(unlocksResult.value.filter(r => r.userId !== user.id));
+            if (leavesResult.status === 'fulfilled') setLeaveRequests(leavesResult.value.data.filter((r: any) => r.userId !== user.id));
+            if (claimsResult.status === 'fulfilled') setExtraWorkClaims(claimsResult.value.data.filter((c: any) => c.userId !== user.id));
+            if (financeResult.status === 'fulfilled') setFinanceRequests(financeResult.value.filter(f => f.createdBy !== user.id));
             if (invoicesResult.status === 'fulfilled') {
-                // Filter for "Due" invoices: !invoiceSentDate && invoiceSharingTentativeDate <= today
                 const today = new Date().toISOString().split('T')[0];
-                finalInvoices = (invoicesResult.value || []).filter(inv => 
-                    !inv.invoiceSentDate && 
-                    inv.invoiceSharingTentativeDate && 
-                    inv.invoiceSharingTentativeDate <= today
-                );
-                setInvoiceAlerts(finalInvoices);
+                setInvoiceAlerts((invoicesResult.value || []).filter(inv => 
+                    !inv.invoiceSentDate && inv.invoiceSharingTentativeDate && inv.invoiceSharingTentativeDate <= today
+                ));
             }
 
-            // Disable auto-expand as per user request to "hide all by default"
-            /*
-            setExpandedSections({
-                unlocks: finalUnlocks.length > 0,
-                leaves: finalLeaves.length > 0,
-                claims: finalClaims.length > 0,
-                finance: finalFinance.length > 0,
-                invoices: finalInvoices.length > 0
-            });
-            */
-
+            if (isSuperAdmin || isHR) {
+                const allScores = await calculateAllEmployeeScores();
+                setInactiveEmployees(allScores.filter(e => e.scores.performanceScore === 0 && e.scores.attendanceScore === 0 && e.scores.responseScore === 0));
+            } else {
+                setInactiveEmployees([]);
+            }
         } catch (err) {
             console.error('Error fetching pending approvals:', err);
         }
-
-        // Fetch inactive (zero-score) employees
-        if (isSuperAdmin || isHR) {
-            try {
-                const allScores = await calculateAllEmployeeScores();
-                const zeroScore = allScores.filter(
-                    e => e.scores.performanceScore === 0 &&
-                         e.scores.attendanceScore === 0 &&
-                         e.scores.responseScore === 0
-                );
-                setInactiveEmployees(zeroScore);
-            } catch (err) {
-                console.error('Error fetching inactive employees:', err);
-            }
-        } else {
-            setInactiveEmployees([]);
-        }
     }, [user]);
+
+    const [isLateCheckDone, setIsLateCheckDone] = React.useState(false);
+
+    React.useEffect(() => {
+        if (isOpen && user && isManagerRole && !isLateCheckDone) {
+            api.checkForLateReporting(user.id).then(() => {
+                setIsLateCheckDone(true);
+            });
+        }
+    }, [isOpen, user, isManagerRole, isLateCheckDone]);
 
     React.useEffect(() => {
         if (isOpen) {
@@ -394,12 +332,8 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
 
     const handleNotificationClick = (notification: Notification) => {
         markAsRead(notification.id);
-        if (notification.linkTo) {
-            navigate(notification.linkTo);
-        }
-        if (window.innerWidth < 768) {
-            onClose();
-        }
+        if (notification.linkTo) navigate(notification.linkTo);
+        if (window.innerWidth < 768) onClose();
     };
 
     const groupedNotifications = useMemo(() => {
@@ -410,44 +344,77 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
         ];
 
         const startIndex = (currentPage - 1) * pageSize;
-        // Filter out security violations and already read notifications
-        const filteredNotifs = notifications.filter(notif => 
-            notif.type !== 'security' && !notif.message.includes('Field attendance violation') && !notif.isRead
-        );
+        const filteredNotifs = notifications.filter(notif => {
+            if (notif.type === 'security') return false;
+            if (notif.message.includes('Field attendance violation')) return false;
+            if (notif.isRead) return false;
+            
+            let meta = notif.metadata as any;
+            if (typeof meta === 'string') {
+                try { meta = JSON.parse(meta); } catch(e) { meta = {}; }
+            }
+            const isTeamEvent = meta?.isTeamActivity || meta?.is_team_activity || 
+                                notif.message.includes('punched in') || 
+                                notif.message.includes('punched out') || 
+                                notif.message.includes('checked in') || 
+                                notif.message.includes('checked out') || 
+                                notif.message.toLowerCase().includes('break');
+            return !isTeamEvent;
+        });
         const pagedNotifs = filteredNotifs.slice(startIndex, startIndex + pageSize);
 
         pagedNotifs.forEach(notif => {
             const date = parseISO(notif.createdAt);
-            if (isToday(date)) {
-                groups[0].items.push(notif);
-            } else if (isYesterday(date)) {
-                groups[1].items.push(notif);
-            } else {
-                groups[2].items.push(notif);
-            }
+            if (isToday(date)) groups[0].items.push(notif);
+            else if (isYesterday(date)) groups[1].items.push(notif);
+            else groups[2].items.push(notif);
         });
 
         return groups.filter(g => g.items.length > 0);
     }, [notifications, currentPage, pageSize]);
 
     const securityViolations = useMemo(() => {
-        return notifications.filter(n => 
-            (!n.isRead) && (n.type === 'security' || n.message.includes('Field attendance violation'))
-        );
+        return notifications.filter(n => (!n.isRead) && (n.type === 'security' || n.message.includes('Field attendance violation')));
     }, [notifications]);
 
-    const filteredNotifCount = notifications.filter(notif => 
-        notif.type !== 'security' && !notif.message.includes('Field attendance violation') && !notif.isRead
-    ).length;
+    const teamActivityNotifications = useMemo(() => {
+        return notifications.filter(n => {
+            if (n.isRead) return false;
+            let meta = n.metadata as any;
+            if (typeof meta === 'string') {
+                try { meta = JSON.parse(meta); } catch(e) { meta = {}; }
+            }
+            return !n.isRead && (meta?.isTeamActivity || meta?.is_team_activity || 
+                   n.message.includes('punched in') || 
+                   n.message.includes('punched out') || 
+                                n.message.includes('checked in') || 
+                                n.message.includes('checked out') || 
+                   n.message.toLowerCase().includes('break'));
+        });
+    }, [notifications]);
+
+    const filteredNotifCount = notifications.filter(notif => {
+        if (notif.type === 'security') return false;
+        if (notif.message.includes('Field attendance violation')) return false;
+        if (notif.isRead) return false;
+        
+        let meta = notif.metadata as any;
+        if (typeof meta === 'string') {
+            try { meta = JSON.parse(meta); } catch(e) { meta = {}; }
+        }
+        const isTeamEvent = meta?.isTeamActivity || meta?.is_team_activity || 
+                            notif.message.includes('punched in') || 
+                            notif.message.includes('punched out') || 
+                                notif.message.includes('checked in') || 
+                                notif.message.includes('checked out') || 
+                            notif.message.toLowerCase().includes('break');
+        return !isTeamEvent;
+    }).length;
     const totalPages = Math.ceil(filteredNotifCount / pageSize);
 
-    const isManagerRole = useMemo(() => {
-        if (!user) return false;
-        const role = (user.role || '').toLowerCase();
-        return ['admin', 'super_admin', 'developer', 'management', 'hr', 'hr_ops', 'finance_manager'].includes(role) || role.includes('manager');
-    }, [user]);
-
-    const pendingCount = isManagerRole ? (unlockRequests.length + leaveRequests.length + extraWorkClaims.length + financeRequests.length + inactiveEmployees.length + securityViolations.length + invoiceAlerts.length) : (securityViolations.length + invoiceAlerts.length);
+    const pendingCount = isManagerRole 
+        ? (unlockRequests.length + leaveRequests.length + extraWorkClaims.length + financeRequests.length + inactiveEmployees.length + securityViolations.length + invoiceAlerts.length + teamActivityNotifications.length) 
+        : (securityViolations.length + invoiceAlerts.length);
 
     if (!isOpen) return null;
 
@@ -553,7 +520,10 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                             </div>
                                             {securityViolations.map(notif => {
                                                 const sevStyles = getSeverityStyles(notif.severity);
-                                                const metadata = notif.metadata || {};
+                                                let metadata = notif.metadata || {};
+                                                if (typeof metadata === 'string') {
+                                                    try { metadata = JSON.parse(metadata); } catch(e) { metadata = {}; }
+                                                }
                                                 const isExpanded = expandedDetails[notif.id];
                                                 
                                                 return (
@@ -654,6 +624,81 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                                                         </div>
                                                                     </div>
                                                                 </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Team Activity Section */}
+                            {teamActivityNotifications.length > 0 && (
+                                <div className={`group rounded-2xl overflow-hidden transition-all duration-300 border ${isMobile ? 'border-sky-500/30 bg-sky-500/5' : 'border-sky-100 bg-sky-50/10 hover:shadow-md'}`}>
+                                    <button 
+                                        onClick={() => toggleSection('team')}
+                                        className="w-full p-3 flex items-center justify-between bg-transparent"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-xl flex items-center justify-center ${isMobile ? 'bg-sky-500/20 text-sky-500 shadow-[0_0_10px_rgba(14,165,233,0.2)]' : 'bg-sky-100 text-sky-600'}`}>
+                                                <UserPlus className="w-4 h-4" />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className={`text-xs font-bold ${isMobile ? 'text-white' : 'text-gray-900'}`}>Team Activity</p>
+                                                <p className={`text-[10px] ${isMobile ? 'text-sky-400' : 'text-sky-500'}`}>Track member status</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className={`flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full text-[10px] font-bold ${isMobile ? 'bg-sky-500 text-white shadow-[0_0_10px_rgba(14,165,233,0.4)]' : 'bg-sky-100 text-sky-700'}`}>
+                                                {teamActivityNotifications.length}
+                                            </span>
+                                            {expandedSections.team ? <ChevronUp className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} /> : <ChevronDown className={`w-4 h-4 ${isMobile ? 'text-white/50' : 'text-gray-400'}`} />}
+                                        </div>
+                                    </button>
+
+                                    {expandedSections.team && (
+                                        <div className={`p-3 space-y-2 border-t ${isMobile ? 'border-sky-500/10' : 'border-sky-100'}`}>
+                                            {teamActivityNotifications.map(notif => {
+                                                let metadata = notif.metadata as any || {};
+                                                if (typeof metadata === 'string') {
+                                                    try { metadata = JSON.parse(metadata); } catch(e) { metadata = {}; }
+                                                }
+                                                const isLateReport = metadata.isLateReport;
+                                                
+                                                return (
+                                                    <div 
+                                                        key={notif.id} 
+                                                        onClick={() => handleNotificationClick(notif)}
+                                                        className={`rounded-xl p-3 border cursor-pointer transition-all hover:scale-[1.01] ${
+                                                            isLateReport 
+                                                            ? isMobile ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-100'
+                                                            : isMobile ? 'bg-white/5 border-white/5' : 'bg-white border-sky-100'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <ProfilePlaceholder 
+                                                                className="w-8 h-8 rounded-lg"
+                                                                photoUrl={metadata.employeePhoto}
+                                                                seed={metadata.employeeId}
+                                                            />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center justify-between mb-0.5">
+                                                                    <p className={`text-xs font-bold truncate ${isMobile ? 'text-white' : 'text-gray-900'}`}>
+                                                                        {metadata.employeeName || 'Team Member'}
+                                                                    </p>
+                                                                    <span className={`text-[9px] ${isMobile ? 'text-white/40' : 'text-gray-400'}`}>
+                                                                        {formatDistanceToNow(parseISO(notif.createdAt), { addSuffix: true })}
+                                                                    </span>
+                                                                </div>
+                                                                <p className={`text-[11px] ${
+                                                                    isLateReport 
+                                                                    ? isMobile ? 'text-red-400 font-bold' : 'text-red-600 font-bold'
+                                                                    : isMobile ? 'text-white/70' : 'text-gray-600'
+                                                                }`}>
+                                                                    {notif.message}
+                                                                </p>
                                                             </div>
                                                         </div>
                                                     </div>

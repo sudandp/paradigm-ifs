@@ -55,10 +55,10 @@ const getFriendlyAuthError = (errorMessage: string): string => {
     return 'Something went wrong. Please try again or contact support.';
 };
 
-const getActionTextForType = (type: string): string => {
+const getActionTextForType = (type: string, workType?: string): string => {
     switch (type) {
-        case 'punch-in': return 'punched in';
-        case 'punch-out': return 'punched out';
+        case 'punch-in': return workType === 'field' ? 'site checked in' : 'punched in';
+        case 'punch-out': return workType === 'field' ? 'site checked out' : 'punched out';
         case 'break-in': return 'started a break ☕';
         case 'break-out': return 'ended a break 🏁';
         default: return 'updated attendance';
@@ -591,14 +591,21 @@ export const useAuthStore = create<AuthState>()(
 
                     // Send notifications via Dynamic Rules
                     let mappedType = newType.replace('-', '_');
-                    if (mappedType === 'punch_in') mappedType = 'check_in';
-                    if (mappedType === 'punch_out') mappedType = 'check_out';
+                    if (mappedType === 'punch_in') {
+                        mappedType = workType === 'field' ? 'site_check_in' : 'check_in';
+                    } else if (mappedType === 'punch_out') {
+                        mappedType = workType === 'field' ? 'site_check_out' : 'check_out';
+                    } else if (mappedType === 'break_in') {
+                        mappedType = 'break_start';
+                    } else if (mappedType === 'break_out') {
+                        mappedType = 'break_end';
+                    }
                     
                     dispatchNotificationFromRules(
                         mappedType,
                         {
                             actorName: user.name || 'An employee',
-                            actionText: getActionTextForType(newType),
+                            actionText: getActionTextForType(newType, workType),
                             locString: locName ? ` at ${locName}` : '',
                             actor: {
                                 id: user.id,
@@ -633,7 +640,7 @@ export const useAuthStore = create<AuthState>()(
                     if (newType === 'punch-in') {
                         // Schedule Shift End Reminder (9 hours)
                         // If user has specific shift duration settings, we could use that. defaulting to 9h.
-                        scheduleShiftEndReminder(new Date(), 9);
+                        scheduleShiftEndReminder(new Date(), Math.max(9, get().totalWorkingDurationToday + 1 || 9));
                     } else if (newType === 'punch-out') {
                         // Cancel shift end reminder
                         cancelNotification('SHIFT_END');
@@ -648,8 +655,8 @@ export const useAuthStore = create<AuthState>()(
                         cancelNotification('BREAK_END');
                     }
 
-                    const successVerb = workType === 'field' ? 'check' : 'punch';
-                    return { success: true, message: `Successfully ${newType === 'punch-in' ? `${successVerb} in` : newType === 'punch-out' ? `${successVerb} out` : newType.replace('-', ' ')}!` };
+                    const actionLabel = getActionTextForType(newType, workType);
+                    return { success: true, message: `Successfully ${actionLabel}!` };
                 };
 
                 if (!position || !position.coords) {
@@ -726,7 +733,7 @@ export const useAuthStore = create<AuthState>()(
                             'violation',
                             {
                                 actorName: user.name || 'An employee',
-                                actionText: getActionTextForType(newType),
+                                actionText: getActionTextForType(newType, workType),
                                 locString: ` outside their assigned geofence at ${locationName}`,
                                 title: '📍 Geofencing Violation',
                                 link: '/hr/field-staff-tracking',
@@ -765,10 +772,10 @@ export const useAuthStore = create<AuthState>()(
                 const result = await finalizeAttendance(latitude, longitude, locationId, locationName);
                 
                 if (isViolation) {
-                    const violationVerb = workType === 'field' ? 'check' : 'punch';
+                    const actionLabel = getActionTextForType(newType, workType);
                     return { 
                         success: true, 
-                        message: `Successfully ${newType === 'punch-in' ? `${violationVerb} in` : newType === 'punch-out' ? `${violationVerb} out` : newType.replace('-', ' ')}! (Note: Recorded as geofencing violation)` 
+                        message: `Successfully ${actionLabel}! (Note: Recorded as geofencing violation)` 
                     };
                 }
                 

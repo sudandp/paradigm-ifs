@@ -37,10 +37,12 @@ import { api } from '../../services/api';
 import type { NotificationRule, NotificationType, User as AppUser, Role } from '../../types';
 
 const EVENT_TYPES = [
-    { value: 'check_in', label: 'Check-in (Punch In)', icon: CheckCircle2 },
-    { value: 'check_out', label: 'Check-out (Punch Out)', icon: LogOutIcon },
-    { value: 'break_in', label: 'Break Start', icon: Coffee },
-    { value: 'break_out', label: 'Break End', icon: Clock },
+    { value: 'check_in', label: 'Office Punch In (General)', icon: CheckCircle2 },
+    { value: 'check_out', label: 'Office Punch Out (General)', icon: LogOutIcon },
+    { value: 'site_check_in', label: 'Site Check-in (Field Activity)', icon: CheckCircle2 },
+    { value: 'site_check_out', label: 'Site Check-out (Field Activity)', icon: LogOutIcon },
+    { value: 'break_start', label: 'Break Start', icon: Coffee },
+    { value: 'break_end', label: 'Break End', icon: Clock },
     { value: 'violation', label: 'Geofencing Violation', icon: AlertTriangle },
     { value: 'field_report', label: 'Field Report Submission', icon: Target },
     { value: 'onboarding_submitted', label: 'New Enrollment Submission', icon: UserIcon },
@@ -74,7 +76,8 @@ const NOTIFICATION_TYPES: { value: NotificationType; label: string }[] = [
     { value: 'info', label: 'Information' },
     { value: 'security', label: 'Security Alert' },
     { value: 'task_assigned', label: 'Task Update' },
-    { value: 'greeting', label: 'General / Greeting' }
+    { value: 'greeting', label: 'General / Greeting' },
+    { value: 'direct_ping', label: 'Direct Ping' }
 ];
 
 const NotificationsControl: React.FC = () => {

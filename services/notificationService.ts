@@ -91,7 +91,8 @@ export const dispatchNotificationFromRules = async (eventType: string, data: Not
                     ...data.metadata,
                     employeeName: data.actor.name,
                     employeePhoto: data.actor.photoUrl,
-                    employeeId: data.actor.id
+                    employeeId: data.actor.id,
+                    isTeamActivity: ['check_in', 'check_out', 'site_check_in', 'site_check_out', 'break_in', 'break_out', 'break_start', 'break_end', 'not_reported_by_12pm'].includes(eventType)
                 }
             }));
             
@@ -117,6 +118,9 @@ const getNotificationTypeForEvent = (eventType: string): any => {
     }
     if (eventType === 'greeting') {
         return 'greeting';
+    }
+    if (['check_in', 'check_out', 'site_check_in', 'site_check_out', 'break_in', 'break_out', 'break_start', 'break_end', 'not_reported_by_12pm'].includes(eventType)) {
+        return 'info'; // These will be filtered into Team section via metadata
     }
     return 'info';
 };

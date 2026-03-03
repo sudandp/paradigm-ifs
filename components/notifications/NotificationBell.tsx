@@ -14,7 +14,8 @@ import {
     MoreHorizontal,
     Inbox,
     Clock,
-    ArrowLeft
+    ArrowLeft,
+    MessageSquare
 } from 'lucide-react';
 import { formatDistanceToNow, isToday, isYesterday, parseISO } from 'date-fns';
 import type { Notification, NotificationType } from '../../types';
@@ -30,6 +31,7 @@ const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({
         greeting: Sun,
         approval_request: ClipboardCheck,
         emergency_broadcast: AlertTriangle,
+        direct_ping: MessageSquare,
     };
 
     const bgMap: Record<NotificationType, string> = {
@@ -42,6 +44,7 @@ const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({
         greeting: 'bg-emerald-50 text-emerald-600 border-emerald-100',
         approval_request: 'bg-orange-50 text-orange-600 border-orange-100',
         emergency_broadcast: 'bg-red-50 text-red-600 border-red-100',
+        direct_ping: 'bg-blue-50 text-blue-600 border-blue-100',
     };
 
     const Icon = iconMap[type] || Bell;

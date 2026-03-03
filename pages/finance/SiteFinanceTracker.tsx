@@ -54,7 +54,7 @@ const SiteFinanceTracker: React.FC = () => {
             const managerId = isSuperAdmin ? undefined : user.id;
 
             const [recordsData, defaultsData, deletedData] = await Promise.all([
-                api.getSiteFinanceRecords(undefined, managerId),
+                api.getSiteFinanceRecords(undefined as any, managerId),
                 api.getSiteInvoiceDefaults(managerId),
                 api.getDeletedSiteFinanceRecords(managerId)
             ]);
@@ -692,7 +692,9 @@ const SiteFinanceTracker: React.FC = () => {
                                 <p className="text-[10px] md:text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider">Total Records</p>
                                 <h3 className="text-lg md:text-xl font-bold text-white md:text-gray-900 mt-1.5">{records.length}</h3>
                                 <p className="text-[9px] md:text-[10px] font-medium text-emerald-400/50 md:text-gray-400 mt-1">
-                                    For {format(new Date(Number(filters.year), Number(filters.month) - 1, 1), 'MMM yyyy')}
+                                    For {(filters.year === 'all' || filters.month === 'all') 
+                                        ? 'All Periods' 
+                                        : format(new Date(Number(filters.year), Number(filters.month) - 1, 1), 'MMM yyyy')}
                                 </p>
                             </div>
                             <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white/5 md:bg-gray-50 flex items-center justify-center border border-white/10 md:border-gray-100">

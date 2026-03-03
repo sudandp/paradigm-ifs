@@ -4560,13 +4560,16 @@ export const api = {
     return toCamelCase(data);
   },
 
-  async getSiteFinanceRecords(billingMonth: string, managerId?: string): Promise<SiteFinanceRecord[]> {
+  async getSiteFinanceRecords(billingMonth?: string, managerId?: string): Promise<SiteFinanceRecord[]> {
     let query = supabase
       .from('site_finance_tracker')
       .select('*')
-      .eq('billing_month', billingMonth)
       .is('deleted_at', null)
       .order('site_name');
+
+    if (billingMonth) {
+        query = query.eq('billing_month', billingMonth);
+    }
 
     if (managerId) {
         query = query.eq('created_by', managerId);
@@ -4721,6 +4724,82 @@ export const api = {
       .in('id', ids);
 
     if (error) throw error;
+  },
+
+  async getTeamActivity(userId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .filter('metadata->isTeamActivity', 'eq', true)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
+
+  async checkForLateReporting(managerId: string): Promise<void> {
+    const now = new Date();
+    // Only check if it's past 12 PM
+    if (now.getHours() < 12) return;
+
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
+
+    // 1. Get all subordinates
+    const { data: subordinates, error: subError } = await supabase
+      .from('users')
+      .select('id, name, role, reporting_manager_id')
+      .or(`reporting_manager_id.eq.${managerId},reporting_manager_2_id.eq.${managerId},reporting_manager_3_id.eq.${managerId}`);
+
+    if (subError || !subordinates || subordinates.length === 0) return;
+
+    // 2. Get attendance for today for these subordinates
+    const { data: attendance, error: attError } = await supabase
+      .from('attendance_events')
+      .select('user_id')
+      .in('user_id', subordinates.map(s => s.id))
+      .gte('timestamp', startOfDay)
+      .lte('timestamp', endOfDay)
+      .in('type', ['punch-in', 'check-in']);
+
+    if (attError) return;
+
+    const reportedUserIds = new Set((attendance || []).map(a => a.user_id));
+
+    for (const sub of subordinates) {
+      if (!reportedUserIds.has(sub.id)) {
+        // 3. Check if we already sent a late report notification today
+        const { data: existing, error: existError } = await supabase
+          .from('notifications')
+          .select('id')
+          .eq('user_id', managerId)
+          .filter('metadata->employeeId', 'eq', sub.id)
+          .filter('metadata->isLateReport', 'eq', true)
+          .gte('created_at', startOfDay)
+          .lte('created_at', endOfDay)
+          .limit(1);
+
+        if (!existError && (!existing || existing.length === 0)) {
+          // 4. Dispatch notification
+          await dispatchNotificationFromRules('not_reported_by_12pm', {
+            actorName: sub.name,
+            actionText: 'has not reported for duty today as of 12 PM',
+            locString: '',
+            actor: {
+              id: sub.id,
+              name: sub.name,
+              role: sub.role,
+              reportingManagerId: sub.reporting_manager_id
+            },
+            metadata: {
+              isLateReport: true
+            }
+          });
+        }
+      }
+    }
   },
 
   async getUniqueTrackerSites(): Promise<{ id: string; name: string }[]> {
