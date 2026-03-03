@@ -518,15 +518,15 @@ const SiteFinanceTracker: React.FC = () => {
 
             {/* ── Action Bar ── */}
             <div className="bg-[#06251c] md:bg-white rounded-xl border border-white/5 md:border-gray-200 shadow-sm p-4 md:p-5 space-y-4">
-                {/* Row 1: Primary Filters & Utilities */}
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex flex-wrap items-center gap-2">
+                {/* Row 1: All Filtering Options */}
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <select
                             value={filters.year}
                             onChange={(e) => setFilters(prev => ({ ...prev, year: e.target.value }))}
-                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-xs md:text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] transition-all font-semibold cursor-pointer"
+                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-xs md:text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] transition-all font-semibold cursor-pointer min-w-[100px]"
                         >
-                            <option value="all">All Years</option>
+                            <option value="all">Year</option>
                             {Array.from({ length: 5 }, (_, i) => {
                                 const year = new Date().getFullYear() - i;
                                 return <option key={year} value={year.toString()}>{year}</option>;
@@ -536,9 +536,9 @@ const SiteFinanceTracker: React.FC = () => {
                         <select
                             value={filters.month}
                             onChange={(e) => setFilters(prev => ({ ...prev, month: e.target.value }))}
-                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-xs md:text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] transition-all font-semibold cursor-pointer"
+                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-xs md:text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] transition-all font-semibold cursor-pointer min-w-[110px]"
                         >
-                            <option value="all">All Months</option>
+                            <option value="all">Month</option>
                             {Array.from({ length: 12 }, (_, i) => {
                                 const date = new Date(2000, i, 1);
                                 return <option key={i + 1} value={(i + 1).toString()}>{format(date, 'MMMM')}</option>;
@@ -548,84 +548,57 @@ const SiteFinanceTracker: React.FC = () => {
                         <select
                             value={filters.status}
                             onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-xs md:text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] transition-all font-semibold cursor-pointer"
+                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-xs md:text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] transition-all font-semibold cursor-pointer min-w-[110px]"
                         >
-                            <option value="">All Status</option>
+                            <option value="">Status</option>
                             <option value="profit">Profit</option>
                             <option value="loss">Loss</option>
                         </select>
-
-                        <div className="flex items-center gap-1 bg-[#041b0f] md:bg-gray-50 p-1 rounded-lg border border-white/10 md:border-gray-200">
-                            <input
-                                type="date"
-                                value={filters.startDate}
-                                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
-                                className="h-8 px-2 bg-transparent text-[10px] text-white md:text-gray-900 focus:outline-none font-semibold cursor-pointer"
-                                title="Start Date"
-                            />
-                            <span className="text-white/30 md:text-gray-400 text-xs">-</span>
-                            <input
-                                type="date"
-                                value={filters.endDate}
-                                onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
-                                className="h-8 px-2 bg-transparent text-[10px] text-white md:text-gray-900 focus:outline-none font-semibold cursor-pointer"
-                                title="End Date"
-                            />
-                        </div>
-                        
-                        <button
-                            onClick={clearFilters}
-                            className="h-10 w-10 flex items-center justify-center text-rose-400 hover:text-rose-500 bg-white/5 md:bg-rose-50 border border-white/10 md:border-rose-100 rounded-lg transition-all hover:scale-105 active:scale-95"
-                            title="Clear All Filters"
-                        >
-                            <FilterX className="h-4 w-4" />
-                        </button>
                     </div>
 
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 scrollbar-hide">
-                        <button
-                            onClick={handleDownloadTemplate}
-                            disabled={isExporting}
-                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-emerald-400 md:text-emerald-700 bg-emerald-500/10 md:bg-emerald-50 border border-emerald-500/20 md:border-emerald-100 rounded-lg hover:bg-emerald-500/20 md:hover:bg-emerald-100 transition-all disabled:opacity-50"
-                        >
-                            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                            Template
-                        </button>
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-amber-400 md:text-amber-700 bg-amber-500/10 md:bg-amber-50 border border-amber-500/20 md:border-amber-100 rounded-lg hover:bg-amber-500/20 md:hover:bg-amber-100 transition-all"
-                        >
-                            <Upload className="h-3.5 w-3.5" />
-                            Import
-                        </button>
-                        <button
-                            onClick={handleExport}
-                            disabled={isExporting}
-                            className="whitespace-nowrap inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-blue-400 md:text-blue-700 bg-blue-500/10 md:bg-blue-50 border border-blue-500/20 md:border-blue-100 rounded-lg hover:bg-blue-500/20 md:hover:bg-blue-100 transition-all disabled:opacity-50"
-                        >
-                            <FileSpreadsheet className="h-3.5 w-3.5" />
-                            Export
-                        </button>
+                    <div className="flex items-center gap-1 bg-[#041b0f] md:bg-gray-50 p-1 rounded-lg border border-white/10 md:border-gray-200 shrink-0">
+                        <input
+                            type="date"
+                            value={filters.startDate}
+                            onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                            className="h-8 px-2 bg-transparent text-[10px] text-white md:text-gray-900 focus:outline-none font-semibold cursor-pointer"
+                            title="Start Date"
+                        />
+                        <span className="text-white/30 md:text-gray-400 text-xs">-</span>
+                        <input
+                            type="date"
+                            value={filters.endDate}
+                            onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                            className="h-8 px-2 bg-transparent text-[10px] text-white md:text-gray-900 focus:outline-none font-semibold cursor-pointer"
+                            title="End Date"
+                        />
                     </div>
-                </div>
 
-                {/* Row 2: Search, Site Selector & Add Button */}
-                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-white/5 md:border-gray-100">
-                    <div className="flex flex-1 items-center gap-3 min-w-[300px]">
-                        <div className="relative flex-1 md:max-w-md">
+                    <button
+                        onClick={clearFilters}
+                        className="h-10 w-10 flex items-center justify-center text-rose-400 hover:text-rose-500 bg-white/5 md:bg-rose-50 border border-white/10 md:border-rose-100 rounded-lg transition-all hover:scale-105 active:scale-95 shrink-0"
+                        title="Clear All Filters"
+                    >
+                        <FilterX className="h-4 w-4" />
+                    </button>
+
+                    <div className="h-10 w-px bg-white/10 md:bg-gray-200 hidden md:block mx-1" />
+
+                    <div className="flex-1 flex items-center gap-2 min-w-[300px]">
+                        <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50 md:text-gray-400" />
                             <input
                                 type="text"
                                 placeholder="Search site or company..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full h-11 pl-10 pr-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-xl text-sm text-white md:text-gray-900 placeholder-emerald-500/30 md:placeholder-gray-400 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 focus:ring-2 focus:ring-[#00D27F]/20 transition-all shadow-sm"
+                                className="w-full h-10 pl-10 pr-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-xs md:text-sm text-white md:text-gray-900 placeholder-emerald-500/30 md:placeholder-gray-400 focus:outline-none focus:border-[#00D27F] transition-all shadow-sm"
                             />
                         </div>
                         <select
                             value={filters.siteName}
                             onChange={(e) => setFilters(prev => ({ ...prev, siteName: e.target.value }))}
-                            className="h-11 px-4 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-xl text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] md:focus:border-emerald-500 transition-all font-semibold min-w-[140px] md:min-w-[180px] shadow-sm cursor-pointer"
+                            className="h-10 px-3 bg-[#041b0f] md:bg-gray-50 border border-white/10 md:border-gray-200 rounded-lg text-xs md:text-sm text-white md:text-gray-900 focus:outline-none focus:border-[#00D27F] transition-all font-semibold min-w-[160px] shadow-sm cursor-pointer"
                         >
                             <option value="">All Sites</option>
                             {siteOptions.map(site => (
@@ -633,14 +606,43 @@ const SiteFinanceTracker: React.FC = () => {
                             ))}
                         </select>
                     </div>
+                </div>
 
+                {/* Row 2: All Primary Actions */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/5 md:border-gray-100">
                     <button
                         onClick={() => navigate('/finance/site-tracker/add')}
-                        className="whitespace-nowrap h-11 inline-flex items-center justify-center gap-2 px-6 py-2 text-sm font-bold text-[#041b0f] md:text-white bg-[#00D27F] md:bg-emerald-600 rounded-xl hover:bg-[#00b86e] md:hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 w-full md:w-auto"
+                        className="whitespace-nowrap h-11 inline-flex items-center justify-center gap-2 px-6 py-2 text-sm font-bold text-[#041b0f] md:text-white bg-[#00D27F] md:bg-emerald-600 rounded-xl hover:bg-[#00b86e] md:hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/10 active:scale-95"
                     >
                         <Plus className="h-4 w-4" />
-                        <span>Add Site</span>
+                        <span>New Entry</span>
                     </button>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleDownloadTemplate}
+                            disabled={isExporting}
+                            className="whitespace-nowrap h-11 inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-emerald-400 md:text-emerald-700 bg-emerald-500/10 md:bg-emerald-50 border border-emerald-500/20 md:border-emerald-100 rounded-lg hover:bg-emerald-500/20 md:hover:bg-emerald-100 transition-all disabled:opacity-50"
+                        >
+                            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                            <span>Download Template</span>
+                        </button>
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="whitespace-nowrap h-11 inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-amber-400 md:text-amber-700 bg-amber-500/10 md:bg-amber-50 border border-amber-500/20 md:border-amber-100 rounded-lg hover:bg-amber-500/20 md:hover:bg-amber-100 transition-all"
+                        >
+                            <Upload className="h-3.5 w-3.5" />
+                            <span>Import Data</span>
+                        </button>
+                        <button
+                            onClick={handleExport}
+                            disabled={isExporting}
+                            className="whitespace-nowrap h-11 inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-blue-400 md:text-blue-700 bg-blue-500/10 md:bg-blue-50 border border-blue-500/20 md:border-blue-100 rounded-lg hover:bg-blue-500/20 md:hover:bg-blue-100 transition-all disabled:opacity-50"
+                        >
+                            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+                            <span>Export Data</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -797,7 +799,7 @@ const SiteFinanceTracker: React.FC = () => {
                                                 <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden md:table-cell whitespace-nowrap">Mgmt Fee</th>
                                                 <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden md:table-cell whitespace-nowrap">Billed Fee</th>
                                                 <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden md:table-cell whitespace-nowrap">Fee Diff</th>
-                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider whitespace-nowrap font-black border-l border-white/5 md:border-gray-100">Net Variation</th>
+                                                <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider whitespace-nowrap font-black">Net Variation</th>
                                                 <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider whitespace-nowrap">Status</th>
                                                 <th className="px-4 py-3 text-center text-[11px] font-semibold text-emerald-400/60 md:text-gray-500 uppercase tracking-wider hidden lg:table-cell whitespace-nowrap">Date</th>
                                             </>
@@ -875,7 +877,7 @@ const SiteFinanceTracker: React.FC = () => {
                                                         <td className={`px-4 py-3.5 text-center font-mono text-xs font-black hidden md:table-cell ${fDiff >= 0 ? 'text-[#00D27F] md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`}>
                                                             {fDiff >= 0 ? '+' : ''}{formatCurrency(fDiff)}
                                                         </td>
-                                                        <td className={`px-4 py-3.5 text-center font-mono text-sm font-black border-l border-white/5 md:border-gray-100 ${isProfit ? 'text-[#00D27F] md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`}>
+                                                        <td className={`px-4 py-3.5 text-center font-mono text-sm font-black ${isProfit ? 'text-[#00D27F] md:text-emerald-600' : 'text-rose-400 md:text-rose-600'}`}>
                                                             {isProfit ? '+' : ''}{formatCurrency(bDiff + fDiff)}
                                                         </td>
                                                         <td className="px-4 py-3.5 text-center">
