@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../../services/api';
+import { pdf } from '@react-pdf/renderer';
+import { InvoiceSummaryDocument } from '../attendance/PDFReports';
 import type { Organization, InvoiceData } from '../../types';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -196,7 +198,6 @@ const InvoiceSummary: React.FC = () => {
     const [roundOff, setRoundOff] = useState(0.20);
 
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-    const pdfRef = useRef<HTMLDivElement>(null);
     const [isGenerating, setIsGenerating] = useState(false);
 
     useEffect(() => {
@@ -246,24 +247,45 @@ const InvoiceSummary: React.FC = () => {
     };
 
     const handleModalDownload = async () => {
-        const element = pdfRef.current;
-        if (!element || !modalState.invoiceData) {
+        if (!modalState.invoiceData) {
             setToast({ message: 'Could not find invoice to export.', type: 'error' });
             return;
         }
 
         setIsGenerating(true);
         try {
-            const htmlContent = element.outerHTML;
-            const opt = {
-                margin: 0.25,
-                filename: `Invoice_${modalState.invoiceData.siteName.replace(' ', '_')}_${modalState.invoiceData.statementMonth}.pdf`,
-                image: { type: 'jpeg' as const, quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
-            };
+            // Calculate totals using the same logic as InvoiceContent or share the hook
+            const invoiceData = modalState.invoiceData;
+            const subTotal = invoiceData.lineItems.reduce((acc, item) => {
+                const amount = item.deployment * item.ratePerMonth;
+                const isDeduction = item.description.toLowerCase().includes('deduction');
+                return isDeduction ? acc - amount : acc + amount;
+            }, 0);
+            const serviceCharge = subTotal * 0.10;
+            const grandTotal = subTotal + serviceCharge - discount;
+            const gst = grandTotal * 0.09;
+            const finalTotal = grandTotal + gst + gst + roundOff;
+            
+            const calculations = { subTotal, serviceCharge, grandTotal, gst, finalTotal };
 
-            await api.generatePdf(htmlContent, opt);
+            const doc = (
+                <InvoiceSummaryDocument 
+                    invoiceData={invoiceData} 
+                    calculations={calculations} 
+                    discount={discount} 
+                    roundOff={roundOff} 
+                />
+            );
+            
+            const blob = await pdf(doc).toBlob();
+            if (blob) {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `Invoice_${invoiceData.siteName.replace(' ', '_')}_${invoiceData.statementMonth}.pdf`;
+                link.click();
+                URL.revokeObjectURL(url);
+            }
         } catch (error) {
             console.error("PDF generation failed:", error);
             setToast({ message: 'Failed to generate PDF.', type: 'error' });
@@ -365,7 +387,7 @@ const InvoiceSummary: React.FC = () => {
                             {modalState.isLoading ? (
                                 <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-accent" /></div>
                             ) : modalState.invoiceData ? (
-                                <div ref={pdfRef}>
+                                <div>
                                     <InvoiceContent invoiceData={modalState.invoiceData} discount={discount} setDiscount={setDiscount} roundOff={roundOff} setRoundOff={setRoundOff} />
                                 </div>
                             ) : (

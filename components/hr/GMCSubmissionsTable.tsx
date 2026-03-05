@@ -5,167 +5,11 @@ import { Search, Filter, ChevronLeft, ChevronRight, FileText, Download, Building
 import Button from '../ui/Button';
 import { format, differenceInYears } from 'date-fns';
 import { exportGenericReportToExcel } from '../../utils/excelExport';
-import html2pdf from 'html2pdf.js';
+import { pdf } from '@react-pdf/renderer';
+import { GMCSubmissionDocument } from '../../pages/attendance/PDFReports';
 
 // Reusable PDF Template for individual GMC submission (Hidden from view)
-const GMCSubmissionPdfTemplate: React.FC<{ sub: GmcSubmission }> = ({ sub }) => {
-    const employeeAge = sub.dob ? differenceInYears(new Date(), new Date(sub.dob)) : 'N/A';
-    
-    return (
-        <div id={`gmc-pdf-template-${sub.id}`} className="p-10 bg-white text-[#041b0f] font-sans" style={{ width: '210mm', minHeight: '297mm' }}>
-            {/* Header */}
-            <div className="flex justify-between items-center border-b-2 border-accent pb-6 mb-8">
-                <div>
-                    <h1 className="text-3xl font-black uppercase tracking-tighter text-accent">GMC Enrollment Receipt</h1>
-                    <p className="text-xs font-bold text-muted">PARADIGM SERVICES - SECURE SUBMISSION</p>
-                </div>
-                <div className="text-right">
-                    <p className="text-xs font-bold text-muted uppercase">Submission ID</p>
-                    <p className="font-mono text-sm leading-none">#{sub.id.substring(0, 8).toUpperCase()}</p>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-10 mb-10">
-                <div className="space-y-4">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-accent/60 mb-2">Member Identity</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <p className="text-[10px] font-bold text-muted uppercase">Full Name</p>
-                            <p className="font-black text-lg leading-tight">{sub.employeeName}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-muted uppercase">Employee ID</p>
-                            <p className="font-bold">{sub.employeeId}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-muted uppercase">Designation</p>
-                            <p className="font-bold">{sub.designation}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-muted uppercase">Joining Date</p>
-                            <p className="font-bold">{sub.dateOfJoining}</p>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 pt-2">
-                        <div>
-                            <p className="text-[10px] font-bold text-muted uppercase">Date of Birth</p>
-                            <p className="font-bold">{sub.dob}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-muted uppercase">Gender</p>
-                            <p className="font-bold">{sub.gender}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="space-y-4">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-accent/60 mb-2">Assignment Details</h3>
-                    <div>
-                        <p className="text-[10px] font-bold text-muted uppercase">Company/Org</p>
-                        <p className="font-bold text-lg">{sub.companyName}</p>
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-bold text-muted uppercase">Primary Site</p>
-                        <p className="font-bold text-lg">{sub.siteName}</p>
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-bold text-muted uppercase">Marital Status</p>
-                        <p className="font-bold">{sub.maritalStatus}</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Plan Summary */}
-            <div className="bg-accent/5 rounded-3xl p-8 border border-accent/10 mb-10 relative overflow-hidden">
-                <div className="absolute right-[-20px] bottom-[-20px] opacity-[0.03] transform rotate-12">
-                    <Heart size={200} fill="currentColor" />
-                </div>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-accent mb-6">Selected Insurance Plan</h3>
-                <div className="grid grid-cols-3 gap-8">
-                    <div>
-                        <p className="text-[10px] font-bold text-muted uppercase mb-1">Coverage Tier</p>
-                        <p className="text-2xl font-black text-accent">{sub.planName}</p>
-                    </div>
-                    <div className="border-l border-accent/20 pl-8">
-                        <p className="text-[10px] font-bold text-muted uppercase mb-1">Verified Age</p>
-                        <p className="text-2xl font-black">{employeeAge} Years</p>
-                    </div>
-                    <div className="border-l border-accent/20 pl-8">
-                        <p className="text-[10px] font-bold text-muted uppercase mb-1">Monthly Premium</p>
-                        <p className="text-2xl font-black">₹{sub.premiumAmount}</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Family Details if any */}
-            {(sub.maritalStatus === 'Married' || (sub.children && sub.children.length > 0)) && (
-                <div className="mb-10">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-accent/60 mb-4">Family Declarations</h3>
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="border-b border-muted/20">
-                                <th className="text-left py-2 text-[10px] font-bold text-muted uppercase">Relation</th>
-                                <th className="text-left py-2 text-[10px] font-bold text-muted uppercase">Name</th>
-                                <th className="text-left py-2 text-[10px] font-bold text-muted uppercase">DOB</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-muted/10">
-                            {sub.maritalStatus === 'Married' && sub.spouseName && (
-                                <tr>
-                                    <td className="py-3 font-bold text-accent">Spouse</td>
-                                    <td className="py-3 font-medium">{sub.spouseName} ({sub.spouseGender})</td>
-                                    <td className="py-3 font-medium">{sub.spouseDob}</td>
-                                    <td className="py-3">{sub.spouseContact || '—'}</td>
-                                </tr>
-                            )}
-                            {sub.children?.map((child: any, idx: number) => (
-                                <tr key={idx}>
-                                    <td className="py-3 font-bold text-accent">Child {idx + 1}</td>
-                                    <td className="py-3 font-medium">{child.name} ({child.gender})</td>
-                                    <td className="py-3 font-medium">{child.dob}</td>
-                                    <td className="py-3">—</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {/* Parental Details - New Fields */}
-            {(sub.fatherName || sub.motherName) && (
-                <div className="mb-10">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-accent/60 mb-4">Parental Declarations</h3>
-                    <div className="grid grid-cols-2 gap-6">
-                        {sub.maritalStatus === 'Single' && sub.fatherName && (
-                            <div className="p-4 bg-gray-50 rounded-xl">
-                                <p className="text-[10px] font-bold text-muted uppercase">Father's Name ({sub.fatherGender})</p>
-                                <p className="font-bold">{sub.fatherName}</p>
-                                <p className="text-xs text-muted">DOB: {sub.fatherDob || '—'}</p>
-                            </div>
-                        )}
-                        {sub.maritalStatus === 'Single' && sub.motherName && (
-                            <div className="p-4 bg-gray-50 rounded-xl">
-                                <p className="text-[10px] font-bold text-muted uppercase">Mother's Name ({sub.motherGender})</p>
-                                <p className="font-bold">{sub.motherName}</p>
-                                <p className="text-xs text-muted">DOB: {sub.motherDob || '—'}</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Footer / Certification */}
-            <div className="mt-auto pt-10 border-t border-muted/20 text-center">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-accent/5 text-accent rounded-full text-[10px] font-black uppercase tracking-widest mb-4">
-                    <ShieldCheck size={14} /> Digitally Verified Enrollment
-                </div>
-                <p className="text-[10px] text-muted leading-relaxed max-w-lg mx-auto">
-                    This document is a computer generated enrollment record and does not require a physical signature. Verified on {format(new Date(sub.updatedAt), 'dd MMMM yyyy')} at {format(new Date(sub.updatedAt), 'HH:mm:ss')}.
-                </p>
-            </div>
-        </div>
-    );
-};
+// Template is now handled by GMCSubmissionDocument in PDFReports.tsx
 
 const GMCSubmissionsTable: React.FC = () => {
     const [submissions, setSubmissions] = useState<GmcSubmission[]>([]);
@@ -300,31 +144,29 @@ const GMCSubmissionsTable: React.FC = () => {
         }
     };
 
-    const handleDownloadPdf = (sub: GmcSubmission) => {
-        const element = document.getElementById(`gmc-pdf-template-${sub.id}`);
-        if (!element) return;
-
-        const opt = {
-            margin: 0,
-            filename: `GMC_Record_${sub.employeeName}_${sub.id.substring(0, 8)}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        (html2pdf() as any).set(opt).from(element).save();
+    const handleDownloadPdf = async (sub: GmcSubmission) => {
+        try {
+            const doc = <GMCSubmissionDocument sub={sub} />;
+            const blob = await pdf(doc).toBlob();
+            if (blob) {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `GMC_Record_${sub.employeeName.replace(/\s+/g, '_')}_${sub.id.substring(0, 8)}.pdf`;
+                link.click();
+                URL.revokeObjectURL(url);
+            }
+        } catch (error) {
+            console.error('PDF generation failed:', error);
+            alert('Failed to generate PDF.');
+        }
     };
 
     const totalPages = Math.ceil(total / limit);
 
     return (
         <div className="space-y-6">
-            {/* Template Container (Hidden) */}
-            <div className="hidden">
-                {submissions.map(sub => (
-                    <GMCSubmissionPdfTemplate key={sub.id} sub={sub} />
-                ))}
-            </div>
+            {/* Template Container Removed - No longer needed for @react-pdf */}
 
             {/* Header with Export */}
             <div className="flex justify-between items-center">

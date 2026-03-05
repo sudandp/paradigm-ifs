@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { api } from '../../services/api';
+import { pdf } from '@react-pdf/renderer';
+import { CostAnalysisDocument } from '../attendance/PDFReports';
 import type { SubmissionCostBreakdown, VerificationCosts, VerificationCostSetting } from '../../types';
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import { DateRangePicker, type Range, type RangeKeyDict } from 'react-date-range';
@@ -84,7 +86,6 @@ const CostAnalysis: React.FC = () => {
     const datePickerRef = useRef<HTMLDivElement>(null);
 
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-    const pdfRef = useRef<HTMLDivElement>(null);
     const isMobile = useMediaQuery('(max-width: 767px)');
 
 
@@ -197,24 +198,19 @@ const CostAnalysis: React.FC = () => {
 
     const handleExport = async (type: 'csv' | 'pdf') => {
         if (type === 'pdf') {
-            const element = pdfRef.current;
-            if (!element) {
-                setToast({ message: 'Could not find report to export.', type: 'error' });
-                return;
-            }
-
             setIsGenerating(true);
             try {
-                const htmlContent = element.outerHTML;
-                const opt = {
-                    margin: 0.5,
-                    filename: `Cost_Analysis_Report_${format(dateRange[0].startDate!, 'yyyy-MM-dd')}_to_${format(dateRange[0].endDate!, 'yyyy-MM-dd')}.pdf`,
-                    image: { type: 'jpeg' as const, quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true },
-                    jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
-                };
-
-                await api.generatePdf(htmlContent, opt);
+                const range = `${format(dateRange[0].startDate!, 'dd MMM yyyy')} to ${format(dateRange[0].endDate!, 'dd MMM yyyy')}`;
+                const doc = <CostAnalysisDocument data={processedData} stats={summaryStats} range={range} />;
+                const blob = await pdf(doc).toBlob();
+                if (blob) {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `Cost_Analysis_Report_${format(dateRange[0].startDate!, 'yyyy-MM-dd')}_to_${format(dateRange[0].endDate!, 'yyyy-MM-dd')}.pdf`;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                }
             } catch (error) {
                 console.error("PDF generation failed:", error);
                 setToast({ message: 'Failed to generate PDF.', type: 'error' });
@@ -222,7 +218,6 @@ const CostAnalysis: React.FC = () => {
                 setIsGenerating(false);
             }
         }
-        // CSV logic would go here if implemented
     };
 
     const dateFilters = [
@@ -366,7 +361,7 @@ const CostAnalysis: React.FC = () => {
                 <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold text-primary-text">Detailed Report</h3>
                 </div>
-                <div ref={pdfRef} className="mt-4 pt-4 border-t border-border">
+                <div className="mt-4 pt-4 border-t border-border">
                     {isMobile ? (
                         isLoading ? <MobileReportSkeleton /> :
                             processedData.length === 0 ? <p className="text-center text-muted py-8">No report data for this period.</p> :

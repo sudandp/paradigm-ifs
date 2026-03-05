@@ -18,7 +18,9 @@ import Logo from '../../components/ui/Logo';
 import SearchableSelect from '../../components/ui/SearchableSelect';
 import { api } from '../../services/api';
 import { useDevice } from '../../hooks/useDevice';
-import html2pdf from 'html2pdf.js';
+import { pdf } from '@react-pdf/renderer';
+import { GMCFormReceiptDocument } from '../attendance/PDFReports';
+import { useLogoStore } from '../../store/logoStore';
 
 
 
@@ -216,19 +218,26 @@ const GMCForm: React.FC = () => {
         }
     };
 
-    const downloadPdf = () => {
-        const element = document.getElementById('gmc-preview-content');
-        if (!element) return;
-
-        const opt = {
-            margin: 10,
-            filename: `GMC_Form_${submissionData?.employeeName}_${format(new Date(), 'yyyyMMdd')}.pdf`,
-            image: { type: 'jpeg' as const, quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        (html2pdf() as any).set(opt).from(element).save();
+    const downloadPdf = async () => {
+        if (!submissionData) return;
+        setIsSubmitting(true);
+        try {
+            const doc = <GMCFormReceiptDocument data={submissionData} />;
+            const blob = await pdf(doc).toBlob();
+            if (blob) {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `GMC_Receipt_${submissionData.employeeName.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.pdf`;
+                link.click();
+                URL.revokeObjectURL(url);
+            }
+        } catch (error) {
+            console.error('PDF generation failed:', error);
+            alert('Failed to generate PDF receipt.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (isSuccess) {
@@ -269,115 +278,7 @@ const GMCForm: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Hidden PDF content moved off-screen for capture */}
-                    <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-                        <div id="gmc-preview-content" className="p-12 text-left bg-white text-black" style={{ width: '210mm', minHeight: '297mm' }}>
-                            <div className="flex justify-between items-start mb-10 border-b-4 border-accent pb-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-accent rounded-xl">
-                                        <Logo className="h-12 text-white invert" />
-                                    </div>
-                                    <div>
-                                        <h1 className="text-2xl font-black uppercase tracking-tight">Paradigm Services</h1>
-                                        <p className="text-[10px] text-accent font-bold uppercase tracking-[0.3em]">Corporate Health Services</p>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <h2 className="text-xl font-bold text-gray-900 mb-1">GMC ENROLLMENT RECORD</h2>
-                                    <p className="text-sm font-semibold text-gray-500">Date: {format(new Date(), 'dd MMM yyyy')}</p>
-                                    <p className="text-xs text-gray-400 font-mono">REF: GMC-{Math.random().toString(36).substring(7).toUpperCase()}</p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-12 mb-10">
-                                <div className="space-y-6">
-                                    <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
-                                        <User className="h-4 w-4 text-accent" />
-                                        <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Employee Profile</h3>
-                                    </div>
-                                    <div className="space-y-4">
-                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Full Name</span><span className="text-sm font-bold text-gray-800">{submissionData?.employeeName}</span></div>
-                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Employee ID</span><span className="text-sm font-bold text-gray-800">{submissionData?.employeeId}</span></div>
-                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Designation</span><span className="text-sm font-bold text-gray-800">{submissionData?.designation}</span></div>
-                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Joining Date</span><span className="text-sm font-bold text-gray-800">{submissionData?.dateOfJoining}</span></div>
-                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Company</span><span className="text-sm font-bold text-gray-800">{submissionData?.companyName}</span></div>
-                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Work Site</span><span className="text-sm font-bold text-gray-800">{submissionData?.siteName}</span></div>
-                                    </div>
-                                </div>
-                                <div className="space-y-6">
-                                    <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
-                                        <Users className="h-4 w-4 text-accent" />
-                                        <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Family Structure</h3>
-                                    </div>
-                                    <div className="space-y-4">
-
-                                        
-
-                                        
-                                        {submissionData?.spouseName && (
-                                            <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Spouse</span><span className="text-sm font-bold text-gray-800">{submissionData?.spouseName} ({submissionData?.spouseGender})</span></div>
-                                        )}
-                                        <div className="flex flex-col"><span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">No. of Children</span><span className="text-sm font-bold text-gray-800">{submissionData?.children?.length || 0}</span></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {submissionData?.children && submissionData.children.length > 0 && (
-                                <div className="mb-10">
-                                    <div className="flex items-center gap-2 border-b border-gray-100 pb-2 mb-4">
-                                        <Users className="h-4 w-4 text-accent" />
-                                        <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Children Details</h3>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-6">
-                                        {submissionData.children.map((child: any, idx: number) => (
-                                            <div key={idx} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                                <p className="text-xs font-bold text-gray-800 mb-1">{child.name}</p>
-                                                <p className="text-[10px] text-gray-500">{child.gender} • DOB: {child.dob}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="p-8 bg-accent/5 rounded-2xl border-2 border-accent/10 mb-12 relative overflow-hidden">
-                                <ShieldCheck className="absolute -right-6 -bottom-6 h-32 w-32 text-accent/10 transform -rotate-12" />
-                                <div className="relative z-10 flex justify-between items-center">
-                                    <div>
-                                        <h3 className="text-[10px] font-black text-accent uppercase tracking-[0.2em] mb-2">Approved Insurance Policy</h3>
-                                        <p className="text-2xl font-black text-gray-900">{submissionData?.plan_name}</p>
-                                        <p className="text-xs text-gray-500 mt-1 font-medium">Group Medical Cover • Age Based Tier</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Monthly Premium</p>
-                                        <p className="text-4xl font-black text-accent">₹{submissionData?.premium_amount}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-24 pt-16 border-t border-dashed border-gray-200">
-                                <div className="text-center">
-                                    <div className="h-16 flex items-end justify-center border-b border-gray-300 mb-3 italic text-gray-400 text-sm">
-                                        Signed Electronically
-                                    </div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-900">Employee Signature</p>
-                                    <p className="text-[9px] text-gray-400 font-medium mt-1">{submissionData?.employeeName}</p>
-                                </div>
-                                <div className="text-center">
-                                    <div className="h-16 flex items-end justify-center border-b border-gray-300 mb-3">
-                                        <div className="p-2 border border-accent/20 rounded-md bg-accent/5 rotate-[-2deg]">
-                                            <Logo className="h-6 opacity-40 invert grayscale" />
-                                        </div>
-                                    </div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-900">Authorized Signatory</p>
-                                    <p className="text-[9px] text-gray-400 font-medium mt-1">Paradigm Services HR</p>
-                                </div>
-                            </div>
-
-                            <div className="mt-20 text-center">
-                                <p className="text-[8px] text-gray-300 uppercase tracking-[0.5em]">System Generated Receipt • No physical signature required</p>
-                            </div>
-                        </div>
-                    </div>
+                    {/* Receipt document is now generated via @react-pdf */}
                 </div>
             </div>
         );

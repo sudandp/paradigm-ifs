@@ -9,6 +9,8 @@ import Button from '../../components/ui/Button';
 import Pagination from '../../components/ui/Pagination';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
+import { pdf } from '@react-pdf/renderer';
+import { FieldReportDocument } from '../attendance/PDFReports';
 import { useDevice } from '../../hooks/useDevice';
 
 // --- PDF Preview Component ---
@@ -19,50 +21,35 @@ const PdfPreviewModal: React.FC<{
     template: ChecklistTemplate | undefined;
 }> = ({ isOpen, onClose, report, template }) => {
     const { user } = useAuthStore();
-    const contentRef = useRef<HTMLDivElement>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSending, setIsSending] = useState(false);
 
     const generatePdfBlob = async (): Promise<Blob | null> => {
-        if (!report || !contentRef.current) return null;
+        if (!report) return null;
         
-        // @ts-ignore
-        const html2pdf = (await import('html2pdf.js')).default;
-        
-        const opt = {
-            margin: 0.5,
-            filename: `FieldReport_${report.siteName.replace(/\s+/g, '_')}_${format(new Date(report.createdAt), 'yyyyMMdd')}.pdf`,
-            image: { type: 'jpeg' as const, quality: 0.98 },
-            html2canvas: { 
-                scale: 2, 
-                useCORS: true, 
-                logging: false,
-                letterRendering: false,
-                windowWidth: 800
-            },
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
-        };
-
-        const pdf = html2pdf().set(opt).from(contentRef.current);
-        const pdfBlob = await pdf.output('blob');
-        return pdfBlob;
+        try {
+            const doc = <FieldReportDocument report={report} template={template} />;
+            const blob = await pdf(doc).toBlob();
+            return blob;
+        } catch (error) {
+            console.error('Failed to generate PDF blob', error);
+            return null;
+        }
     };
 
     const handleDownload = async () => {
-        if (!report || !contentRef.current) return;
+        if (!report) return;
         setIsGenerating(true);
         try {
-            await new Promise(resolve => setTimeout(resolve, 500)); // Ensure render
-            // @ts-ignore
-            const html2pdf = (await import('html2pdf.js')).default;
-            const opt = {
-                margin: 0.5,
-                filename: `FieldReport_${report.siteName.replace(/\s+/g, '_')}_${format(new Date(report.createdAt), 'yyyyMMdd')}.pdf`,
-                image: { type: 'jpeg' as const, quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: false, windowWidth: 800 },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
-            };
-            await html2pdf().set(opt).from(contentRef.current).save();
+            const blob = await generatePdfBlob();
+            if (blob) {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `FieldReport_${report.siteName.replace(/\s+/g, '_')}_${format(new Date(report.createdAt), 'yyyyMMdd')}.pdf`;
+                link.click();
+                URL.revokeObjectURL(url);
+            }
             onClose();
         } catch (err) {
             console.error("PDF generation failed:", err);
@@ -73,7 +60,7 @@ const PdfPreviewModal: React.FC<{
     };
 
     const handleSendToManager = async () => {
-        if (!report || !contentRef.current) return;
+        if (!report) return;
         if (!user?.reportingManagerId) {
             alert("You do not have a reporting manager assigned.");
             return;
@@ -81,11 +68,9 @@ const PdfPreviewModal: React.FC<{
 
         setIsSending(true);
         try {
-            await new Promise(resolve => setTimeout(resolve, 500)); // Ensure render
             const pdfBlob = await generatePdfBlob();
             if (!pdfBlob) throw new Error("Failed to generate PDF blob");
 
-             // Fetch manager name for logging/display
              const manager = await api.getUserById(user.reportingManagerId);
              const managerName = manager?.name || "Manager";
 
@@ -98,10 +83,10 @@ const PdfPreviewModal: React.FC<{
             );
 
             alert(`Report sent successfully to ${managerName}!`);
-            onClose(); // Optional: close or keep open
+            onClose(); // Optional: close            }
         } catch (err) {
-            console.error("Failed to send report:", err);
-            alert("Failed to send report. Please try again.");
+            console.error("Report sending failed:", err);
+            alert("Failed to send report.");
         } finally {
             setIsSending(false);
         }
@@ -133,11 +118,11 @@ const PdfPreviewModal: React.FC<{
         >
             <div className="flex justify-center bg-gray-100 p-2 md:p-4 -mx-6 -my-6 h-[70vh] overflow-auto">
                 <div 
-                    ref={contentRef}
                     id="pdf-content-source"
                     className="bg-white shadow-lg p-[20px] md:p-[40px] min-w-[700px] min-h-[1100px] text-left mx-auto text-gray-900"
                     style={{ fontFamily: "'Helvetica', 'Arial', sans-serif", color: '#111827' }}
                 >
+                    {/* Re-using the same preview as before for UI consistency, while PDF uses FieldReportDocument */}
                     {/* Header */}
                     <div style={{ borderBottom: '3px solid #006B3F', paddingBottom: '20px', marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                         <div>
@@ -170,7 +155,7 @@ const PdfPreviewModal: React.FC<{
                     <h2 style={{ borderLeft: '5pt solid #006B3F', paddingLeft: '10pt', color: '#111827', fontSize: '18pt', marginBottom: '15pt', fontWeight: 'bold' }}>Checklist Summary</h2>
                     
                     {template?.sections.map(section => (
-                        <div key={section.id} style={{ marginBottom: '20pt', pageBreakInside: 'avoid' }}>
+                        <div key={section.id} style={{ marginBottom: '20pt' }}>
                             <div style={{ background: '#E5E7EB', padding: '8pt 12pt', borderRadius: '5pt', marginBottom: '10pt' }}>
                                 <p style={{ margin: 0, fontWeight: 'bold', fontSize: '11pt', color: '#374151' }}>{section.title.toUpperCase()}</p>
                             </div>
@@ -211,7 +196,7 @@ const PdfPreviewModal: React.FC<{
                     {!template && <p style={{ textAlign: 'center', color: '#999999', padding: '20pt' }}>Detailed checklist data unavailable.</p>}
 
                     {/* Management Review */}
-                    <div style={{ pageBreakInside: 'avoid' }}>
+                    <div>
                         <h2 style={{ borderLeft: '5pt solid #006B3F', paddingLeft: '10pt', color: '#111827', fontSize: '18pt', marginTop: '30pt', marginBottom: '15pt', fontWeight: 'bold' }}>Management Review</h2>
                         <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', padding: '20pt', borderRadius: '10pt' }}>
                             <p style={{ margin: 0, fontSize: '12pt', lineHeight: 1.6, color: '#374151', whiteSpace: 'pre-wrap' }}>{report.summary}</p>

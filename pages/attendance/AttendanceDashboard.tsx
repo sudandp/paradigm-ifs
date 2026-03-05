@@ -5,7 +5,8 @@ import { isAdmin } from '../../utils/auth';
 // number increments on the chart axes, and unify the report generation/download flow into a single action.
 import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
-import html2pdf from 'html2pdf.js';
+import { pdf } from '@react-pdf/renderer';
+import { BasicReportDocument, MonthlyReportDocument } from './PDFReports';
 import { useAuthStore } from '../../store/authStore';
 import { usePermissionsStore } from '../../store/permissionsStore';
 import type {
@@ -795,7 +796,9 @@ const AttendanceDashboard: React.FC = () => {
 
     const [selectedUser, setSelectedUser] = useState<string>('all');
     const [selectedRole, setSelectedRole] = useState<string>('all');
+    const [selectedSite, setSelectedSite] = useState<string>('all');
     const [selectedStatus, setSelectedStatus] = useState<string>('all');
+    const [organizations, setOrganizations] = useState<Organization[]>([]);
     
     // Manual Entry State
     const [isManualEntryModalOpen, setIsManualEntryModalOpen] = useState(false);
@@ -806,7 +809,6 @@ const AttendanceDashboard: React.FC = () => {
     const [isDownloading, setIsDownloading] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-    const pdfRef = useRef<HTMLDivElement>(null);
 
     // --- Fetch Audit Logs ---
     const fetchAuditLogs = useCallback(async () => {
@@ -876,6 +878,7 @@ const AttendanceDashboard: React.FC = () => {
     useEffect(() => {
         if (canDownloadReport) {
             api.getUsers().then(setUsers);
+            api.getOrganizations().then(setOrganizations);
         }
     }, [canDownloadReport]);
 
@@ -1109,7 +1112,16 @@ const AttendanceDashboard: React.FC = () => {
             }
 
             // Filter out management users from attendance tracking and reports
-            const activeStaff = currentUsers.filter(u => u.role !== 'management');
+            let activeStaff = currentUsers.filter(u => u.role !== 'management');
+            
+            if (selectedSite !== 'all') {
+                activeStaff = activeStaff.filter(u => u.organizationId === selectedSite);
+            }
+            if (selectedRole !== 'all') {
+                activeStaff = activeStaff.filter(u => u.role === selectedRole);
+            }
+            
+            const activeStaffIds = new Set(activeStaff.map(u => u.id));
 
             // Determine query range
             const today = new Date();
@@ -1130,13 +1142,16 @@ const AttendanceDashboard: React.FC = () => {
 
             // --- Calculate "Today" Stats ---
             const todayStr = format(today, 'yyyy-MM-dd');
-            const todayEvents = events.filter(e => format(new Date(e.timestamp), 'yyyy-MM-dd') === todayStr);
+            const todayEvents = events.filter(e => 
+                format(new Date(e.timestamp), 'yyyy-MM-dd') === todayStr && 
+                activeStaffIds.has(e.userId)
+            );
             const presentToday = new Set(todayEvents.map(e => e.userId)).size;
 
             const todayLeaves = leavesData.filter(l => {
                 const start = new Date(l.startDate);
                 const end = new Date(l.endDate);
-                return today >= start && today <= end;
+                return today >= start && today <= end && activeStaffIds.has(l.userId);
             });
             const onLeaveToday = new Set(todayLeaves.map(l => l.userId)).size;
 
@@ -1156,14 +1171,17 @@ const AttendanceDashboard: React.FC = () => {
                 const dateStr = format(day, 'yyyy-MM-dd');
 
                 // Present
-                const dayEvents = events.filter(e => format(new Date(e.timestamp), 'yyyy-MM-dd') === dateStr);
+                const dayEvents = events.filter(e => 
+                    format(new Date(e.timestamp), 'yyyy-MM-dd') === dateStr &&
+                    activeStaffIds.has(e.userId)
+                );
                 const uniqueUsersPresent = new Set(dayEvents.map(e => e.userId)).size;
 
                 // On Leave
                 const activeLeaves = leavesData.filter(l => {
                     const start = new Date(l.startDate);
                     const end = new Date(l.endDate);
-                    return day >= start && day <= end;
+                    return day >= start && day <= end && activeStaffIds.has(l.userId);
                 });
                 const usersOnLeave = new Set(activeLeaves.map(l => l.userId)).size;
 
@@ -1218,7 +1236,7 @@ const AttendanceDashboard: React.FC = () => {
             await new Promise(resolve => setTimeout(resolve, 10000));
             setIsLoading(false);
         }
-    }, [isEmployeeView]);
+    }, [isEmployeeView, selectedSite, selectedRole]);
 
     const reportTypeId = useId();
     const employeeId = useId();
@@ -1232,7 +1250,7 @@ const AttendanceDashboard: React.FC = () => {
         if (dateRange.startDate && dateRange.endDate) {
             fetchDashboardData(dateRange.startDate, dateRange.endDate);
         }
-    }, [dateRange, fetchDashboardData]);
+    }, [dateRange, fetchDashboardData, selectedSite, selectedRole]);
 
     const availableRoles = useMemo(() => {
         const roles = new Set(users.map(u => u.role).filter(Boolean));
@@ -1296,6 +1314,9 @@ const AttendanceDashboard: React.FC = () => {
         }
         if (selectedRole !== 'all') {
             filteredUsers = filteredUsers.filter(u => u.role === selectedRole);
+        }
+        if (selectedSite !== 'all') {
+            filteredUsers = filteredUsers.filter(u => u.organizationId === selectedSite);
         }
 
         const targetUsers = filteredUsers;
@@ -1473,13 +1494,12 @@ const AttendanceDashboard: React.FC = () => {
         }
 
         return filteredData;
-    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, selectedStatus, selectedRecordType, recurringHolidays, leaves, userHolidaysPool, officeHolidays, fieldHolidays]);
+    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, selectedSite, selectedStatus, selectedRecordType, recurringHolidays, leaves, userHolidaysPool, officeHolidays, fieldHolidays]);
 
     // 2. Attendance Log Data (Raw Events)
     const attendanceLogData: AttendanceLogDataRow[] = useMemo(() => {
         if (!dateRange.startDate || !dateRange.endDate) return [];
 
-        // Exclude management users from logs
         // Exclude management users from logs
         let filteredUsers = users.filter(u => u.role !== 'management');
 
@@ -1488,6 +1508,9 @@ const AttendanceDashboard: React.FC = () => {
         }
         if (selectedRole !== 'all') {
             filteredUsers = filteredUsers.filter(u => u.role === selectedRole);
+        }
+        if (selectedSite !== 'all') {
+            filteredUsers = filteredUsers.filter(u => u.organizationId === selectedSite);
         }
 
         const targetUsers = filteredUsers;
@@ -1517,7 +1540,7 @@ const AttendanceDashboard: React.FC = () => {
                 return a.time.localeCompare(b.time);
             });
 
-    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, leaves, recurringHolidays, userHolidaysPool, officeHolidays, fieldHolidays]);
+    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, selectedSite, leaves, recurringHolidays, userHolidaysPool, officeHolidays, fieldHolidays]);
 
     // 3. Monthly Report Data (Aggregated)
     const monthlyReportData: MonthlyReportRow[] = useMemo(() => {
@@ -1533,6 +1556,9 @@ const AttendanceDashboard: React.FC = () => {
         }
         if (selectedRole !== 'all') {
             filteredUsers = filteredUsers.filter(u => u.role === selectedRole);
+        }
+        if (selectedSite !== 'all') {
+            filteredUsers = filteredUsers.filter(u => u.organizationId === selectedSite);
         }
 
         const targetUsers = filteredUsers;
@@ -1786,7 +1812,7 @@ const AttendanceDashboard: React.FC = () => {
             return row.statuses.includes(selectedStatus);
         });
 
-    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, recurringHolidays, leaves, userHolidaysPool, officeHolidays, fieldHolidays]);
+    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, selectedSite, recurringHolidays, leaves, userHolidaysPool, officeHolidays, fieldHolidays]);
 
 
     // Determine which PDF component to render
@@ -1811,35 +1837,104 @@ const AttendanceDashboard: React.FC = () => {
 
 
 
-    const handleDownloadCsv = async () => {
+    const handleDownloadPdf = async () => {
         setIsDownloading(true);
         try {
-            // 1. Fetch Logo (Common to all reports now)
             const logo = useLogoStore.getState().currentLogo;
             let logoBase64 = '';
 
-            // Attempt to get logo as base64
             if (logo && logo.startsWith('data:image')) {
                 logoBase64 = logo;
             } else {
-                 // If no store logo or it's a URL, fallback logic.
                  const logoUrl = (logo && (logo.startsWith('http') || logo.startsWith('/'))) ? logo : pdfLogoLocalPath;
-                 
                  if (logoUrl) {
                     try {
                         const response = await fetch(logoUrl);
-                        if (!response.ok) throw new Error('Fetch failed');
-                        const blob = await response.blob();
-                        logoBase64 = await new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onloadend = () => resolve(reader.result as string);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(blob);
-                        });
-                    } catch (err) {
-                        console.error("Failed to fetch logo for Excel export:", err);
+                        if (response.ok) {
+                            const blob = await response.blob();
+                            logoBase64 = await new Promise((resolve) => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => resolve(reader.result as string);
+                                reader.readAsDataURL(blob);
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Logo fetch failed', e);
                     }
-                }
+                 }
+            }
+
+            const generatedBy = user?.name || 'Unknown User';
+            const fileName = `Attendance_Report_${reportType}_${format(new Date(), 'yyyyMMdd')}.pdf`;
+
+            let blob;
+            if (reportType === 'basic') {
+                const doc = <BasicReportDocument 
+                    data={basicReportData} 
+                    dateRange={{ startDate: dateRange.startDate!, endDate: dateRange.endDate! }} 
+                    generatedBy={generatedBy}
+                    logoUrl={logoBase64}
+                />;
+                blob = await pdf(doc).toBlob();
+            } else if (reportType === 'monthly') {
+                const days = eachDayOfInterval({ start: dateRange.startDate!, end: dateRange.endDate! });
+                const doc = <MonthlyReportDocument 
+                    data={monthlyReportData} 
+                    dateRange={{ startDate: dateRange.startDate!, endDate: dateRange.endDate! }} 
+                    generatedBy={generatedBy}
+                    logoUrl={logoBase64}
+                    days={days}
+                />;
+                blob = await pdf(doc).toBlob();
+            } else {
+                setToast({ message: 'This report type is not yet supported in PDF format.', type: 'error' });
+                setIsDownloading(false);
+                return;
+            }
+
+            if (blob) {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = fileName;
+                link.click();
+                URL.revokeObjectURL(url);
+                setToast({ message: 'PDF downloaded successfully!', type: 'success' });
+            }
+
+        } catch (error) {
+            console.error('PDF Download failed', error);
+            setToast({ message: 'Failed to download PDF.', type: 'error' });
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
+    const handleDownloadExcel = async () => {
+        setIsDownloading(true);
+        try {
+            const logo = useLogoStore.getState().currentLogo;
+            let logoBase64 = '';
+
+            if (logo && logo.startsWith('data:image')) {
+                logoBase64 = logo;
+            } else {
+                 const logoUrl = (logo && (logo.startsWith('http') || logo.startsWith('/'))) ? logo : pdfLogoLocalPath;
+                 if (logoUrl) {
+                    try {
+                        const response = await fetch(logoUrl);
+                        if (response.ok) {
+                            const blob = await response.blob();
+                            logoBase64 = await new Promise((resolve) => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => resolve(reader.result as string);
+                                reader.readAsDataURL(blob);
+                            });
+                        }
+                    } catch (e) {
+                         console.error("Logo fetch failed", e);
+                    }
+                 }
             }
 
             if (reportType === 'monthly') {
@@ -1850,7 +1945,6 @@ const AttendanceDashboard: React.FC = () => {
                     user?.name || 'Unknown User'
                 );
             } else {
-                // Use generic Excel export for other report types
                 let columns: GenericReportColumn[] = [];
                 let dataToExport: any[] = [];
                 let reportTitle = '';
@@ -1876,7 +1970,7 @@ const AttendanceDashboard: React.FC = () => {
                         { header: 'Date', key: 'date', width: 15 },
                         { header: 'Time', key: 'time', width: 15 },
                         { header: 'Event', key: 'type', width: 15 },
-                         { header: 'Location', key: 'locationName', width: 30 },
+                        { header: 'Location', key: 'locationName', width: 30 },
                         { header: 'Latitude', key: 'latitude', width: 15 },
                         { header: 'Longitude', key: 'longitude', width: 15 }
                     ];
@@ -1914,10 +2008,9 @@ const AttendanceDashboard: React.FC = () => {
                 );
             }
             setToast({ message: 'Excel report downloaded successfully.', type: 'success' });
-
         } catch (error) {
-            console.error("Download failed:", error);
-            setToast({ message: 'Failed to generate report.', type: 'error' });
+            console.error("Excel Download failed:", error);
+            setToast({ message: 'Failed to generate Excel report.', type: 'error' });
         } finally {
             setIsDownloading(false);
         }
@@ -2252,7 +2345,25 @@ const AttendanceDashboard: React.FC = () => {
                     </div>
 
                     <div className="col-span-1">
-                        <label htmlFor={roleId} className="block text-xs font-medium text-gray-400 md:text-gray-500 mb-1">Role</label>
+                        <label htmlFor="site-select" className="block text-xs font-medium text-gray-400 md:text-gray-500 mb-1">Site</label>
+                        <select
+                            id="site-select"
+                            name="site"
+                            className="w-full md:w-auto border border-[#1a3d2c] md:border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#041b0f] md:bg-white text-white md:text-gray-900 focus:ring-2 focus:ring-[#22c55e] outline-none appearance-none"
+                            value={selectedSite}
+                            onChange={(e) => {
+                                setSelectedSite(e.target.value);
+                                setSelectedUser('all');
+                            }}
+                        >
+                            <option value="all">All Sites</option>
+                            {organizations.map(org => (
+                                <option key={org.id} value={org.id}>{org.fullName || org.shortName}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="col-span-1">
                         <select
                             id={roleId}
                             name="role"
@@ -2283,7 +2394,7 @@ const AttendanceDashboard: React.FC = () => {
                         >
                             <option value="all">All Employees</option>
                             {users
-                                .filter(u => selectedRole === 'all' || u.role === selectedRole)
+                                .filter(u => (selectedRole === 'all' || u.role === selectedRole) && (selectedSite === 'all' || u.organizationId === selectedSite))
                                 .map(u => (
                                     <option key={u.id} value={u.id}>{u.name}</option>
                                 ))
@@ -2378,12 +2489,6 @@ const AttendanceDashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* Off-screen PDF Container for generation */}
-            <div style={{ position: 'fixed', top: '0', left: '0', width: '1123px', zIndex: -1000, opacity: 0, pointerEvents: 'none' }}>
-                <div ref={pdfRef} className="w-full bg-white">
-                    {pdfContent}
-                </div>
-            </div>
 
             {/* Work Hours Report */}
             {reportType === 'workHours' && (
@@ -2418,15 +2523,26 @@ const AttendanceDashboard: React.FC = () => {
                             </div>
                         </div>
                         {canDownloadReport && (
-                            <Button
-                                type="button"
-                                onClick={handleDownloadCsv}
-                                disabled={isDownloading}
-                                className="w-full sm:w-auto bg-[#22c55e] hover:bg-[#16a34a] text-white shadow-lg rounded-xl flex items-center justify-center gap-2 py-2.5 px-6 font-medium"
-                            >
-                                {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                                {isDownloading ? 'Generating...' : 'Download CSV'}
-                            </Button>
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <Button
+                                    type="button"
+                                    onClick={handleDownloadPdf}
+                                    disabled={isDownloading}
+                                    className="bg-primary hover:bg-primary-hover text-white shadow-lg rounded-xl flex items-center justify-center gap-2 py-2.5 px-6 font-medium whitespace-nowrap"
+                                >
+                                    {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                                    {isDownloading ? 'Generating...' : 'Download PDF'}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={handleDownloadExcel}
+                                    disabled={isDownloading}
+                                    className="bg-[#22c55e] hover:bg-[#16a34a] text-white shadow-lg rounded-xl flex items-center justify-center gap-2 py-2.5 px-6 font-medium whitespace-nowrap"
+                                >
+                                    {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                                    {isDownloading ? 'Generating...' : 'Download Excel'}
+                                </Button>
+                            </div>
                         )}
                     </div>
 

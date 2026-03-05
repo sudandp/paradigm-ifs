@@ -1,36 +1,32 @@
-
-
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import type { OnboardingData, FamilyMember } from '../types';
 import { api } from '../services/api';
 import { Download, ShieldCheck, Loader2 } from 'lucide-react';
+import { pdf } from '@react-pdf/renderer';
+import { InsuranceSummaryDocument } from './attendance/PDFReports';
 
-const PdfExportButton: React.FC<{ elementRef: React.RefObject<HTMLDivElement>, filename: string }> = ({ elementRef, filename }) => {
+const PdfExportButton: React.FC<{ employeeData: OnboardingData }> = ({ employeeData }) => {
     const [isGenerating, setIsGenerating] = useState(false);
 
     const handleExport = async () => {
-        const element = elementRef.current;
-        if (element) {
-            setIsGenerating(true);
-            try {
-                const htmlContent = element.outerHTML;
-                const opt = {
-                    margin: 0.5,
-                    filename: filename,
-                    image: { type: 'jpeg' as const, quality: 0.98 },
-                    html2canvas: { scale: 2 },
-                    jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const }
-                };
-
-                await api.generatePdf(htmlContent, opt);
-            } catch (error) {
-                console.error("PDF generation failed:", error);
-                // In a real app, you'd show a toast/error message here
-            } finally {
-                setIsGenerating(false);
+        setIsGenerating(true);
+        try {
+            const doc = <InsuranceSummaryDocument data={employeeData} />;
+            const blob = await pdf(doc).toBlob();
+            if (blob) {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `Insurance_Card_${employeeData.personal.employeeId}.pdf`;
+                link.click();
+                URL.revokeObjectURL(url);
             }
+        } catch (error) {
+            console.error("PDF generation failed:", error);
+        } finally {
+            setIsGenerating(false);
         }
     };
 
@@ -43,11 +39,9 @@ const PdfExportButton: React.FC<{ elementRef: React.RefObject<HTMLDivElement>, f
 };
 
 const InsurancePdfView: React.FC = () => {
-    // Fix: Removed generic type argument from useParams() to avoid untyped function call error.
     const { id } = useParams();
     const [employeeData, setEmployeeData] = useState<OnboardingData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const pdfRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -76,7 +70,7 @@ const InsurancePdfView: React.FC = () => {
 
     return (
         <div className="max-w-4xl p-4 sm:p-6 lg:p-8">
-            <div ref={pdfRef} className="bg-card p-8 rounded-xl border border-border">
+            <div className="bg-card p-8 rounded-xl border border-border">
                 <header className="flex justify-between items-center border-b pb-4 mb-6">
                     <div>
                         <h1 className="text-2xl font-bold text-accent-dark">Paradigm Inc.</h1>
@@ -133,7 +127,7 @@ const InsurancePdfView: React.FC = () => {
                 </footer>
             </div>
             <div className="text-center">
-                <PdfExportButton elementRef={pdfRef} filename={`Insurance_Card_${personal.employeeId}.pdf`} />
+                <PdfExportButton employeeData={employeeData} />
             </div>
         </div>
     );

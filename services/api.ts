@@ -3850,16 +3850,8 @@ export const api = {
     });
   },
 
-  generatePdf: async (content: string | HTMLElement, options: any): Promise<void> => {
-    try {
-      // @ts-ignore
-      const html2pdf = (await import('html2pdf.js')).default;
-      await html2pdf().set(options).from(content).save();
-    } catch (error) {
-      console.error('PDF generation failed:', error);
-      throw error;
-    }
-  },
+    // PDF generation service removed in favor of @react-pdf/renderer
+    // deleteOnboardingData: async (id: string): Promise<void> => {
 
   /**
    * Batch resolve addresses for a list of coordinates.
