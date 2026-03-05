@@ -35,6 +35,13 @@ export default defineConfig({
 
 
 
+  optimizeDeps: {
+    include: [
+      '@react-pdf/renderer',
+      '@react-pdf/pdfkit',
+      'pako',
+    ],
+  },
   resolve: {
     alias: {
       '@/services': path.resolve(__dirname, './services'),
