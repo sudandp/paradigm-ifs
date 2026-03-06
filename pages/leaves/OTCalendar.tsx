@@ -6,9 +6,13 @@ import { api } from '../../services/api';
 import type { AttendanceEvent, AttendanceSettings } from '../../types';
 import Button from '../../components/ui/Button';
 
-const OTCalendar: React.FC = () => {
+interface OTCalendarProps {
+    viewingDate: Date;
+    onDateChange: (date: Date) => void;
+}
+
+const OTCalendar: React.FC<OTCalendarProps> = ({ viewingDate, onDateChange }) => {
     const { user } = useAuthStore();
-    const [currentDate, setCurrentDate] = useState(new Date());
     const [events, setEvents] = useState<AttendanceEvent[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [threshold, setThreshold] = useState(8);
@@ -19,8 +23,8 @@ const OTCalendar: React.FC = () => {
             setIsLoading(true);
             try {
                 // Fetch events
-                const start = startOfMonth(currentDate).toISOString();
-                const end = endOfMonth(currentDate).toISOString();
+                const start = startOfMonth(viewingDate).toISOString();
+                const end = endOfMonth(viewingDate).toISOString();
                 const [data, settings] = await Promise.all([
                     api.getAttendanceEvents(user.id, start, end),
                     api.getAttendanceSettings()
@@ -52,14 +56,14 @@ const OTCalendar: React.FC = () => {
         };
 
         fetchEvents();
-    }, [user, currentDate]);
+    }, [user, viewingDate]);
 
     const daysInMonth = useMemo(() => {
         return eachDayOfInterval({
-            start: startOfMonth(currentDate),
-            end: endOfMonth(currentDate)
+            start: startOfMonth(viewingDate),
+            end: endOfMonth(viewingDate)
         });
-    }, [currentDate]);
+    }, [viewingDate]);
 
     /** Calculate hours-based OT (working > 8h in a day) */
     const getDailyOT = (date: Date) => {
@@ -122,16 +126,16 @@ const OTCalendar: React.FC = () => {
     }, [events, threshold]);
 
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const startDay = getDay(startOfMonth(currentDate));
+    const startDay = getDay(startOfMonth(viewingDate));
 
     return (
         <div className="bg-card p-5 rounded-xl shadow-card border border-border w-full md:max-w-[350px] flex flex-col min-h-[460px]">
             <div className="flex items-center justify-between mb-6 flex-shrink-0">
                 <h3 className="text-sm font-semibold text-primary-text">OT Calendar</h3>
                 <div className="flex items-center gap-1">
-                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-3 w-3" /></Button>
-                    <span className="font-medium min-w-[80px] text-center text-sm">{format(currentDate, 'MMMM yyyy')}</span>
-                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="h-3 w-3" /></Button>
+                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => onDateChange(subMonths(viewingDate, 1))}><ChevronLeft className="h-3 w-3" /></Button>
+                    <span className="font-medium min-w-[80px] text-center text-sm">{format(viewingDate, 'MMMM yyyy')}</span>
+                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => onDateChange(addMonths(viewingDate, 1))}><ChevronRight className="h-3 w-3" /></Button>
                 </div>
             </div>
 

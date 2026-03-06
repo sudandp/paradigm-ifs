@@ -13,12 +13,13 @@ interface CompOffCalendarProps {
     leaveRequests?: LeaveRequest[];
     userHolidays?: UserHoliday[];
     isLoading?: boolean;
+    viewingDate: Date;
+    onDateChange: (date: Date) => void;
 }
 
-const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests = [], userHolidays = [], isLoading = false }) => {
+const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests = [], userHolidays = [], isLoading = false, viewingDate, onDateChange }) => {
     const { user } = useAuthStore();
     const { officeHolidays, fieldHolidays, recurringHolidays, attendance } = useSettingsStore();
-    const [currentDate, setCurrentDate] = useState(new Date());
     const [events, setEvents] = useState<AttendanceEvent[]>([]);
     const [isLoadingEvents, setIsLoadingEvents] = useState(false);
 
@@ -34,8 +35,8 @@ const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests =
             if (!user) return;
             setIsLoadingEvents(true);
             try {
-                const start = startOfMonth(currentDate).toISOString();
-                const end = endOfMonth(currentDate).toISOString();
+                const start = startOfMonth(viewingDate).toISOString();
+                const end = endOfMonth(viewingDate).toISOString();
                 const data = await api.getAttendanceEvents(user.id, start, end);
                 setEvents(data);
             } catch (error) {
@@ -45,14 +46,14 @@ const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests =
             }
         };
         fetchEvents();
-    }, [user, currentDate]);
+    }, [user, viewingDate]);
 
     const daysInMonth = useMemo(() => {
         return eachDayOfInterval({
-            start: startOfMonth(currentDate),
-            end: endOfMonth(currentDate)
+            start: startOfMonth(viewingDate),
+            end: endOfMonth(viewingDate)
         });
-    }, [currentDate]);
+    }, [viewingDate]);
 
     const getDayStatus = (date: Date) => {
         const currentYear = date.getFullYear();
@@ -127,7 +128,7 @@ const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests =
     };
 
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const startDay = getDay(startOfMonth(currentDate)); // 0-6
+    const startDay = getDay(startOfMonth(viewingDate)); // 0-6
 
     const loading = isLoading || isLoadingEvents;
 
@@ -136,9 +137,9 @@ const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests =
             <div className="flex items-center justify-between mb-6 flex-shrink-0">
                 <h3 className="text-sm font-semibold text-primary-text">Comp Off Tracker</h3>
                 <div className="flex items-center gap-1">
-                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-3 w-3" /></Button>
-                    <span className="font-medium min-w-[80px] text-center text-sm">{format(currentDate, 'MMMM yyyy')}</span>
-                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="h-3 w-3" /></Button>
+                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => onDateChange(subMonths(viewingDate, 1))}><ChevronLeft className="h-3 w-3" /></Button>
+                    <span className="font-medium min-w-[80px] text-center text-sm">{format(viewingDate, 'MMMM yyyy')}</span>
+                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => onDateChange(addMonths(viewingDate, 1))}><ChevronRight className="h-3 w-3" /></Button>
                 </div>
             </div>
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
+import { supabase } from '../../services/supabase';
 import type { LeaveBalance, LeaveRequest, LeaveType, LeaveRequestStatus, UploadedFile, CompOffLog, AttendanceEvent, UserHoliday, AttendanceSettings } from '../../types';
 import { Loader2, Plus, ArrowLeft, AlertTriangle, Briefcase, HeartPulse, Plane, CalendarClock, Clock, Edit, Trash2, XCircle, Search, Calendar, Settings, Check } from 'lucide-react';
 import { HOLIDAY_SELECTION_POOL, FIXED_HOLIDAYS } from '../../utils/constants';
@@ -26,7 +27,7 @@ import HolidayCalendar from './HolidayCalendar';
 
 // --- Reusable Components ---
 
-const LeaveBalanceCard: React.FC<{ title: string; value: string; icon: React.ElementType; isExpired?: boolean }> = ({ title, value, icon: Icon, isExpired }) => (
+const LeaveBalanceCard: React.FC<{ title: string; value: string; icon: React.ElementType; isExpired?: boolean; description?: string }> = ({ title, value, icon: Icon, isExpired, description }) => (
     <div className={`bg-card p-3 md:p-4 rounded-xl flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 border text-center md:text-left w-full ${isExpired ? 'border-amber-500/50 bg-amber-500/5' : 'border-border'}`}>
         <div className={`${isExpired ? 'bg-amber-100' : 'bg-accent-light'} p-2 md:p-3 rounded-full flex-shrink-0`}>
             <Icon className={`h-5 w-5 md:h-6 md:w-6 ${isExpired ? 'text-amber-600' : 'text-accent-dark'}`} />
@@ -37,6 +38,7 @@ const LeaveBalanceCard: React.FC<{ title: string; value: string; icon: React.Ele
                 {isExpired && <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold uppercase">Expired</span>}
             </div>
             <p className={`text-lg md:text-2xl font-bold ${isExpired ? 'text-amber-600' : 'text-primary-text'}`}>{value}</p>
+            {description && <p className="text-[10px] md:text-xs text-muted-foreground mt-1">{description}</p>}
         </div>
     </div>
 );
@@ -98,6 +100,7 @@ const LeaveDashboard: React.FC = () => {
     const [requests, setRequests] = useState<LeaveRequest[]>([]);
     const [compOffLogs, setCompOffLogs] = useState<CompOffLog[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [isCompOffHistoryDisabled, setIsCompOffHistoryDisabled] = useState(false);
     const [filter, setFilter] = useState<LeaveRequestStatus | 'all'>('all');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -133,107 +136,108 @@ const LeaveDashboard: React.FC = () => {
     const fetchData = useCallback(async () => {
         if (!user) return;
         setIsLoading(true);
-        setIsCompOffHistoryDisabled(false);
+        setError(null);
+        
         try {
             const dateStr = format(viewingDate, 'yyyy-MM-dd');
-            const [balanceData, requestsData, compOffData] = await Promise.all([
+            const startStr = startOfMonth(viewingDate).toISOString();
+            const endStr = endOfMonth(viewingDate).toISOString();
+
+            // Fetch base data points
+            const [balanceData, requestsData, compOffData, eventsData, settings] = await Promise.all([
                 api.getLeaveBalancesForUser(user.id, dateStr),
                 api.getLeaveRequests({
                     userId: user.id,
                     status: filter === 'all' ? undefined : filter
                 }).then(res => res.data),
-                api.getCompOffLogs(user.id).catch(error => {
-                    if (error && error.message && (error.message.includes('comp_off_logs') || error.message.includes("relation \"public.comp_off_logs\" does not exist"))) {
-                        setIsCompOffHistoryDisabled(true);
-                        return []; // Return empty array to not break Promise.all
-                    }
-                    throw error; // Re-throw other errors
-                })
+                api.getCompOffLogs(user.id).catch(() => []),
+                api.getAttendanceEvents(user.id, startStr, endStr),
+                api.getAttendanceSettings()
             ]);
+
             setBalance(balanceData);
             setRequests(requestsData);
             setCompOffLogs(compOffData);
-
-            // Calculate OT hours for field staff
-            if (user.role === 'field_staff') {
-                const start = startOfMonth(viewingDate).toISOString();
-                const end = endOfMonth(viewingDate).toISOString();
-                const events = await api.getAttendanceEvents(user.id, start, end);
-
-                // Groups events by day for calculation
-                const eventsByDay: Record<string, AttendanceEvent[]> = {};
-                events.forEach(e => {
-                    const dateStr = format(new Date(e.timestamp), 'yyyy-MM-dd');
-                    if (!eventsByDay[dateStr]) eventsByDay[dateStr] = [];
-                    eventsByDay[dateStr].push(e);
-                });
-
-                // Fetch Holiday Selection Settings and determine threshold
-                const settings = await api.getAttendanceSettings();
-                
-                // Map User Role to Staff Category (office, field, site)
-                let staffCategory: keyof AttendanceSettings = 'field';
-                const userRole = user.role.toLowerCase();
-                if ([
-                    'admin', 'hr', 'finance', 'developer', 'management', 'office_staff', 
-                    'back_office_staff', 'bd', 'operation_manager', 'field_staff',
-                    'finance_manager', 'hr_ops', 'business developer', 'unverified',
-                    'operation manager', 'field staff', 'finance manager', 'hr ops'
-                ].includes(userRole)) {
-                    staffCategory = 'office';
-                } else if (['site_manager', 'site_supervisor', 'site manager', 'site supervisor'].includes(userRole)) {
-                    staffCategory = 'site';
-                } else {
-                    staffCategory = 'field';
-                }
-
-                const userRules = settings[staffCategory];
-                const shiftThreshold = userRules?.dailyWorkingHours?.max || 8;
-                setThreshold(shiftThreshold);
-
-                let totalOT = 0;
-                Object.values(eventsByDay).forEach(dayEvents => {
-                    // Sort events
-                    const sortedEvents = [...dayEvents].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-                    let totalMinutes = 0;
-                    let checkInTime: Date | null = null;
-
-                    sortedEvents.forEach(event => {
-                        const eventTime = new Date(event.timestamp);
-                        if (event.type === 'punch-in') {
-                            checkInTime = eventTime;
-                        } else if (event.type === 'punch-out' && checkInTime) {
-                            totalMinutes += differenceInMinutes(eventTime, checkInTime);
-                            checkInTime = null;
-                        }
-                    });
-
-                    const hours = totalMinutes / 60;
-                    if (hours > shiftThreshold) {
-                        totalOT += (hours - shiftThreshold);
-                    }
-                });
-                setCalculatedOTHours(parseFloat(totalOT.toFixed(1)));
-            }
             
-            // Universal Holiday Selection logic (outside role specific blocks)
-            const settings = await api.getAttendanceSettings();
-            let staffCategory: keyof AttendanceSettings = 'field';
-            const userRole = user.role.toLowerCase();
+            // Refetch current user profile to get latest persistent OT fields (bank, monthly)
+            // This ensures we have the most up-to-date role and balance information
+            const freshUser = await supabase
+                .from('users')
+                .select('*, role:roles(display_name)')
+                .eq('id', user.id)
+                .single();
+
+            let currentUserData = user;
+            if (freshUser.data) {
+                const data = freshUser.data;
+                const roleData = data.role;
+                const rawRoleName = (Array.isArray(roleData) ? roleData[0]?.display_name : (roleData as any)?.display_name) || data.role_id;
+                const normalizedRole = typeof rawRoleName === 'string' ? rawRoleName.toLowerCase().replace(/\s+/g, '_') : rawRoleName;
+                
+                currentUserData = {
+                    ...api.toCamelCase(data),
+                    role: normalizedRole,
+                    roleId: data.role_id
+                };
+                
+                // Update store asynchronously to avoid interrupting current calculation
+                setTimeout(() => {
+                    useAuthStore.getState().updateUserProfile(currentUserData);
+                }, 0);
+            }
+
+            // Map User Role to Staff Category (office, field, site)
+            let staffCategory: keyof AttendanceSettings = 'office';
+            const userRole = (currentUserData.role || '').toLowerCase();
+
             if ([
                 'admin', 'hr', 'finance', 'developer', 'management', 'office_staff', 
-                'back_office_staff', 'bd', 'operation_manager', 'field_staff',
-                'finance_manager', 'hr_ops', 'business developer', 'unverified',
-                'operation manager', 'field staff', 'finance manager', 'hr ops'
+                'back_office_staff', 'bd', 'operation_manager', 'finance_manager', 
+                'hr_ops', 'business developer', 'operation manager', 'finance manager', 'hr ops'
             ].includes(userRole)) {
                 staffCategory = 'office';
-            } else if (['site_manager', 'site_supervisor', 'site manager', 'site supervisor'].includes(userRole)) {
+            } else if (userRole.includes('site')) {
                 staffCategory = 'site';
             } else {
                 staffCategory = 'field';
             }
-            const userRules = settings[staffCategory];
 
+            const userRules = settings[staffCategory];
+            const shiftThreshold = userRules?.dailyWorkingHours?.max || 8;
+            setThreshold(shiftThreshold);
+
+            // Group events by day and calculate OT using normalized logic
+            const dayLogs: Record<string, AttendanceEvent[]> = {};
+            eventsData.forEach(e => {
+                const d = format(new Date(e.timestamp), 'yyyy-MM-dd');
+                if (!dayLogs[d]) dayLogs[d] = [];
+                dayLogs[d].push(e);
+            });
+
+            let totalOTHours = 0;
+            Object.values(dayLogs).forEach(dayEvents => {
+                const sorted = [...dayEvents].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                let dailyTotalMinutes = 0;
+                let lastIn: Date | null = null;
+
+                sorted.forEach(evt => {
+                    const time = new Date(evt.timestamp);
+                    const type = evt.type.toLowerCase();
+                    if (type.includes('in') && !type.includes('break')) {
+                        lastIn = time;
+                    } else if (type.includes('out') && !type.includes('break') && lastIn) {
+                        dailyTotalMinutes += differenceInMinutes(time, lastIn);
+                        lastIn = null;
+                    }
+                });
+
+                const dayHours = dailyTotalMinutes / 60;
+                if (dayHours > shiftThreshold) {
+                    totalOTHours += (dayHours - shiftThreshold);
+                }
+            });
+
+            setCalculatedOTHours(parseFloat(totalOTHours.toFixed(1)));
             setIsHolidaySelectionEnabled(userRules?.enableCustomHolidays || false);
             setActiveHolidayPool(userRules?.holidayPool || HOLIDAY_SELECTION_POOL);
             
@@ -242,21 +246,22 @@ const LeaveDashboard: React.FC = () => {
                 setUserHolidays(selections);
             }
 
-        } catch (error: any) {
+        } catch (err: any) {
+            console.error('Error fetching dashboard data:', err);
             let message = 'Failed to load leave data.';
-            if (error && typeof error.message === 'string') {
-                if (error.message.includes('relation "leave_requests" does not exist')) {
+            if (err && typeof err.message === 'string') {
+                if (err.message.includes('relation "leave_requests" does not exist')) {
                     message = 'Database setup error: The "leave_requests" table is missing.';
+                } else {
+                    message = err.message;
                 }
             }
-            console.error("Failed to load leave data", error);
-            if (!isCompOffHistoryDisabled) { // Avoid double-toast if comp-off is the only issue
-                setToast({ message, type: 'error' });
-            }
+            setError(message);
+            setToast({ message, type: 'error' });
         } finally {
             setIsLoading(false);
         }
-    }, [user, filter, viewingDate]);
+    }, [user?.id, user?.role, filter, viewingDate]);
 
     useEffect(() => {
         fetchData();
@@ -294,24 +299,28 @@ const LeaveDashboard: React.FC = () => {
         { 
             title: 'Earned Leave', 
             value: `${Math.max(0, balance.earnedTotal - balance.earnedUsed)} / ${balance.earnedTotal}`, 
+            description: `Total: ${balance.earnedTotal}d. Available: ${Math.max(0, balance.earnedTotal - balance.earnedUsed)}d.`,
             icon: Briefcase,
             isExpired: balance.expiryStates?.earned 
         },
         { 
             title: 'Sick Leave', 
             value: `${Math.max(0, balance.sickTotal - balance.sickUsed)} / ${balance.sickTotal}`, 
+            description: `Total: ${balance.sickTotal}d. Available: ${Math.max(0, balance.sickTotal - balance.sickUsed)}d.`,
             icon: HeartPulse,
             isExpired: balance.expiryStates?.sick
         },
         { 
             title: 'Floating Holiday', 
             value: `${Math.max(0, balance.floatingTotal - balance.floatingUsed)} / ${balance.floatingTotal}`, 
+            description: `Total: ${balance.floatingTotal}d. Available: ${Math.max(0, balance.floatingTotal - balance.floatingUsed)}d.`,
             icon: Plane,
             isExpired: balance.expiryStates?.floating
         },
         { 
             title: 'Compensatory Off', 
             value: `${Math.max(0, balance.compOffTotal - balance.compOffUsed)} / ${balance.compOffTotal}`, 
+            description: `Total: ${balance.compOffTotal}d. Available: ${Math.max(0, balance.compOffTotal - balance.compOffUsed) }d.`,
             icon: CalendarClock,
             isExpired: balance.expiryStates?.compOff
         },
@@ -336,7 +345,8 @@ const LeaveDashboard: React.FC = () => {
                 <div className="relative group w-full">
                     <LeaveBalanceCard 
                         title="Monthly OT Hours" 
-                        value={formatPreciseHours(user?.monthlyOtHours || 0)} 
+                        value={formatPreciseHours(calculatedOTHours || user?.monthlyOtHours || 0)} 
+                        description={`Calculated from hours exceeding ${threshold}h daily.`}
                         icon={Clock} 
                     />
                     <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -350,6 +360,7 @@ const LeaveDashboard: React.FC = () => {
                     </div>
                 </div>
             </div>
+
 
             {/* Holiday Selection Section */}
             {isHolidaySelectionEnabled && (
@@ -423,10 +434,26 @@ const LeaveDashboard: React.FC = () => {
                     currentDate={viewingDate}
                     setCurrentDate={setViewingDate}
                 />
-                <CompOffCalendar logs={compOffLogs} leaveRequests={requests} userHolidays={userHolidays} isLoading={isLoading} />
-                <HolidayCalendar adminHolidays={adminHolidays} userSelectedHolidays={userHolidays} isLoading={isLoading} />
+                <CompOffCalendar 
+                    logs={compOffLogs} 
+                    leaveRequests={requests} 
+                    userHolidays={userHolidays} 
+                    isLoading={isLoading} 
+                    viewingDate={viewingDate}
+                    onDateChange={setViewingDate}
+                />
+                <HolidayCalendar 
+                    adminHolidays={adminHolidays} 
+                    userSelectedHolidays={userHolidays} 
+                    isLoading={isLoading} 
+                    viewingDate={viewingDate}
+                    onDateChange={setViewingDate}
+                />
                 <YearlyAttendanceChart />
-                <OTCalendar />
+                <OTCalendar 
+                    viewingDate={viewingDate}
+                    onDateChange={setViewingDate}
+                />
             </div>
 
             {isMobile && (

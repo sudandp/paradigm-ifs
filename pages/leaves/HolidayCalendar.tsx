@@ -9,18 +9,19 @@ interface HolidayCalendarProps {
     adminHolidays: Holiday[];
     userSelectedHolidays: UserHoliday[];
     isLoading?: boolean;
+    viewingDate: Date;
+    onDateChange: (date: Date) => void;
 }
 
-const HolidayCalendar: React.FC<HolidayCalendarProps> = ({ adminHolidays, userSelectedHolidays, isLoading = false }) => {
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const currentYear = currentDate.getFullYear();
+const HolidayCalendar: React.FC<HolidayCalendarProps> = ({ adminHolidays, userSelectedHolidays, isLoading = false, viewingDate, onDateChange }) => {
+    const currentYear = viewingDate.getFullYear();
 
     const daysInMonth = useMemo(() => {
         return eachDayOfInterval({
-            start: startOfMonth(currentDate),
-            end: endOfMonth(currentDate)
+            start: startOfMonth(viewingDate),
+            end: endOfMonth(viewingDate)
         });
-    }, [currentDate]);
+    }, [viewingDate]);
 
     const getDayStatus = (date: Date) => {
         // 1. Check Fixed Common Holidays
@@ -55,16 +56,16 @@ const HolidayCalendar: React.FC<HolidayCalendarProps> = ({ adminHolidays, userSe
     };
 
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const startDay = getDay(startOfMonth(currentDate));
+    const startDay = getDay(startOfMonth(viewingDate));
 
     return (
         <div className="bg-card p-5 rounded-xl shadow-card border border-border w-full md:max-w-[350px] flex flex-col min-h-[460px]">
             <div className="flex items-center justify-between mb-6 flex-shrink-0">
                 <h3 className="text-sm font-semibold text-primary-text">Holiday Calendar</h3>
                 <div className="flex items-center gap-1">
-                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-3 w-3" /></Button>
-                    <span className="font-medium min-w-[80px] text-center text-sm">{format(currentDate, 'MMMM yyyy')}</span>
-                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="h-3 w-3" /></Button>
+                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => onDateChange(subMonths(viewingDate, 1))}><ChevronLeft className="h-3 w-3" /></Button>
+                    <span className="font-medium min-w-[80px] text-center text-sm">{format(viewingDate, 'MMMM yyyy')}</span>
+                    <Button variant="secondary" size="sm" className="btn-icon !p-1 h-6 w-6" onClick={() => onDateChange(addMonths(viewingDate, 1))}><ChevronRight className="h-3 w-3" /></Button>
                 </div>
             </div>
 
