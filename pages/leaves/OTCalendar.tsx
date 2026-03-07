@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, getDay, isAfter, startOfDay, differenceInMinutes } from 'date-fns';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { calculateWorkingHours } from '../../utils/attendanceCalculations';
 import { api } from '../../services/api';
 import type { AttendanceEvent, AttendanceSettings } from '../../types';
 import Button from '../../components/ui/Button';
@@ -65,30 +66,16 @@ const OTCalendar: React.FC<OTCalendarProps> = ({ viewingDate, onDateChange }) =>
         });
     }, [viewingDate]);
 
-    /** Calculate hours-based OT (working > 8h in a day) */
+    /** Calculate hours-based OT (working > threshold in a day, subtracting breaks) */
     const getDailyOT = (date: Date) => {
         const dayEvents = events.filter(e => isSameDay(new Date(e.timestamp), date));
 
         if (dayEvents.length === 0) return { hoursOT: 0, hasOtPunch: false };
 
-        const sortedEvents = [...dayEvents].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        const { workingHours } = calculateWorkingHours(dayEvents);
+        const hasOtPunch = dayEvents.some(e => e.type === 'punch-in' && e.isOt);
 
-        let totalMinutes = 0;
-        let checkInTime: Date | null = null;
-        let hasOtPunch = false;
-
-        sortedEvents.forEach(event => {
-            const eventTime = new Date(event.timestamp);
-            if (event.type === 'punch-in') {
-                checkInTime = eventTime;
-                if (event.isOt) hasOtPunch = true;
-            } else if (event.type === 'punch-out' && checkInTime) {
-                totalMinutes += differenceInMinutes(eventTime, checkInTime);
-                checkInTime = null;
-            }
-        });
-
-        const otMinutes = Math.max(0, totalMinutes - (threshold * 60));
+        const otMinutes = Math.max(0, (workingHours * 60) - (threshold * 60));
         
         return { 
             hoursOT: Math.floor(otMinutes / 60), 
@@ -176,32 +163,9 @@ const OTCalendar: React.FC<OTCalendarProps> = ({ viewingDate, onDateChange }) =>
                 </div>
             )}
 
-            {/* Summary Information */}
-            <div className="mb-4 p-3 bg-accent-light/30 rounded-lg border border-accent-light/50">
-                <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-semibold text-primary-text">This Month's OT</span>
-                    <span className="text-lg font-bold text-accent-dark">
-                        {monthlySummary.h}h {monthlySummary.m}m
-                    </span>
-                </div>
-                <div className="flex justify-between items-center text-[11px] text-muted">
-                    <span>Pending in Bank</span>
-                    <span className="font-medium">
-                        {Math.floor((user?.otHoursBank || 0))}h {Math.round(((user?.otHoursBank || 0) % 1) * 60)}m / 8h
-                    </span>
-                </div>
-                <div className="w-full bg-border/30 h-1.5 rounded-full mt-2 overflow-hidden">
-                    <div 
-                        className="bg-accent-dark h-full transition-all duration-500" 
-                        style={{ width: `${Math.min(100, ((user?.otHoursBank || 0) / 8) * 100)}%` }}
-                    ></div>
-                </div>
-                <p className="text-[10px] text-muted italic mt-2">Every 8h of OT earns you 1 Comp Off automatically.</p>
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-border/50 flex flex-wrap gap-2 text-[11px] text-muted-foreground uppercase font-bold tracking-tight">
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"></div> Overtime (&gt;{threshold}h)</div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-orange-600 rounded-full flex-shrink-0"></div> OT Punch</div>
+            <div className="mt-6 pt-4 border-t border-border flex items-center justify-between flex-shrink-0">
+                <span className="text-xs text-muted font-medium">Monthly Total</span>
+                <span className="text-sm font-bold text-primary-text">{monthlySummary.h}h {monthlySummary.m}m</span>
             </div>
         </div>
     );

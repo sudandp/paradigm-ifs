@@ -345,21 +345,29 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
 
         const startIndex = (currentPage - 1) * pageSize;
         const filteredNotifs = notifications.filter(notif => {
-            if (notif.type === 'security') return false;
-            if (notif.message.includes('Field attendance violation')) return false;
             if (notif.isRead) return false;
             
-            let meta = notif.metadata as any;
-            if (typeof meta === 'string') {
-                try { meta = JSON.parse(meta); } catch(e) { meta = {}; }
+            // For managers, we filter out items that have their own dedicated sections
+            if (isManagerRole) {
+                if (notif.type === 'security') return false;
+                if (notif.message.includes('Field attendance violation')) return false;
+                
+                let meta = notif.metadata as any;
+                if (typeof meta === 'string') {
+                    try { meta = JSON.parse(meta); } catch(e) { meta = {}; }
+                }
+                const isTeamEvent = meta?.isTeamActivity || meta?.is_team_activity || 
+                                    (notif.type !== 'direct_ping' && notif.type !== 'approval_request' && (
+                                    notif.message.includes('punched in') || 
+                                    notif.message.includes('punched out') || 
+                                    notif.message.includes('checked in') || 
+                                    notif.message.includes('checked out') || 
+                                    notif.message.toLowerCase().includes('break')));
+                return !isTeamEvent;
             }
-            const isTeamEvent = meta?.isTeamActivity || meta?.is_team_activity || 
-                                notif.message.includes('punched in') || 
-                                notif.message.includes('punched out') || 
-                                notif.message.includes('checked in') || 
-                                notif.message.includes('checked out') || 
-                                notif.message.toLowerCase().includes('break');
-            return !isTeamEvent;
+            
+            // For non-managers, show all unread notifications in Recent Updates
+            return true;
         });
         const pagedNotifs = filteredNotifs.slice(startIndex, startIndex + pageSize);
 
@@ -394,21 +402,25 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
     }, [notifications]);
 
     const filteredNotifCount = notifications.filter(notif => {
-        if (notif.type === 'security') return false;
-        if (notif.message.includes('Field attendance violation')) return false;
         if (notif.isRead) return false;
-        
-        let meta = notif.metadata as any;
-        if (typeof meta === 'string') {
-            try { meta = JSON.parse(meta); } catch(e) { meta = {}; }
-        }
-        const isTeamEvent = meta?.isTeamActivity || meta?.is_team_activity || 
-                            notif.message.includes('punched in') || 
-                            notif.message.includes('punched out') || 
+        if (isManagerRole) {
+            if (notif.type === 'security') return false;
+            if (notif.message.includes('Field attendance violation')) return false;
+            
+            let meta = notif.metadata as any;
+            if (typeof meta === 'string') {
+                try { meta = JSON.parse(meta); } catch(e) { meta = {}; }
+            }
+            const isTeamEvent = meta?.isTeamActivity || meta?.is_team_activity || 
+                                (notif.type !== 'direct_ping' && notif.type !== 'approval_request' && (
+                                notif.message.includes('punched in') || 
+                                notif.message.includes('punched out') || 
                                 notif.message.includes('checked in') || 
                                 notif.message.includes('checked out') || 
-                            notif.message.toLowerCase().includes('break');
-        return !isTeamEvent;
+                                notif.message.toLowerCase().includes('break')));
+            return !isTeamEvent;
+        }
+        return true;
     }).length;
     const totalPages = Math.ceil(filteredNotifCount / pageSize);
 
@@ -458,7 +470,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                 className={`flex-1 overflow-y-auto custom-scrollbar ${isMobile ? 'bg-[#0A3D2E]' : 'bg-white'}`}
             >
                 {/* Pending Approvals Section */}
-                {(pendingCount > 0) && isManagerRole && (
+                {(pendingCount > 0) && (
                     <div className={`border-b ${isMobile ? 'border-white/10 bg-gradient-to-b from-white/5 to-transparent' : 'border-gray-100 bg-amber-50/30'}`}>
                         <div className="px-6 py-4 flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -466,7 +478,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                     <Clock className="w-3.5 h-3.5" />
                                 </div>
                                 <h5 className={`text-[11px] font-black uppercase tracking-widest ${isMobile ? 'text-white/90' : 'text-amber-900'}`}>
-                                    Pending Approvals
+                                    {isManagerRole ? 'Pending Approvals' : 'Important Alerts'}
                                 </h5>
                             </div>
                             <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${isMobile ? 'bg-white/10 text-white border border-white/5' : 'bg-amber-100 text-amber-700'}`}>
@@ -1350,8 +1362,6 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
                                 </Button>
                             </div>
                         </div>
-                        
-
                     </div>
                 </div>
             )}

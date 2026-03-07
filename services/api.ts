@@ -2396,32 +2396,30 @@ export const api = {
       }
     });
 
-    // --- Floating Holiday Overflow Logic ---
-    // If a floating holiday expires (end of following month) and wasn't used, 
-    // it converts to a Compensatory Off.
+    // --- Floating Holiday Expiry Logic ---
+    // Floating holidays simply expire once past their validity date.
+    // They do NOT convert to Comp Offs.
     let remainingFHUsed = balance.floatingUsed;
     let finalFHTotal = 0;
-    let overflowCompOff = 0;
+
+    const fhExpiryDateStr = rules.floatingLeavesExpiryDate; // e.g. "2026-02-01"
+    const fhExpiryDate = fhExpiryDateStr ? new Date(fhExpiryDateStr.replace(/-/g, '/')) : null;
 
     floatingHolidayDates.sort((a, b) => a.getTime() - b.getTime()).forEach(fhDate => {
-        const expiryDate = endOfMonth(fhDate);
-        const isExpiredInView = expiryDate < startOfMonth(referenceDate);
+        // If an expiry date is set, check if the holiday is still valid as of the START of the month viewed.
+        // OR if the holiday itself is past the expiry date.
+        const isExpiredByRules = fhExpiryDate && fhDate > fhExpiryDate;
+        const isExpiredByView = fhExpiryDate && fhExpiryDate < startOfMonth(referenceDate);
 
-        if (remainingFHUsed >= 1) {
-            // This instance was used as a Floating Leave
-            finalFHTotal++;
-            remainingFHUsed -= 1;
-        } else if (isExpiredInView) {
-            // Expired and not used -> Overflow to Comp Off
-            overflowCompOff++;
-        } else {
-            // Still active as Floating
-            finalFHTotal++;
+        if (isExpiredByRules || isExpiredByView) {
+            // This holiday is expired and no longer counts towards the balance.
+            return;
         }
+
+        finalFHTotal++;
     });
 
     balance.floatingTotal = finalFHTotal;
-    balance.compOffTotal += overflowCompOff;
 
     balance.debug = {
         staffType,

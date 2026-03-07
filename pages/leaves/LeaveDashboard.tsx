@@ -13,6 +13,7 @@ import { useForm, Controller, SubmitHandler, Resolver } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { format, differenceInCalendarDays, isSameDay, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
+import { calculateWorkingHours } from '../../utils/attendanceCalculations';
 import DatePicker from '../../components/ui/DatePicker';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -272,24 +273,9 @@ const LeaveDashboard: React.FC = () => {
 
             let totalOTHours = 0;
             Object.values(dayLogs).forEach(dayEvents => {
-                const sorted = [...dayEvents].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-                let dailyTotalMinutes = 0;
-                let lastIn: Date | null = null;
-
-                sorted.forEach(evt => {
-                    const time = new Date(evt.timestamp);
-                    const type = evt.type.toLowerCase();
-                    if (type.includes('in') && !type.includes('break')) {
-                        lastIn = time;
-                    } else if (type.includes('out') && !type.includes('break') && lastIn) {
-                        dailyTotalMinutes += differenceInMinutes(time, lastIn);
-                        lastIn = null;
-                    }
-                });
-
-                const dayHours = dailyTotalMinutes / 60;
-                if (dayHours > shiftThreshold) {
-                    totalOTHours += (dayHours - shiftThreshold);
+                const { workingHours } = calculateWorkingHours(dayEvents);
+                if (workingHours > shiftThreshold) {
+                    totalOTHours += (workingHours - shiftThreshold);
                 }
             });
 
@@ -389,17 +375,6 @@ const LeaveDashboard: React.FC = () => {
             <div className="flex justify-between items-center">
                 <div className="flex flex-col">
                     <h2 className="text-2xl font-bold text-primary-text">My Leave Requests</h2>
-                    {balanceDataState?.debug?.processedLeaves && (
-                        <div className="text-[10px] text-muted-foreground mt-1 max-w-2xl bg-amber-50 p-1 border border-amber-100 rounded">
-                            <span className="font-bold text-amber-800">Leave Trace:</span> {
-                                balanceDataState.debug.processedLeaves.map((l: any, i: number) => (
-                                    <span key={i} className="mr-2">
-                                        [{l.type}] {format(new Date(l.start.replace(/-/g, '/')), 'MMM d')}: {l.amount}d
-                                    </span>
-                                ))
-                            }
-                        </div>
-                    )}
                 </div>
                 {!isMobile && (
                     <div className="flex gap-2">
