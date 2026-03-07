@@ -82,15 +82,45 @@ const AttendanceAuditReport: React.FC<AttendanceAuditReportProps> = ({ logs, gen
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 text-gray-600 max-w-xs truncate">
-                                    <div className="flex flex-col gap-1">
+                                    <div className="flex flex-col gap-1.5">
                                         {log.details.date && (
-                                            <span className="flex items-center text-xs">
-                                                <Calendar className="w-3 h-3 mr-1" /> {log.details.date}
+                                            <span className="flex items-center text-xs font-semibold text-gray-700">
+                                                <Calendar className="w-3.5 h-3.5 mr-1.5 text-blue-500" /> {log.details.date}
                                             </span>
                                         )}
+                                        <div className="flex flex-wrap gap-2 mt-0.5">
+                                            {log.details.status && (
+                                                <span className="px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] font-bold border border-gray-200">
+                                                    {log.details.status}
+                                                </span>
+                                            )}
+                                            {log.details.workType === 'field' && (
+                                                <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold border border-emerald-100">
+                                                    Site Visit
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-[10px] text-gray-500 grid grid-cols-2 gap-x-4 gap-y-0.5 leading-tight">
+                                            {log.details.checkIn && log.details.checkIn !== 'N/A' && (
+                                                <span>In: <span className="text-gray-900 font-medium">{log.details.checkIn}</span></span>
+                                            )}
+                                            {log.details.checkOut && log.details.checkOut !== 'N/A' && (
+                                                <span>Out: <span className="text-gray-900 font-medium">{log.details.checkOut}</span></span>
+                                            )}
+                                            {log.details.includeBreak && (
+                                                <>
+                                                    {log.details.breakIn && log.details.breakIn !== 'N/A' && (
+                                                        <span>B.In: <span className="text-gray-900 font-medium">{log.details.breakIn}</span></span>
+                                                    )}
+                                                    {log.details.breakOut && log.details.breakOut !== 'N/A' && (
+                                                        <span>B.Out: <span className="text-gray-900 font-medium">{log.details.breakOut}</span></span>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
                                         {log.details.reason && (
-                                            <span className="flex items-center text-xs italic text-gray-500" title={log.details.reason}>
-                                                <FileText className="w-3 h-3 mr-1" /> {log.details.reason}
+                                            <span className="flex items-start text-[11px] italic text-gray-500 mt-1 line-clamp-2" title={log.details.reason}>
+                                                <FileText className="w-3 h-3 mr-1.5 mt-0.5 flex-shrink-0" /> {log.details.reason}
                                             </span>
                                         )}
                                     </div>

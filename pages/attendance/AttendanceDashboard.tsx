@@ -69,6 +69,7 @@ import {
     MonthlyReportRow,
     GenericReportColumn
 } from '../../utils/excelExport';
+import { calculateWorkingHours } from '../../utils/attendanceCalculations';
 import { FIXED_HOLIDAYS } from '../../utils/constants';
 import LoadingScreen from '../../components/ui/LoadingScreen';
 import {
@@ -335,6 +336,7 @@ type BasicReportDataRow = {
     checkIn: string | null;
     checkOut: string | null;
     duration: string | null;
+    locationName?: string;
 };
 
 type AttendanceLogDataRow = {
@@ -342,9 +344,11 @@ type AttendanceLogDataRow = {
     date: string;
     time: string;
     type: string;
+    displayType?: string;
     locationName?: string;
     latitude?: number;
     longitude?: number;
+    workType?: string;
 };
 
 
@@ -377,7 +381,9 @@ const AttendanceLogPdfComponent: React.FC<{ data: AttendanceLogDataRow[]; dateRa
                             <td className="p-2 border border-gray-300">{event.userName}</td>
                             <td className="p-2 border border-gray-300">{event.date}</td>
                             <td className="p-2 border border-gray-300">{event.time}</td>
-                            <td className="p-2 border border-gray-300 capitalize">{event.type.replace('-', ' ')}</td>
+                            <td className="p-2 border border-gray-300 capitalize">
+                                {event.displayType || event.type.replace('-', ' ')}
+                            </td>
                             <td className="p-2 border border-gray-300">{event.locationName || (event.latitude ? `${event.latitude?.toFixed(4)}, ${event.longitude?.toFixed(4)}` : 'N/A')}</td>
                         </tr>
                     ))}
@@ -525,6 +531,18 @@ const BasicReportPdfLayout: React.FC<{ data: BasicReportDataRow[]; dateRange: Ra
                                                 border: '1px solid #000',
                                                 padding: '10px 5px',
                                                 textAlign: 'center',
+                                                width: '16%',
+                                                fontSize: '11px',
+                                                fontWeight: 'bold',
+                                            }}
+                                        >
+                                            Location
+                                        </th>
+                                        <th
+                                            style={{
+                                                border: '1px solid #000',
+                                                padding: '10px 5px',
+                                                textAlign: 'center',
                                                 width: '12%',
                                                 fontSize: '11px',
                                                 fontWeight: 'bold',
@@ -599,6 +617,18 @@ const BasicReportPdfLayout: React.FC<{ data: BasicReportDataRow[]; dateRange: Ra
                                                 }}
                                             >
                                                 {row.status}
+                                            </td>
+                                            <td
+                                                style={{
+                                                    border: '1px solid #ccc',
+                                                    padding: '8px 5px',
+                                                    textAlign: 'center',
+                                                    verticalAlign: 'middle',
+                                                    fontSize: '10px',
+                                                    lineHeight: '1.2'
+                                                }}
+                                            >
+                                                {row.locationName || '-'}
                                             </td>
                                             <td
                                                 style={{
@@ -1013,7 +1043,9 @@ const AttendanceDashboard: React.FC = () => {
                         else if (leaveType === 'loss of pay' || leaveType === 'lop') status = 'A';
                         else status = 'E/L';
                     } else if (hasActivity) {
+                        const isWorkFromHome = dayEvents.some(e => e.locationName?.toLowerCase().includes('work from home'));
                         if (isWeekend) status = 'W/P';
+                        else if (isWorkFromHome) status = 'W/H';
                         else status = 'P';
                     } else if (isWeekend) {
                         status = 'W/O';
@@ -1032,10 +1064,9 @@ const AttendanceDashboard: React.FC = () => {
 
                             // Calculate OT (if > 8 hours)
                             if (checkInEvent) {
-                                const diff = differenceInMinutes(new Date(checkOutEvent.timestamp), new Date(checkInEvent.timestamp));
-                                const hours = diff / 60;
-                                if (hours > 8) {
-                                    dailyOT = Math.round((hours - 8) * 10) / 10;
+                                const { workingHours } = calculateWorkingHours(dayEvents);
+                                if (workingHours > 8) {
+                                    dailyOT = Math.round((workingHours - 8) * 10) / 10;
                                 }
                             }
                         }
@@ -1200,14 +1231,8 @@ const AttendanceDashboard: React.FC = () => {
                 });
 
                 Object.values(userEvents).forEach(ue => {
-                    ue.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-                    const checkIn = ue.find(e => e.type === 'punch-in');
-                    const checkOut = [...ue].reverse().find(e => e.type === 'punch-out');
-
-                    if (checkIn && checkOut) {
-                        const diff = differenceInMinutes(new Date(checkOut.timestamp), new Date(checkIn.timestamp));
-                        totalHours += diff / 60;
-                    }
+                    const { workingHours } = calculateWorkingHours(ue);
+                    totalHours += workingHours;
                 });
 
                 productivityData.push(uniqueUsersPresent > 0 ? parseFloat((totalHours / uniqueUsersPresent).toFixed(1)) : 0);
@@ -1444,25 +1469,23 @@ const AttendanceDashboard: React.FC = () => {
                         checkOut = format(new Date(checkOutEvent.timestamp), 'HH:mm');
                     }
 
-                    if (checkInEvent && checkOutEvent) {
-                        const start = new Date(checkInEvent.timestamp);
-                        const end = new Date(checkOutEvent.timestamp);
-                        const diff = differenceInMinutes(end, start);
-                        const hours = Math.floor(diff / 60);
-                        const minutes = diff % 60;
-                        duration = `${hours}h ${minutes}m`;
-                    }
+                    const { workingHours } = calculateWorkingHours(dayEvents);
+                    const hours = Math.floor(workingHours);
+                    const minutes = Math.round((workingHours - hours) * 60);
+                    duration = `${hours}h ${minutes}m`;
                 } else if (hasApprovedLeave) {
                     status = 'E/L'; // Default to E/L for basic report, can be specific if needed
                 }
 
+                const checkInEvent = dayEvents.find(e => e.type === 'punch-in');
                 data.push({
                     userName: user.name,
                     date: dateStr,
                     status,
                     checkIn,
                     checkOut,
-                    duration
+                    duration,
+                    locationName: (checkInEvent?.locationName || 'Office')
                 });
             });
         });
@@ -1524,14 +1547,22 @@ const AttendanceDashboard: React.FC = () => {
                 const location = e.locationName || 
                                 (e.latitude && e.longitude ? `${e.latitude.toFixed(4)}, ${e.longitude.toFixed(4)}` : 'N/A');
 
+                let displayType = e.type.replace('-', ' ');
+                if (e.workType === 'field') {
+                    if (e.type === 'punch-in') displayType = 'Site Check In';
+                    else if (e.type === 'punch-out') displayType = 'Site Check Out';
+                }
+
                 return {
                     userName: user?.name || 'Unknown',
                     date: format(new Date(e.timestamp), 'yyyy-MM-dd'),
                     time: format(new Date(e.timestamp), 'HH:mm:ss'),
                     type: e.type,
+                    displayType,
                     locationName: location,
                     latitude: e.latitude,
-                    longitude: e.longitude
+                    longitude: e.longitude,
+                    workType: e.workType
                 };
             })
             .sort((a, b) => {
@@ -1730,12 +1761,8 @@ const AttendanceDashboard: React.FC = () => {
                     const checkInEvent = sortedEvents.find(e => e.type === 'punch-in');
                     const checkOutEvent = [...sortedEvents].reverse().find(e => e.type === 'punch-out');
                     
-                    let workedMinutes = 0;
-                    if (checkInEvent && checkOutEvent) {
-                        const start = new Date(checkInEvent.timestamp);
-                        const end = new Date(checkOutEvent.timestamp);
-                        workedMinutes = differenceInMinutes(end, start);
-                    }
+                    const { workingHours } = calculateWorkingHours(dayEvents);
+                    const workedMinutes = workingHours * 60;
                     
                     const workedHours = workedMinutes / 60;
                     const minHoursFullDay = 6;
@@ -1959,6 +1986,7 @@ const AttendanceDashboard: React.FC = () => {
                         { header: 'Status', key: 'status', width: 15 },
                         { header: 'Punch In', key: 'checkIn', width: 15 },
                         { header: 'Punch Out', key: 'checkOut', width: 15 },
+                        { header: 'Location', key: 'locationName', width: 25 },
                         { header: 'Hours', key: 'duration', width: 15 }
                     ];
                     dataToExport = basicReportData;
@@ -2172,7 +2200,7 @@ const AttendanceDashboard: React.FC = () => {
                                  row.status === 'A' || row.type === 'punch-out' ? 'bg-red-500/20 text-red-400' : 
                                  'bg-blue-500/20 text-blue-400'
                              }`}>
-                                 {row.status || (row.type === 'punch-in' ? 'In' : row.type === 'punch-out' ? 'Out' : 'Log')}
+                                 {row.status || row.displayType || (row.type === 'punch-in' ? 'In' : row.type === 'punch-out' ? 'Out' : 'Log')}
                              </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3 text-xs">

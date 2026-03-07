@@ -253,8 +253,7 @@ html {
 }
 body {
     background-color: #f9fafb;
-    zoom: 70%;
-    min-height: 143vh;
+    min-height: 100vh;
 }
 @media (max-width: 767px) {
     html, body {
@@ -262,7 +261,7 @@ body {
     }
 }
 #root {
-    min-height: 143vh;
+    min-height: 100vh;
 }
 @media (max-width: 767px) {
     #root {
@@ -270,10 +269,10 @@ body {
     }
 }
 .min-h-screen {
-    min-height: 143vh !important;
+    min-height: 100vh !important;
 }
 .h-screen {
-    height: 143vh !important;
+    height: 100vh !important;
 }
 .form-input {
     background-color: #ffffff;

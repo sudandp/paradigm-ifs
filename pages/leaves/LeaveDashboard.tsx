@@ -383,7 +383,7 @@ const LeaveDashboard: React.FC = () => {
                 )}
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6 justify-items-center md:justify-items-start">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {balanceCards.map(b => <LeaveBalanceCard key={b.title} {...b} />)}
                 {/* Show Overtime card for everyone now that we track it persistent */}
                 <div className="relative group w-full">
@@ -471,7 +471,7 @@ const LeaveDashboard: React.FC = () => {
 
 
             {/* Attendance Calendar Section */}
-            <div className="flex flex-col lg:flex-row gap-6 items-start overflow-x-auto pb-4 custom-scrollbar-horizontal">
+            <div className="flex flex-wrap gap-6 items-start">
                 <AttendanceCalendar 
                     leaveRequests={requests} 
                     userHolidays={userHolidays} 

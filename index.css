@@ -5,14 +5,13 @@
 
 @media (min-width: 768px) {
     body {
-        zoom: 75%;
-        min-height: 133.34vh;
+        min-height: 100vh;
     }
     .min-h-screen {
-        min-height: 133.34vh !important;
+        min-height: 100vh !important;
     }
     .h-screen {
-        height: 133.34vh !important;
+        height: 100vh !important;
     }
 }
 
@@ -304,21 +303,20 @@ body {
 }
 @media (max-width: 767px) {
     body {
-        zoom: 70%;
-        min-height: 143vh;
+        min-height: 100vh;
     }
     #root {
-        min-height: 143vh;
+        min-height: 100vh;
         background-color: #041b0f !important;
     }
 }
 
 @media (max-width: 767px) {
     .min-h-screen {
-        min-height: 143vh !important;
+        min-height: 100vh !important;
     }
     .h-screen {
-        height: 143vh !important;
+        height: 100vh !important;
     }
 }
 .form-input {

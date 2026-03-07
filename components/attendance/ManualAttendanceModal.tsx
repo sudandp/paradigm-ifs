@@ -3,6 +3,8 @@ import { X, Save, Loader2, Calendar as CalendarIcon, Clock, User, FileText } fro
 import { supabase } from '../../services/supabase';
 import { format } from 'date-fns';
 import { User as UserType } from '../../types';
+import { api } from '../../services/api';
+import Toast from '../ui/Toast';
 
 interface ManualAttendanceModalProps {
     isOpen: boolean;
@@ -28,8 +30,13 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
     const [checkOutTime, setCheckOutTime] = useState<string>('18:00');
     const [locationName, setLocationName] = useState<string>('Office');
     const [reason, setReason] = useState<string>('');
+    const [breakInTime, setBreakInTime] = useState<string>('13:00');
+    const [breakOutTime, setBreakOutTime] = useState<string>('14:00');
+    const [includeBreak, setIncludeBreak] = useState<boolean>(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [isLoadingExisting, setIsLoadingExisting] = useState(false);
+    const [existingEventIds, setExistingEventIds] = useState<string[]>([]);
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -39,25 +46,126 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
             setStatus('Present');
             setCheckInTime('09:00');
             setCheckOutTime('18:00');
+            setBreakInTime('13:00');
+            setBreakOutTime('14:00');
+            setIncludeBreak(false);
             setLocationName('Office');
             setReason('');
-            setError(null);
+            setExistingEventIds([]);
+            setIsLoadingExisting(false);
+            setToast(null);
         }
     }, [isOpen]);
+
+    useEffect(() => {
+        const fetchExistingLogs = async () => {
+            if (!selectedUserId || !date || !isOpen) return;
+
+            setIsLoadingExisting(true);
+            try {
+                const startDate = `${date}T00:00:00Z`;
+                const endDate = `${date}T23:59:59Z`;
+
+                const { data, error: fetchError } = await supabase
+                    .from('attendance_events')
+                    .select('*')
+                    .eq('user_id', selectedUserId)
+                    .gte('timestamp', startDate)
+                    .lte('timestamp', endDate);
+
+                if (fetchError) throw fetchError;
+
+                if (data && data.length > 0) {
+                    setExistingEventIds(data.map(e => e.id));
+                    
+                    // Find punch-in and punch-out
+                    const punchIn = data.find(e => e.type === 'punch-in' || e.type === 'check-in');
+                    const punchOut = data.find(e => e.type === 'punch-out' || e.type === 'check-out');
+                    const breakIn = data.find(e => e.type === 'break-in');
+                    const breakOut = data.find(e => e.type === 'break-out');
+
+                    if (punchIn) setCheckInTime(format(new Date(punchIn.timestamp), 'HH:mm'));
+                    if (punchOut) setCheckOutTime(format(new Date(punchOut.timestamp), 'HH:mm'));
+                    
+                    if (breakIn || breakOut) {
+                        setIncludeBreak(true);
+                        if (breakIn) setBreakInTime(format(new Date(breakIn.timestamp), 'HH:mm'));
+                        if (breakOut) setBreakOutTime(format(new Date(breakOut.timestamp), 'HH:mm'));
+                    } else {
+                        setIncludeBreak(false);
+                    }
+
+                    // Set location and status from any event
+                    const firstEvent = data[0];
+                    const hasFieldEvent = data.some(e => e.work_type === 'field');
+
+                    if (hasFieldEvent) {
+                        setStatus('Site Visit');
+                        setLocationName(firstEvent.location_name || '');
+                    } else if (firstEvent.location_name === 'Work From Home') {
+                        setStatus('W/H');
+                    } else {
+                        setStatus('Present');
+                        setLocationName(firstEvent.location_name || 'Office');
+                    }
+                    
+                    if (firstEvent.reason) setReason(firstEvent.reason);
+                } else {
+                    // Reset to defaults if no logs found for this user/date
+                    setExistingEventIds([]);
+                    setCheckInTime('09:00');
+                    setCheckOutTime('18:00');
+                    setBreakInTime('13:00');
+                    setBreakOutTime('14:00');
+                    setIncludeBreak(false);
+                    setStatus('Present');
+                    setLocationName('Office');
+                    setReason('');
+                }
+            } catch (err) {
+                console.error('Error fetching existing logs:', err);
+            } finally {
+                setIsLoadingExisting(false);
+            }
+        };
+
+        fetchExistingLogs();
+    }, [selectedUserId, date, isOpen]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedUserId) {
-            setError('Please select an employee.');
+            setToast({ message: 'Please select an employee.', type: 'error' });
             return;
         }
         if (!reason) {
-            setError('Please provide a reason or note for this manual entry.');
+            setToast({ message: 'Please provide a reason or note for this manual entry.', type: 'error' });
             return;
         }
 
+        if (includeBreak) {
+            if (!breakInTime || !breakOutTime) {
+                setToast({ message: 'Please provide both break in and break out times.', type: 'error' });
+                return;
+            }
+            
+            const checkInDate = new Date(`${date}T${checkInTime}:00`);
+            const checkOutDate = new Date(`${date}T${checkOutTime}:00`);
+            const breakInDate = new Date(`${date}T${breakInTime}:00`);
+            const breakOutDate = new Date(`${date}T${breakOutTime}:00`);
+
+            if (breakInDate <= checkInDate || breakInDate >= checkOutDate) {
+                setToast({ message: 'Break in time must be between punch in and punch out.', type: 'error' });
+                return;
+            }
+            if (breakOutDate <= breakInDate || breakOutDate >= checkOutDate) {
+                setToast({ message: 'Break out time must be after break in and before punch out.', type: 'error' });
+                return;
+            }
+        }
+
         setIsSubmitting(true);
-        setError(null);
+        setToast(null);
 
         try {
             const selectedUser = users.find(u => u.id === selectedUserId);
@@ -67,13 +175,14 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
             const eventsToInsert = [];
 
             // Check In
-            if (status === 'Present' || status === 'W/H') {
+            if (status === 'Present' || status === 'W/H' || status === 'Site Visit') {
                 const checkInDate = new Date(`${timestampBase}T${checkInTime}:00`);
                 eventsToInsert.push({
                     user_id: selectedUserId,
                     timestamp: checkInDate.toISOString(),
-                    type: 'check-in',
+                    type: 'punch-in',
                     location_name: status === 'W/H' ? 'Work From Home' : locationName,
+                    work_type: status === 'Site Visit' ? 'field' : 'office',
                     is_manual: true,
                     created_by: currentUserId,
                     reason: reason
@@ -84,12 +193,51 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
                 eventsToInsert.push({
                     user_id: selectedUserId,
                     timestamp: checkOutDate.toISOString(),
-                    type: 'check-out',
+                    type: 'punch-out',
                     location_name: status === 'W/H' ? 'Work From Home' : locationName,
+                    work_type: status === 'Site Visit' ? 'field' : 'office',
                     is_manual: true,
                     created_by: currentUserId,
                     reason: reason
                 });
+
+                // Add Break Events if selected
+                if (includeBreak) {
+                    const breakInDate = new Date(`${timestampBase}T${breakInTime}:00`);
+                    const breakOutDate = new Date(`${timestampBase}T${breakOutTime}:00`);
+                    
+                    eventsToInsert.push({
+                        user_id: selectedUserId,
+                        timestamp: breakInDate.toISOString(),
+                        type: 'break-in',
+                        location_name: status === 'W/H' ? 'Work From Home' : locationName,
+                        work_type: status === 'Site Visit' ? 'field' : 'office',
+                        is_manual: true,
+                        created_by: currentUserId,
+                        reason: reason
+                    });
+
+                    eventsToInsert.push({
+                        user_id: selectedUserId,
+                        timestamp: breakOutDate.toISOString(),
+                        type: 'break-out',
+                        location_name: status === 'W/H' ? 'Work From Home' : locationName,
+                        work_type: status === 'Site Visit' ? 'field' : 'office',
+                        is_manual: true,
+                        created_by: currentUserId,
+                        reason: reason
+                    });
+                }
+            }
+
+            // 0. If existing events exist, delete them first (Correction logic)
+            if (existingEventIds.length > 0) {
+                const { error: deleteError } = await supabase
+                    .from('attendance_events')
+                    .delete()
+                    .in('id', existingEventIds);
+
+                if (deleteError) throw deleteError;
             }
 
             if (eventsToInsert.length > 0) {
@@ -108,8 +256,12 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
                 details: {
                     date,
                     status,
-                    checkIn: status === 'Present' || status === 'W/H' ? checkInTime : 'N/A',
-                    checkOut: status === 'Present' || status === 'W/H' ? checkOutTime : 'N/A',
+                    checkIn: (status === 'Present' || status === 'W/H' || status === 'Site Visit') ? checkInTime : 'N/A',
+                    checkOut: (status === 'Present' || status === 'W/H' || status === 'Site Visit') ? checkOutTime : 'N/A',
+                    includeBreak,
+                    breakIn: includeBreak ? breakInTime : 'N/A',
+                    breakOut: includeBreak ? breakOutTime : 'N/A',
+                    workType: status === 'Site Visit' ? 'field' : 'office',
                     reason,
                     userName: selectedUser?.name
                 }
@@ -117,19 +269,48 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
 
             const { error: auditError } = await supabase
                 .from('attendance_audit_logs')
-                .insert([auditLog]);
+                .insert([{
+                    ...auditLog,
+                    action: existingEventIds.length > 0 ? 'MANUAL_ENTRY_UPDATED' : 'MANUAL_ENTRY_ADDED',
+                }]);
 
             if (auditError) throw auditError;
 
+            // 3. Send Notification to Reporting Manager
+            if (selectedUser?.reportingManagerId) {
+                try {
+                    await api.createNotification({
+                        userId: selectedUser.reportingManagerId,
+                        message: `Manual attendance correction for ${selectedUser.name} on ${date}`,
+                        type: 'info',
+                        linkTo: '/attendance/tracker',
+                        metadata: {
+                            isTeamActivity: true,
+                            employeeId: selectedUserId,
+                            employeeName: selectedUser.name,
+                            date: date,
+                            action: existingEventIds.length > 0 ? 'UPDATE' : 'ADD'
+                        }
+                    });
+                } catch (notifErr) {
+                    console.error('Failed to send notification to manager:', notifErr);
+                    // Don't fail the whole request if only notification fails
+                }
+            }
+
             onSuccess();
-            onClose();
+            // Show local success before closing to give immediate feedback
+            setToast({ message: 'Manual entry saved successfully!', type: 'success' });
+            setTimeout(() => {
+                onClose();
+            }, 1000);
         } catch (err: any) {
             console.error('Manual attendance error:', err);
             let msg = 'Failed to save manual entry.';
             if (err.message) msg = err.message;
             if (err.details) msg += ` (${err.details})`;
             if (err.hint) msg += ` Hint: ${err.hint}`;
-            setError(msg);
+            setToast({ message: msg, type: 'error' });
         } finally {
             setIsSubmitting(false);
         }
@@ -153,10 +334,14 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
                     </button>
                 </div>
 
-                <div className="p-6 overflow-y-auto custom-scrollbar">
-                    {error && (
-                        <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg flex items-center">
-                            <span className="mr-2">⚠️</span> {error}
+                <div className="p-6 overflow-y-auto custom-scrollbar relative">
+                    {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
+                    {isLoadingExisting && (
+                        <div className="absolute inset-0 z-10 bg-white/50 backdrop-blur-[1px] flex items-center justify-center">
+                            <div className="flex flex-col items-center">
+                                <Loader2 className="w-8 h-8 text-blue-600 animate-spin mb-2" />
+                                <p className="text-sm font-medium text-gray-600">Loading existing logs...</p>
+                            </div>
                         </div>
                     )}
 
@@ -204,6 +389,7 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-gray-50/30 text-sm"
                                 >
                                     <option value="Present">Present (Office)</option>
+                                    <option value="Site Visit">Site Visit (Field)</option>
                                     <option value="W/H">Work From Home</option>
                                 </select>
                             </div>
@@ -213,7 +399,7 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
                         <div className="grid grid-cols-2 gap-4 bg-blue-50/50 p-4 rounded-lg border border-blue-100">
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold text-gray-700 flex items-center">
-                                    <Clock className="w-3.5 h-3.5 mr-1.5 text-green-600" /> Punch In <span className="text-red-500">*</span>
+                                    <Clock className="w-3.5 h-3.5 mr-1.5 text-green-600" /> {status === 'Site Visit' ? 'Site Check In' : 'Punch In'} <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="time"
@@ -226,7 +412,7 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
 
                             <div className="space-y-1.5">
                                 <label className="text-sm font-semibold text-gray-700 flex items-center">
-                                    <Clock className="w-3.5 h-3.5 mr-1.5 text-red-600" /> Punch Out <span className="text-red-500">*</span>
+                                    <Clock className="w-3.5 h-3.5 mr-1.5 text-red-600" /> {status === 'Site Visit' ? 'Site Check Out' : 'Punch Out'} <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="time"
@@ -238,15 +424,61 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
                             </div>
                         </div>
 
-                        {/* Location (if Present) */}
-                        {status === 'Present' && (
+                        {/* Break Selection */}
+                        <div className="space-y-4 pt-2 border-t border-gray-100">
+                            <div className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    id="includeBreak"
+                                    checked={includeBreak}
+                                    onChange={(e) => setIncludeBreak(e.target.checked)}
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <label htmlFor="includeBreak" className="ml-2 text-sm font-medium text-gray-700">
+                                    Include Lunch Break?
+                                </label>
+                            </div>
+
+                            {includeBreak && (
+                                <div className="grid grid-cols-2 gap-4 bg-amber-50/50 p-4 rounded-lg border border-amber-100">
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-semibold text-gray-700 flex items-center">
+                                            <Clock className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> Break In <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="time"
+                                            value={breakInTime}
+                                            onChange={(e) => setBreakInTime(e.target.value)}
+                                            className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white text-sm"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-semibold text-gray-700 flex items-center">
+                                            <Clock className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> Break Out <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="time"
+                                            value={breakOutTime}
+                                            onChange={(e) => setBreakOutTime(e.target.value)}
+                                            className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white text-sm"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Location (if Present or Site Visit) */}
+                        {(status === 'Present' || status === 'Site Visit') && (
                             <div className="space-y-1.5">
-                                <label className="text-sm font-semibold text-gray-700">Location Name</label>
+                                <label className="text-sm font-semibold text-gray-700">{status === 'Site Visit' ? 'Site Name' : 'Location Name'}</label>
                                 <input
                                     type="text"
                                     value={locationName}
                                     onChange={(e) => setLocationName(e.target.value)}
-                                    placeholder="e.g. Head Office, Client Site"
+                                    placeholder={status === 'Site Visit' ? "e.g. Prestige Shantiniketan, Brigade Tech Park" : "e.g. Head Office, Client Site"}
                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-gray-50/30 text-sm"
                                 />
                             </div>
