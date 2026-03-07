@@ -723,6 +723,8 @@ export interface RecurringHolidayRule {
   type?: 'office' | 'field' | 'site' | 'admin' | 'management'; // Optional as it might be inferred
   day: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
   n: number; // 1 for 1st, 2 for 2nd, 3 for 3rd, 4 for 4th, 5 for 5th
+  roleType?: string; // For database compatibility
+  occurrence?: number; // For database compatibility
 }
 
 export interface StaffAttendanceRules {
@@ -942,7 +944,7 @@ export interface CompOffLog {
 
 export interface LeaveBalance {
   userId: string;
-  [key: string]: number | string | { earned: boolean; sick: boolean; floating: boolean; compOff: boolean; } | undefined; // To allow indexing with a string
+  [key: string]: any; // Broadened to allow debug and other dynamic fields
   earnedTotal: number;
   earnedUsed: number;
   sickTotal: number;
@@ -957,6 +959,20 @@ export interface LeaveBalance {
     sick: boolean;
     floating: boolean;
     compOff: boolean;
+  };
+  debug?: {
+    staffType?: string;
+    countableDays?: number;
+    hasEarnedRule?: boolean;
+    day17IsFloating?: boolean;
+    hasSettings?: boolean;
+    officeRules?: boolean;
+    fieldRules?: boolean;
+    earnedRule?: any;
+    openingDate?: string;
+    asOfDate?: string;
+    processedLeaves?: any[];
+    monthsElapsed?: number;
   };
 }
 

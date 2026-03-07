@@ -16,8 +16,8 @@ import type {
 import { getObjectDiff } from '../utils/diff';
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { 
-  differenceInCalendarDays, format, startOfMonth, endOfMonth, 
-  startOfDay, endOfDay, eachDayOfInterval, isSameDay, getDay
+  differenceInCalendarDays, differenceInCalendarMonths, format, startOfMonth, endOfMonth, 
+  startOfDay, endOfDay, eachDayOfInterval, isSameDay, getDay, getDate, getDaysInMonth, addMonths
 } from 'date-fns';
 import { dispatchNotificationFromRules } from './notificationService';
 import { calculateSiteTravelTime, validateFieldStaffAttendance } from '../utils/fieldStaffTracking';
@@ -2137,9 +2137,9 @@ export const api = {
       // Office Roles
       if ([
         'hr', 'admin', 'finance', 'developer', 'management', 'office_staff', 
-        'back_office_staff', 'bd', 'operation_manager', 'field_staff',
+        'back_office_staff', 'bd', 'operation_manager',
         'finance_manager', 'hr_ops', 'business developer', 'unverified',
-        'operation manager', 'field staff', 'finance manager', 'hr ops'
+        'operation manager', 'finance manager', 'hr ops'
       ].includes(r)) return 'office';
       
       // Site Roles
@@ -2214,13 +2214,32 @@ export const api = {
     const isExpired = (expiryDate?: string) => expiryDate ? todayStr > expiryDate : false;
 
     // Calculate Earned Leave dynamically if rule exists
+    const now = new Date();
+    const viewingPastMonth = referenceDate < startOfMonth(now);
+    const accrualEndDate = viewingPastMonth ? endOfMonth(referenceDate) : now;
+
+    let tempCountableDays = 0;
     let earnedTotal = rules.annualEarnedLeaves || 0;
+    let monthsElapsed = 0;
     if (rules.earnedLeaveAccrual) {
       const openingBalance = userData.earned_leave_opening_balance || 0;
-      const openingDate = userData.earned_leave_opening_date || format(new Date(), 'yyyy-MM-dd');
+      // Default to start of current year if opening date is missing, to support viewing past months correctly.
+      const openingDate = userData.earned_leave_opening_date || `${currentYear}-01-01`;
       
-      const countableDays = await api.getCountableDays(userId, openingDate, format(new Date(), 'yyyy-MM-dd'), holidays || [], recurringHolidays || [], rules);
-      earnedTotal = openingBalance + Math.floor(countableDays / rules.earnedLeaveAccrual.daysRequired) * rules.earnedLeaveAccrual.amountEarned;
+      // Determine the accrual end date: Use end of the viewed month for past months, 
+      // or current date for the current/future month.
+      const openingDateObj = new Date(openingDate.replace(/-/g, '/'));
+      monthsElapsed = differenceInCalendarMonths(startOfMonth(accrualEndDate), openingDateObj);
+      const daysElapsedInMonth = getDate(accrualEndDate);
+      const totalDaysInMonth = getDaysInMonth(accrualEndDate);
+      
+      const accrualRate = rules.earnedLeaveAccrual?.amountEarned || 1.5;
+      const currentMonthAccrual = (daysElapsedInMonth / totalDaysInMonth) * accrualRate;
+      earnedTotal = openingBalance + (monthsElapsed * accrualRate) + currentMonthAccrual;
+      
+      // Also fetch countable days for debug/trace purposes if needed
+      const countableDays = await api.getCountableDays(userId, openingDate, format(accrualEndDate, 'yyyy-MM-dd'), holidays || [], recurringHolidays || [], rules, staffType);
+      tempCountableDays = countableDays;
     }
 
     // Calculate Floating Holidays based on attendance on Recurring Holidays (e.g. 3rd Saturday)
@@ -2228,27 +2247,56 @@ export const api = {
     const attendedDates = new Set((yearEvents || []).map(e => format(new Date(e.timestamp), 'yyyy-MM-dd')));
     const holidayDates = new Set(holidays.map(h => format(new Date(h.date), 'yyyy-MM-dd')));
     
+    // Include holidays from the pool (e.g. -01-01) for the current year
+    if (rules.holidayPool) {
+        rules.holidayPool.forEach((hp: any) => {
+            if (hp.date.startsWith('-')) {
+                holidayDates.add(`${currentYear}${hp.date}`);
+            }
+        });
+    }
+    
     let floatingTotal = 0;
     let dynamicCompOffTotal = 0;
+    let day17Floating = false;
     
+    // 1. Comp Offs based on attendance on Sundays or Public Holidays (Earned via Work)
     attendedDates.forEach(dateStr => {
-        const date = new Date(dateStr);
+        const date = new Date(dateStr.replace(/-/g, '/'));
         const dayName = format(date, 'EEEE');
         
-        // Floating Holiday Check
-        const isFloatingRecurringHoliday = (recurringHolidays || []).some(rh => {
-             if (rh.type && rh.type !== staffType) return false;
-             if (rh.day !== dayName) return false;
-             if (rh.n === 0) return true; 
-             const dayOfMonth = date.getDate();
-             const nth = Math.ceil(dayOfMonth / 7);
-             return rh.n === nth;
-        });
-        if (isFloatingRecurringHoliday) floatingTotal++;
+        // Only count work up to the end of the viewed month
+        if (date > endOfMonth(referenceDate)) return;
 
         // Comp Off Accrual Check (Sunday or Public Holiday)
         if (dayName === 'Sunday' || holidayDates.has(dateStr)) {
-            dynamicCompOffTotal++;
+            dynamicCompOffTotal += 1;
+        }
+    });
+
+    // 2. Floating Holiday Allocation (Calendar-based, not attendance-based)
+    // Grant 1.0 Floating Holiday for EACH matching recurring holiday (e.g. 3rd Saturday)
+    // occurring between the start of the year (or opening date) and the end of the month.
+    const floatingHolidayDates: Date[] = [];
+    const intervalDays = eachDayOfInterval({ start: new Date(yearStart.replace(/-/g, '/')), end: endOfMonth(referenceDate) });
+    intervalDays.forEach(day => {
+        const dateStr = format(day, 'yyyy-MM-dd');
+        const dayName = format(day, 'EEEE');
+        
+        const isFloatingRecurringHoliday = (recurringHolidays || []).some(rh => {
+             const rhType = rh.type || rh.roleType;
+             const rhN = typeof rh.n !== 'undefined' ? rh.n : rh.occurrence;
+             
+             if (rhType && rhType !== staffType) return false;
+             if (rh.day !== dayName) return false;
+             if (rhN === 0) return true; 
+             const nth = Math.ceil(day.getDate() / 7);
+             return rhN === nth;
+        });
+
+        if (isFloatingRecurringHoliday) {
+            floatingHolidayDates.push(day);
+            if (dateStr === '2026-01-17') day17Floating = true;
         }
     });
 
@@ -2269,29 +2317,21 @@ export const api = {
         }
       }
       
-      const accrualStart = new Date(Math.max(new Date(startDateStr.replace(/-/g, '/')).getTime(), new Date(yearStart.replace(/-/g, '/')).getTime()));
-      let current = startOfMonth(accrualStart);
-      let accruedDays = 0;
-
-      // Group attendance events by month
-      const attendanceMonths = new Set((yearEvents || []).map(e => format(new Date(e.timestamp), 'yyyy-MM')));
-
-      // Start from the accrual start and iterate until the end of the month being viewed
-      const endBoundary = endOfMonth(referenceDate);
-      
-      while (current <= endBoundary) {
-        const monthStr = format(current, 'yyyy-MM');
-        if (attendanceMonths.has(monthStr)) {
-          accruedDays += 1; // 1 day per month if present
-        }
-        current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
-      }
-      sickTotal = openingBalance + accruedDays;
+      const openingDateSL = userData.sick_leave_opening_date || `${currentYear}-01-01`;
+      const openingDateObjSL = new Date(openingDateSL.replace(/-/g, '/'));      
+      const fullMonthsSL = differenceInCalendarMonths(startOfMonth(accrualEndDate), startOfMonth(openingDateObjSL));
+      const currentMonthAccrualSL = (getDate(accrualEndDate) / getDaysInMonth(accrualEndDate)) * 1.0;
+      sickTotal = openingBalance + (fullMonthsSL * 1.0) + currentMonthAccrualSL;
     } else {
       sickTotal = rules.annualSickLeaves || 0;
     }
 
-    const compOffTotal = (compOffData || []).filter(log => log.status === 'earned' || log.status === 'used').length + dynamicCompOffTotal;
+    const monthEnd = endOfMonth(referenceDate);
+    const compOffTotal = (compOffData || []).filter(log => {
+      const isEarnedOrUsed = log.status === 'earned' || log.status === 'used';
+      const earnedDate = log.date_earned ? new Date(log.date_earned) : new Date(log.created_at);
+      return isEarnedOrUsed && earnedDate <= monthEnd;
+    }).length + dynamicCompOffTotal;
 
     const expiryStates = {
       earned: isExpired(rules.earnedLeavesExpiryDate),
@@ -2306,51 +2346,101 @@ export const api = {
       earnedUsed: 0,
       sickTotal,
       sickUsed: 0,
-      floatingTotal,
+      floatingTotal: 0, // Calculated below via overflow rules
       floatingUsed: 0,
-      compOffTotal,
+      compOffTotal, // Dynamic + base
       compOffUsed: 0,
       otHoursThisMonth: (otData || []).reduce((sum, log) => sum + (log.hours_worked || 0), 0),
       expiryStates
     };
 
-    (approvedLeaves || []).forEach(leave => {
-      const leaveAmount = leave.day_option === 'half' ? 0.5 : differenceInCalendarDays(new Date(leave.end_date), new Date(leave.start_date)) + 1;
+    const processedLeaves: any[] = [];
+    approvedLeaves.forEach(leave => {
       const leaveStart = leave.start_date;
+      const leaveEndDate = leave.end_date;
+      const type = (leave.leave_type || '').toLowerCase();
       
-      if (leave.leave_type === 'Earned') {
-        // Only count towards used if it was taken during validity, or if not expired
+      const leaveStartDateObj = new Date(leaveStart.replace(/-/g, '/'));
+      if (leaveStartDateObj > endOfMonth(referenceDate)) return;
+      
+      let leaveAmount = 1;
+      if (leave.day_option === 'half') leaveAmount = 0.5;
+      else {
+          const duration = differenceInCalendarDays(new Date(leaveEndDate.replace(/-/g, '/')), new Date(leaveStart.replace(/-/g, '/'))) + 1;
+          leaveAmount = duration;
+      }
+
+      processedLeaves.push({
+          type: leave.leave_type,
+          start: leaveStart,
+          amount: leaveAmount
+      });
+
+      // Robust matching: Check if type contains key words (earned, sick/sl, floating, comp)
+      if (type.includes('earned') || type === 'el') {
         if (!expiryStates.earned || (rules.earnedLeavesExpiryDate && leaveStart <= rules.earnedLeavesExpiryDate)) {
           balance.earnedUsed += leaveAmount;
         }
-      }
-      if (leave.leave_type === 'Sick') {
+      } else if (type.includes('sick') || type === 'sl' || type === 's/l') {
         if (!expiryStates.sick || (rules.sickLeavesExpiryDate && leaveStart <= rules.sickLeavesExpiryDate)) {
           balance.sickUsed += leaveAmount;
         }
-      }
-      if (leave.leave_type === 'Floating') {
+      } else if (type.includes('floating') || type === 'fh' || type === 'hp') {
         if (!expiryStates.floating || (rules.floatingLeavesExpiryDate && leaveStart <= rules.floatingLeavesExpiryDate)) {
           balance.floatingUsed += leaveAmount;
         }
-      }
-      if (leave.leave_type === 'Comp Off') {
+      } else if (type.includes('comp') || type === 'co') {
         if (!expiryStates.compOff || (rules.compOffLeavesExpiryDate && leaveStart <= rules.compOffLeavesExpiryDate)) {
           balance.compOffUsed += leaveAmount;
         }
       }
     });
 
-    // Capping Logic for expired leaves: if expired, available should be 0.
-    // We achieve this by setting used = total if expired and used < total.
-    // However, the dashboard calculation is (total - used).
-    // Better to keep total and used honest but add logic in dashboard or here.
-    // Let's keep it honest here and let the Dashboard handle visual "Expired" and capping.
+    // --- Floating Holiday Overflow Logic ---
+    // If a floating holiday expires (end of following month) and wasn't used, 
+    // it converts to a Compensatory Off.
+    let remainingFHUsed = balance.floatingUsed;
+    let finalFHTotal = 0;
+    let overflowCompOff = 0;
+
+    floatingHolidayDates.sort((a, b) => a.getTime() - b.getTime()).forEach(fhDate => {
+        const expiryDate = endOfMonth(fhDate);
+        const isExpiredInView = expiryDate < startOfMonth(referenceDate);
+
+        if (remainingFHUsed >= 1) {
+            // This instance was used as a Floating Leave
+            finalFHTotal++;
+            remainingFHUsed -= 1;
+        } else if (isExpiredInView) {
+            // Expired and not used -> Overflow to Comp Off
+            overflowCompOff++;
+        } else {
+            // Still active as Floating
+            finalFHTotal++;
+        }
+    });
+
+    balance.floatingTotal = finalFHTotal;
+    balance.compOffTotal += overflowCompOff;
+
+    balance.debug = {
+        staffType,
+        hasEarnedRule: !!rules.earnedLeaveAccrual,
+        earnedRule: rules.earnedLeaveAccrual,
+        monthsElapsed,
+        countableDays: tempCountableDays,
+        processedLeaves,
+        openingDate: userData.earned_leave_opening_date,
+        asOfDate,
+        hasSettings: !!settingsData?.attendance_settings,
+        officeRules: !!(toCamelCase(settingsData.attendance_settings) as any).office?.earnedLeaveAccrual,
+        fieldRules: !!(toCamelCase(settingsData.attendance_settings) as any).field?.earnedLeaveAccrual
+    };
 
     return balance;
   },
 
-  getCountableDays: async (userId: string, fromDate: string, toDate: string, holidays: any[], recurringHolidays: any[], rules: StaffAttendanceRules): Promise<number> => {
+  getCountableDays: async (userId: string, fromDate: string, toDate: string, holidays: any[], recurringHolidays: any[], rules: StaffAttendanceRules, staffType: string): Promise<number> => {
     // 1. Fetch attendance events for the period
     const { data: events, error } = await supabase
       .from('attendance_events')
@@ -2363,6 +2453,16 @@ export const api = {
 
     const attendedDates = new Set((events || []).map(e => format(new Date(e.timestamp), 'yyyy-MM-dd')));
     const holidayDates = new Set(holidays.map(h => format(new Date(h.date), 'yyyy-MM-dd')));
+    
+    // Include holidays from the pool for the year of the interval
+    const yearOfInterval = new Date(toDate).getFullYear();
+    if (rules.holidayPool) {
+        rules.holidayPool.forEach((hp: any) => {
+            if (hp.date.startsWith('-')) {
+                holidayDates.add(`${yearOfInterval}${hp.date}`);
+            }
+        });
+    }
 
     let countableCount = 0;
     const interval = { start: new Date(fromDate), end: new Date(toDate) };
@@ -2393,13 +2493,16 @@ export const api = {
 
       // b) Check recurring holidays (specifically role-based week-offs like "Every Sunday")
       const isRecurring = recurringHolidays.some(rh => {
+        const rhType = rh.type || rh.roleType;
+        const rhN = typeof rh.n !== 'undefined' ? rh.n : rh.occurrence;
+
         if (rh.day !== format(day, 'EEEE')) return false;
-        if (rh.n === 0) return true; // 0 usually means every
-        
-        // Calculate which occurrence of that day it is in the month
+        if (rhN === 0) return true; // 0 usually means every
         const dayOfMonth = day.getDate();
         const nth = Math.ceil(dayOfMonth / 7);
-        return rh.n === nth;
+        if (rhN !== nth) return false;
+        if (rhType && rhType !== staffType) return false;
+        return true;
       });
 
       if (isRecurring) {

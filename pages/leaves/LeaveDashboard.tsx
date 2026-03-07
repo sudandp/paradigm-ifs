@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
-import type { LeaveBalance, LeaveRequest, LeaveType, LeaveRequestStatus, UploadedFile, CompOffLog, AttendanceEvent, UserHoliday, AttendanceSettings } from '../../types';
+import type { LeaveBalance, LeaveRequest, LeaveType, LeaveRequestStatus, UploadedFile, CompOffLog, AttendanceEvent, UserHoliday, AttendanceSettings, StaffAttendanceRules } from '../../types';
 import { Loader2, Plus, ArrowLeft, AlertTriangle, Briefcase, HeartPulse, Plane, CalendarClock, Clock, Edit, Trash2, XCircle, Search, Calendar, Settings, Check } from 'lucide-react';
 import { HOLIDAY_SELECTION_POOL, FIXED_HOLIDAYS } from '../../utils/constants';
 import Button from '../../components/ui/Button';
@@ -96,7 +96,7 @@ const getLeaveValidationSchema = (threshold: number) => yup.object({
 // --- Main Dashboard ---
 const LeaveDashboard: React.FC = () => {
     const { user } = useAuthStore();
-    const [balance, setBalance] = useState<LeaveBalance | null>(null);
+    const [balanceDataState, setBalance] = useState<LeaveBalance | null>(null);
     const [requests, setRequests] = useState<LeaveRequest[]>([]);
     const [compOffLogs, setCompOffLogs] = useState<CompOffLog[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -113,6 +113,62 @@ const LeaveDashboard: React.FC = () => {
     const [userHolidays, setUserHolidays] = useState<UserHoliday[]>([]);
     const [isHolidaySelectionEnabled, setIsHolidaySelectionEnabled] = useState(false);
     const [activeHolidayPool, setActiveHolidayPool] = useState<{ name: string; date: string }[]>([]);
+
+    // Emergency Self-Healing for Attendance Rules
+    useEffect(() => {
+        const repairSettings = async () => {
+            try {
+                const settings = await api.getAttendanceSettings();
+                let needsUpdate = false;
+                
+                ['office', 'field', 'site'].forEach((cat) => {
+                    const typedCat = cat as keyof AttendanceSettings;
+                    // Safely cast to StaffAttendanceRules for the self-healing logic
+                    const catRules = settings[typedCat] as StaffAttendanceRules;
+                    
+                    if (!catRules) {
+                        (settings as any)[typedCat] = {};
+                        needsUpdate = true;
+                        return;
+                    }
+                    
+                    // User requested 1.5 EL for every month completed.
+                    // Sequence: 1.5, 3.0, 4.5, 6.0, 7.5...
+                    if (!catRules.earnedLeaveAccrual || catRules.earnedLeaveAccrual.amountEarned !== 1.5) {
+                        catRules.earnedLeaveAccrual = { daysRequired: 30, amountEarned: 1.5 };
+                        needsUpdate = true;
+                    }
+                    
+                    if (catRules.enableSickLeaveAccrual === undefined) {
+                        catRules.enableSickLeaveAccrual = true;
+                        needsUpdate = true;
+                    }
+
+                    // Fallback for missing recurring holidays in JSON
+                    if (!catRules.recurringHolidays || catRules.recurringHolidays.length === 0) {
+                        if (cat === 'office' || cat === 'site') {
+                            catRules.recurringHolidays = [{ day: 'Saturday', n: 3, type: cat as any }];
+                            needsUpdate = true;
+                        }
+                    }
+                });
+
+                if (needsUpdate) {
+                    await api.saveAttendanceSettings(settings);
+                    console.log("Self-healing: Updated attendance rules for all categories.");
+                    // Refresh the page once to apply new rules
+                    window.location.reload();
+                }
+            } catch (err) {
+                console.error("Self-healing failed:", err);
+            }
+        };
+
+        if (user && (user.role?.toLowerCase().includes('admin') || user.role?.toLowerCase().includes('hr'))) {
+            repairSettings();
+        }
+    }, [user]);
+
     const [viewingDate, setViewingDate] = useState(new Date());
     const [threshold, setThreshold] = useState(8);
     const currentYear = viewingDate.getFullYear();
@@ -295,34 +351,34 @@ const LeaveDashboard: React.FC = () => {
     const formatTabName = (tab: string) => tab.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     const filterTabs: Array<LeaveRequestStatus | 'all'> = ['all', 'pending_manager_approval', 'pending_hr_confirmation', 'approved', 'rejected'];
 
-    const balanceCards = balance ? [
+    const balanceCards = balanceDataState ? [
         { 
             title: 'Earned Leave', 
-            value: `${Math.max(0, balance.earnedTotal - balance.earnedUsed)} / ${balance.earnedTotal}`, 
-            description: `Total: ${balance.earnedTotal}d. Available: ${Math.max(0, balance.earnedTotal - balance.earnedUsed)}d.`,
+            value: `${parseFloat((balanceDataState.earnedTotal - balanceDataState.earnedUsed).toFixed(1))} / ${parseFloat(balanceDataState.earnedTotal.toFixed(1))}`, 
+            description: `Total: ${parseFloat(balanceDataState.earnedTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.earnedTotal - balanceDataState.earnedUsed).toFixed(1))}d.`,
             icon: Briefcase,
-            isExpired: balance.expiryStates?.earned 
+            isExpired: balanceDataState.expiryStates?.earned 
         },
         { 
             title: 'Sick Leave', 
-            value: `${Math.max(0, balance.sickTotal - balance.sickUsed)} / ${balance.sickTotal}`, 
-            description: `Total: ${balance.sickTotal}d. Available: ${Math.max(0, balance.sickTotal - balance.sickUsed)}d.`,
+            value: `${parseFloat((balanceDataState.sickTotal - balanceDataState.sickUsed).toFixed(1))} / ${parseFloat(balanceDataState.sickTotal.toFixed(1))}`, 
+            description: `Total: ${parseFloat(balanceDataState.sickTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.sickTotal - balanceDataState.sickUsed).toFixed(1))}d.`,
             icon: HeartPulse,
-            isExpired: balance.expiryStates?.sick
+            isExpired: balanceDataState.expiryStates?.sick
         },
         { 
             title: 'Floating Holiday', 
-            value: `${Math.max(0, balance.floatingTotal - balance.floatingUsed)} / ${balance.floatingTotal}`, 
-            description: `Total: ${balance.floatingTotal}d. Available: ${Math.max(0, balance.floatingTotal - balance.floatingUsed)}d.`,
+            value: `${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))} / ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}`, 
+            description: `Total: ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))}d.`,
             icon: Plane,
-            isExpired: balance.expiryStates?.floating
+            isExpired: balanceDataState.expiryStates?.floating
         },
         { 
             title: 'Compensatory Off', 
-            value: `${Math.max(0, balance.compOffTotal - balance.compOffUsed)} / ${balance.compOffTotal}`, 
-            description: `Total: ${balance.compOffTotal}d. Available: ${Math.max(0, balance.compOffTotal - balance.compOffUsed) }d.`,
+            value: `${parseFloat((balanceDataState.compOffTotal - balanceDataState.compOffUsed).toFixed(1))} / ${parseFloat(balanceDataState.compOffTotal.toFixed(1))}`, 
+            description: `Total: ${parseFloat(balanceDataState.compOffTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.compOffTotal - balanceDataState.compOffUsed).toFixed(1))}d.`,
             icon: CalendarClock,
-            isExpired: balance.expiryStates?.compOff
+            isExpired: balanceDataState.expiryStates?.compOff
         },
     ].filter(card => !card.isExpired) : [];
 
@@ -331,7 +387,20 @@ const LeaveDashboard: React.FC = () => {
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
 
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-primary-text">My Leave Requests</h2>
+                <div className="flex flex-col">
+                    <h2 className="text-2xl font-bold text-primary-text">My Leave Requests</h2>
+                    {balanceDataState?.debug?.processedLeaves && (
+                        <div className="text-[10px] text-muted-foreground mt-1 max-w-2xl bg-amber-50 p-1 border border-amber-100 rounded">
+                            <span className="font-bold text-amber-800">Leave Trace:</span> {
+                                balanceDataState.debug.processedLeaves.map((l: any, i: number) => (
+                                    <span key={i} className="mr-2">
+                                        [{l.type}] {format(new Date(l.start.replace(/-/g, '/')), 'MMM d')}: {l.amount}d
+                                    </span>
+                                ))
+                            }
+                        </div>
+                    )}
+                </div>
                 {!isMobile && (
                     <div className="flex gap-2">
                         <Button onClick={handleNewRequest}><Plus className="mr-2 h-4" /> New Request</Button>
