@@ -98,9 +98,9 @@ const AuthLayout: React.FC = () => {
                     {/* Right Form Column with Glassmorphism effect */}
                     <div className="p-6 lg:p-10 xl:p-16 flex flex-col justify-center bg-[#050505]/85 backdrop-blur-xl border-l border-white/10">
                         <div className="w-full max-w-md mx-auto">
-                            {/* Mobile-only Logo */}
-                            <div className="md:hidden flex justify-center mb-8">
-                                <Logo className="h-12" />
+                            {/* Mobile Logo Visibility Fix */}
+                            <div className="flex justify-center mb-6">
+                                <Logo className="h-10 lg:h-12" />
                             </div>
                             <h2 className="text-xl lg:text-2xl xl:text-3xl font-bold text-white mb-2">{pageInfo.title}</h2>
                             <p className="text-gray-300 mb-4 lg:mb-6 xl:mb-8 text-xs lg:text-sm xl:text-base">{pageInfo.subtitle}</p>

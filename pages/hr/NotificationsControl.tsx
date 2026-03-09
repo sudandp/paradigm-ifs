@@ -400,7 +400,7 @@ const NotificationsControl: React.FC = () => {
                     </div>
                 </div>
             ) : (
-                <div className="max-w-3xl mx-auto space-y-6">
+                <div className="space-y-6">
                     <section className="bg-card p-8 rounded-2xl border border-border shadow-lg">
                         <div className="flex items-center gap-4 mb-8">
                             <div className="p-3 bg-emerald-500 rounded-2xl text-white shadow-emerald-200 shadow-xl">

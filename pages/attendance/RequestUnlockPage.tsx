@@ -62,7 +62,7 @@ const RequestUnlockPage: React.FC = () => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto md:pt-8 animate-in fade-in duration-500">
+        <div className="md:pt-8 animate-in fade-in duration-500">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             
             <div className="w-full">
@@ -81,7 +81,7 @@ const RequestUnlockPage: React.FC = () => {
 
                 {/* Main Content Card - Desktop Optimized */}
                 <div className="md:bg-white md:p-8 md:rounded-[2rem] md:shadow-xl md:border md:border-gray-100">
-                    <div className="max-w-3xl mx-auto space-y-6 md:space-y-8">
+                    <div className="space-y-6 md:space-y-8">
                         {/* Policy Box - Better contrast for both themes */}
                         <div className={`p-6 rounded-2xl border shadow-sm ${
                             isOTRequest 

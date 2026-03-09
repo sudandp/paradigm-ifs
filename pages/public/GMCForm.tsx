@@ -259,7 +259,7 @@ const GMCForm: React.FC = () => {
                     </div>
 
                     <div className="w-full p-8 space-y-6">
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-2xl mx-auto">
+                        <div className="flex flex-col sm:flex-row gap-4">
                             <Button
                                 onClick={downloadPdf}
                                 className="flex-1 sm:flex-initial sm:px-10 flex items-center justify-center gap-3 h-14 !rounded-2xl !text-base shadow-lg shadow-accent/20"

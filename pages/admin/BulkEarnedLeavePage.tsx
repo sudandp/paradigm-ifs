@@ -138,7 +138,7 @@ const BulkEarnedLeavePage: React.FC = () => {
     };
 
     return (
-        <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
+        <div className="p-4 md:p-6 lg:p-8">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             
             <div className="mb-6 flex items-center gap-4">

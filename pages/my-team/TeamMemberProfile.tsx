@@ -305,7 +305,7 @@ const TeamMemberProfile: React.FC = () => {
     <div className="flex flex-col min-h-screen bg-background text-primary-text">
       {/* Premium Header */}
       <div className="bg-card border-b border-border shadow-soft sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+        <div className="px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -403,7 +403,7 @@ const TeamMemberProfile: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto w-full p-4 md:p-8">
+      <div className="w-full p-4 md:p-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-4 space-y-4">
             <MetricCard title="Total Distance" value={`${metrics.totalDistance} km`} subtext="Traveled across segments" icon={<Navigation className="w-5 h-5" />} color="bg-blue-500" />

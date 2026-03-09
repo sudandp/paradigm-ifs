@@ -3,6 +3,10 @@
 @import "react-date-range/dist/styles.css";
 @import "react-date-range/dist/theme/default.css";
 
+html {
+    zoom: 0.72;
+}
+
 @media (min-width: 768px) {
     body {
         min-height: 100vh;
@@ -282,9 +286,7 @@
 .pro-dark-theme .skeleton-pulse {
     background-color: #374151;
 }
-html {
-    scrollbar-width: none;
-}
+
 ::-webkit-scrollbar {
     display: none;
 }

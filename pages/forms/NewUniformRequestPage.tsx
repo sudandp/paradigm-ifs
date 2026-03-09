@@ -284,7 +284,7 @@ const NewUniformRequestPage: React.FC = () => {
 
     return (
         <div className="p-4 md:p-6">
-            <div className="bg-card p-8 rounded-xl shadow-card w-full max-w-5xl mx-auto">
+            <div className="bg-card p-8 rounded-xl shadow-card w-full">
                 <div className="flex items-center mb-6">
                     <div className="bg-accent-light p-3 rounded-full mr-4">
                         <Shirt className="h-8 w-8 text-accent-dark" />

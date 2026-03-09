@@ -122,7 +122,7 @@ const PermissionsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-page p-4 pb-24">
-      <div className="max-w-2xl mx-auto">
+      <div className="">
         {/* Header */}
         <div className="mb-6 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-accent-light rounded-full mb-4">

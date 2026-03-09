@@ -63,7 +63,7 @@ const OnboardingHome: React.FC = () => {
           </div>
         </div>
         <h2 className="text-3xl font-bold text-primary-text mb-2">Welcome to Employee Onboarding</h2>
-        <p className="text-muted mb-8 max-w-md mx-auto">
+        <p className="text-muted mb-8">
           We need to collect some information to get you set up. This should only take a few minutes.
         </p>
 
