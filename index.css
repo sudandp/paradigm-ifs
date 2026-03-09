@@ -826,10 +826,12 @@ body {
     }
     @media (max-width: 767px) {
         .auth-card-container {
-            transform: scale(1.7) !important;
-            width: 58.8% !important;
+            transform: scale(1.05) !important;
+            width: 90% !important;
             margin-left: auto !important;
             margin-right: auto !important;
+            margin-top: 30vh !important;
+            margin-bottom: auto !important;
             background: rgba(0, 0, 0, 0.5) !important;
             backdrop-filter: blur(25px) !important;
             -webkit-backdrop-filter: blur(25px) !important;

@@ -2320,7 +2320,8 @@ export const api = {
       const openingDateSL = userData.sick_leave_opening_date || `${currentYear}-01-01`;
       const openingDateObjSL = new Date(openingDateSL.replace(/-/g, '/'));      
       const fullMonthsSL = differenceInCalendarMonths(startOfMonth(accrualEndDate), startOfMonth(openingDateObjSL));
-      const currentMonthAccrualSL = (getDate(accrualEndDate) / getDaysInMonth(accrualEndDate)) * 1.0;
+      // Give 1 full day for the current month, avoiding decimal fractions since it's 1 per month
+      const currentMonthAccrualSL = 1.0;
       sickTotal = openingBalance + (fullMonthsSL * 1.0) + currentMonthAccrualSL;
     } else {
       sickTotal = rules.annualSickLeaves || 0;

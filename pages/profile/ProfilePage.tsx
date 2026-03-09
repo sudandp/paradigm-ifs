@@ -27,9 +27,10 @@ const profileValidationSchema = yup.object({
     name: yup.string().required('Name is required'),
     email: yup.string().email('Must be a valid email').required('Email is required'),
     phone: yup.string().matches(/^[6-9][0-9]{9}$/, 'Must be a valid 10-digit Indian mobile number').optional().nullable(),
+    gender: yup.string().oneOf(['Male', 'Female', 'Other', '']).optional().nullable(),
 }).defined();
 
-type ProfileFormData = Pick<User, 'name' | 'email' | 'phone'>;
+type ProfileFormData = Pick<User, 'name' | 'email' | 'phone' | 'gender'>;
 
 
 // --- Main Component ---
@@ -229,7 +230,7 @@ const ProfilePage: React.FC = () => {
     // Profile form
     const { register, handleSubmit: handleProfileSubmit, formState: { errors: profileErrors, isDirty }, getValues, trigger, reset } = useForm<ProfileFormData>({
         resolver: yupResolver(profileValidationSchema) as Resolver<ProfileFormData>,
-        defaultValues: { name: user?.name || '', email: user?.email || '', phone: user?.phone || '' },
+        defaultValues: { name: user?.name || '', email: user?.email || '', phone: user?.phone || '', gender: user?.gender || '' },
     });
 
     // Effect to keep form synchronized with global user state
@@ -238,7 +239,8 @@ const ProfilePage: React.FC = () => {
             reset({
                 name: user.name || '',
                 email: user.email || '',
-                phone: user.phone || ''
+                phone: user.phone || '',
+                gender: user.gender || ''
             });
         }
     }, [user, reset]);
@@ -351,6 +353,16 @@ const ProfilePage: React.FC = () => {
                             <Input label="Full Name" id="name" error={profileErrors.name?.message} registration={register('name')} autoComplete="name" />
                             <Input label="Email Address" id="email" type="email" error={profileErrors.email?.message} registration={register('email')} readOnly className="!bg-gray-700/50" autoComplete="email" />
                             <Input label="Phone Number" id="phone" type="tel" error={profileErrors.phone?.message} registration={register('phone')} autoComplete="tel" />
+                            <div className="space-y-1">
+                                <label htmlFor="gender" className="block text-sm font-medium text-gray-300">Gender</label>
+                                <select id="gender" {...register('gender')} className="form-input !bg-[#0d2c18] !border-emerald-500/20 !text-white w-full">
+                                    <option value="" disabled>Select Gender</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                                {profileErrors.gender && <p className="text-red-500 text-xs mt-1">{profileErrors.gender.message}</p>}
+                            </div>
                             <div className="flex justify-end pt-2"><Button type="submit" isLoading={isSaving} disabled={!isDirty}>Save Changes</Button></div>
                         </form>
                     </section>
@@ -815,6 +827,16 @@ const ProfilePage: React.FC = () => {
                                 </div>
                                 <div className="w-full">
                                     <Input label="Email Address" id="email" type="email" error={profileErrors.email?.message} registration={register('email')} readOnly className="bg-gray-100/50 text-gray-500 cursor-not-allowed border-gray-200" autoComplete="email" />
+                                </div>
+                                <div className="w-full space-y-1">
+                                    <label htmlFor="gender-desktop" className="block text-sm font-medium text-gray-700">Gender</label>
+                                    <select id="gender-desktop" {...register('gender')} className="form-input bg-gray-50/50 border-gray-200 focus:bg-white transition-colors w-full h-[42px]">
+                                        <option value="" disabled>Select Gender</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                    {profileErrors.gender && <p className="text-red-500 text-xs mt-1">{profileErrors.gender.message}</p>}
                                 </div>
                             </div>
                             <div className="flex justify-end pt-5 mt-5 border-t border-gray-100">

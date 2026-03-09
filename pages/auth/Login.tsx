@@ -209,21 +209,10 @@ const Login: React.FC = () => {
                     {isSuccess ? <Check className="w-6 h-6 animate-bounce" /> : "Sign In"}
                 </Button>
 
-                {/* Public Forms Button */}
-                <div className="pt-2">
-                    <Button
-                        type="button"
-                        onClick={() => navigate('/public/forms')}
-                        className="w-full !font-bold !py-3 !rounded-full shadow-lg transition-all transform hover:scale-[1.02] bg-white/10 border border-white/20 text-white hover:bg-white/20"
-                        size="lg"
-                        disabled={isFormDisabled}
-                    >
-                        Forms
-                    </Button>
-                </div>
+
             </form>
 
-            <div className="md:-translate-y-[20%] -translate-y-[30%]">
+            <div>
                 <div className="flex items-center my-6">
                     <div className="flex-1 border-t border-white/10"></div>
                     <span className="px-4 text-sm text-gray-400 font-medium">OR</span>

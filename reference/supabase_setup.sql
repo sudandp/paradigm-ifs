@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   organization_name text,
   reporting_manager_id uuid REFERENCES public.users (id),
   photo_url text,
+  gender text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );

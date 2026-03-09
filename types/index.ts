@@ -74,6 +74,7 @@ export interface User {
   name: string;
   email: string;
   phone?: string;
+  gender?: string;
   role: string; // Display name for UI
   roleId: string; // UUID from database
   organizationId?: string;

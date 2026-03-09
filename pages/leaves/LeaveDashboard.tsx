@@ -417,13 +417,18 @@ const LeaveDashboard: React.FC = () => {
                         icon={Clock} 
                         isLoading={isLoading}
                     />
-                    <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="bg-popover text-popover-foreground text-[10px] p-2 rounded shadow-lg border border-border w-48 pointer-events-none">
-                            <p className="font-bold border-b border-border mb-1 pb-1">OT Accumulation</p>
-                            <p>Current Bank: <span className="text-accent-dark font-bold">
+                    {/* Position tooltip below or above so it doesn't overlap text, and use solid bg-card */}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                        <div className="bg-card text-primary-text text-[10px] p-3 rounded-lg shadow-xl border border-border w-56 relative text-center lg:text-left">
+                            {/* Small triangle arrow at the top */}
+                            <div className="absolute -top-2 left-1/2 -translate-x-1/2 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-border" />
+                            <div className="absolute -top-[7px] left-1/2 -translate-x-1/2 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-card" />
+                            
+                            <p className="font-bold border-b border-border mb-1.5 pb-1">OT Accumulation</p>
+                            <p className="mb-1">Current Bank: <span className="text-accent-dark font-bold text-[11px]">
                                 {formatPreciseHours(user?.otHoursBank || 0)}
                             </span></p>
-                            <p className="mt-1 text-muted-foreground italic">Every 8h of accumulated OT is automatically converted to 1 Comp Off.</p>
+                            <p className="text-muted-foreground italic leading-tight">Every 8h of accumulated OT is automatically converted to 1 Comp Off.</p>
                         </div>
                     </div>
                 </div>
