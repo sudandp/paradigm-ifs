@@ -14,6 +14,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { useAuthStore } from '../../store/authStore';
 
+
 type UniformFormData = {
     siteId: string;
     gender: 'Gents' | 'Ladies';

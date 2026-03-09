@@ -8,6 +8,7 @@ import Input from '../../components/ui/Input';
 import { Building, Zap } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 
+
 const QuickAddSitePage: React.FC = () => {
     const navigate = useNavigate();
     const isMobile = useMediaQuery('(max-width: 767px)');

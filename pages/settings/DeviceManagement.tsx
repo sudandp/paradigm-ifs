@@ -13,6 +13,7 @@ import {
 import { DeviceType } from '../../types';
 import UserDeviceList from '../../components/devices/UserDeviceList';
 
+
 const DeviceManagement: React.FC = () => {
   const { user } = useAuthStore();
   const [currentDeviceIdentifier, setCurrentDeviceIdentifier] = useState<string>('');

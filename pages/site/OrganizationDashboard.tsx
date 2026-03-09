@@ -12,6 +12,8 @@ import Select from '../../components/ui/Select';
 
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { isAdmin } from '../../utils/auth';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const SiteDashboard: React.FC = () => {
     const [submissions, setSubmissions] = useState<OnboardingData[]>([]);
@@ -74,6 +76,10 @@ const SiteDashboard: React.FC = () => {
 
     const currentOrgName = organizations.find(o => o.id === selectedOrgId)?.shortName || user?.organizationName;
     const filterTabs = ['all', 'pending', 'verified', 'rejected'];
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="p-4 border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card">

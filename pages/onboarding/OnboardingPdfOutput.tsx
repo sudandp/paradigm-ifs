@@ -8,6 +8,8 @@ import { useOnboardingStore } from '../../store/onboardingStore';
 import { useLogoStore } from '../../store/logoStore';
 import { pdf } from '@react-pdf/renderer';
 import { EmployeeOnboardingDocument } from '../attendance/PDFReports';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const OnboardingPdfOutput: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -69,6 +71,10 @@ const OnboardingPdfOutput: React.FC = () => {
     const fatherName = d.family.find(f => f.relation === 'Father')?.name || '';
     const spouseName = d.family.find(f => f.relation === 'Spouse')?.name || '';
     const motherName = d.family.find(f => f.relation === 'Mother')?.name || '';
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="bg-page">

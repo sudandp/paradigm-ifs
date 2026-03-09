@@ -4,28 +4,41 @@ import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { api } from '../../services/api';
-import type { AttendanceEvent, UserHoliday, LeaveRequest } from '../../types';
+import type { AttendanceEvent, UserHoliday, LeaveRequest, AttendanceSettings, RecurringHolidayRule } from '../../types';
 import { FIXED_HOLIDAYS, HOLIDAY_SELECTION_POOL } from '../../utils/constants';
 import Button from '../../components/ui/Button';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 interface AttendanceCalendarProps {
     leaveRequests?: LeaveRequest[];
     userHolidays?: UserHoliday[];
     currentDate: Date;
     setCurrentDate: (date: Date) => void;
+    events: AttendanceEvent[];
+    settings: AttendanceSettings | null;
+    recurringHolidays: RecurringHolidayRule[];
+    isLoading?: boolean;
 }
 
-const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests = [], userHolidays = [], currentDate, setCurrentDate }) => {
+const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ 
+    leaveRequests = [], 
+    userHolidays = [], 
+    currentDate, 
+    setCurrentDate,
+    events,
+    settings,
+    recurringHolidays,
+    isLoading = false
+}) => {
     const { user } = useAuthStore();
-    const { officeHolidays, fieldHolidays, attendance, recurringHolidays } = useSettingsStore();
-    const [events, setEvents] = useState<AttendanceEvent[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
 
     // Determine which holidays to use based on user role
     const holidays = useMemo(() => {
+        const { officeHolidays, fieldHolidays } = useSettingsStore.getState();
         if (user?.role === 'field_staff') return fieldHolidays;
         return officeHolidays;
-    }, [user, fieldHolidays, officeHolidays]);
+    }, [user]);
 
     const recurringRules = useMemo(() => {
         const roleType = user?.role === 'field_staff' ? 'field' : 'office';
@@ -45,8 +58,8 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests =
 
         // Get the allowed number of floating holidays per month from settings
         const allowedFloatingHolidays = (user?.role === 'field_staff'
-            ? attendance?.field?.monthlyFloatingLeaves
-            : attendance?.office?.monthlyFloatingLeaves) ?? 0;
+            ? settings?.field?.monthlyFloatingLeaves
+            : settings?.office?.monthlyFloatingLeaves) ?? 0;
 
         let foundHolidays = 0;
 
@@ -69,64 +82,13 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests =
             }
         });
         return dates;
-    }, [currentDate, recurringRules, attendance, user]);
+    }, [currentDate, recurringRules, settings, user]);
 
     useEffect(() => {
         console.log("Calculated Recurring Holiday Dates:", recurringHolidayDates);
     }, [recurringHolidayDates]);
 
-    useEffect(() => {
-        const fetchEvents = async () => {
-            if (!user) return;
-            setIsLoading(true);
-            try {
-                const start = startOfMonth(currentDate).toISOString();
-                const end = endOfMonth(currentDate).toISOString();
-                const data = await api.getAttendanceEvents(user.id, start, end);
-                setEvents(data);
-            } catch (error) {
-                console.error("Failed to fetch attendance events", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        // Only refresh settings if they're not already loaded (avoid redundant fetches)
-        const fetchSettings = async () => {
-            try {
-                // Check if we already have attendance settings loaded
-                const currentAttendance = useSettingsStore.getState().attendance;
-                if (!currentAttendance || Object.keys(currentAttendance).length === 0) {
-                    console.log("Fetching attendance settings...");
-                    const settings = await api.getAttendanceSettings();
-                    console.log("Fetched settings:", settings);
-                    useSettingsStore.getState().updateAttendanceSettings(settings);
-                }
-            } catch (error) {
-                console.error("Failed to fetch attendance settings", error);
-            }
-        };
-
-        // Fetch recurring holidays only if not already loaded
-        const fetchRecurringHolidays = async () => {
-            try {
-                const currentRecurring = useSettingsStore.getState().recurringHolidays;
-                if (!currentRecurring || currentRecurring.length === 0) {
-                    console.log("Fetching recurring holidays...");
-                    const holidays = await api.getRecurringHolidays();
-                    console.log("Fetched recurring holidays:", holidays);
-                    // Update the store directly
-                    useSettingsStore.setState({ recurringHolidays: holidays });
-                }
-            } catch (error) {
-                console.error("Failed to fetch recurring holidays", error);
-            }
-        };
-
-        fetchEvents();
-        fetchSettings();
-        fetchRecurringHolidays();
-    }, [user, currentDate]);
+    // No internal fetching needed as data is passed via props
 
     const daysInMonth = useMemo(() => {
         return eachDayOfInterval({
@@ -138,7 +100,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests =
     const getDayStatus = (date: Date) => {
         const currentYear = date.getFullYear();
         const staffCategory = user?.role === 'field_staff' ? 'field' : 'office';
-        const activePool = (attendance as any)?.[staffCategory]?.holidayPool || HOLIDAY_SELECTION_POOL;
+        const activePool = (settings as any)?.[staffCategory]?.holidayPool || HOLIDAY_SELECTION_POOL;
         
         // Check for attendance (present)
         const hasCheckIn = events.some(e => isSameDay(new Date(e.timestamp), date) && (e.type.toLowerCase().includes('check') || e.type.toLowerCase().includes('in')));
@@ -147,14 +109,14 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests =
         const isRecurringHoliday = recurringHolidayDates.some(d => isSameDay(d, date));
         
         // Expiry Check for Floating Holiday
-        const floatingExpiryDate = (attendance as any)?.[staffCategory]?.floatingLeavesExpiryDate;
+        const floatingExpiryDate = (settings as any)?.[staffCategory]?.floatingLeavesExpiryDate;
         const isFloatingExpired = floatingExpiryDate && format(date, 'yyyy-MM-dd') > floatingExpiryDate;
 
         // Check for general expiry (if all allocation rules are expired, hide highlights)
         const dateStr = format(date, 'yyyy-MM-dd');
-        const earnedExpiry = (attendance as any)?.[staffCategory]?.earnedLeavesExpiryDate;
-        const sickExpiry = (attendance as any)?.[staffCategory]?.sickLeavesExpiryDate;
-        const compOffExpiry = (attendance as any)?.[staffCategory]?.compOffLeavesExpiryDate;
+        const earnedExpiry = (settings as any)?.[staffCategory]?.earnedLeavesExpiryDate;
+        const sickExpiry = (settings as any)?.[staffCategory]?.sickLeavesExpiryDate;
+        const compOffExpiry = (settings as any)?.[staffCategory]?.compOffLeavesExpiryDate;
         
         const isEarnedExpired = earnedExpiry && dateStr > earnedExpiry;
         const isSickExpired = sickExpiry && dateStr > sickExpiry;
@@ -242,6 +204,10 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ leaveRequests =
 
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const startDay = getDay(startOfMonth(currentDate)); // 0-6
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="bg-card p-5 rounded-xl shadow-card border border-border w-full md:max-w-[350px] flex flex-col min-h-[460px]">

@@ -9,6 +9,8 @@ import { Loader2, Plus, Trash2, Edit2, ClipboardList, CheckCircle2, Clock, Mail,
 import { useAuthStore } from '../../store/authStore';
 import Toast from '../../components/ui/Toast';
 import RevisionHistoryModal from '../../components/modals/RevisionHistoryModal';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const SiteAttendanceTracker: React.FC = () => {
     const navigate = useNavigate();
@@ -481,6 +483,10 @@ const SiteAttendanceTracker: React.FC = () => {
     }, [activeSubTab]);
 
     const isAdmin = ['admin', 'super_admin', 'management', 'hr'].includes(user?.role || '');
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="space-y-6 w-full px-4">

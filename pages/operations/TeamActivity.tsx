@@ -13,6 +13,8 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { isAdmin } from '../../utils/auth';
 import Pagination from '../../components/ui/Pagination';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 interface TeamMember extends User {
     lastCheckIn?: string;
@@ -373,6 +375,10 @@ const TeamActivity: React.FC = () => {
             </div>
         </div>
     );
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="p-4 lg:p-8 space-y-6">

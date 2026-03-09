@@ -9,6 +9,7 @@ import Checkbox from '../../components/ui/Checkbox';
 import PageInterfaceSettingsModal from '../../components/developer/PageInterfaceSettingsModal';
 import { useDevice } from '../../hooks/useDevice';
 
+
 const SettingsCard: React.FC<{ title: string; icon: React.ElementType, children: React.ReactNode, className?: string }> = ({ title, icon: Icon, children, className }) => (
     <div className={`border-0 shadow-none lg:bg-card lg:p-6 lg:rounded-xl lg:shadow-card ${className || ''}`}>
         <div className="flex items-center mb-6">

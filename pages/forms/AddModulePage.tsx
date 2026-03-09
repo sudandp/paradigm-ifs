@@ -8,6 +8,7 @@ import Input from '../../components/ui/Input';
 import { Package } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 
+
 const AddModulePage: React.FC = () => {
     const navigate = useNavigate();
     const isMobile = useMediaQuery('(max-width: 767px)');

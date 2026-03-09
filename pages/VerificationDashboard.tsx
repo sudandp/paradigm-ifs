@@ -8,6 +8,7 @@ import { Search, Eye, FileText, Send, RefreshCw, AlertTriangle, Loader2, CheckSq
 import Toast from '@/components/ui/Toast';
 import { useAuthStore } from '@/store/authStore';
 
+
 const VerificationChecks: React.FC<{ submission: OnboardingData; isSyncing: boolean }> = ({ submission, isSyncing }) => {
     if (submission.status !== 'verified' || !submission.portalSyncStatus) {
         return <span className="text-sm font-medium text-muted">-</span>;

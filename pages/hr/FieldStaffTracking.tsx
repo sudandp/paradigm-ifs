@@ -11,6 +11,8 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useThemeStore } from '../../store/themeStore';
 import { reverseGeocode } from '../../utils/locationUtils';
 import Pagination from '../../components/ui/Pagination';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 // Maps raw event type strings to user-friendly display labels.
 // Uses the workType field to distinguish office ("Punch In/Out") from
@@ -178,6 +180,8 @@ const MapView: React.FC<{ events: (AttendanceEvent & { userName: string })[], us
         }
 
     }, [events, users]);
+
+
 
 
     return <div ref={mapContainerRef} style={{ height: '600px', width: '100%', borderRadius: '1rem', zIndex: 0 }} />;

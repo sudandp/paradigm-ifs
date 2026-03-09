@@ -12,6 +12,7 @@ import { api } from '../../services/api';
 import { UserPlus, ArrowLeft, Calendar } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 
+
 const createUserSchema = yup.object({
   id: yup.string().optional(),
   name: yup.string().required('Name is required'),
@@ -192,6 +193,7 @@ const AddUserPage: React.FC = () => {
   };
 
   if (isMobile) {
+
     return (
       <div className="h-full flex flex-col">
         <header className="p-4 flex-shrink-0 fo-mobile-header">

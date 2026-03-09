@@ -7,6 +7,7 @@ import Modal from '../../components/ui/Modal';
 import Toast from '../../components/ui/Toast';
 import Input from '../../components/ui/Input';
 
+
 interface GMCRate {
     id: number;
     minAge: number;

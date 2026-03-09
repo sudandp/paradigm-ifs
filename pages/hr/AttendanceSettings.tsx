@@ -15,6 +15,8 @@ import type { StaffAttendanceRules, AttendanceSettings, RecurringHolidayRule, Ro
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import { api } from '../../services/api';
 import { FIXED_HOLIDAYS, HOLIDAY_SELECTION_POOL } from '../../utils/constants';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const AttendanceSettings: React.FC = () => {
     const { attendance, officeHolidays, fieldHolidays, siteHolidays, recurringHolidays, addHoliday, removeHoliday, addRecurringHoliday, removeRecurringHoliday, updateAttendanceSettings: updateStore } = useSettingsStore();
@@ -262,6 +264,10 @@ const AttendanceSettings: React.FC = () => {
             setIsSaving(false);
         }
     };
+
+    if (isLoadingRoles) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="p-4 border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card w-full pb-40">

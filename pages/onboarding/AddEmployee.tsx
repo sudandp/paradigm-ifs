@@ -12,6 +12,8 @@ import { Loader2, User, MapPin, Building, Users, GraduationCap, IndianRupee, Bad
 import Modal from '../../components/ui/Modal';
 import { useEnrollmentRulesStore } from '../../store/enrollmentRulesStore';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const stepDefinitions: Omit<Step, 'status'>[] = [
   { key: 'personal', label: 'Personal', icon: User },
@@ -342,6 +344,10 @@ const AddEmployee: React.FC = () => {
                 </footer>
             </div>
         )
+    }
+
+    if (isLoadingData) {
+        return <LoadingScreen message="Loading page data..." />;
     }
 
     return (

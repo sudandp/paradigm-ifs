@@ -14,6 +14,8 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import ApprovalModal from '../../components/admin/ApprovalModal';
 import LocationAssignmentModal from '../../components/admin/LocationAssignmentModal';
 import Pagination from '../../components/ui/Pagination';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 // Helper for role names
 const getRoleName = (role: string) => {
@@ -299,6 +301,10 @@ const UserManagement: React.FC = () => {
             return true;
         }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     }, [users, filters]);
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="p-4 border-0 shadow-none lg:bg-card lg:p-6 lg:rounded-xl lg:shadow-card">

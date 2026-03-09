@@ -12,6 +12,8 @@ import Select from '../../components/ui/Select';
 import { pdf } from '@react-pdf/renderer';
 import { FieldReportDocument } from '../attendance/PDFReports';
 import { useDevice } from '../../hooks/useDevice';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 // --- PDF Preview Component ---
 const PdfPreviewModal: React.FC<{
@@ -93,6 +95,8 @@ const PdfPreviewModal: React.FC<{
     };
 
     if (!report) return null;
+
+
 
     return (
         <Modal

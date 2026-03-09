@@ -4,6 +4,8 @@ import { api } from '../../services/api';
 import type { User } from '../../types';
 import WorkflowChart2D from '../../components/admin/WorkflowChart2D';
 import { X, Loader2 } from 'lucide-react';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 type UserWithManager = User & { managerName?: string };
 
@@ -36,6 +38,10 @@ const WorkflowChartFullScreen: React.FC = () => {
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
+    }
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
     }
 
     return (

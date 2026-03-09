@@ -15,9 +15,11 @@ import Toast from '../../components/ui/Toast';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 
+
 // Mobile Card component for the detailed report
 const CostReportCard: React.FC<{ item: SubmissionCostBreakdown }> = ({ item }) => {
     const [isExpanded, setIsExpanded] = useState(false);
+
     return (
         <div className="bg-card rounded-xl border border-border p-4">
             <div className="flex justify-between items-start">

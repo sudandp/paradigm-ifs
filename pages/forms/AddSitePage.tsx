@@ -11,6 +11,8 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import { Building, Loader2 } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const schema = yup.object({
     groupId: yup.string().required('Please select a group'),
@@ -198,6 +200,10 @@ const AddSitePage: React.FC = () => {
                 {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             </div>
         );
+    }
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
     }
 
     return (

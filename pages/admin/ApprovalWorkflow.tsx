@@ -10,6 +10,8 @@ import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import WorkflowChart2D from '../../components/admin/WorkflowChart2D';
 import OrgWorkflowCard from '../../components/admin/OrgWorkflowCard';
 import Pagination from '../../components/ui/Pagination';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 
 type UserWithManager = User & { managerName?: string, manager2Name?: string, manager3Name?: string };
@@ -86,6 +88,10 @@ const ApprovalWorkflow: React.FC = () => {
             setIsSaving(false);
         }
     };
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="p-4 border-0 shadow-none md:bg-card md:p-8 md:rounded-xl md:shadow-card">

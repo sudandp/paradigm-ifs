@@ -8,6 +8,7 @@ import Select from '../../components/ui/Select';
 import { Gift } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 
+
 const GrantCompOffPage: React.FC = () => {
     const navigate = useNavigate();
     const isMobile = useMediaQuery('(max-width: 767px)');

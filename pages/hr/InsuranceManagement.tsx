@@ -7,6 +7,8 @@ import Toast from '../../components/ui/Toast';
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import Modal from '../../components/ui/Modal';
 import InsuranceForm from '../../components/hr/InsuranceForm';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const InsuranceManagement: React.FC = () => {
     const [insurances, setInsurances] = useState<Insurance[]>([]);
@@ -45,6 +47,10 @@ const InsuranceManagement: React.FC = () => {
              setToast({ message: 'Failed to save insurance.', type: 'error' });
         }
     };
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div>

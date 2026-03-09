@@ -7,6 +7,8 @@ import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { api } from '../../services/api';
 import Button from '../../components/ui/Button';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 interface CompOffCalendarProps {
     logs: CompOffLog[];
@@ -15,13 +17,20 @@ interface CompOffCalendarProps {
     isLoading?: boolean;
     viewingDate: Date;
     onDateChange: (date: Date) => void;
+    events: AttendanceEvent[];
 }
 
-const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests = [], userHolidays = [], isLoading = false, viewingDate, onDateChange }) => {
+const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ 
+    logs, 
+    leaveRequests = [], 
+    userHolidays = [], 
+    isLoading = false, 
+    viewingDate, 
+    onDateChange,
+    events
+}) => {
     const { user } = useAuthStore();
     const { officeHolidays, fieldHolidays, recurringHolidays, attendance } = useSettingsStore();
-    const [events, setEvents] = useState<AttendanceEvent[]>([]);
-    const [isLoadingEvents, setIsLoadingEvents] = useState(false);
 
     // Determine which holidays to use based on user role
     const holidays = useMemo(() => {
@@ -30,23 +39,7 @@ const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests =
     }, [user, fieldHolidays, officeHolidays]);
 
     // Fetch attendance events for the current month
-    useEffect(() => {
-        const fetchEvents = async () => {
-            if (!user) return;
-            setIsLoadingEvents(true);
-            try {
-                const start = startOfMonth(viewingDate).toISOString();
-                const end = endOfMonth(viewingDate).toISOString();
-                const data = await api.getAttendanceEvents(user.id, start, end);
-                setEvents(data);
-            } catch (error) {
-                console.error("Failed to fetch attendance events for CompOffCalendar", error);
-            } finally {
-                setIsLoadingEvents(false);
-            }
-        };
-        fetchEvents();
-    }, [user, viewingDate]);
+    // No internal fetching needed as events are passed via props
 
     const daysInMonth = useMemo(() => {
         return eachDayOfInterval({
@@ -130,7 +123,11 @@ const CompOffCalendar: React.FC<CompOffCalendarProps> = ({ logs, leaveRequests =
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const startDay = getDay(startOfMonth(viewingDate)); // 0-6
 
-    const loading = isLoading || isLoadingEvents;
+    const loading = isLoading;
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="bg-card p-5 rounded-xl shadow-card border border-border w-full md:max-w-[350px] flex flex-col min-h-[460px]">

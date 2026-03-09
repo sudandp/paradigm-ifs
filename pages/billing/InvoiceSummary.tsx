@@ -13,6 +13,7 @@ import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import Pagination from '../../components/ui/Pagination';
 import { Search, FilterX } from 'lucide-react';
 
+
 // New component for status chip
 type InvoiceStatus = 'Not Generated' | 'Generated' | 'Sent' | 'Paid';
 const InvoiceStatusChip: React.FC<{ status?: InvoiceStatus }> = ({ status }) => {
@@ -24,6 +25,7 @@ const InvoiceStatusChip: React.FC<{ status?: InvoiceStatus }> = ({ status }) => 
         'Sent': 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300',
         'Paid': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300',
     };
+
     return (
         <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyles[status]}`}>{status}</span>
     );

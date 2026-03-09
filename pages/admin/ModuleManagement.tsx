@@ -9,6 +9,8 @@ import Modal from '../../components/ui/Modal';
 import Toast from '../../components/ui/Toast';
 import ModuleFormModal from '../../components/admin/ModuleFormModal';
 import GridSkeleton from '../../components/skeletons/GridSkeleton';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const ModuleManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -66,6 +68,10 @@ const ModuleManagement: React.FC = () => {
       setToast({ message: 'Failed to delete module.', type: 'error' });
     }
   };
+
+  if (isLoading) {
+      return <LoadingScreen message="Loading page data..." />;
+  }
 
   return (
     <div className="p-4 border-0 shadow-none lg:bg-card lg:p-6 lg:rounded-xl lg:shadow-card">

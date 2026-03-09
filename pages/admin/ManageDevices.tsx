@@ -7,6 +7,8 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Toast from '../../components/ui/Toast';
 import { Cpu, Plus, Trash2, Wifi, WifiOff, MapPin, RefreshCw, Settings } from 'lucide-react';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const ManageDevices: React.FC = () => {
   const [devices, setDevices] = useState<any[]>([]);
@@ -96,6 +98,10 @@ const ManageDevices: React.FC = () => {
       setToast({ message: 'Failed to delete device.', type: 'error' });
     }
   };
+
+  if (isLoading) {
+      return <LoadingScreen message="Loading page data..." />;
+  }
 
   return (
     <div className="p-4 md:p-8">

@@ -11,6 +11,8 @@ import SearchableSelect from '../../components/ui/SearchableSelect';
 import { Save, ArrowLeft, ClipboardList, TrendingUp, Building, Calendar, Users, Briefcase, FileText, Clock } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { format, getDate, getMonth, getYear, set, parseISO } from 'date-fns';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const AddSiteAttendanceRecord: React.FC = () => {
     const navigate = useNavigate();
@@ -142,11 +144,12 @@ const AddSiteAttendanceRecord: React.FC = () => {
                 const targetId = site ? site.id : value;
                 const defaults = siteDefaults.find(d => d.siteId === targetId || d.siteName === value);
                 if (defaults) {
-                    updated.companyName = defaults.companyName || updated.companyName;
-                    updated.billingCycle = defaults.billingCycle || updated.billingCycle;
-                    updated.opsIncharge = defaults.opsIncharge || updated.opsIncharge;
-                    updated.hrIncharge = defaults.hrIncharge || updated.hrIncharge;
-                    updated.invoiceIncharge = defaults.invoiceIncharge || updated.invoiceIncharge;
+                    const defs = defaults as any;
+                    updated.companyName = defs.companyName || updated.companyName;
+                    updated.billingCycle = defs.billingCycle || updated.billingCycle;
+                    updated.opsIncharge = defs.opsIncharge || updated.opsIncharge;
+                    updated.hrIncharge = defs.hrIncharge || updated.hrIncharge;
+                    updated.invoiceIncharge = defs.invoiceIncharge || updated.invoiceIncharge;
 
                     // Dynamic Date Adjustment: Use the day from defaults, but current Year & Month
                     const adjustDateToCurrentPeriod = (dateStr: string | undefined): string => {
@@ -166,9 +169,9 @@ const AddSiteAttendanceRecord: React.FC = () => {
                         }
                     };
 
-                    updated.managerTentativeDate = adjustDateToCurrentPeriod(defaults.managerTentativeDate) || updated.managerTentativeDate;
-                    updated.hrTentativeDate = adjustDateToCurrentPeriod(defaults.hrTentativeDate) || updated.hrTentativeDate;
-                    updated.invoiceSharingTentativeDate = adjustDateToCurrentPeriod(defaults.invoiceSharingTentativeDate) || updated.invoiceSharingTentativeDate;
+                    updated.managerTentativeDate = adjustDateToCurrentPeriod(defs.managerTentativeDate) || updated.managerTentativeDate;
+                    updated.hrTentativeDate = adjustDateToCurrentPeriod(defs.hrTentativeDate) || updated.hrTentativeDate;
+                    updated.invoiceSharingTentativeDate = adjustDateToCurrentPeriod(defs.invoiceSharingTentativeDate) || updated.invoiceSharingTentativeDate;
                 }
             }
 
@@ -494,6 +497,10 @@ const AddSiteAttendanceRecord: React.FC = () => {
                 {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             </div>
         );
+    }
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
     }
 
     return (

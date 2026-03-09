@@ -12,6 +12,8 @@ import Toast from '../../components/ui/Toast';
 import TableSkeleton from '../../components/skeletons/TableSkeleton';
 import { useDevice } from '../../hooks/useDevice';
 import { isAdmin } from '../../utils/auth';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 export const allPermissions: { key: Permission; name: string; description: string }[] = [...[
     { key: 'apply_for_leave', name: 'Apply for Leave', description: 'Allows users to request time off.' },
@@ -247,6 +249,10 @@ const RoleManagement: React.FC = () => {
             })}
         </tr>
     );
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className={`${isTablet ? 'p-2' : 'p-4'} border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card`}>

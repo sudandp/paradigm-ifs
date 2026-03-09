@@ -4,9 +4,9 @@ import { useForm, type SubmitHandler, type Resolver } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import type { SiteStaff, SiteStaffDesignation } from '../../types';
-import Button from '../ui/Button';
-import Input from '../ui/Input';
-import Select from '../ui/Select';
+import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
 import { api } from '../../services/api';
 
 interface SiteStaffFormModalProps {

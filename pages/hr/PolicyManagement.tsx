@@ -8,6 +8,7 @@ import Toast from '../../components/ui/Toast';
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import Modal from '../../components/ui/Modal';
 
+
 // A simple form for Policy using the reusable Modal component
 const PolicyForm: React.FC<{
     isOpen: boolean,

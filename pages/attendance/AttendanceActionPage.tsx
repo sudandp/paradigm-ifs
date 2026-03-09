@@ -7,6 +7,7 @@ import { LogIn, LogOut } from 'lucide-react';
 import SmartFieldReportModal from '../../components/attendance/SmartFieldReportModal';
 import { api } from '../../services/api';
 
+
 const AttendanceActionPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();

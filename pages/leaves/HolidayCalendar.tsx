@@ -4,6 +4,8 @@ import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import type { UserHoliday, Holiday } from '../../types';
 import { FIXED_HOLIDAYS } from '../../utils/constants';
 import Button from '../../components/ui/Button';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 interface HolidayCalendarProps {
     adminHolidays: Holiday[];
@@ -57,6 +59,10 @@ const HolidayCalendar: React.FC<HolidayCalendarProps> = ({ adminHolidays, userSe
 
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const startDay = getDay(startOfMonth(viewingDate));
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="bg-card p-5 rounded-xl shadow-card border border-border w-full md:max-w-[350px] flex flex-col min-h-[460px]">

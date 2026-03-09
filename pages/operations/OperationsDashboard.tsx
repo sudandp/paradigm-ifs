@@ -15,6 +15,8 @@ import FormHeader from '../../components/onboarding/FormHeader';
 import DatePicker from '../../components/ui/DatePicker';
 import StatCard from '../../components/ui/StatCard';
 import { useAuthStore } from '../../store/authStore';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const OperationsDashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -100,6 +102,10 @@ const OperationsDashboard: React.FC = () => {
     const dateRangeText = (dateRange[0].startDate && dateRange[0].endDate)
         ? `${format(dateRange[0].startDate, 'MMM d, yyyy')} - ${format(dateRange[0].endDate, 'MMM d, yyyy')}`
         : 'Select Date';
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="p-4 space-y-8">

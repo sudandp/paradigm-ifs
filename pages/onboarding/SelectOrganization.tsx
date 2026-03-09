@@ -9,6 +9,8 @@ import Select from '../../components/ui/Select';
 import { Loader2, Building, ArrowRight, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuthStore } from '../../store/authStore';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const SelectOrganization = () => {
     const navigate = useNavigate();
@@ -223,6 +225,10 @@ const SelectOrganization = () => {
                 </footer>
             </div>
         );
+    }
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
     }
 
     return (

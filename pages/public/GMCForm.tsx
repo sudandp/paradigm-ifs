@@ -21,6 +21,8 @@ import { useDevice } from '../../hooks/useDevice';
 import { pdf } from '@react-pdf/renderer';
 import { GMCFormReceiptDocument } from '../attendance/PDFReports';
 import { useLogoStore } from '../../store/logoStore';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 
 
@@ -282,6 +284,10 @@ const GMCForm: React.FC = () => {
                 </div>
             </div>
         );
+    }
+
+    if (isLoadingData) {
+        return <LoadingScreen message="Loading page data..." />;
     }
 
     return (

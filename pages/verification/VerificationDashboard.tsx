@@ -10,6 +10,7 @@ import Toast from '@/components/ui/Toast';
 import TableSkeleton from '@/components/skeletons/TableSkeleton';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
+
 const VerificationChecks: React.FC<{ submission: OnboardingData; isSyncing: boolean }> = ({ submission, isSyncing }) => {
     if (submission.status !== 'verified' || !submission.portalSyncStatus) {
         return <span className="text-sm font-medium text-muted">-</span>;

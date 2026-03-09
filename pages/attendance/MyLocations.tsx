@@ -8,6 +8,8 @@ import Toast from '../../components/ui/Toast';
 import { Pin, MapPin, Trash2, Edit, Search } from 'lucide-react';
 import { reverseGeocode, getPrecisePosition } from '../../utils/locationUtils';
 import Pagination from '../../components/ui/Pagination';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 // Helper function to convert text to Title Case
 const toTitleCase = (str: string): string => {
@@ -316,6 +318,10 @@ const MyLocations: React.FC = () => {
     if (!loc.address) return true;
     return index === self.findIndex((t) => t.address === loc.address);
   });
+
+  if (loading) {
+      return <LoadingScreen message="Loading page data..." />;
+  }
 
   return (
     <div className="p-4 md:p-6 w-full">

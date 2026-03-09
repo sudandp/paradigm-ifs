@@ -10,6 +10,7 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { usePermissionsStore } from '../../store/permissionsStore';
 import { allPermissions } from '../admin/RoleManagement';
 
+
 const AddRolePage: React.FC = () => {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();

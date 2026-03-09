@@ -246,7 +246,7 @@ const PermissionGuard: React.FC<PermissionGuardProps> = ({ children }) => {
 
     const openSettings = async () => {
         try {
-            await App.openAppSettings();
+            await (App as any).openAppSettings();
         } catch (e) {
             console.error("Failed to open settings", e);
         }

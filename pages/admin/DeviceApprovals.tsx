@@ -21,6 +21,8 @@ import { DeviceChangeRequest } from '../../types';
 import { formatDate } from '../../utils/date';
 
 import { useAuthStore } from '../../store/authStore';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const DeviceApprovals: React.FC = () => {
   const { user } = useAuthStore();
@@ -101,6 +103,10 @@ const DeviceApprovals: React.FC = () => {
       setProcessingId(null);
     }
   };
+
+  if (loading) {
+      return <LoadingScreen message="Loading page data..." />;
+  }
 
   return (
     <div className="p-4 md:p-8 pb-20">

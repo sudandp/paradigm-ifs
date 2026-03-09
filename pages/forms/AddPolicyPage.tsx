@@ -6,6 +6,7 @@ import Toast from '../../components/ui/Toast';
 import { FileText } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 
+
 const AddPolicyPage: React.FC = () => {
     const navigate = useNavigate();
     const isMobile = useMediaQuery('(max-width: 767px)');

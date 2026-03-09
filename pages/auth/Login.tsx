@@ -19,6 +19,7 @@ import { authService } from '../../services/authService';
 import { api } from '../../services/api';
 
 
+
 const emailValidationSchema = yup.object({
     email: yup.string().email('Must be a valid email').required('Email is required'),
     password: yup.string().required('Password is required'),

@@ -19,6 +19,8 @@ import Modal from '../../components/ui/Modal';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { isAdmin } from '../../utils/auth';
 import { calculateEmployeeScores, getEmployeeScore } from '../../services/employeeScoring';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 // --- Profile Section ---
 const profileValidationSchema = yup.object({
@@ -668,6 +670,10 @@ const ProfilePage: React.FC = () => {
                 </div>
             </div>
         );
+    }
+
+    if (isScoresLoading) {
+        return <LoadingScreen message="Loading page data..." />;
     }
 
     return (

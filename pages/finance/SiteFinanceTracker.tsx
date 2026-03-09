@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import Toast from '../../components/ui/Toast';
 import RevisionHistoryModal from '../../components/modals/RevisionHistoryModal';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const SiteFinanceTracker: React.FC = () => {
     const navigate = useNavigate();
@@ -512,6 +514,10 @@ const SiteFinanceTracker: React.FC = () => {
             return next;
         });
     };
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="space-y-6 w-full px-4">

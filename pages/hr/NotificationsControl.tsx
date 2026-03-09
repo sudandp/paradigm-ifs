@@ -35,6 +35,8 @@ import Toast from '../../components/ui/Toast';
 import Checkbox from '../../components/ui/Checkbox';
 import { api } from '../../services/api';
 import type { NotificationRule, NotificationType, User as AppUser, Role } from '../../types';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const EVENT_TYPES = [
     { value: 'check_in', label: 'Office Punch In (General)', icon: CheckCircle2 },
@@ -209,6 +211,10 @@ const NotificationsControl: React.FC = () => {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
             </div>
         );
+    }
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
     }
 
     return (

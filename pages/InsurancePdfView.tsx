@@ -7,6 +7,7 @@ import { Download, ShieldCheck, Loader2 } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { InsuranceSummaryDocument } from './attendance/PDFReports';
 
+
 const PdfExportButton: React.FC<{ employeeData: OnboardingData }> = ({ employeeData }) => {
     const [isGenerating, setIsGenerating] = useState(false);
 

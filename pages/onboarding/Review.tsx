@@ -9,6 +9,7 @@ import { api } from '../../services/api';
 import type { VerificationResult, EducationRecord, UploadedFile } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 
+
 const DetailItem: React.FC<{ label: string; value?: string | number | null }> = ({ label, value }) => (
     <div>
         <dt className="text-sm font-medium text-muted">{label}</dt>

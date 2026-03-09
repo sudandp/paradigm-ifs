@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Check, X, AlertCircle, ChevronRight } from 'lucide-react';
-import Button from '../components/ui/Button';
+import Button from '../../components/ui/Button';
 import { 
   PermissionType, 
   checkPermission, 
   requestPermission,
   PermissionState 
-} from '../utils/permissions';
+} from '../../utils/permissions';
+import LoadingScreen from '../../components/ui/LoadingScreen';
 
 interface PermissionInfo {
   type: PermissionType;
@@ -119,6 +120,10 @@ const PermissionsPage: React.FC = () => {
         return 'text-yellow-600';
     }
   };
+
+  if (loading) {
+      return <LoadingScreen message="Loading page data..." />;
+  }
 
   return (
     <div className="min-h-screen bg-page p-4 pb-24">

@@ -9,6 +9,7 @@ import StatusChip from '../../components/ui/StatusChip';
 import { useEnrollmentRulesStore } from '../../store/enrollmentRulesStore';
 import CardListSkeleton from '../../components/skeletons/CardListSkeleton';
 
+
 type StatusFilter = 'in-progress' | 'existing';
 
 // Reusable component for the small checkboxes with labels

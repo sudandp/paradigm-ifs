@@ -10,6 +10,7 @@ import Toast from '../../components/ui/Toast';
 import { Loader2, Save, Shirt, X } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 
+
 type UniformFormData = {
     siteId: string;
     gender: 'Gents' | 'Ladies';

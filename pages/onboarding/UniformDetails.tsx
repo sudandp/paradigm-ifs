@@ -11,6 +11,8 @@ import { Loader2, Shirt, Plus, Edit } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Button from '../../components/ui/Button';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 interface OutletContext {
   onValidated: () => Promise<void>;
@@ -234,6 +236,10 @@ const UniformDetails = () => {
                 </div>
             </form>
         );
+    }
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
     }
 
     return (

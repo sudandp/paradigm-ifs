@@ -6,58 +6,44 @@ import { calculateWorkingHours } from '../../utils/attendanceCalculations';
 import { api } from '../../services/api';
 import type { AttendanceEvent, AttendanceSettings } from '../../types';
 import Button from '../../components/ui/Button';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 interface OTCalendarProps {
     viewingDate: Date;
     onDateChange: (date: Date) => void;
+    events: AttendanceEvent[];
+    settings: AttendanceSettings | null;
+    isLoading?: boolean;
 }
 
-const OTCalendar: React.FC<OTCalendarProps> = ({ viewingDate, onDateChange }) => {
+const OTCalendar: React.FC<OTCalendarProps> = ({ viewingDate, onDateChange, events, settings, isLoading = false }) => {
     const { user } = useAuthStore();
-    const [events, setEvents] = useState<AttendanceEvent[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
     const [threshold, setThreshold] = useState(8);
 
     useEffect(() => {
-        const fetchEvents = async () => {
-            if (!user) return;
-            setIsLoading(true);
-            try {
-                // Fetch events
-                const start = startOfMonth(viewingDate).toISOString();
-                const end = endOfMonth(viewingDate).toISOString();
-                const [data, settings] = await Promise.all([
-                    api.getAttendanceEvents(user.id, start, end),
-                    api.getAttendanceSettings()
-                ]);
-                setEvents(data);
+        if (!settings || !user) return;
+        
+        // Calculate threshold
+        let staffCategory: keyof AttendanceSettings = 'field';
+        const userRole = user.role.toLowerCase();
+        if ([
+            'admin', 'hr', 'finance', 'developer', 'management', 'office_staff', 
+            'back_office_staff', 'bd', 'operation_manager', 'field_staff',
+            'finance_manager', 'hr_ops', 'business developer', 'unverified',
+            'operation manager', 'field staff', 'finance manager', 'hr ops'
+        ].includes(userRole)) {
+            staffCategory = 'office';
+        } else if (['site_manager', 'site_supervisor', 'site manager', 'site supervisor'].includes(userRole)) {
+            staffCategory = 'site';
+        }
 
-                // Calculate threshold
-                let staffCategory: keyof AttendanceSettings = 'field';
-                const userRole = user.role.toLowerCase();
-                if ([
-                    'admin', 'hr', 'finance', 'developer', 'management', 'office_staff', 
-                    'back_office_staff', 'bd', 'operation_manager', 'field_staff',
-                    'finance_manager', 'hr_ops', 'business developer', 'unverified',
-                    'operation manager', 'field staff', 'finance manager', 'hr ops'
-                ].includes(userRole)) {
-                    staffCategory = 'office';
-                } else if (['site_manager', 'site_supervisor', 'site manager', 'site supervisor'].includes(userRole)) {
-                    staffCategory = 'site';
-                }
+        const rules = settings[staffCategory];
+        const shiftMax = rules?.dailyWorkingHours?.max || 8;
+        setThreshold(shiftMax);
+    }, [user, settings]);
 
-                const rules = settings[staffCategory];
-                const shiftMax = rules?.dailyWorkingHours?.max || 8;
-                setThreshold(shiftMax);
-            } catch (error) {
-                console.error("Failed to fetch attendance data", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchEvents();
-    }, [user, viewingDate]);
+    // No internal fetching needed as events are passed via props
 
     const daysInMonth = useMemo(() => {
         return eachDayOfInterval({
@@ -115,6 +101,10 @@ const OTCalendar: React.FC<OTCalendarProps> = ({ viewingDate, onDateChange }) =>
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const startDay = getDay(startOfMonth(viewingDate));
 
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
+
     return (
         <div className="bg-card p-5 rounded-xl shadow-card border border-border w-full md:max-w-[350px] flex flex-col min-h-[460px]">
             <div className="flex items-center justify-between mb-6 flex-shrink-0">
@@ -139,7 +129,6 @@ const OTCalendar: React.FC<OTCalendarProps> = ({ viewingDate, onDateChange }) =>
                     {daysInMonth.map(date => {
                         const { hoursOT, minutesOT, hasOtPunch } = getDailyOT(date);
                         const hasHoursOT = hoursOT + minutesOT > 0;
-                        const hasAnyOT = hasHoursOT || hasOtPunch;
 
                         // Color: orange for OT punch cycles, blue for hours-based OT, both = orange
                         const bgClass = hasOtPunch 

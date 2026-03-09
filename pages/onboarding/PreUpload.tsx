@@ -24,6 +24,7 @@ import Input from '../../components/ui/Input';
 import Logo from '../../components/ui/Logo';
 import NotificationBell from '../../components/notifications/NotificationBell';
 
+
 const defaultDesignationRules = {
     documents: {
         aadhaar: true,

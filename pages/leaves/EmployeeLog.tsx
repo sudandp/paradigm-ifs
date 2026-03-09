@@ -3,9 +3,11 @@ import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
 import type { AttendanceEvent } from '../../types';
 import { Loader2, MapPin, Clock, Calendar } from 'lucide-react';
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay } from 'date-fns';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { processDailyEvents } from '../../utils/attendanceCalculations';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 type TimeRange = 'day' | 'week' | 'month';
 
@@ -18,44 +20,55 @@ interface GroupedAttendance {
     totalBreakMinutes: number;
 }
 
-const EmployeeLog: React.FC = () => {
+interface EmployeeLogProps {
+    initialEvents?: AttendanceEvent[];
+}
+
+const EmployeeLog: React.FC<EmployeeLogProps> = ({ initialEvents = [] }) => {
     const { user } = useAuthStore();
-    const [events, setEvents] = useState<AttendanceEvent[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [events, setEvents] = useState<AttendanceEvent[]>(initialEvents);
+    const [isLoading, setIsLoading] = useState(initialEvents.length === 0);
     const [selectedRange, setSelectedRange] = useState<TimeRange>('day');
     const [selectedDate, setSelectedDate] = useState(new Date());
     const isMobile = useMediaQuery('(max-width: 767px)');
 
     const fetchAttendanceEvents = async () => {
         if (!user) return;
+        
+        let startDate: Date;
+        let endDate: Date;
+
+        switch (selectedRange) {
+            case 'day':
+                startDate = startOfDay(selectedDate);
+                endDate = endOfDay(selectedDate);
+                break;
+            case 'week':
+                startDate = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Monday
+                endDate = endOfWeek(selectedDate, { weekStartsOn: 1 });
+                break;
+            case 'month':
+                startDate = startOfMonth(selectedDate);
+                endDate = endOfMonth(selectedDate);
+                break;
+        }
+
+        // If it's the current month and we just mounted with initialEvents, skipping first fetch
+        // as the parent already provided the data for the current month.
+        if (initialEvents.length > 0 && selectedRange === 'month' && isSameDay(startDate, startOfMonth(new Date()))) {
+            setEvents(initialEvents);
+            setIsLoading(false);
+            return;
+        }
+
         setIsLoading(true);
         try {
-            let startDate: Date;
-            let endDate: Date;
-
-            switch (selectedRange) {
-                case 'day':
-                    startDate = startOfDay(selectedDate);
-                    endDate = endOfDay(selectedDate);
-                    break;
-                case 'week':
-                    startDate = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Monday
-                    endDate = endOfWeek(selectedDate, { weekStartsOn: 1 });
-                    break;
-                case 'month':
-                    startDate = startOfMonth(selectedDate);
-                    endDate = endOfMonth(selectedDate);
-                    break;
-            }
-
             const data = await api.getAttendanceEvents(
                 user.id,
                 startDate.toISOString(),
                 endDate.toISOString()
             );
             setEvents(data);
-
-
         } catch (error) {
             console.error('Failed to fetch attendance events:', error);
         } finally {
@@ -64,8 +77,18 @@ const EmployeeLog: React.FC = () => {
     };
 
     useEffect(() => {
+        // Only fetch if we don't have events or if range/date changed
+        // Exception: on first mount, if initialEvents is provided for current month, we already handled it
         fetchAttendanceEvents();
     }, [user, selectedRange, selectedDate]);
+
+    // Update internal events if initialEvents changes (e.g. parent refetch)
+    useEffect(() => {
+        if (initialEvents.length > 0) {
+            setEvents(initialEvents);
+            setIsLoading(false);
+        }
+    }, [initialEvents]);
 
     const groupedByDate = useMemo(() => {
         const groups: Record<string, GroupedAttendance> = {};
@@ -141,6 +164,10 @@ const EmployeeLog: React.FC = () => {
     };
 
     if (!user) return null;
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card w-full">

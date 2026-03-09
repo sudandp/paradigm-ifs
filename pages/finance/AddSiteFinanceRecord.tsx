@@ -11,6 +11,8 @@ import Input from '../../components/ui/Input';
 import Toast from '../../components/ui/Toast';
 import SearchableSelect from '../../components/ui/SearchableSelect';
 import { format, startOfMonth } from 'date-fns';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const AddSiteFinanceRecord: React.FC = () => {
     const navigate = useNavigate();
@@ -275,6 +277,10 @@ const AddSiteFinanceRecord: React.FC = () => {
             }
         }
     };
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="w-full p-4 md:p-8 space-y-6">

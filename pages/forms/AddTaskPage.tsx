@@ -18,6 +18,7 @@ import { useThemeStore } from '../../store/themeStore';
 import { CheckSquare } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 
+
 const validationSchema = yup.object({
     name: yup.string().required('Task name is required'),
     description: yup.string().required('Description is required'),

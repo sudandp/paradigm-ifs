@@ -176,14 +176,14 @@ const PageInterfaceSettingsModal: React.FC<PageInterfaceSettingsModalProps> = ({
                                 label="Enable Auto-Click on Hover"
                                 description="Automatically switch tabs or pages by hovering over them."
                                 checked={uiSettings.autoClickOnHover}
-                                onChange={uiSettings.setAutoClickOnHover}
+                                onChange={(e) => uiSettings.setAutoClickOnHover(e.target.checked)}
                             />
                             <Checkbox
                                 id="auto-scroll-hover-modal"
                                 label="Enable Auto-Scroll on Hover"
                                 description="Automatically scroll the page by hovering over the up/down arrows."
                                 checked={uiSettings.autoScrollOnHover}
-                                onChange={uiSettings.setAutoScrollOnHover}
+                                onChange={(e) => uiSettings.setAutoScrollOnHover(e.target.checked)}
                             />
                         </div>
                     </SettingsCard>

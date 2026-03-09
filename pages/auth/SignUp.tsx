@@ -8,6 +8,7 @@ import Input from '../../components/ui/Input';
 import { Mail, Lock, User as UserIcon, MailCheck } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
+
 const validationSchema = yup.object({
     name: yup.string().required('Your name is required'),
     email: yup.string().email('Must be a valid email').required('Email is required'),

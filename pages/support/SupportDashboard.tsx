@@ -15,6 +15,7 @@ import Modal from '../../components/ui/Modal';
 import { getAllPreComputedScores, calculateAllEmployeeScores, type EmployeeScoreWithUser } from '../../services/employeeScoring';
 import { isAdmin } from '../../utils/auth';
 
+
 const PriorityIndicator: React.FC<{ priority: SupportTicket['priority'] }> = ({ priority }) => {
     const styles = {
         Low: 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]',
@@ -33,6 +34,7 @@ const StatusChip: React.FC<{ status: SupportTicket['status'] }> = ({ status }) =
         Resolved: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
         Closed: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
     };
+
     return (
         <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status]}`}>
             {status}

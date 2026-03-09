@@ -10,6 +10,8 @@ import { Calendar as CalendarIcon, Check, ChevronLeft, Info, Loader2, Save } fro
 import Toast from '../../components/ui/Toast';
 import HolidayCalendar from './HolidayCalendar';
 import type { UserHoliday, Holiday, StaffAttendanceRules } from '../../types';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const HolidaySelectionPage: React.FC = () => {
     const navigate = useNavigate();
@@ -22,6 +24,7 @@ const HolidaySelectionPage: React.FC = () => {
     const [userHolidays, setUserHolidays] = useState<UserHoliday[]>([]);
     const [selectedHolidays, setSelectedHolidays] = useState<{ name: string; date: string }[]>([]);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [viewingDate, setViewingDate] = useState(new Date());
 
     const currentYear = new Date().getFullYear();
     const userRole = user?.role?.toLowerCase();
@@ -119,6 +122,10 @@ const HolidaySelectionPage: React.FC = () => {
         year: currentYear
     }));
 
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
+
     return (
         <div className="p-4 md:p-6 pb-32">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
@@ -206,6 +213,8 @@ const HolidaySelectionPage: React.FC = () => {
                         <HolidayCalendar 
                             adminHolidays={adminHolidays}
                             userSelectedHolidays={calendarUserHolidays}
+                            viewingDate={viewingDate}
+                            onDateChange={setViewingDate}
                         />
                         <div className="mt-6 p-4 bg-accent/5 border border-accent/10 rounded-xl space-y-3">
                             <h4 className="text-sm font-semibold text-accent-dark">Legend</h4>

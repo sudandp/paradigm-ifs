@@ -163,7 +163,7 @@ const GmcDetails = () => {
                                         id={`dep-mob-${dep.id}`}
                                         label={`${dep.name} (${dep.relation})`}
                                         checked={isChecked}
-                                        onChange={(checked) => handleDependentChange(dep, checked)}
+                                        onChange={(e) => handleDependentChange(dep, e.target.checked)}
                                     />
                                 );
                             })}
@@ -231,7 +231,7 @@ const GmcDetails = () => {
                                             id={`dep-${dep.id}`}
                                             label={`${dep.name} (${dep.relation})`}
                                             checked={isChecked}
-                                            onChange={(checked) => handleDependentChange(dep, checked)}
+                                            onChange={(e) => handleDependentChange(dep, e.target.checked)}
                                         />
                                     );
                                 })

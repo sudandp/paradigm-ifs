@@ -14,6 +14,8 @@ import { ProfilePlaceholder } from '../../components/ui/ProfilePlaceholder';
 import TicketPostComponent from '../../components/support/TicketPost';
 import CloseTicketModal from '../../components/support/CloseTicketModal';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const PriorityIndicator: React.FC<{ priority: SupportTicket['priority'] }> = ({ priority }) => {
     const styles = {
@@ -206,6 +208,10 @@ const TicketDetail: React.FC = () => {
             </div>
         );
     };
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="p-4">

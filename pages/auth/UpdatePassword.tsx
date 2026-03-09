@@ -10,6 +10,7 @@ import { authService } from '../../services/authService';
 import { CheckCircle, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
+
 const validationSchema = yup.object({
   password: yup.string().min(6, 'Password must be at least 6 characters').required('Password is required'),
   confirmPassword: yup.string().oneOf([yup.ref('password')], 'Passwords must match').required('Please confirm your password'),
@@ -68,6 +69,7 @@ const UpdatePassword = () => {
   };
 
   if (success) {
+
     return (
       <div className="text-center">
         <CheckCircle className="mx-auto h-12 w-12 text-accent" />

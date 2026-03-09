@@ -20,6 +20,8 @@ import { differenceInDays } from 'date-fns';
 import Input from '../../components/ui/Input';
 import Pagination from '../../components/ui/Pagination';
 import { Search } from 'lucide-react';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+
 
 const siteCsvColumns = ['id', 'shortName', 'fullName', 'address', 'manpowerApprovedCount', 'reportingManagerName', 'managerName', 'fieldStaffNames', 'backendFieldStaffName'];
 
@@ -260,6 +262,10 @@ export const SiteManagement: React.FC = () => {
         };
         reader.readAsText(file);
     };
+
+    if (isLoading) {
+        return <LoadingScreen message="Loading page data..." />;
+    }
 
     return (
         <div className="p-4 md:p-6">

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
-import type { LeaveBalance, LeaveRequest, LeaveType, LeaveRequestStatus, UploadedFile, CompOffLog, AttendanceEvent, UserHoliday, AttendanceSettings, StaffAttendanceRules } from '../../types';
+import type { LeaveBalance, LeaveRequest, LeaveType, LeaveRequestStatus, UploadedFile, CompOffLog, AttendanceEvent, UserHoliday, AttendanceSettings, StaffAttendanceRules, RecurringHolidayRule } from '../../types';
 import { Loader2, Plus, ArrowLeft, AlertTriangle, Briefcase, HeartPulse, Plane, CalendarClock, Clock, Edit, Trash2, XCircle, Search, Calendar, Settings, Check } from 'lucide-react';
 import { HOLIDAY_SELECTION_POOL, FIXED_HOLIDAYS } from '../../utils/constants';
 import Button from '../../components/ui/Button';
@@ -25,21 +25,31 @@ import YearlyAttendanceChart from './YearlyAttendanceChart';
 import EmployeeLog from './EmployeeLog';
 import Modal from '../../components/ui/Modal';
 import HolidayCalendar from './HolidayCalendar';
+import LoadingScreen from '../../components/ui/LoadingScreen';
 
 // --- Reusable Components ---
 
-const LeaveBalanceCard: React.FC<{ title: string; value: string; icon: React.ElementType; isExpired?: boolean; description?: string }> = ({ title, value, icon: Icon, isExpired, description }) => (
-    <div className={`bg-card p-3 md:p-4 rounded-xl flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 border text-center md:text-left w-full ${isExpired ? 'border-amber-500/50 bg-amber-500/5' : 'border-border'}`}>
+const LeaveBalanceCard: React.FC<{ title: string; value: string; icon: React.ElementType; isExpired?: boolean; description?: string; isLoading?: boolean }> = ({ title, value, icon: Icon, isExpired, description, isLoading }) => (
+    <div className={`bg-card p-3 md:p-4 rounded-xl flex flex-col lg:flex-row items-center lg:items-center gap-2 md:gap-4 border text-center lg:text-left w-full h-full justify-center lg:justify-start ${isExpired ? 'border-amber-500/50 bg-amber-500/5' : 'border-border'}`}>
         <div className={`${isExpired ? 'bg-amber-100' : 'bg-accent-light'} p-2 md:p-3 rounded-full flex-shrink-0`}>
-            <Icon className={`h-5 w-5 md:h-6 md:w-6 ${isExpired ? 'text-amber-600' : 'text-accent-dark'}`} />
+            {isLoading ? (
+                <div className="h-5 w-5 md:h-6 md:w-6 animate-pulse bg-gray-200 rounded-full" />
+            ) : (
+                <Icon className={`h-5 w-5 md:h-6 md:w-6 ${isExpired ? 'text-amber-600' : 'text-accent-dark'}`} />
+            )}
         </div>
-        <div className="flex-1">
-            <div className="flex items-center justify-center md:justify-start gap-2">
+        <div className="flex-1 w-full text-center lg:text-left flex flex-col items-center lg:items-start">
+            <div className="flex items-center justify-center lg:justify-start gap-2">
                 <p className="text-xs md:text-sm text-muted font-medium">{title}</p>
                 {isExpired && <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold uppercase">Expired</span>}
             </div>
-            <p className={`text-lg md:text-2xl font-bold ${isExpired ? 'text-amber-600' : 'text-primary-text'}`}>{value}</p>
-            {description && <p className="text-[10px] md:text-xs text-muted-foreground mt-1">{description}</p>}
+            {isLoading ? (
+                <div className="h-7 md:h-8 w-24 bg-gray-100 animate-pulse rounded mt-1 mx-auto lg:mx-0" />
+            ) : (
+                <p className={`text-lg md:text-2xl font-bold ${isExpired ? 'text-amber-600' : 'text-primary-text'}`}>{value}</p>
+            )}
+            {description && !isLoading && <p className="text-[9px] md:text-xs text-muted-foreground mt-1 text-center lg:text-left">{description}</p>}
+            {isLoading && <div className="h-3 w-32 bg-gray-50 animate-pulse rounded mt-2 mx-auto lg:mx-0" />}
         </div>
     </div>
 );
@@ -100,6 +110,9 @@ const LeaveDashboard: React.FC = () => {
     const [balanceDataState, setBalance] = useState<LeaveBalance | null>(null);
     const [requests, setRequests] = useState<LeaveRequest[]>([]);
     const [compOffLogs, setCompOffLogs] = useState<CompOffLog[]>([]);
+    const [events, setEvents] = useState<AttendanceEvent[]>([]);
+    const [attendanceSettings, setAttendanceSettings] = useState<AttendanceSettings | null>(null);
+    const [recurringHolidays, setRecurringHolidays] = useState<RecurringHolidayRule[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isCompOffHistoryDisabled, setIsCompOffHistoryDisabled] = useState(false);
@@ -201,7 +214,7 @@ const LeaveDashboard: React.FC = () => {
             const endStr = endOfMonth(viewingDate).toISOString();
 
             // Fetch base data points
-            const [balanceData, requestsData, compOffData, eventsData, settings] = await Promise.all([
+            const [balanceData, requestsData, compOffData, eventsData, settings, recurringData, selections] = await Promise.all([
                 api.getLeaveBalancesForUser(user.id, dateStr),
                 api.getLeaveRequests({
                     userId: user.id,
@@ -209,12 +222,18 @@ const LeaveDashboard: React.FC = () => {
                 }).then(res => res.data),
                 api.getCompOffLogs(user.id).catch(() => []),
                 api.getAttendanceEvents(user.id, startStr, endStr),
-                api.getAttendanceSettings()
+                api.getAttendanceSettings(),
+                api.getRecurringHolidays(),
+                api.getUserHolidays(user.id).catch(() => [])
             ]);
 
             setBalance(balanceData);
             setRequests(requestsData);
             setCompOffLogs(compOffData);
+            setEvents(eventsData);
+            setAttendanceSettings(settings);
+            setRecurringHolidays(recurringData);
+            setUserHolidays(selections);
             
             // Refetch current user profile to get latest persistent OT fields (bank, monthly)
             // This ensures we have the most up-to-date role and balance information
@@ -282,11 +301,6 @@ const LeaveDashboard: React.FC = () => {
             setCalculatedOTHours(parseFloat(totalOTHours.toFixed(1)));
             setIsHolidaySelectionEnabled(userRules?.enableCustomHolidays || false);
             setActiveHolidayPool(userRules?.holidayPool || HOLIDAY_SELECTION_POOL);
-            
-            if (userRules?.enableCustomHolidays) {
-                const selections = await api.getUserHolidays(user.id);
-                setUserHolidays(selections);
-            }
 
         } catch (err: any) {
             console.error('Error fetching dashboard data:', err);
@@ -332,6 +346,10 @@ const LeaveDashboard: React.FC = () => {
         }
     };
 
+    if (isLoading) {
+        return <LoadingScreen message="Establishing secure uplink..." />;
+    }
+
 
 
     const formatTabName = (tab: string) => tab.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -343,7 +361,7 @@ const LeaveDashboard: React.FC = () => {
             value: `${parseFloat((balanceDataState.earnedTotal - balanceDataState.earnedUsed).toFixed(1))} / ${parseFloat(balanceDataState.earnedTotal.toFixed(1))}`, 
             description: `Total: ${parseFloat(balanceDataState.earnedTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.earnedTotal - balanceDataState.earnedUsed).toFixed(1))}d.`,
             icon: Briefcase,
-            isExpired: balanceDataState.expiryStates?.earned 
+            isExpired: balanceDataState.expiryStates?.earned
         },
         { 
             title: 'Sick Leave', 
@@ -353,7 +371,7 @@ const LeaveDashboard: React.FC = () => {
             isExpired: balanceDataState.expiryStates?.sick
         },
         { 
-            title: 'Floating Holiday', 
+            title: 'Annual Leave', 
             value: `${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))} / ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}`, 
             description: `Total: ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))}d.`,
             icon: Plane,
@@ -366,7 +384,12 @@ const LeaveDashboard: React.FC = () => {
             icon: CalendarClock,
             isExpired: balanceDataState.expiryStates?.compOff
         },
-    ].filter(card => !card.isExpired) : [];
+    ].filter(card => !card.isExpired) : [
+        { title: 'Earned Leave', value: '0 / 0', icon: Briefcase, isLoading: true },
+        { title: 'Sick Leave', value: '0 / 0', icon: HeartPulse, isLoading: true },
+        { title: 'Annual Leave', value: '0 / 0', icon: Plane, isLoading: true },
+        { title: 'Compensatory Off', value: '0 / 0', icon: CalendarClock, isLoading: true },
+    ];
 
     return (
         <div className="p-4 space-y-6">
@@ -383,15 +406,16 @@ const LeaveDashboard: React.FC = () => {
                 )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {balanceCards.map(b => <LeaveBalanceCard key={b.title} {...b} />)}
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+                {balanceCards.map(b => <div key={b.title} className="w-full h-full flex"><LeaveBalanceCard {...b} /></div>)}
                 {/* Show Overtime card for everyone now that we track it persistent */}
-                <div className="relative group w-full">
+                <div className="relative group w-full h-full flex">
                     <LeaveBalanceCard 
                         title="Monthly OT Hours" 
                         value={formatPreciseHours(calculatedOTHours || user?.monthlyOtHours || 0)} 
                         description={`Calculated from hours exceeding ${threshold}h daily.`}
                         icon={Clock} 
+                        isLoading={isLoading}
                     />
                     <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <div className="bg-popover text-popover-foreground text-[10px] p-2 rounded shadow-lg border border-border w-48 pointer-events-none">
@@ -477,6 +501,10 @@ const LeaveDashboard: React.FC = () => {
                     userHolidays={userHolidays} 
                     currentDate={viewingDate}
                     setCurrentDate={setViewingDate}
+                    events={events}
+                    settings={attendanceSettings}
+                    recurringHolidays={recurringHolidays}
+                    isLoading={isLoading}
                 />
                 <CompOffCalendar 
                     logs={compOffLogs} 
@@ -485,6 +513,7 @@ const LeaveDashboard: React.FC = () => {
                     isLoading={isLoading} 
                     viewingDate={viewingDate}
                     onDateChange={setViewingDate}
+                    events={events}
                 />
                 <HolidayCalendar 
                     adminHolidays={adminHolidays} 
@@ -497,6 +526,9 @@ const LeaveDashboard: React.FC = () => {
                 <OTCalendar 
                     viewingDate={viewingDate}
                     onDateChange={setViewingDate}
+                    events={events}
+                    settings={attendanceSettings}
+                    isLoading={isLoading}
                 />
             </div>
 
@@ -625,7 +657,7 @@ const LeaveDashboard: React.FC = () => {
             </div>
 
             {/* Employee Attendance Log */}
-            <EmployeeLog />
+            <EmployeeLog initialEvents={events} />
         </div>
     );
 };
