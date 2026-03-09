@@ -11,7 +11,7 @@ import type {
   BiometricDevice, ChecklistTemplate, FieldReport, FieldAttendanceViolation,
   NotificationRule, NotificationType, Company, GmcPolicySettings, StaffAttendanceRules,
   GmcSubmission, UserHoliday, AttendanceUnlockRequest, LeaveType, SiteAttendanceRecord, SiteInvoiceRecord, SiteInvoiceDefault, SiteFinanceRecord,
-  CommunicationLog, RevisionLog
+  CommunicationLog, RevisionLog, UserChild
 } from '../types';
 import { getObjectDiff } from '../utils/diff';
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
@@ -27,6 +27,7 @@ import { createWorker } from 'tesseract.js';
 const ONBOARDING_DOCS_BUCKET = 'onboarding-documents';
 const AVATAR_BUCKET = 'avatars';
 const SUPPORT_ATTACHMENTS_BUCKET = 'support-attachments';
+const BIRTH_CERT_BUCKET = 'birth-certificates';
 // Buckets for storing branding assets.  These buckets should be created
 // in your Supabase project via the Storage interface.  The `logo`
 // bucket stores the active and default logos displayed throughout the
@@ -2160,7 +2161,9 @@ export const api = {
           earned_leave_opening_balance, 
           earned_leave_opening_date, 
           sick_leave_opening_balance, 
-          sick_leave_opening_date
+          sick_leave_opening_date,
+          gender,
+          created_at
         `)
         .eq('id', userId)
         .single()
@@ -2292,7 +2295,7 @@ export const api = {
              if (rhN === 0) return true; 
              const nth = Math.ceil(day.getDate() / 7);
              return rhN === nth;
-        });
+        }) || (dayName === 'Saturday' && Math.ceil(day.getDate() / 7) === 3);
 
         if (isFloatingRecurringHoliday) {
             floatingHolidayDates.push(day);
@@ -2334,6 +2337,16 @@ export const api = {
       return isEarnedOrUsed && earnedDate <= monthEnd;
     }).length + dynamicCompOffTotal;
 
+    // OT to Comp Off Conversion Rule
+    let otCompOffContribution = 0;
+    const otHoursThisMonth = (otData || []).reduce((sum, log) => sum + (log.hours_worked || 0), 0);
+    const otThreshold = rules.otConversionThreshold || 8;
+    if (rules.enableOtToCompOffConversion && otHoursThisMonth >= otThreshold) {
+      otCompOffContribution = Math.floor(otHoursThisMonth / otThreshold);
+    }
+
+    const finalCompOffTotal = compOffTotal + otCompOffContribution;
+
     const expiryStates = {
       earned: isExpired(rules.earnedLeavesExpiryDate),
       sick: isExpired(rules.sickLeavesExpiryDate),
@@ -2349,11 +2362,65 @@ export const api = {
       sickUsed: 0,
       floatingTotal: 0, // Calculated below via overflow rules
       floatingUsed: 0,
-      compOffTotal, // Dynamic + base
+      compOffTotal: finalCompOffTotal, // Dynamic + base + OT conversion
       compOffUsed: 0,
-      otHoursThisMonth: (otData || []).reduce((sum, log) => sum + (log.hours_worked || 0), 0),
+      maternityTotal: 0,
+      maternityUsed: 0,
+      childCareTotal: 0,
+      childCareUsed: 0,
+      pinkTotal: 0,
+      pinkUsed: 0,
+      otHoursThisMonth,
       expiryStates
     };
+
+    const userGender = userData.gender?.toLowerCase() || '';
+
+    // --- Pink Leave (Female employees only, 1/month, no carry forward) ---
+    if (userGender === 'female') {
+      balance.pinkTotal = 1;
+    }
+
+    // --- Maternity & Child Care Leave (Female employees only) ---
+    if (userGender === 'female') {
+      // Maternity: 26 weeks (182 days), requires 6 months tenure
+      const maternityWeeks = rules.maternityLeaveWeeks ?? 26;
+      const maternityMinTenure = rules.maternityMinTenureMonths ?? 6;
+      const userCreatedAt = userData.created_at ? new Date(userData.created_at) : new Date();
+      const tenureMonths = differenceInCalendarMonths(referenceDate, userCreatedAt);
+      if (tenureMonths >= maternityMinTenure) {
+        balance.maternityTotal = maternityWeeks * 7; // Convert weeks to days
+      }
+
+      // Child Care: Based on approved children
+      try {
+        const { data: childrenData } = await supabase
+          .from('user_children')
+          .select('date_of_birth, verification_status')
+          .eq('user_id', userId)
+          .eq('verification_status', 'approved');
+        
+        if (childrenData && childrenData.length > 0) {
+          const childCareUnder5 = rules.childCareLeaveUnder5 ?? 6;
+          const childCare5to15 = rules.childCareLeave5to15 ?? 3;
+          let maxChildCare = 0;
+          
+          childrenData.forEach((child: any) => {
+            const childDob = new Date(child.date_of_birth);
+            const childAgeYears = differenceInCalendarMonths(referenceDate, childDob) / 12;
+            if (childAgeYears < 5) {
+              maxChildCare = Math.max(maxChildCare, childCareUnder5);
+            } else if (childAgeYears < 15) {
+              maxChildCare = Math.max(maxChildCare, childCare5to15);
+            }
+          });
+          // Per policy: max applicable across multiple children, not additive
+          balance.childCareTotal = maxChildCare;
+        }
+      } catch (e) {
+        console.error('Failed to fetch children for child care leave:', e);
+      }
+    }
 
     const processedLeaves: any[] = [];
     approvedLeaves.forEach(leave => {
@@ -2394,8 +2461,24 @@ export const api = {
         if (!expiryStates.compOff || (rules.compOffLeavesExpiryDate && leaveStart <= rules.compOffLeavesExpiryDate)) {
           balance.compOffUsed += leaveAmount;
         }
+      } else if (type.includes('child') || type.includes('child care')) {
+        balance.childCareUsed += leaveAmount;
+      } else if (type.includes('maternity')) {
+        balance.maternityUsed += leaveAmount;
+      } else if (type.includes('pink')) {
+        // Pink Leave is monthly and non-carry forward. Only count if it's within the viewed month.
+        const monthStart = startOfMonth(referenceDate);
+        if (leaveStartDateObj >= monthStart && leaveStartDateObj <= monthEnd) {
+          balance.pinkUsed += leaveAmount;
+        }
       }
     });
+
+    // For females, Pink Leave replaces the standard Floating Holiday pool
+    if (userGender === 'female') {
+      balance.floatingTotal = 0;
+      balance.floatingUsed = 0;
+    }
 
     // --- Floating Holiday Expiry Logic ---
     // Floating holidays simply expire once past their validity date.
@@ -4912,5 +4995,94 @@ export const api = {
     });
 
     return Array.from(uniqueMap.entries()).map(([id, name]) => ({ id, name }));
+  },
+
+  // --- User Children CRUD ---
+  getUserChildren: async (userId: string): Promise<UserChild[]> => {
+    const { data, error } = await supabase
+      .from('user_children')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data || []).map(toCamelCase) as UserChild[];
+  },
+  getAllChildrenRecords: async (): Promise<(UserChild & { userName: string })[]> => {
+    const { data, error } = await supabase
+      .from('user_children')
+      .select('*, user:user_id(name)')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching children records:', error);
+      throw error;
+    }
+
+    return (data || []).map(item => ({
+      ...toCamelCase(item),
+      userName: (item as any).user?.name || 'Unknown'
+    })) as (UserChild & { userName: string })[];
+  },
+
+  addChild: async (userId: string, child: { childName: string; dateOfBirth: string; birthCertificateDataUrl?: string | null }): Promise<UserChild> => {
+    let birthCertUrl: string | null = null;
+
+    if (child.birthCertificateDataUrl && child.birthCertificateDataUrl.startsWith('data:')) {
+      const blob = await dataUrlToBlob(child.birthCertificateDataUrl);
+      const fileExt = child.birthCertificateDataUrl.split(';')[0].split('/')[1] || 'jpg';
+      const filePath = `${userId}/${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from(BIRTH_CERT_BUCKET).upload(filePath, blob, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from(BIRTH_CERT_BUCKET).getPublicUrl(filePath);
+      birthCertUrl = publicUrl;
+    }
+
+    const { data, error } = await supabase.from('user_children').insert({
+      user_id: userId,
+      child_name: child.childName,
+      date_of_birth: child.dateOfBirth,
+      birth_certificate_url: birthCertUrl,
+      verification_status: 'pending'
+    }).select().single();
+    if (error) throw error;
+    return toCamelCase(data) as UserChild;
+  },
+
+  updateChild: async (childId: string, updates: Partial<{ childName: string; dateOfBirth: string; birthCertificateDataUrl: string | null }>): Promise<UserChild> => {
+    const dbUpdates: any = {};
+    if (updates.childName !== undefined) dbUpdates.child_name = updates.childName;
+    if (updates.dateOfBirth !== undefined) dbUpdates.date_of_birth = updates.dateOfBirth;
+
+    if (updates.birthCertificateDataUrl && updates.birthCertificateDataUrl.startsWith('data:')) {
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id || 'unknown';
+      const blob = await dataUrlToBlob(updates.birthCertificateDataUrl);
+      const fileExt = updates.birthCertificateDataUrl.split(';')[0].split('/')[1] || 'jpg';
+      const filePath = `${userId}/${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from(BIRTH_CERT_BUCKET).upload(filePath, blob, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from(BIRTH_CERT_BUCKET).getPublicUrl(filePath);
+      dbUpdates.birth_certificate_url = publicUrl;
+      dbUpdates.verification_status = 'pending'; // Reset verification when certificate changes
+    }
+
+    const { data, error } = await supabase.from('user_children').update(dbUpdates).eq('id', childId).select().single();
+    if (error) throw error;
+    return toCamelCase(data) as UserChild;
+  },
+
+  deleteChild: async (childId: string): Promise<void> => {
+    const { error } = await supabase.from('user_children').delete().eq('id', childId);
+    if (error) throw error;
+  },
+
+  verifyChild: async (childId: string, status: 'approved' | 'rejected', verifierId: string): Promise<UserChild> => {
+    const { data, error } = await supabase.from('user_children').update({
+      verification_status: status,
+      verified_by: verifierId,
+      verified_at: new Date().toISOString()
+    }).eq('id', childId).select().single();
+    if (error) throw error;
+    return toCamelCase(data) as UserChild;
   }
 };

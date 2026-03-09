@@ -277,9 +277,7 @@ const YearlyAttendanceChart: React.FC = () => {
                        stats.monthlyHolidays.reduce((a, b) => a + b, 0) + 
                        stats.monthlySundays.reduce((a, b) => a + b, 0);
 
-    if (isLoading) {
-        return <LoadingScreen message="Loading page data..." />;
-    }
+
 
     return (
         <div className="bg-card p-5 rounded-xl shadow-card border border-border w-full md:max-w-[350px] flex flex-col min-h-[460px]">

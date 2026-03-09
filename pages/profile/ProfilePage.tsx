@@ -5,13 +5,13 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useAuthStore } from '../../store/authStore';
 import { usePermissionsStore } from '../../store/permissionsStore';
-import type { User, UploadedFile, EmployeeScore } from '../../types';
+import type { User, UploadedFile, EmployeeScore, UserChild } from '../../types';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import { api } from '../../services/api';
 import { dispatchNotificationFromRules } from '../../services/notificationService';
-import { User as UserIcon, Loader2, ClipboardList, LogOut, LogIn, Crosshair, CheckCircle, Info, MapPin, AlertTriangle, Clock, Lock, Edit, Camera, Mail } from 'lucide-react';
+import { User as UserIcon, Loader2, ClipboardList, LogOut, LogIn, Crosshair, CheckCircle, Info, MapPin, AlertTriangle, Clock, Lock, Edit, Camera, Mail, Baby, PlusCircle, Trash2, FileCheck, FileX } from 'lucide-react';
 import { AvatarUpload } from '../../components/onboarding/AvatarUpload';
 import { format } from 'date-fns';
 import Modal from '../../components/ui/Modal';
@@ -73,6 +73,13 @@ const ProfilePage: React.FC = () => {
     // Employee Scores State
     const [employeeScores, setEmployeeScores] = useState<EmployeeScore | null>(null);
     const [isScoresLoading, setIsScoresLoading] = useState(true);
+
+    // Children State (for female employees)
+    const [children, setChildren] = useState<UserChild[]>([]);
+    const [isChildrenLoading, setIsChildrenLoading] = useState(false);
+    const [newChildName, setNewChildName] = useState('');
+    const [newChildDob, setNewChildDob] = useState('');
+    const [newChildCert, setNewChildCert] = useState<string | null>(null);
 
     // Punch Restriction: 1 punch-in per day, unlimited unlock requests (1st=duty, 2nd+=OT)
     const hasPunchedToday = (dailyPunchCount || 0) >= 1;
@@ -156,6 +163,16 @@ const ProfilePage: React.FC = () => {
         loadScores();
         return () => { cancelled = true; };
     }, [user?.id, user?.role]);
+
+    // Fetch children when gender is Female
+    useEffect(() => {
+        if (!user || user.gender !== 'Female') return;
+        setIsChildrenLoading(true);
+        api.getUserChildren(user.id)
+            .then(data => setChildren(data))
+            .catch(err => console.error('Failed to load children:', err))
+            .finally(() => setIsChildrenLoading(false));
+    }, [user?.id, user?.gender]);
 
     const isMobile = useMediaQuery('(max-width: 767px)');
     const isMobileView = isMobile; // Apply mobile view for all users on mobile
@@ -304,6 +321,50 @@ const ProfilePage: React.FC = () => {
 
     const handleLogoutClick = () => {
         window.location.hash = '#/auth/logout';
+    };
+
+    const handleAddChild = async () => {
+        if (!user || !newChildName.trim() || !newChildDob) {
+            setToast({ message: 'Please enter child name and date of birth.', type: 'error' });
+            return;
+        }
+        if (children.length >= 2) {
+            setToast({ message: 'Maximum 2 children allowed.', type: 'error' });
+            return;
+        }
+        try {
+            const child = await api.addChild(user.id, {
+                childName: newChildName.trim(),
+                dateOfBirth: newChildDob,
+                birthCertificateDataUrl: newChildCert
+            });
+            setChildren(prev => [...prev, child]);
+            setNewChildName('');
+            setNewChildDob('');
+            setNewChildCert(null);
+            setToast({ message: 'Child added successfully! Birth certificate sent for verification.', type: 'success' });
+        } catch (e) {
+            setToast({ message: 'Failed to add child.', type: 'error' });
+        }
+    };
+
+    const handleDeleteChild = async (childId: string) => {
+        if (!window.confirm('Are you sure you want to remove this child?')) return;
+        try {
+            await api.deleteChild(childId);
+            setChildren(prev => prev.filter(c => c.id !== childId));
+            setToast({ message: 'Child removed.', type: 'success' });
+        } catch (e) {
+            setToast({ message: 'Failed to remove child.', type: 'error' });
+        }
+    };
+
+    const handleCertFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onloadend = () => setNewChildCert(reader.result as string);
+        reader.readAsDataURL(file);
     };
 
     const formatTime = (isoString: string | null) => {
@@ -1015,6 +1076,101 @@ const ProfilePage: React.FC = () => {
                         </div>
                     ) : <div></div>}
                     </div> {/* End Side-by-Side Grid */}
+
+                    {/* Family Details Section (Female employees only) */}
+                    {user.gender === 'Female' && (
+                        <div className="md:bg-white md:p-6 md:rounded-xl md:shadow-[0_4px_12px_rgba(0,0,0,0.06)] border border-gray-100 transition-shadow">
+                            <div className="flex items-center gap-3 mb-5">
+                                <div className="p-2 bg-pink-50 rounded-lg">
+                                    <Baby className="h-5 w-5 text-pink-600" />
+                                </div>
+                                <h3 className="text-lg md:text-base font-bold text-gray-900">Family Details</h3>
+                                <span className="text-xs text-gray-400">({children.length}/2 children)</span>
+                            </div>
+
+                            {isChildrenLoading ? (
+                                <div className="flex items-center justify-center h-20"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {/* Existing children */}
+                                    {children.map(child => (
+                                        <div key={child.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-semibold text-gray-900 text-sm">{child.childName}</p>
+                                                <p className="text-xs text-gray-500">DOB: {child.dateOfBirth}</p>
+                                                {child.birthCertificateUrl && (
+                                                    <a href={child.birthCertificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1 mt-1">
+                                                        <FileCheck className="h-3 w-3" /> View Certificate
+                                                    </a>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {child.verificationStatus === 'approved' && (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">
+                                                        <CheckCircle className="h-3 w-3" /> Approved
+                                                    </span>
+                                                )}
+                                                {child.verificationStatus === 'pending' && (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">
+                                                        <Clock className="h-3 w-3" /> Pending
+                                                    </span>
+                                                )}
+                                                {child.verificationStatus === 'rejected' && (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded-full">
+                                                        <FileX className="h-3 w-3" /> Rejected
+                                                    </span>
+                                                )}
+                                                <button onClick={() => handleDeleteChild(child.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Remove child">
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {/* Add child form */}
+                                    {children.length < 2 && (
+                                        <div className="p-4 border-2 border-dashed border-gray-200 rounded-xl space-y-3">
+                                            <p className="text-sm font-medium text-gray-700">Add Child</p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Child's Name"
+                                                    value={newChildName}
+                                                    onChange={e => setNewChildName(e.target.value)}
+                                                    className="form-input bg-white border-gray-200 text-sm h-[40px] rounded-lg"
+                                                />
+                                                <input
+                                                    type="date"
+                                                    value={newChildDob}
+                                                    onChange={e => setNewChildDob(e.target.value)}
+                                                    className="form-input bg-white border-gray-200 text-sm h-[40px] rounded-lg"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-500 mb-1">Birth Certificate (PDF/Image)</label>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*,.pdf"
+                                                    onChange={handleCertFileChange}
+                                                    className="text-xs text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={handleAddChild}
+                                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-pink-600 hover:bg-pink-700 rounded-lg transition-colors"
+                                            >
+                                                <PlusCircle className="h-4 w-4" /> Add Child
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {children.length === 0 && (
+                                        <p className="text-xs text-gray-400 italic">Add your children's details to become eligible for Child Care Leave.</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Hide entirely on desktop using md:hidden as requested */}

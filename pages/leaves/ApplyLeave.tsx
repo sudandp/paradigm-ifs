@@ -27,7 +27,7 @@ type LeaveRequestFormData = {
 };
 
 const getLeaveValidationSchema = (threshold: number) => yup.object({
-    leaveType: yup.string<LeaveType>().oneOf(['Earned', 'Sick', 'Floating', 'Comp Off', 'Loss of Pay']).required('Leave type is required'),
+    leaveType: yup.string<LeaveType>().oneOf(['Earned', 'Sick', 'Floating', 'Comp Off', 'Loss of Pay', 'Maternity', 'Child Care', 'Pink Leave']).required('Leave type is required'),
     startDate: yup.string().required('Start date is required'),
     endDate: yup.string().required('End date is required')
         .test('is-after-start', 'End date must be on or after start date', function (value) {
@@ -59,6 +59,7 @@ const ApplyLeave: React.FC = () => {
     const [searchParams] = useSearchParams();
     const editId = searchParams.get('edit');
     const isEditMode = !!editId;
+    const isFemale = user?.gender?.toLowerCase() === 'female';
     const [isInitialLoading, setIsInitialLoading] = React.useState(isEditMode);
 
     const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<LeaveRequestFormData>({
@@ -189,9 +190,11 @@ const ApplyLeave: React.FC = () => {
                                 <Select label="Leave Type" {...field} error={errors.leaveType?.message} className={isMobile ? 'pro-select pro-select-arrow' : ''}>
                                     <option value="Earned">Earned</option>
                                     <option value="Sick">Sick</option>
-                                    <option value="Floating">Floating Holiday</option>
+                                    <option value={isFemale ? "Pink Leave" : "Floating"}>{isFemale ? "Pink Leave" : "Floating Holiday"}</option>
                                     <option value="Comp Off">Comp Off</option>
                                     <option value="Loss of Pay">Loss of Pay</option>
+                                    {isFemale && <option value="Maternity">Maternity</option>}
+                                    {isFemale && <option value="Child Care">Child Care</option>}
                                 </Select>
                             )} />
 

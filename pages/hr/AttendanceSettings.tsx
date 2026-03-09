@@ -333,6 +333,29 @@ const AttendanceSettings: React.FC = () => {
                             onChange={(e) => handleSettingChange('minimumHoursHalfDay', parseFloat(e.target.value) || 0)}
                         />
                     </div>
+
+                    <div className="mt-6 p-4 bg-accent/5 border border-accent/20 rounded-xl space-y-4">
+                        <Checkbox
+                            id="enableOtToCompOffConversion"
+                            label="Enable OT to Comp Off Conversion"
+                            description="Automatically convert Overtime (OT) hours in a month into Compensatory Off days."
+                            checked={currentRules.enableOtToCompOffConversion || false}
+                            onChange={(e) => handleSettingChange('enableOtToCompOffConversion', e.target.checked)}
+                        />
+                        {currentRules.enableOtToCompOffConversion && (
+                            <div className="pl-8 w-full max-w-xs">
+                                <Input
+                                    label="OT Hours required for 1 Comp Off Day"
+                                    id="otConversionThreshold"
+                                    type="number"
+                                    min="1"
+                                    value={currentRules.otConversionThreshold || 8}
+                                    onChange={(e) => handleSettingChange('otConversionThreshold', parseFloat(e.target.value) || 8)}
+                                    description="Every X hours of OT adds 1 Comp Off day."
+                                />
+                            </div>
+                        )}
+                    </div>
                 </section>
 
                 {/* Device Limits Section */}
@@ -638,6 +661,45 @@ const AttendanceSettings: React.FC = () => {
                         </div>
                     </div>
 
+                    <div className="mt-8 p-4 bg-pink-500/5 border border-pink-500/20 rounded-xl">
+                        <h4 className="text-sm font-semibold text-pink-600 mb-4 flex items-center">
+                            <LifeBuoy className="mr-2 h-4 w-4" /> Maternity & Child Care Leave (Female Employees)
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <Input
+                                label="Maternity Leave (weeks)"
+                                id="maternityLeaveWeeks"
+                                type="number"
+                                value={currentRules.maternityLeaveWeeks ?? 26}
+                                onChange={(e) => handleSettingChange('maternityLeaveWeeks', parseInt(e.target.value, 10) || 26)}
+                                description="26 weeks as per policy (8 before + 18 after delivery)"
+                            />
+                            <Input
+                                label="Min. Tenure (months)"
+                                id="maternityMinTenureMonths"
+                                type="number"
+                                value={currentRules.maternityMinTenureMonths ?? 6}
+                                onChange={(e) => handleSettingChange('maternityMinTenureMonths', parseInt(e.target.value, 10) || 6)}
+                                description="Minimum months in company to be eligible"
+                            />
+                            <Input
+                                label="Child Care (< 5 yrs)"
+                                id="childCareLeaveUnder5"
+                                type="number"
+                                value={currentRules.childCareLeaveUnder5 ?? 6}
+                                onChange={(e) => handleSettingChange('childCareLeaveUnder5', parseInt(e.target.value, 10) || 6)}
+                                description="Days/year for child under 5 years"
+                            />
+                            <Input
+                                label="Child Care (5-15 yrs)"
+                                id="childCareLeave5to15"
+                                type="number"
+                                value={currentRules.childCareLeave5to15 ?? 3}
+                                onChange={(e) => handleSettingChange('childCareLeave5to15', parseInt(e.target.value, 10) || 3)}
+                                description="Days/year for child 5-15 years"
+                            />
+                        </div>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
                         <div className="flex flex-col">
                             <Input

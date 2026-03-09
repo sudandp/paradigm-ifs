@@ -165,9 +165,7 @@ const EmployeeLog: React.FC<EmployeeLogProps> = ({ initialEvents = [] }) => {
 
     if (!user) return null;
 
-    if (isLoading) {
-        return <LoadingScreen message="Loading page data..." />;
-    }
+
 
     return (
         <div className="border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card w-full">

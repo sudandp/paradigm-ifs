@@ -117,6 +117,19 @@ export interface User {
   isNearby?: boolean;
 }
 
+export interface UserChild {
+  id: string;
+  userId: string;
+  childName: string;
+  dateOfBirth: string; // YYYY-MM-DD
+  birthCertificateUrl?: string | null;
+  verificationStatus: 'pending' | 'approved' | 'rejected';
+  verifiedBy?: string | null;
+  verifiedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface BiometricDevice {
   id: string;
   sn: string;
@@ -763,6 +776,8 @@ export interface StaffAttendanceRules {
   adminAllocatedHolidays?: number; // Limit for admin (e.g., 5)
   employeeHolidays?: number; // Limit for employee selection (e.g., 5)
   enableCustomHolidays?: boolean; // Whether users can pick their own holidays
+  enableOtToCompOffConversion?: boolean; // Convert OT to Comp Off day
+  otConversionThreshold?: number; // Hours required for 1 Comp Off (e.g., 8)
   // Weekly off configuration
   weeklyOffDays?: number[]; // [0] for Sunday, [0,6] for Sunday and Saturday
   // Field Staff Site/Travel Tracking
@@ -783,6 +798,11 @@ export interface StaffAttendanceRules {
   };
   // Admin-configured tracking interval (minutes)
   trackingIntervalMinutes?: number;
+  // Maternity & Child Care Leave
+  maternityLeaveWeeks?: number; // default 26
+  maternityMinTenureMonths?: number; // default 6
+  childCareLeaveUnder5?: number; // default 6 days/year
+  childCareLeave5to15?: number; // default 3 days/year
 }
 
 export interface UserHoliday {
@@ -920,7 +940,7 @@ export interface DailyAttendanceRecord {
 }
 
 // Types for Leave Management
-export type LeaveType = 'Earned' | 'Sick' | 'Floating' | 'Comp Off' | 'Loss of Pay';
+export type LeaveType = 'Earned' | 'Sick' | 'Floating' | 'Comp Off' | 'Loss of Pay' | 'Maternity' | 'Child Care' | 'Pink Leave';
 export type LeaveRequestStatus = 'pending_manager_approval' | 'pending_hr_confirmation' | 'approved' | 'rejected' | 'cancelled' | 'withdrawn';
 
 export interface ApprovalRecord {
@@ -954,6 +974,12 @@ export interface LeaveBalance {
   floatingUsed: number;
   compOffTotal: number;
   compOffUsed: number;
+  maternityTotal: number;
+  maternityUsed: number;
+  childCareTotal: number;
+  childCareUsed: number;
+  pinkTotal: number;
+  pinkUsed: number;
   otHoursThisMonth: number;
   expiryStates?: {
     earned: boolean;

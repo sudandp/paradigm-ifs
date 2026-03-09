@@ -205,9 +205,7 @@ const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const startDay = getDay(startOfMonth(currentDate)); // 0-6
 
-    if (isLoading) {
-        return <LoadingScreen message="Loading page data..." />;
-    }
+
 
     return (
         <div className="bg-card p-5 rounded-xl shadow-card border border-border w-full md:max-w-[350px] flex flex-col min-h-[460px]">

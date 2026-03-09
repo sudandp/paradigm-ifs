@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import type { LeaveBalance, LeaveRequest, LeaveType, LeaveRequestStatus, UploadedFile, CompOffLog, AttendanceEvent, UserHoliday, AttendanceSettings, StaffAttendanceRules, RecurringHolidayRule } from '../../types';
-import { Loader2, Plus, ArrowLeft, AlertTriangle, Briefcase, HeartPulse, Plane, CalendarClock, Clock, Edit, Trash2, XCircle, Search, Calendar, Settings, Check } from 'lucide-react';
+import { Loader2, Plus, ArrowLeft, AlertTriangle, Briefcase, HeartPulse, Plane, CalendarClock, Clock, Edit, Trash2, XCircle, Search, Calendar, Settings, Check, Baby, Heart } from 'lucide-react';
 import { HOLIDAY_SELECTION_POOL, FIXED_HOLIDAYS } from '../../utils/constants';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
@@ -79,7 +79,7 @@ type LeaveRequestFormData = {
 };
 
 const getLeaveValidationSchema = (threshold: number) => yup.object({
-    leaveType: yup.string<LeaveType>().oneOf(['Earned', 'Sick', 'Floating', 'Comp Off']).required('Leave type is required'),
+    leaveType: yup.string<LeaveType>().oneOf(['Earned', 'Sick', 'Floating', 'Comp Off', 'Maternity', 'Child Care']).required('Leave type is required'),
     startDate: yup.string().required('Start date is required'),
     endDate: yup.string().required('End date is required')
         .test('is-after-start', 'End date must be on or after start date', function (value) {
@@ -354,6 +354,7 @@ const LeaveDashboard: React.FC = () => {
 
     const formatTabName = (tab: string) => tab.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     const filterTabs: Array<LeaveRequestStatus | 'all'> = ['all', 'pending_manager_approval', 'pending_hr_confirmation', 'approved', 'rejected'];
+    const isFemale = user?.gender?.toLowerCase() === 'female';
 
     const balanceCards = balanceDataState ? [
         { 
@@ -371,11 +372,15 @@ const LeaveDashboard: React.FC = () => {
             isExpired: balanceDataState.expiryStates?.sick
         },
         { 
-            title: 'Annual Leave', 
-            value: `${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))} / ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}`, 
-            description: `Total: ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))}d.`,
-            icon: Plane,
-            isExpired: balanceDataState.expiryStates?.floating
+            title: isFemale ? 'Pink Leave' : 'Annual Leave', 
+            value: isFemale 
+                ? `${parseFloat((balanceDataState.pinkTotal - balanceDataState.pinkUsed).toFixed(0))} / ${balanceDataState.pinkTotal}`
+                : `${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))} / ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}`, 
+            description: isFemale
+                ? `1 day per month (mandatory, non-carry forward). Available: ${parseFloat((balanceDataState.pinkTotal - balanceDataState.pinkUsed).toFixed(0))}d.`
+                : `Total: ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))}d.`,
+            icon: isFemale ? Heart : Plane,
+            isExpired: !isFemale && balanceDataState.expiryStates?.floating
         },
         { 
             title: 'Compensatory Off', 
@@ -390,6 +395,22 @@ const LeaveDashboard: React.FC = () => {
         { title: 'Annual Leave', value: '0 / 0', icon: Plane, isLoading: true },
         { title: 'Compensatory Off', value: '0 / 0', icon: CalendarClock, isLoading: true },
     ];
+
+    // Maternity & Child Care cards (only for female users with non-zero balances)
+    const maternityCards = (balanceDataState && isFemale) ? [
+        ...(balanceDataState.maternityTotal > 0 ? [{
+            title: 'Maternity Leave',
+            value: `${parseFloat((balanceDataState.maternityTotal - balanceDataState.maternityUsed).toFixed(0))} / ${parseFloat(balanceDataState.maternityTotal.toFixed(0))} days`,
+            description: `${Math.round(balanceDataState.maternityTotal / 7)} weeks total. Available: ${parseFloat((balanceDataState.maternityTotal - balanceDataState.maternityUsed).toFixed(0))} days.`,
+            icon: Baby,
+        }] : []),
+        ...(balanceDataState.childCareTotal > 0 ? [{
+            title: 'Child Care Leave',
+            value: `${parseFloat((balanceDataState.childCareTotal - balanceDataState.childCareUsed).toFixed(0))} / ${parseFloat(balanceDataState.childCareTotal.toFixed(0))}`,
+            description: `Available: ${parseFloat((balanceDataState.childCareTotal - balanceDataState.childCareUsed).toFixed(0))} days for child care.`,
+            icon: Heart,
+        }] : []),
+    ] : [];
 
     return (
         <div className="p-4 space-y-6">
@@ -433,6 +454,13 @@ const LeaveDashboard: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Maternity & Child Care Cards */}
+            {maternityCards.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+                    {maternityCards.map(b => <div key={b.title} className="w-full h-full flex"><LeaveBalanceCard {...b} /></div>)}
+                </div>
+            )}
 
 
             {/* Holiday Selection Section */}

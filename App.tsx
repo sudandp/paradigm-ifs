@@ -73,6 +73,7 @@ const LeaveDashboard = lazyWithRetry(() => import('./pages/leaves/LeaveDashboard
 const ApplyLeave = lazyWithRetry(() => import('./pages/leaves/ApplyLeave'));
 const HolidaySelectionPage = lazyWithRetry(() => import('./pages/leaves/HolidaySelectionPage'));
 const LeaveManagement = lazyWithRetry(() => import('./pages/hr/LeaveManagement'));
+const FamilyVerification = lazyWithRetry(() => import('./pages/hr/FamilyVerification'));
 const ApprovalWorkflow = lazyWithRetry(() => import('./pages/admin/ApprovalWorkflow'));
 const WorkflowChartFullScreen = lazyWithRetry(() => import('./pages/admin/WorkflowChartFullScreen'));
 const TaskManagement = lazyWithRetry(() => import('./pages/tasks/TaskManagement'));
@@ -799,6 +800,7 @@ const App: React.FC = () => {
           <Route element={<ProtectedRoute requiredPermission="manage_attendance_rules" />}>
             <Route path="hr/attendance-settings" element={<AttendanceSettings />} />
             <Route path="hr/notification-management" element={<NotificationsControl />} />
+            <Route path="hr/family-verification" element={<FamilyVerification />} />
           </Route>
           <Route element={<ProtectedRoute requiredPermission="manage_leave_requests" />}>
             <Route path="hr/leave-management" element={<LeaveManagement />} />
