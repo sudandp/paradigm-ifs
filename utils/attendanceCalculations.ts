@@ -192,12 +192,11 @@ export function calculateHoursBasedStatus(
   minHoursFullDay: number,
   minHoursHalfDay: number
 ): DailyAttendanceStatus {
+  // User Rule: 8hrs above means P. Below 8hrs (and anything above 0) means 1/2p.
   if (workingHours >= minHoursFullDay) {
     return 'Present';
-  } else if (workingHours >= minHoursHalfDay) {
-    return 'Half Day';
   } else if (workingHours > 0) {
-    return 'Incomplete';
+    return 'Half Day';
   } else {
     return 'Absent';
   }

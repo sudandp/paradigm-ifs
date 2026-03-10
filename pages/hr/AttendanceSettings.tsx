@@ -338,9 +338,16 @@ const AttendanceSettings: React.FC = () => {
                         <Checkbox
                             id="enableOtToCompOffConversion"
                             label="Enable OT to Comp Off Conversion"
-                            description="Automatically convert Overtime (OT) hours in a month into Compensatory Off days."
+                            description="Automatically convert Overtime (OT) hours in a month into Compensatory Off days. Also shows the OT Calendar on User Dashboard."
                             checked={currentRules.enableOtToCompOffConversion || false}
                             onChange={(e) => handleSettingChange('enableOtToCompOffConversion', e.target.checked)}
+                        />
+                        <Checkbox
+                            id="enableShortfall"
+                            label="Enable Shortfall"
+                            description="Show shortfall card and calendar on User Dashboard based on 8h net work goal."
+                            checked={currentRules.enableShortfall || false}
+                            onChange={(e) => handleSettingChange('enableShortfall', e.target.checked)}
                         />
                         {currentRules.enableOtToCompOffConversion && (
                             <div className="pl-8 w-full max-w-xs">

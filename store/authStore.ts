@@ -375,16 +375,22 @@ export const useAuthStore = create<AuthState>()(
                 return;
             }
             set({ isAttendanceLoading: true });
+            
             try {
                 const today = new Date();
-                const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
-                const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
+                const startOfDayStr = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).toISOString();
+                const endOfDayStr = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
 
-                const events = await api.getAttendanceEvents(user.id, startOfDay, endOfDay);
+                // Run data fetching concurrently to save time
+                const [eventsResult, unlockCountResult, dailyUnlockCountResult] = await Promise.allSettled([
+                    api.getAttendanceEvents(user.id, startOfDayStr, endOfDayStr),
+                    api.checkUnlockStatus(),
+                    api.getDailyUnlockRequestCount()
+                ]);
 
-                // Always check unlock status, even with zero events (fresh start scenario)
-                const approvedUnlockCount = await api.checkUnlockStatus();
-                const dailyUnlockRequestCount = await api.getDailyUnlockRequestCount();
+                const events = eventsResult.status === 'fulfilled' ? eventsResult.value : [];
+                const approvedUnlockCount = unlockCountResult.status === 'fulfilled' ? unlockCountResult.value : 0;
+                const dailyUnlockRequestCount = dailyUnlockCountResult.status === 'fulfilled' ? dailyUnlockCountResult.value : 0;
 
                 if (events.length === 0) {
                     set({
@@ -407,31 +413,23 @@ export const useAuthStore = create<AuthState>()(
                 
                 // --- INDEPENDENT FLOW LOGIC ---
                 // 1. Daily Punch Session (Office/General)
-                // A user is punched in for the day if their last 'office' punch-in/out event was a punch-in.
                 const officeEvents = events.filter(e => !e.workType || e.workType === 'office');
                 const lastOfficePunchEvent = officeEvents.filter(e => e.type === 'punch-in' || e.type === 'punch-out').pop();
                 const currentlyCheckedIn = lastOfficePunchEvent ? (lastOfficePunchEvent.type === 'punch-in') : false;
                 
                 // 2. Site/Work Session (Field)
-                // A user is on a site visit if their last 'field' punch-in/out event was a punch-in.
                 const fieldEvents = events.filter(e => e.workType === 'field');
                 const lastFieldPunchEvent = fieldEvents.filter(e => e.type === 'punch-in' || e.type === 'punch-out').pop();
                 const isFieldCheckedIn = lastFieldPunchEvent ? (lastFieldPunchEvent.type === 'punch-in') : false;
 
                 // 3. Break Session
-                // A user is on break if their last break event was a break-in.
                 const breakEvents = events.filter(e => e.type === 'break-in' || e.type === 'break-out');
                 const lastBreakEvent = breakEvents.length > 0 ? breakEvents[breakEvents.length - 1] : null;
                 const isOnBreak = lastBreakEvent ? (lastBreakEvent.type === 'break-in') : false;
 
-                // Count daily primary punches (only office/general sessions)
+                // Count daily primary punches
                 const dailyPunchCount = events.filter(e => e.type === 'punch-in' && (!e.workType || e.workType === 'office')).length;
 
-                // approvedUnlockCount & dailyUnlockRequestCount already fetched above
-
-                // A user has an unused unlock if the number of approved unlocks
-                // exceeds the number of extra punch cycles already used.
-                // Each punch cycle after the 1st uses one unlock approval.
                 const extraPunchCyclesUsed = Math.max(0, dailyPunchCount - 1);
                 const isPunchUnlocked = approvedUnlockCount > extraPunchCyclesUsed;
 
@@ -454,7 +452,7 @@ export const useAuthStore = create<AuthState>()(
                     isFieldCheckedOut: lastFieldPunchEvent ? (lastFieldPunchEvent.type === 'punch-out') : false
                 });
             } catch (error) {
-                console.error("Failed to check attendance status:", error);
+                console.error("Failed to check attendance status (unexpected error):", error);
                 set({ isAttendanceLoading: false });
             } finally {
                 // Pre-fetch geofencing settings for faster toggle action
@@ -511,8 +509,8 @@ export const useAuthStore = create<AuthState>()(
 
                 try {
                     // Stage 1: Primary - Robust Position Acquisition with internal fallbacks
-                    // 25s timeout gives Android GPS sufficient warmup time (cold start can take 15-30s)
-                    position = await getPrecisePosition(150, 25000);
+                    // 10s timeout gives sufficient time for GPS while preventing long hangs
+                    position = await getPrecisePosition(150, 10000);
                 } catch (err: any) {
                     console.warn('[Location] All location acquisition stages failed:', err.message);
                     // Provide a more descriptive fallback than just "GPS Unavailable"

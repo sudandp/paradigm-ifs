@@ -19,6 +19,7 @@ export interface DailyData {
   breakDuration: string;
   netWorkedHours: string;
   ot: string;
+  shortfall: string;
   shift: string;
 }
 
@@ -73,7 +74,7 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
 
   const getStaffCategory = (role: string): 'office' | 'field' | 'site' => {
     const r = role.toLowerCase();
-    if (['admin', 'developer', 'hr', 'operations_manager', 'back_office'].includes(r)) return 'office';
+    if (['admin', 'developer', 'hr', 'operations_manager', 'back_office', 'receptionist', 'site_ops', 'finance'].includes(r)) return 'office';
     if (['field_staff', 'site_manager'].includes(r)) return 'field';
     return 'site';
   };
@@ -252,6 +253,7 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
       let currentDayBreakDuration = '-';
       let currentDayNetWorkedHours = '-';
       let currentDayOT = '-';
+      let currentDayShortfall = '-';
       let currentDayShift = '-';
 
       // Helper to format time
@@ -361,21 +363,23 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
           shiftCounts[shift] = (shiftCounts[shift] || 0) + 1;
         }
 
-        const fullDayHours = rules.minimumHoursFullDay || 8;
-        const halfDayHours = rules.minimumHoursHalfDay || 4;
+        // GLOBAL RULE: 8h target for shortfall, 4h threshold for "Present" (P)
+        const fullDayHours = 8; 
+        const halfDayHours = 4; 
         
         if (isSunday) {
             status = 'WOP';
             if (!isFuture) weekendPresents++;
         } else {
             if (duration >= fullDayHours) {
+                // Rules based: 8hrs above means P
                 status = 'P';
-            } else if (duration >= halfDayHours) {
+            } else if (duration > 0) {
+                // Rules based: 4 hrs below (and anything less than 8) means 1/2p
                 status = '1/2P';
-                halfDays++; // Increment halfDays counter
+                halfDays++; 
             } else {
-                status = 'P'; // Default to P even if low hours if worked? Or should it be half? 
-                // Usually if worked any hours it counts towards something.
+                status = 'A';
             }
         }
 
@@ -385,6 +389,11 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
         currentDayBreakDuration = breakHours > 0 ? formatTime(breakHours) : '-';
         currentDayNetWorkedHours = netHours > 0 ? formatTime(netHours) : '-';
         currentDayOT = ot > 0 ? formatTime(ot) : '-';
+        
+        const targetNetHours = 8; // User requested 8h net work target for shortfall
+        const shortfall = Math.max(0, targetNetHours - netHours);
+        currentDayShortfall = (shortfall > 0 && netHours > 0 && !isSunday && !isHoliday && !isRecurringHoliday) ? formatTime(shortfall) : '-';
+        
         currentDayShift = shift || '-';
 
       } else if (isSunday) {
@@ -418,6 +427,7 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
         breakDuration: currentDayBreakDuration,
         netWorkedHours: currentDayNetWorkedHours,
         ot: currentDayOT,
+        shortfall: currentDayShortfall,
         shift: currentDayShift,
       });
     }
@@ -587,6 +597,12 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
                   <td className="p-2 font-semibold bg-gray-200 text-gray-900 border-r border-gray-300 whitespace-nowrap">OT</td>
                   {employee.dailyData.map((day) => (
                     <td key={day.date} className="p-1 text-center border-l border-gray-300 text-gray-900">{day.ot}</td>
+                  ))}
+                </tr>
+                <tr className="border-b border-gray-300">
+                  <td className="p-2 font-semibold bg-gray-200 text-gray-900 border-r border-gray-300 whitespace-nowrap">Shortfall (8h)</td>
+                  {employee.dailyData.map((day) => (
+                    <td key={day.date} className={`p-1 text-center border-l border-gray-300 ${day.shortfall !== '-' ? 'text-red-500 font-medium' : 'text-gray-900'}`}>{day.shortfall}</td>
                   ))}
                 </tr>
                 <tr className="border-b border-gray-300">

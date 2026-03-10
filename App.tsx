@@ -21,6 +21,9 @@ import type { User } from './types';
 import { useOnboardingStore } from './store/onboardingStore';
 import { usePWAStore } from './store/pwaStore';
 import { useNotificationStore } from './store/notificationStore';
+import { syncService } from './services/offline/syncService';
+import OfflineStatusBanner from './components/OfflineStatusBanner';
+import { useNetworkStatus } from './hooks/useNetworkStatus';
 
 
 import { AlertTriangle } from 'lucide-react';
@@ -142,8 +145,8 @@ const ImageViewerPage = lazyWithRetry(() => import('./pages/ImageViewerPage'));
 
 // Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import { IdleTimeoutManager } from './components/auth/IdleTimeoutManager';
 import ScrollToTop from './components/ScrollToTop';
+import { App as CapacitorApp } from '@capacitor/app';
 
 // Theme Manager
 const ThemeManager: React.FC = () => {
@@ -281,6 +284,12 @@ const App: React.FC = () => {
   const location = useLocation();
   const { setDeferredPrompt } = usePWAStore();
   const { isUpdateRequired, updateInfo } = useAppUpdate();
+  const { isOnline } = useNetworkStatus();
+
+  // Initialize offline sync service
+  useEffect(() => {
+    syncService.init().catch(err => console.error('Failed to initialize sync service:', err));
+  }, []);
 
   // Expose API for testing
   useEffect(() => {
@@ -371,15 +380,21 @@ const App: React.FC = () => {
             try {
               // We use withTimeout to prevent hanging on poor mobile networks
               const { data: refreshData, error: refreshError } = await withTimeout(
-                supabase.auth.setSession({ refresh_token: refreshToken } as any),
-                10000,
+                supabase.auth.refreshSession({ refresh_token: refreshToken }),
+                20000, // 20s for session restoration
                 'Session restoration timed out'
               ).catch(e => ({ data: { session: null }, error: { message: e.message } }));
 
               if (refreshError) {
                 console.error('Failed to restore session from long-term token:', refreshError.message);
-                // If the error is a definitive auth failure (400), clear the token
-                if (refreshError.message?.includes('400') || refreshError.message?.includes('invalid refresh token')) {
+                // ONLY clear the token if it's a definitive invalidation (400)
+                // If it's a network error (failed to fetch) or timeout, we DO NOT clear it.
+                // This ensures "auto renew until manual logout" even if they open the app while offline.
+                const isDefinitiveFailure = refreshError.message?.includes('400') || 
+                                           refreshError.message?.includes('invalid refresh token') ||
+                                           refreshError.message?.includes('not found');
+                
+                if (isDefinitiveFailure) {
                   console.warn('Invalid refresh token detected. Clearing persistent storage.');
                   await Preferences.remove({ key: 'supabase.auth.rememberMe' });
                 }
@@ -438,76 +453,85 @@ const App: React.FC = () => {
     // tick via setTimeout().  This ensures the callback returns
     // immediately and prevents the client from locking up when tabs are
     // switched or refreshed.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`[AuthEvent] ${event}`);
+      
       if (event === 'PASSWORD_RECOVERY') {
         navigate('/auth/update-password', { replace: true });
         return;
       }
 
       // Handle Token Updates for Persistence
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         if (session) {
-          try {
-            // FORCE PERSISTENCE: Always update the persistent token on refresh/sign-in
-            // This ensures we always have the latest valid token for restoration.
-            await Preferences.set({ 
-              key: 'supabase.auth.rememberMe', 
-              value: session.refresh_token 
-            });
-            // Also sync email if needed
-            if (session.user.email) {
-                await Preferences.set({ key: 'rememberedEmail', value: session.user.email });
-            }
-          } catch (err) {
-            console.error('Error synchronizing auth token:', err);
+          Preferences.set({ 
+            key: 'supabase.auth.rememberMe', 
+            value: session.refresh_token 
+          }).catch(err => console.error('Error synchronizing auth token:', err));
+          
+          if (session.user.email) {
+            Preferences.set({ key: 'rememberedEmail', value: session.user.email }).catch(() => {});
           }
         }
       }
 
+      // Update global user state based on the session
       if (session?.user) {
-        // schedule fetching the full profile after the callback returns
-        setTimeout(async () => {
-          try {
-            const appUser = await withTimeout(
-              authService.getAppUserProfile(session.user),
-              15000,
-              'Profile fetch timed out'
-            ).catch(err => {
-              console.warn('Transient error fetching profile:', err.message);
-              // Return the current user if profile fetch fails due to timeout/network
-              // to avoid kicking the user out of the app.
-              return user; 
-            });
+        // Only fetch profile if user isn't set OR if it's a critical auth event
+        const currentUser = useAuthStore.getState().user;
+        if (!currentUser || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          setTimeout(async () => {
+            try {
+              const appUser = await withTimeout(
+                authService.getAppUserProfile(session.user),
+                15000,
+                'Profile fetch timed out'
+              ).catch(err => {
+                console.warn('Transient error fetching profile:', err.message);
+                return currentUser; 
+              });
 
-            if (isMounted && appUser) {
-              setUser(appUser);
-              // Send a one‑time greeting notification when a user logs in via OAuth or any method
-              try {
+              if (isMounted && appUser) {
+                setUser(appUser);
+                // Greeting logic
                 const greetKey = `greetingSent_${appUser.id}`;
                 if (!localStorage.getItem(greetKey)) {
-                  await apiService.createNotification({
+                  apiService.createNotification({
                     userId: appUser.id,
                     message: `Good morning, ${appUser.name || 'there'}! Welcome to Paradigm Services.`,
                     type: 'greeting',
-                  });
+                  }).catch(() => {});
                   localStorage.setItem(greetKey, '1');
                 }
-              } catch (err) {
-                console.error('Failed to send login greeting notification', err);
               }
+            } catch (err) {
+              console.error('Failed to fetch user profile after auth change:', err);
             }
-          } catch (err) {
-            console.error('Failed to fetch user profile after auth change:', err);
-            // ONLY clear session if user is explicitly null (logged out)
-            // or if it's a definitive "user not found" error.
-            // For now, we prefer keeping the user logged in.
-          }
-        }, 0);
+          }, 0);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        // DEFINITIVE LOGOUT: Clear local state
         if (isMounted) {
-          // If we had a user but now we don't, or if the event is a definitive logout
           setUser(null);
           resetAttendance();
           useOnboardingStore.getState().reset();
+          Preferences.remove({ key: 'supabase.auth.rememberMe' }).catch(() => {});
+        }
+      }
+    });
+
+    // Check session when app returns to foreground
+    const appStateSubscription = CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
+      if (isActive) {
+        console.log('[AppState] App returned to foreground. Verifying session...');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          // If session is lost in background, we might need to restore it
+          const { value: refreshToken } = await Preferences.get({ key: 'supabase.auth.rememberMe' });
+          if (refreshToken) {
+            console.log('[AppState] Attempting to restore lost session...');
+            await supabase.auth.refreshSession({ refresh_token: refreshToken }).catch(() => {});
+          }
         }
       }
     });
@@ -647,8 +671,8 @@ const App: React.FC = () => {
     <>
       <ScrollToTop />
       <ThemeManager />
+      <OfflineStatusBanner />
       {isUpdateRequired && <UpdatePromptModal updateInfo={updateInfo} />}
-      {user && <IdleTimeoutManager />}
       <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div></div>}>
       <Routes>
         {/* 1. Public Authentication & Form Routes */}

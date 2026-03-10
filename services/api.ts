@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, PostgrestResponse } from '@supabase/supabase-js';
 import { supabase, supabaseAnonKey } from './supabase';
 import type {
   OnboardingData, User, Organization, OrganizationGroup, AttendanceEvent, Location, AttendanceSettings, Holiday,
@@ -20,9 +20,12 @@ import {
   startOfDay, endOfDay, eachDayOfInterval, isSameDay, getDay, getDate, getDaysInMonth, addMonths
 } from 'date-fns';
 import { dispatchNotificationFromRules } from './notificationService';
+import { offlineDb } from './offline/database';
+import { Network } from '@capacitor/network';
 import { calculateSiteTravelTime, validateFieldStaffAttendance } from '../utils/fieldStaffTracking';
 import { GoogleGenAI, Type, Modality } from '@google/genai';
 import { createWorker } from 'tesseract.js';
+import { withTimeout } from '../utils/async';
 
 const ONBOARDING_DOCS_BUCKET = 'onboarding-documents';
 const AVATAR_BUCKET = 'avatars';
@@ -255,7 +258,11 @@ const fetchAll = async <T,>(queryBuilder: any, pageSize = 1000): Promise<T[]> =>
   let hasMore = true;
 
   while (hasMore) {
-    const { data, error } = await queryBuilder.range(from, to);
+    const { data, error } = (await withTimeout(
+      queryBuilder.range(from, to) as any,
+      15000,
+      'Query execution timeout'
+    )) as any;
     if (error) throw error;
     
     if (data && data.length > 0) {
@@ -273,7 +280,33 @@ const fetchAll = async <T,>(queryBuilder: any, pageSize = 1000): Promise<T[]> =>
   return allData;
 };
 
+/**
+ * Generic helper to fetch data from a function, cache it locally, 
+ * and fallback to the cache if offline or on network failure.
+ */
+const fetchWithCache = async <T>(cacheKey: string, fetchFn: () => Promise<T>, defaultOfflineValue: any = []): Promise<T> => {
+  const status = await Network.getStatus();
+  if (status.connected) {
+    try {
+      const data = await fetchFn();
+      if (data !== undefined && data !== null) {
+        await offlineDb.setCache(cacheKey, data);
+      }
+      return data;
+    } catch (err: any) {
+      console.warn(`[API] Failed to fetch ${cacheKey} from cloud, falling back to cache:`, err);
+    }
+  }
+  
+  const cached = await offlineDb.getCache(cacheKey);
+  if (cached !== null) return cached;
+  
+  if (defaultOfflineValue !== undefined) return defaultOfflineValue;
+  throw new Error(`You are offline and no cached data is available for ${cacheKey}.`);
+};
+
 export const api = {
+  auth: supabase.auth,
   toCamelCase,
   handleError: (error: any): never => {
     if (!error) throw new Error('An unknown error occurred.');
@@ -295,35 +328,53 @@ export const api = {
   },
   // --- Initial Data Loading ---
   getInitialAppData: async (): Promise<{ settings: any; roles: Role[]; holidays: Holiday[] }> => {
-    const { data: settingsData, error: settingsError } = await supabase
-      .from('settings')
-      .select('*')
-      .eq('id', 'singleton')
-      .maybeSingle();
-    if (settingsError) return api.handleError(settingsError);
-    if (!settingsData) throw new Error('Core application settings are missing from the database.');
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const [settingsRes, rolesRes, holidaysRes] = (await withTimeout(
+          Promise.all([
+            supabase.from('settings').select('*').eq('id', 'singleton').maybeSingle(),
+            supabase.from('roles').select('*'),
+            supabase.from('holidays').select('*')
+          ]) as any,
+          15000,
+          'Initial data fetch timed out'
+        )) as any[];
 
-    const { data: rolesData, error: rolesError } = await supabase.from('roles').select('*');
-    if (rolesError) return api.handleError(rolesError);
+        if (settingsRes.error) return api.handleError(settingsRes.error);
+        if (rolesRes.error) return api.handleError(rolesRes.error);
+        if (holidaysRes.error) return api.handleError(holidaysRes.error);
 
-    const { data: holidaysData, error: holidaysError } = await supabase.from('holidays').select('*');
-    if (holidaysError) return api.handleError(holidaysError);
+        const result = {
+          settings: toCamelCase(settingsRes.data),
+          roles: (rolesRes.data || []).map(toCamelCase),
+          holidays: (holidaysRes.data || []).map(toCamelCase),
+        };
 
-    return {
-      settings: toCamelCase(settingsData),
-      roles: (rolesData || []).map(toCamelCase),
-      holidays: (holidaysData || []).map(toCamelCase),
-    };
+        // Cache for offline use
+        await offlineDb.setCache('initial_app_data', result);
+        return result;
+      } catch (err) {
+        console.warn('Failed to fetch initial app data from cloud, falling back to cache:', err);
+      }
+    }
+
+    const cached = await offlineDb.getCache('initial_app_data');
+    if (cached) return cached;
+    
+    throw new Error('You are offline and no cached application data is available. Please connect to the internet.');
   },
 
   // --- Site Attendance Tracker ---
   getSiteAttendanceRecords: async (): Promise<SiteAttendanceRecord[]> => {
-    const { data, error } = await supabase
-      .from('site_attendance_tracker')
-      .select('*')
-      .order('billing_date', { ascending: false });
-    if (error) throw error;
-    return (data || []).map(toCamelCase);
+    return fetchWithCache('site_attendance_records', async () => {
+      const { data, error } = await supabase
+        .from('site_attendance_tracker')
+        .select('*')
+        .order('billing_date', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(toCamelCase);
+    });
   },
 
   saveSiteAttendanceRecord: async (record: Partial<SiteAttendanceRecord>): Promise<SiteAttendanceRecord> => {
@@ -346,41 +397,45 @@ export const api = {
   },
 
   getSiteInvoiceRecords: async (managerId?: string): Promise<SiteInvoiceRecord[]> => {
-  let query = supabase
-    .from('site_invoice_tracker')
-    .select('*, creator:created_by(reporting_manager_id, reporting_manager_2_id, reporting_manager_3_id)')
-    .is('deleted_at', null)
-    .order('site_name');
-  
-  const { data, error } = await query;
-  if (error) throw error;
+    return fetchWithCache(`site_invoice_records_${managerId || 'all'}`, async () => {
+      let query = supabase
+        .from('site_invoice_tracker')
+        .select('*, creator:created_by(reporting_manager_id, reporting_manager_2_id, reporting_manager_3_id)')
+        .is('deleted_at', null)
+        .order('site_name');
+      
+      const { data, error } = await query;
+      if (error) throw error;
 
-  let filteredData = data || [];
-  if (managerId) {
-      filteredData = filteredData.filter((row: any) => 
-          row.creator?.reporting_manager_id === managerId ||
-          row.creator?.reporting_manager_2_id === managerId ||
-          row.creator?.reporting_manager_3_id === managerId
-      );
-  }
+      let filteredData = data || [];
+      if (managerId) {
+          filteredData = filteredData.filter((row: any) => 
+              row.creator?.reporting_manager_id === managerId ||
+              row.creator?.reporting_manager_2_id === managerId ||
+              row.creator?.reporting_manager_3_id === managerId
+          );
+      }
 
-  return filteredData.map(toCamelCase);
-},
+      return filteredData.map(toCamelCase);
+    });
+  },
 
   getDeletedSiteInvoiceRecords: async (managerId?: string): Promise<SiteInvoiceRecord[]> => {
-    let query = supabase
-      .from('site_invoice_tracker')
-      .select('*')
-      .not('deleted_at', 'is', null)
-      .order('site_name');
+    return fetchWithCache(`deleted_site_invoice_records_${managerId || 'all'}`, async () => {
+      let query = supabase
+        .from('site_invoice_tracker')
+        .select('*')
+        .not('deleted_at', 'is', null)
+        .order('site_name');
+        
+      if (managerId) {
+          query = query.eq('created_by', managerId);
+      }
       
-    if (managerId) {
-        query = query.eq('created_by', managerId);
-    }
-    
-    const { data, error } = await query;
-    if (error) throw error;
-    return (data || []).map(toCamelCase);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []).map(toCamelCase);
+    });
   },
 
   saveSiteInvoiceRecord: async (record: Partial<SiteInvoiceRecord>): Promise<SiteInvoiceRecord> => {
@@ -506,18 +561,20 @@ export const api = {
 
   // --- Site Invoice Defaults (Auto-fill templates) ---
   getSiteInvoiceDefaults: async (managerId?: string): Promise<SiteInvoiceDefault[]> => {
-    let query = supabase
-      .from('site_invoice_defaults')
-      .select('*')
-      .order('site_name');
+    return fetchWithCache(`site_invoice_defaults_${managerId || 'all'}`, async () => {
+      let query = supabase
+        .from('site_invoice_defaults')
+        .select('*')
+        .order('site_name');
+        
+      if (managerId) {
+          query = query.eq('created_by', managerId);
+      }
       
-    if (managerId) {
-        query = query.eq('created_by', managerId);
-    }
-    
-    const { data, error } = await query;
-    if (error) throw error;
-    return (data || []).map(toCamelCase);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []).map(toCamelCase);
+    });
   },
 
   upsertSiteContract: async (siteId: string, year: number, details: { contractAmount: number, contractManagementFee: number, companyName: string, createdBy?: string, createdByName?: string }): Promise<void> => {
@@ -613,37 +670,59 @@ export const api = {
 
   // --- Onboarding & Verification ---
   getVerificationSubmissions: async (status?: string, organizationId?: string, managerId?: string): Promise<OnboardingData[]> => {
-    let query = supabase.from('onboarding_submissions').select('*, user:user_id(reporting_manager_id)');
-    if (status) query = query.eq('status', status);
-    if (organizationId) query = query.eq('organization_id', organizationId);
-    const { data, error } = await query.order('created_at', { ascending: false }).limit(5000);
-    if (error) throw error;
-    
-    let filteredData = data || [];
-    if (managerId) {
-        filteredData = filteredData.filter((row: any) => 
-            row.user?.reporting_manager_id === managerId || 
-            row.user?.reporting_manager_2_id === managerId || 
-            row.user?.reporting_manager_3_id === managerId
-        );
-    }
-    
-    return filteredData.map(toCamelCase);
+    return fetchWithCache(`verification_submissions_${status || 'all'}_${organizationId || 'all'}_${managerId || 'all'}`, async () => {
+      let query = supabase.from('onboarding_submissions').select('*, user:user_id(reporting_manager_id)');
+      if (status) query = query.eq('status', status);
+      if (organizationId) query = query.eq('organization_id', organizationId);
+      const { data, error } = await query.order('created_at', { ascending: false }).limit(5000);
+      if (error) throw error;
+      
+      let filteredData = data || [];
+      if (managerId) {
+          filteredData = filteredData.filter((row: any) => 
+              row.user?.reporting_manager_id === managerId || 
+              row.user?.reporting_manager_2_id === managerId || 
+              row.user?.reporting_manager_3_id === managerId
+          );
+      }
+      
+      return filteredData.map(toCamelCase);
+    });
   },
 
   getOnboardingDataById: async (id: string): Promise<OnboardingData | null> => {
-    const { data, error } = await supabase.from('onboarding_submissions').select('*').eq('id', id).single();
-    if (error && error.code !== 'PGRST116') throw error;
-    return data ? toCamelCase(data) : null;
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const { data, error } = await supabase.from('onboarding_submissions').select('*').eq('id', id).single();
+        if (error && error.code !== 'PGRST116') throw error;
+        if (data) {
+          const formatted = toCamelCase(data);
+          await offlineDb.setCache(`onboarding_${id}`, formatted);
+          return formatted;
+        }
+      } catch (err) {
+        console.warn('Failed to fetch onboarding data from cloud, falling back to cache');
+      }
+    }
+    return await offlineDb.getCache(`onboarding_${id}`);
   },
 
   _saveSubmission: async (data: OnboardingData, asDraft: boolean): Promise<{ draftId: string }> => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) throw new Error("User not authenticated");
 
-    const submissionId = (data.id && !data.id.startsWith('draft_')) ? data.id : crypto.randomUUID();
-    const dataWithPaths = await processFilesForUpload(data, session.user.id, submissionId);
+    const submissionId = (data.id && !data.id.startsWith('draft_')) ? data.id : (data.id || crypto.randomUUID());
+    
+    const status = await Network.getStatus();
+    if (!status.connected) {
+        const offlineData = { ...data, id: submissionId, status: asDraft ? 'draft' : data.status };
+        await offlineDb.addToOutbox({ table_name: 'onboarding_submissions', action: 'INSERT', payload: { data, asDraft } });
+        await offlineDb.setCache(`onboarding_${submissionId}`, offlineData);
+        return { draftId: submissionId };
+    }
 
+    const dataWithPaths = await processFilesForUpload(data, session.user.id, submissionId);
     const snakedData = toSnakeCase(dataWithPaths);
     
     const dbData = {
@@ -657,13 +736,15 @@ export const api = {
     // Remove any client-side only properties that don't have columns
     delete dbData.file;
     delete dbData.confirm_account_number;
-    delete (dbData as any).is_qr_verified; // Guard against legacy state
+    delete (dbData as any).is_qr_verified; 
 
     const { data: savedData, error } = await supabase.from('onboarding_submissions').upsert(dbData, { onConflict: 'id' }).select('id').single();
     if (error) {
         console.error('Save submission error:', error);
         throw error;
     }
+    // Update cache
+    await offlineDb.setCache(`onboarding_${savedData.id}`, toCamelCase(dbData));
     return { draftId: savedData.id };
   },
 
@@ -719,62 +800,65 @@ export const api = {
     page?: number,
     limit?: number 
   }): Promise<{ data: GmcSubmission[], total: number }> => {
-    const { 
-      name, site, role, company, 
-      minAge, maxAge, maritalStatus,
-      startDate, endDate,
-      page, limit 
-    } = filters || {};
-    let query = supabase.from('gmc_form_submissions').select('*', { count: 'exact' });
+    const filterKey = JSON.stringify(filters || {});
+    return fetchWithCache(`gmc_submissions_${filterKey}`, async () => {
+      const { 
+        name, site, role, company, 
+        minAge, maxAge, maritalStatus,
+        startDate, endDate,
+        page, limit 
+      } = filters || {};
+      let query = supabase.from('gmc_form_submissions').select('*', { count: 'exact' });
 
-    if (name) query = query.ilike('employee_name', `%${name}%`);
-    if (site) query = query.eq('site_name', site);
-    // Role is not explicitly in the GMCForm data but can be searched in the employee_name/details if needed.
-    // However, the user asked for "search by name,site,role,etc". 
-    // I'll assume role might be added later or we search in related user data if available.
-    // For now, I'll filter by the fields we have.
-    if (company) query = query.eq('company_name', company);
-    if (maritalStatus) query = query.eq('marital_status', maritalStatus);
+      if (name) query = query.ilike('employee_name', `%${name}%`);
+      if (site) query = query.eq('site_name', site);
+      // Role is not explicitly in the GMCForm data but can be searched in the employee_name/details if needed.
+      // However, the user asked for "search by name,site,role,etc". 
+      // I'll assume role might be added later or we search in related user data if available.
+      // For now, I'll filter by the fields we have.
+      if (company) query = query.eq('company_name', company);
+      if (maritalStatus) query = query.eq('marital_status', maritalStatus);
 
-    if (minAge !== undefined || maxAge !== undefined) {
-      const today = new Date();
-      if (maxAge !== undefined) {
-        // maxAge 30 means DOB must be >= (Today - 31 years + 1 day)
-        const minDob = new Date(today.getFullYear() - maxAge - 1, today.getMonth(), today.getDate() + 1);
-        query = query.gte('dob', format(minDob, 'yyyy-MM-dd'));
+      if (minAge !== undefined || maxAge !== undefined) {
+        const today = new Date();
+        if (maxAge !== undefined) {
+          // maxAge 30 means DOB must be >= (Today - 31 years + 1 day)
+          const minDob = new Date(today.getFullYear() - maxAge - 1, today.getMonth(), today.getDate() + 1);
+          query = query.gte('dob', format(minDob, 'yyyy-MM-dd'));
+        }
+        if (minAge !== undefined) {
+          // minAge 18 means DOB must be <= (Today - 18 years)
+          const maxDob = new Date(today.getFullYear() - minAge, today.getMonth(), today.getDate());
+          query = query.lte('dob', format(maxDob, 'yyyy-MM-dd'));
+        }
       }
-      if (minAge !== undefined) {
-        // minAge 18 means DOB must be <= (Today - 18 years)
-        const maxDob = new Date(today.getFullYear() - minAge, today.getMonth(), today.getDate());
-        query = query.lte('dob', format(maxDob, 'yyyy-MM-dd'));
+
+      if (startDate) {
+        query = query.gte('updated_at', startOfDay(new Date(startDate)).toISOString());
       }
-    }
+      if (endDate) {
+        query = query.lte('updated_at', endOfDay(new Date(endDate)).toISOString());
+      }
 
-    if (startDate) {
-      query = query.gte('updated_at', startOfDay(new Date(startDate)).toISOString());
-    }
-    if (endDate) {
-      query = query.lte('updated_at', endOfDay(new Date(endDate)).toISOString());
-    }
+      const currentPage = page || 1;
+      const currentLimit = limit || 10;
+      const isExport = limit === -1;
 
-    const currentPage = page || 1;
-    const currentLimit = limit || 10;
-    const isExport = limit === -1;
+      if (!isExport) {
+          const from = (currentPage - 1) * currentLimit;
+          const to = from + currentLimit - 1;
+          query = query.range(from, to);
+      }
 
-    if (!isExport) {
-        const from = (currentPage - 1) * currentLimit;
-        const to = from + currentLimit - 1;
-        query = query.range(from, to);
-    }
+      const { data, error, count } = await query
+        .order('updated_at', { ascending: false });
 
-    const { data, error, count } = await query
-      .order('updated_at', { ascending: false });
-
-    if (error) throw error;
-    return {
-      data: (data || []).map(toCamelCase),
-      total: count || 0
-    };
+      if (error) throw error;
+      return {
+        data: (data || []).map(toCamelCase),
+        total: count || 0
+      };
+    }, { data: [], total: 0 });
   },
 
   getEntities: async (): Promise<Entity[]> => {
@@ -922,6 +1006,15 @@ export const api = {
 
   // --- Users & Orgs ---
   getUsers: async (filter?: { page?: number, pageSize?: number, search?: string, sortBy?: string, sortAscending?: boolean, fetchAll?: boolean }): Promise<any> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+        const cached = await offlineDb.getCache(filter?.fetchAll ? 'users_all' : 'users') || [];
+        if (filter?.page !== undefined && filter?.pageSize !== undefined) {
+            return { data: cached, total: cached.length };
+        }
+        return cached;
+    }
+
     if (filter?.fetchAll) {
       let allData: any[] = [];
       let page = 1;
@@ -1297,6 +1390,14 @@ export const api = {
   },
 
   updateUser: async (id: string, updates: Partial<User>) => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+        await offlineDb.addToOutbox({ table_name: 'users', action: 'UPDATE', payload: { id, updates } });
+        const cached = await offlineDb.getCache('users') || [];
+        await offlineDb.setCache('users', cached.map((u: any) => u.id === id ? { ...u, ...updates } : u));
+        return { ...updates, id };
+    }
+
     const { role, biometricId, organizationId, organizationName, ...rest } = updates;
     const dbUpdates: any = toSnakeCase(rest);
     if (role) dbUpdates.role_id = role;
@@ -1382,25 +1483,54 @@ export const api = {
   },
 
   getOrganizations: async (filter?: { page?: number, pageSize?: number }): Promise<any> => {
-    let query = supabase.from('organizations').select('*', { count: 'exact' });
-    
-    const isPaginated = filter?.page !== undefined && filter?.pageSize !== undefined;
-    if (isPaginated) {
-      const from = (filter!.page! - 1) * filter!.pageSize!;
-      const to = from + filter!.pageSize! - 1;
-      query = query.range(from, to);
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        let query = supabase.from('organizations').select('*', { count: 'exact' });
+        
+        const isPaginated = filter?.page !== undefined && filter?.pageSize !== undefined;
+        if (isPaginated) {
+          const from = (filter!.page! - 1) * filter!.pageSize!;
+          const to = from + filter!.pageSize! - 1;
+          query = query.range(from, to);
+        }
+        
+        const { data, count, error } = (await withTimeout(
+          query.order('short_name') as any,
+          15000,
+          'Fetch organizations timed out'
+        )) as any;
+        if (error) throw error;
+        
+        const formattedData = (data || []).map(toCamelCase);
+        if (!isPaginated) {
+            await offlineDb.setCache('organizations', formattedData);
+        }
+
+        if (isPaginated) {
+          return { data: formattedData, total: count || 0 };
+        }
+        return formattedData;
+      } catch (err) {
+        console.warn('Failed to fetch organizations from cloud, falling back to cache');
+      }
     }
     
-    const { data, count, error } = await query.order('short_name');
-    if (error) throw error;
-    
-    const formattedData = (data || []).map(toCamelCase);
-    if (isPaginated) {
-      return { data: formattedData, total: count || 0 };
+    const cached = await offlineDb.getCache('organizations') || [];
+    if (filter?.page !== undefined && filter?.pageSize !== undefined) {
+        return { data: cached, total: cached.length };
     }
-    return formattedData;
+    return cached;
   },
   createOrganization: async (org: Organization): Promise<Organization> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ table_name: 'organizations', action: 'INSERT', payload: org });
+      const cached = await offlineDb.getCache('organizations') || [];
+      await offlineDb.setCache('organizations', [...cached, org]);
+      return org;
+    }
+
     const { data, error } = await supabase.from('organizations').insert(toSnakeCase(org)).select().single();
     if (error) throw error;
     return toCamelCase(data);
@@ -1491,6 +1621,23 @@ export const api = {
   },
   saveEntity: async (entity: Partial<Entity>): Promise<Entity> => {
     const { id, ...rest } = entity;
+    const status = await Network.getStatus();
+    
+    if (!status.connected) {
+        const offlineId = id && !id.startsWith('new_') ? id : `new_${Date.now()}`;
+        await offlineDb.addToOutbox({ table_name: 'entities', action: id?.startsWith('new_') ? 'INSERT' : 'UPDATE', payload: entity });
+        const mockEntity = { ...entity, id: offlineId } as Entity;
+        
+        // Optimistic cache update
+        const cached = await offlineDb.getCache('entities') || [];
+        if (id?.startsWith('new_')) {
+            await offlineDb.setCache('entities', [...cached, mockEntity]);
+        } else {
+            await offlineDb.setCache('entities', cached.map((e: any) => e.id === id ? mockEntity : e));
+        }
+        return mockEntity;
+    }
+
     const dbData = toSnakeCase(rest);
     let query;
     if (id && !id.startsWith('new_')) {
@@ -1507,6 +1654,14 @@ export const api = {
     if (error) throw error;
   },
   saveSiteConfiguration: async (organizationId: string, config: SiteConfiguration): Promise<void> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+        await offlineDb.addToOutbox({ table_name: 'site_configurations', action: 'UPDATE', payload: { organizationId, config } });
+        const cached = await offlineDb.getCache('site_configurations') || [];
+        await offlineDb.setCache('site_configurations', cached.map((c: any) => c.organizationId === organizationId ? config : c));
+        return;
+    }
+
     const { data, error } = await supabase.from('site_configurations').upsert({
       organization_id: organizationId,
       config_data: config
@@ -1514,12 +1669,22 @@ export const api = {
     if (error) throw error;
   },
   getSiteConfigurations: async (): Promise<SiteConfiguration[]> => {
-    const { data, error } = await supabase.from('site_configurations').select('*');
-    if (error) throw error;
-    return (data || []).map(row => ({
-      ...toCamelCase(row.config_data),
-      organizationId: row.organization_id
-    }));
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const { data, error } = await supabase.from('site_configurations').select('*');
+        if (error) throw error;
+        const formatted = (data || []).map(row => ({
+          ...toCamelCase(row.config_data),
+          organizationId: row.organization_id
+        }));
+        await offlineDb.setCache('site_configurations', formatted);
+        return formatted;
+      } catch (err) {
+        console.warn('Failed to fetch site configurations from cloud, falling back to cache');
+      }
+    }
+    return await offlineDb.getCache('site_configurations') || [];
   },
   bulkUploadOrganizations: async (orgs: Organization[]): Promise<{ count: number }> => {
     const { count, error } = await supabase.from('organizations').upsert(toSnakeCase(orgs), { onConflict: 'id' });
@@ -1527,9 +1692,19 @@ export const api = {
     return { count: count || 0 };
   },
   getModules: async (): Promise<AppModule[]> => {
-    const { data, error } = await supabase.from('app_modules').select('*');
-    if (error) throw error;
-    return (data || []).map(toCamelCase);
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const { data, error } = await supabase.from('app_modules').select('*');
+        if (error) throw error;
+        const formatted = (data || []).map(toCamelCase);
+        await offlineDb.setCache('app_modules', formatted);
+        return formatted;
+      } catch (err) {
+        console.warn('Failed to fetch modules from cloud, falling back to cache');
+      }
+    }
+    return await offlineDb.getCache('app_modules') || [];
   },
   saveModules: async (modules: AppModule[]): Promise<void> => {
     // A full replacement is complex, upsert is simplest for now.
@@ -1537,9 +1712,19 @@ export const api = {
     if (error) throw error;
   },
   getRoles: async (): Promise<Role[]> => {
-    const { data, error } = await supabase.from('roles').select('*');
-    if (error) throw error;
-    return (data || []).map(toCamelCase);
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const { data, error } = await supabase.from('roles').select('*');
+        if (error) throw error;
+        const formatted = (data || []).map(toCamelCase);
+        await offlineDb.setCache('roles', formatted);
+        return formatted;
+      } catch (err) {
+        console.warn('Failed to fetch roles from cloud, falling back to cache');
+      }
+    }
+    return await offlineDb.getCache('roles') || [];
   },
   saveRoles: async (roles: Role[]): Promise<void> => {
     const { error } = await supabase.from('roles').upsert(toSnakeCase(roles));
@@ -1560,25 +1745,46 @@ export const api = {
     if (error) throw error;
   },
   getAttendanceEvents: async (userId: string, start: string, end: string): Promise<AttendanceEvent[]> => {
-    const query = supabase.from('attendance_events')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('timestamp', start)
-      .lte('timestamp', end)
-      .order('timestamp', { ascending: true });
-    
-    const data = await fetchAll<any>(query);
-    return (data || []).map(toCamelCase);
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const query = supabase.from('attendance_events')
+          .select('*')
+          .eq('user_id', userId)
+          .gte('timestamp', start)
+          .lte('timestamp', end)
+          .order('timestamp', { ascending: true });
+        
+        const data = await withTimeout(fetchAll<any>(query), 5000, 'Fetch attendance events timed out');
+        const formatted = (data || []).map(toCamelCase);
+        // Cache per user/period might be too much, but we can cache recent ones
+        await offlineDb.setCache(`attendance_${userId}_${start.split('T')[0]}`, formatted);
+        return formatted;
+      } catch (err) {
+        console.warn('Failed to fetch attendance events from cloud, falling back to cache');
+      }
+    }
+    return await offlineDb.getCache(`attendance_${userId}_${start.split('T')[0]}`) || [];
   },
   getAllAttendanceEvents: async (start: string, end: string): Promise<AttendanceEvent[]> => {
-    const query = supabase.from('attendance_events')
-      .select('*')
-      .gte('timestamp', start)
-      .lte('timestamp', end)
-      .order('timestamp', { ascending: true });
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const query = supabase.from('attendance_events')
+          .select('*')
+          .gte('timestamp', start)
+          .lte('timestamp', end)
+          .order('timestamp', { ascending: true });
 
-    const data = await fetchAll<any>(query);
-    return (data || []).map(toCamelCase);
+        const data = await fetchAll<any>(query);
+        const formatted = (data || []).map(toCamelCase);
+        await offlineDb.setCache(`attendance_all_${start.split('T')[0]}`, formatted);
+        return formatted;
+      } catch (err) {
+        console.warn('Failed to fetch all attendance events from cloud, falling back to cache');
+      }
+    }
+    return await offlineDb.getCache(`attendance_all_${start.split('T')[0]}`) || [];
   },
   getAttendanceDashboardData: async (startDate: Date, endDate: Date, currentDate: Date, timezone: string = 'UTC') => {
     const { data, error } = await supabase.rpc('get_attendance_dashboard_data', {
@@ -1601,10 +1807,40 @@ export const api = {
    *              latitude, longitude, locationId, and locationName properties.
    */
   addAttendanceEvent: async (event: Omit<AttendanceEvent, 'id'>): Promise<void> => {
-    const { error } = await supabase
-      .from('attendance_events')
-      .insert(toSnakeCase(event));
-    if (error) throw error;
+    const status = await Network.getStatus();
+    if (!status.connected) {
+        const offlineId = `att_offline_${Date.now()}`;
+        const offlineEvent = { ...event, id: offlineId } as AttendanceEvent;
+        await offlineDb.addToOutbox({ table_name: 'attendance_events', action: 'INSERT', payload: event });
+        
+        // Update local cache if possible (using today's date)
+        const today = new Date().toISOString().split('T')[0];
+        const cacheKey = `attendance_${event.userId}_${today}`;
+        const cached = await offlineDb.getCache(cacheKey) || [];
+        await offlineDb.setCache(cacheKey, [...cached, offlineEvent]);
+        return;
+    }
+    try {
+      const { error } = (await withTimeout(
+        supabase
+          .from('attendance_events')
+          .insert(toSnakeCase(event)) as any,
+        5000, // Reduced from 15s for faster offline fallback
+        'Attendance submission timed out'
+      )) as any;
+      if (error) throw error;
+    } catch (err: any) {
+      console.warn('Failed to submit attendance to cloud, saving to outbox:', err.message);
+      // Fallback to outbox if cloud insert fails or times out
+      const offlineId = `att_offline_${Date.now()}`;
+      const offlineEvent = { ...event, id: offlineId } as AttendanceEvent;
+      await offlineDb.addToOutbox({ table_name: 'attendance_events', action: 'INSERT', payload: event });
+      
+      const today = new Date().toISOString().split('T')[0];
+      const cacheKey = `attendance_${event.userId}_${today}`;
+      const cached = await offlineDb.getCache(cacheKey) || [];
+      await offlineDb.setCache(cacheKey, [...cached, offlineEvent]);
+    }
   },
 
   requestAttendanceUnlock: async (reason: string): Promise<void> => {
@@ -1682,16 +1918,33 @@ export const api = {
     if (!session?.user) return 0;
     
     const today = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase
-      .from('attendance_unlock_requests')
-      .select('id')
-      .eq('user_id', session.user.id)
-      .eq('status', 'approved')
-      .gte('requested_at', startOfDay(new Date()).toISOString())
-      .lte('requested_at', endOfDay(new Date()).toISOString());
+    const status = await Network.getStatus();
+    
+    if (status.connected) {
+      try {
+        const { data, error } = (await withTimeout(
+          supabase
+            .from('attendance_unlock_requests')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .eq('status', 'approved')
+            .gte('requested_at', startOfDay(new Date()).toISOString())
+            .lte('requested_at', endOfDay(new Date()).toISOString()) as any,
+          10000,
+          'Unlock status check timed out'
+        )) as any;
 
-    if (error) return 0;
-    return data?.length || 0;
+        if (!error) {
+          const count = data?.length || 0;
+          await offlineDb.setCache(`unlock_count_${session.user.id}_${today}`, count);
+          return count;
+        }
+      } catch (err) {
+        console.warn('Failed to check unlock status from cloud, falling back to cache');
+      }
+    }
+    
+    return await offlineDb.getCache(`unlock_count_${session.user.id}_${today}`) || 0;
   },
 
   /** Count total unlock requests (pending + approved) made today — used to enforce daily max. */
@@ -1700,16 +1953,33 @@ export const api = {
     if (!session?.user) return 0;
 
     const today = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase
-      .from('attendance_unlock_requests')
-      .select('id')
-      .eq('user_id', session.user.id)
-      .in('status', ['pending', 'approved'])
-      .gte('requested_at', startOfDay(new Date()).toISOString())
-      .lte('requested_at', endOfDay(new Date()).toISOString());
+    const status = await Network.getStatus();
+    
+    if (status.connected) {
+      try {
+        const { data, error } = (await withTimeout(
+          supabase
+            .from('attendance_unlock_requests')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .in('status', ['pending', 'approved'])
+            .gte('requested_at', startOfDay(new Date()).toISOString())
+            .lte('requested_at', endOfDay(new Date()).toISOString()) as any,
+          10000,
+          'Daily unlock request count check timed out'
+        )) as any;
 
-    if (error) return 0;
-    return data?.length || 0;
+        if (!error) {
+          const count = data?.length || 0;
+          await offlineDb.setCache(`daily_unlock_count_${session.user.id}_${today}`, count);
+          return count;
+        }
+      } catch (err) {
+        console.warn('Failed to check daily unlock request count from cloud, falling back to cache');
+      }
+    }
+    
+    return await offlineDb.getCache(`daily_unlock_count_${session.user.id}_${today}`) || 0;
   },
 
   getMyUnlockRequest: async (): Promise<AttendanceUnlockRequest | null> => {
@@ -1790,29 +2060,35 @@ export const api = {
    * record is not found.  This helper returns camel‑cased keys.
    */
   getLocations: async (): Promise<Location[]> => {
-    // Join the locations table to the users table via the created_by
-    // foreign key.  Alias the joined user as created_by_user so the
-    // resulting object includes nested fields under that key.  We
-    // explicitly select all location columns, then the name of the
-    // creator.  Supabase will return an array of objects with a
-    // created_by_user property containing the joined user row.
-    const { data, error } = await supabase
-      .from('locations')
-      .select('*, created_at, created_by_user:created_by (id, name)')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    // Convert to camelCase and hoist the creator name into
-    // createdByName for convenience.  Preserve other fields as is.
-    return (data || []).map((raw: any) => {
-      const camel = toCamelCase(raw) as any;
-      const createdByUser = camel.createdByUser as { id?: string; name?: string } | undefined;
-      const createdByName = createdByUser?.name || undefined;
-      // Remove the nested createdByUser field to avoid leaking
-      // implementation details.  Spread the camel object first to
-      // preserve all other properties.
-      const { createdByUser: _omit, ...rest } = camel;
-      return { ...rest, createdByName } as Location;
-    });
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const { data, error } = (await withTimeout(
+          supabase
+            .from('locations')
+            .select('*, created_at, created_by_user:created_by (id, name)')
+            .order('created_at', { ascending: false }) as any,
+          15000,
+          'Fetch locations timed out'
+        )) as any;
+        if (error) throw error;
+
+        const formatted = (data || []).map((raw: any) => {
+          const camel = toCamelCase(raw) as any;
+          const createdByUser = camel.createdByUser as { id?: string; name?: string } | undefined;
+          const createdByName = createdByUser?.name || undefined;
+          const { createdByUser: _omit, ...rest } = camel;
+          return { ...rest, createdByName } as Location;
+        });
+
+        await offlineDb.setCache('locations', formatted);
+        return formatted;
+      } catch (err) {
+        console.warn('Failed to fetch locations from cloud, falling back to cache');
+      }
+    }
+
+    return await offlineDb.getCache('locations') || [];
   },
 
   /**
@@ -1822,16 +2098,32 @@ export const api = {
    * override by specifying a different userId.
    */
   getUserLocations: async (userId: string): Promise<Location[]> => {
-    const { data, error } = await supabase
-      .from('user_locations')
-      .select('location_id:location_id (*), id')
-      .eq('user_id', userId);
-    if (error) throw error;
-    // Flatten nested location record from join: { location_id: { ... } }
-    return (data || []).map((row: any) => {
-      const loc = row.location_id || {};
-      return toCamelCase(loc);
-    }) as Location[];
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const { data, error } = (await withTimeout(
+          supabase
+            .from('user_locations')
+            .select('location_id:location_id (*), id')
+            .eq('user_id', userId) as any,
+          15000,
+          'Fetch user locations timeout'
+        )) as any;
+        if (error) throw error;
+
+        const formatted = (data || []).map((row: any) => {
+          const loc = row.location_id || {};
+          return toCamelCase(loc);
+        }) as Location[];
+
+        await offlineDb.setCache(`user_locations_${userId}`, formatted);
+        return formatted;
+      } catch (err) {
+        console.warn('Failed to fetch user locations from cloud, falling back to cache');
+      }
+    }
+
+    return await offlineDb.getCache(`user_locations_${userId}`) || [];
   },
 
   /**
@@ -1848,6 +2140,17 @@ export const api = {
     address?: string | null;
     createdBy?: string | null;
   }): Promise<Location> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      const offlineId = `loc_offline_${Date.now()}`;
+      const offlineLoc = { ...loc, id: offlineId, createdAt: new Date().toISOString() } as Location;
+      await offlineDb.addToOutbox({ table_name: 'locations', action: 'INSERT', payload: loc });
+      
+      const cached = await offlineDb.getCache('locations') || [];
+      await offlineDb.setCache('locations', [...cached, offlineLoc]);
+      return offlineLoc;
+    }
+
     // Convert camelCased keys to snake_cased for Supabase
     const payload = toSnakeCase(loc);
     const { data, error } = await supabase
@@ -1993,12 +2296,36 @@ export const api = {
     if (error) throw error;
   },
   getAttendanceSettings: async (): Promise<AttendanceSettings> => {
-    const { data, error } = await supabase.from('settings').select('attendance_settings').eq('id', 'singleton').single();
-    if (error) return api.handleError(error);
-    if (!data?.attendance_settings) throw new Error('Attendance settings are not configured.');
-    return toCamelCase(data.attendance_settings) as AttendanceSettings;
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const { data, error } = (await withTimeout(
+          supabase.from('settings').select('attendance_settings').eq('id', 'singleton').single() as any,
+          10000,
+          'Fetch attendance settings timed out'
+        )) as any;
+        if (!error && data?.attendance_settings) {
+          const formatted = toCamelCase(data.attendance_settings) as AttendanceSettings;
+          await offlineDb.setCache('attendance_settings', formatted);
+          return formatted;
+        }
+      } catch (err) {
+        console.warn('Failed to fetch attendance settings from cloud, falling back to cache');
+      }
+    }
+
+    const cached = await offlineDb.getCache('attendance_settings');
+    if (cached) return cached;
+    
+    throw new Error('Attendance settings are not available offline. Please connect once to sync settings.');
   },
   saveAttendanceSettings: async (settings: AttendanceSettings): Promise<void> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ table_name: 'settings', action: 'SAVE_SETTINGS', payload: { id: 'singleton', attendance_settings: settings } });
+      return;
+    }
+
     // Ensure we are upserting with the correct ID and data structure
     const { error } = await supabase
       .from('settings')
@@ -2149,28 +2476,55 @@ export const api = {
       // Default to field (includes 'field_staff', 'field staff', etc.)
       return 'field';
     };
-    const [
-      { data: settingsData, error: settingsError },
-      { data: userData, error: userError }
-    ] = await Promise.all([
-      supabase.from('settings').select('attendance_settings').eq('id', 'singleton').single(),
-      supabase.from('users')
-        .select(`
-          role_id, 
-          role:roles(display_name),
-          earned_leave_opening_balance, 
-          earned_leave_opening_date, 
-          sick_leave_opening_balance, 
-          sick_leave_opening_date,
-          gender,
-          created_at
-        `)
-        .eq('id', userId)
-        .single()
-    ]);
+    const status = await Network.getStatus();
+    let settingsData: any;
+    let userData: any;
 
-    if (settingsError || !settingsData?.attendance_settings) throw new Error('Could not load attendance rules.');
-    if (userError) throw userError;
+    if (status.connected) {
+      try {
+        const [settingsRes, userRes] = (await withTimeout(
+          Promise.all([
+            supabase.from('settings').select('attendance_settings').eq('id', 'singleton').single(),
+            supabase.from('users')
+              .select(`
+                role_id, 
+                role:roles(display_name),
+                earned_leave_opening_balance, 
+                earned_leave_opening_date, 
+                sick_leave_opening_balance, 
+                sick_leave_opening_date,
+                gender,
+                created_at
+              `)
+              .eq('id', userId)
+              .single()
+          ]) as any,
+          15000,
+          'Leave balance initial data fetch timed out'
+        )) as any[];
+
+        if (!settingsRes.error && !userRes.error) {
+          settingsData = settingsRes.data;
+          userData = userRes.data;
+          await offlineDb.setCache(`user_profile_leave_${userId}`, userData);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch leave settings/user from cloud:', err);
+      }
+    }
+
+    if (!userData) {
+      userData = await offlineDb.getCache(`user_profile_leave_${userId}`);
+    }
+    
+    // Always get settings from cache if cloud fails (we likely have them from getInitialAppData)
+    if (!settingsData) {
+      const initialData = await offlineDb.getCache('initial_app_data');
+      settingsData = initialData?.settings ? { attendance_settings: toSnakeCase(initialData.settings) } : null;
+    }
+
+    if (!settingsData?.attendance_settings) throw new Error('Could not load attendance rules.');
+    if (!userData) throw new Error('User profile data not available offline.');
 
     // Get role name from join or fallback to role_id string
     const roleData = userData.role;
@@ -2183,34 +2537,71 @@ export const api = {
     const yearStart = `${currentYear}-01-01`;
     const todayStr = format(referenceDate, 'yyyy-MM-dd');
 
-    const [
-      { data: approvedLeaves, error: leavesError },
-      { data: compOffData, error: compOffError },
-      { data: otData, error: otError },
-      { data: holidays, error: holidaysError },
-      recurringHolidays,
-      { data: yearEvents, error: eventsError }
-    ] = await Promise.all([
-      supabase.from('leave_requests')
-        .select('leave_type, start_date, end_date, day_option')
-        .eq('user_id', userId)
-        .eq('status', 'approved')
-        .gte('start_date', yearStart)
-        .lte('start_date', `${currentYear}-12-31`),
-      supabase.from('comp_off_logs').select('*').eq('user_id', userId),
-      supabase.from('extra_work_logs').select('hours_worked').eq('user_id', userId).eq('claim_type', 'OT').eq('status', 'Approved').gte('work_date', format(startOfMonth(referenceDate), 'yyyy-MM-dd')).lte('work_date', format(endOfMonth(referenceDate), 'yyyy-MM-dd')),
-      supabase.from('holidays').select('*'),
-      api.getRecurringHolidays(),
-      supabase.from('attendance_events')
-        .select('timestamp')
-        .eq('user_id', userId)
-        .gte('timestamp', yearStart)
-        .lte('timestamp', `${currentYear}-12-31`)
-    ]);
+    const emptyRes = { data: [], error: null };
+    let approvedLeaves: any[] = [];
+    let compOffData: any[] = [];
+    let otData: any[] = [];
+    let holidays: any[] = [];
+    let recurringHolidays: any[] = [];
+    let yearEvents: any[] = [];
 
-    if (leavesError || compOffError || otError || holidaysError || eventsError) {
-      const firstError = leavesError || compOffError || otError || holidaysError || eventsError;
-      return api.handleError(firstError);
+    if (status.connected) {
+      try {
+        const [
+          leavesRes, 
+          compOffRes, 
+          otRes, 
+          holidaysRes, 
+          recurringRes, 
+          eventsRes
+        ] = (await withTimeout(
+          Promise.all([
+            supabase.from('leave_requests')
+              .select('leave_type, start_date, end_date, day_option')
+              .eq('user_id', userId)
+              .eq('status', 'approved')
+              .gte('start_date', yearStart)
+              .lte('start_date', `${currentYear}-12-31`),
+            supabase.from('comp_off_logs').select('*').eq('user_id', userId),
+            supabase.from('extra_work_logs').select('hours_worked').eq('user_id', userId).eq('claim_type', 'OT').eq('status', 'Approved').gte('work_date', format(startOfMonth(referenceDate), 'yyyy-MM-dd')).lte('work_date', format(endOfMonth(referenceDate), 'yyyy-MM-dd')),
+            supabase.from('holidays').select('*'),
+            api.getRecurringHolidays(),
+            supabase.from('attendance_events')
+              .select('timestamp')
+              .eq('user_id', userId)
+              .gte('timestamp', yearStart)
+              .lte('timestamp', `${currentYear}-12-31`)
+          ]) as any,
+          20000,
+          'Leave balance detailed data fetch timed out'
+        )) as any[];
+
+        approvedLeaves = leavesRes.data || [];
+        compOffData = compOffRes.data || [];
+        otData = otRes.data || [];
+        holidays = holidaysRes.data || [];
+        recurringHolidays = recurringRes || [];
+        yearEvents = eventsRes.data || [];
+        
+        // Cache these for offline balance simulation
+        await offlineDb.setCache(`leave_data_bundle_${userId}_${currentYear}`, {
+          approvedLeaves, compOffData, otData, holidays, recurringHolidays, yearEvents
+        });
+      } catch (err) {
+        console.warn('Failed to fetch detailed leave data from cloud, using cache if available');
+      }
+    }
+
+    if (!approvedLeaves.length && !yearEvents.length) {
+      const cached = await offlineDb.getCache(`leave_data_bundle_${userId}_${currentYear}`);
+      if (cached) {
+        approvedLeaves = cached.approvedLeaves || [];
+        compOffData = cached.compOffData || [];
+        otData = cached.otData || [];
+        holidays = cached.holidays || [];
+        recurringHolidays = cached.recurringHolidays || [];
+        yearEvents = cached.yearEvents || [];
+      }
     }
 
     // Expiry Check Logic Helper
@@ -2596,14 +2987,25 @@ export const api = {
     return countableCount;
   },
   submitLeaveRequest: async (data: Omit<LeaveRequest, 'id' | 'status' | 'currentApproverId' | 'approvalHistory'>): Promise<LeaveRequest> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+        const offlineId = `offline_${Date.now()}`;
+        const offlineRequest = { ...data, id: offlineId, status: 'pending_manager_approval' } as LeaveRequest;
+        await offlineDb.addToOutbox({ table_name: 'leave_requests', action: 'INSERT', payload: data });
+        
+        // Update local cache for leave requests
+        const cached = await offlineDb.getCache('leave_requests') || [];
+        await offlineDb.setCache('leave_requests', [offlineRequest, ...cached]);
+
+        return offlineRequest;
+    }
+
     const { data: userProfile, error: userError } = await supabase.from('users').select('reporting_manager_id').eq('id', data.userId).single();
     if (userError) throw userError;
     
-    // Process any attached files (like doctor's certificate)
     const dataWithPaths = await processFilesForUpload(data, data.userId, '');
     const dbData = toSnakeCase(dataWithPaths);
     
-    // user_name is not a column in the leave_requests table
     delete dbData.user_name;
 
     const { data: insertedData, error: insertError } = await supabase.from('leave_requests').insert({ 
@@ -2615,10 +3017,8 @@ export const api = {
     
     if (insertError) throw insertError;
 
-    // Trigger notification to manager
     if (userProfile.reporting_manager_id) {
       try {
-        // Dynamic Rule Dispatch
         dispatchNotificationFromRules('leave_request', {
           actorName: data.userName || 'An employee',
           actionText: `has submitted a new ${data.leaveType} leave request`,
@@ -2630,8 +3030,6 @@ export const api = {
             reportingManagerId: userProfile.reporting_manager_id 
           }
         });
-
-        // Explicit notification removed in favor of rule-based dispatching above
       } catch (notifError) {
         console.error('Failed to trigger leave notification:', notifError);
       }
@@ -2700,6 +3098,12 @@ export const api = {
     if (error) throw error;
   },
   getLeaveRequests: async (filter?: { userId?: string, userIds?: string[], status?: string, forApproverId?: string, startDate?: string, endDate?: string, page?: number, pageSize?: number }): Promise<{ data: LeaveRequest[], total: number }> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+        const cached = await offlineDb.getCache('leave_requests') || [];
+        return { data: cached, total: cached.length };
+    }
+
     let query = supabase.from('leave_requests').select('*, users(name)', { count: 'exact' });
     if (filter?.userId) query = query.eq('user_id', filter.userId);
     if (filter?.userIds) query = query.in('user_id', filter.userIds);
@@ -2733,8 +3137,17 @@ export const api = {
       query = query.range(from, to);
     }
 
-    const { data, count, error } = await query.order('start_date', { ascending: false });
+    const { data, count, error } = (await withTimeout(
+      query.order('start_date', { ascending: false }) as any,
+      15000,
+      'Fetch leave requests timed out'
+    )) as any;
     if (error) return api.handleError(error);
+    
+    // Cache for offline
+    if (!filter?.page) {
+        await offlineDb.setCache('leave_requests', (data || []).map(toCamelCase));
+    }
     
     // Get unique approver IDs
     const approverIds = [...new Set((data || []).map(item => item.current_approver_id).filter(Boolean))];
@@ -2759,25 +3172,59 @@ export const api = {
     return { data: formattedData, total: count || 0 };
   },
   getTasks: async (filter?: { page?: number, pageSize?: number }): Promise<any> => {
-    let query = supabase.from('tasks').select('*', { count: 'exact' });
-    
-    const isPaginated = filter?.page !== undefined && filter?.pageSize !== undefined;
-    if (isPaginated) {
-      const from = (filter!.page! - 1) * filter!.pageSize!;
-      const to = from + filter!.pageSize! - 1;
-      query = query.range(from, to);
+    // 1. Try to get from cloud if online
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        let query = supabase.from('tasks').select('*', { count: 'exact' });
+        
+        const isPaginated = filter?.page !== undefined && filter?.pageSize !== undefined;
+        if (isPaginated) {
+          const from = (filter!.page! - 1) * filter!.pageSize!;
+          const to = from + filter!.pageSize! - 1;
+          query = query.range(from, to);
+        }
+        
+        const { data, count, error } = await query.order('created_at', { ascending: false });
+        if (error) throw error;
+        
+        const formattedData = (data || []).map(toCamelCase);
+        
+        // Cache the latest tasks (for simplicity, we cache the whole list if not paginated)
+        if (!isPaginated) {
+            await offlineDb.setCache('tasks', formattedData);
+        }
+
+        if (isPaginated) {
+          return { data: formattedData, total: count || 0 };
+        }
+        return formattedData;
+      } catch (err) {
+        console.warn('Failed to fetch tasks from cloud, falling back to cache');
+      }
     }
     
-    const { data, count, error } = await query.order('created_at', { ascending: false });
-    if (error) throw error;
-    
-    const formattedData = (data || []).map(toCamelCase);
-    if (isPaginated) {
-      return { data: formattedData, total: count || 0 };
+    // 2. Fallback to local cache
+    const cachedTasks = await offlineDb.getCache('tasks');
+    if (filter?.page !== undefined && filter?.pageSize !== undefined) {
+        return { data: cachedTasks || [], total: (cachedTasks || []).length };
     }
-    return formattedData;
+    return cachedTasks || [];
   },
   createTask: async (taskData: Partial<Task>): Promise<Task> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+       const offlineId = `offline_${Date.now()}`;
+       const offlineTask = { ...taskData, id: offlineId, createdAt: new Date().toISOString(), status: 'To Do', escalationStatus: 'None' };
+       await offlineDb.addToOutbox({ table_name: 'tasks', action: 'INSERT', payload: taskData });
+       
+       // Optimistic Cache update
+       const cached = await offlineDb.getCache('tasks') || [];
+       await offlineDb.setCache('tasks', [offlineTask, ...cached]);
+
+       return toCamelCase(offlineTask);
+    }
+
     const { data, error } = await supabase.from('tasks').insert(toSnakeCase({ ...taskData, status: 'To Do', escalationStatus: 'None' })).select().single();
     if (error) throw error;
 
@@ -2794,6 +3241,16 @@ export const api = {
     return toCamelCase(data);
   },
   updateTask: async (id: string, updates: Partial<Task>): Promise<Task> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+        await offlineDb.addToOutbox({ table_name: 'tasks', action: 'UPDATE', payload: { id, updates } });
+        // Optimistic cache update
+        const cached = await offlineDb.getCache('tasks') || [];
+        const updated = cached.map((t: any) => t.id === id ? { ...t, ...updates } : t);
+        await offlineDb.setCache('tasks', updated);
+        return { id, ...updates } as Task;
+    }
+
     // Handle completion photo upload
     if ((updates as any)?.completionPhoto && (updates as any).completionPhoto.file) {
       const completion: any = (updates as any).completionPhoto;
@@ -2883,9 +3340,19 @@ export const api = {
   },
 
   getNotificationRules: async (): Promise<NotificationRule[]> => {
-    const { data, error } = await supabase.from('notification_rules').select('*').order('created_at', { ascending: false });
-    if (error) return api.handleError(error);
-    return data.map(toCamelCase);
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const { data, error } = await supabase.from('notification_rules').select('*').order('created_at', { ascending: false });
+        if (error) return api.handleError(error);
+        const formatted = data.map(toCamelCase);
+        await offlineDb.setCache('notification_rules', formatted);
+        return formatted;
+      } catch (err) {
+        console.warn('Failed to fetch notification rules from cloud, falling back to cache');
+      }
+    }
+    return await offlineDb.getCache('notification_rules') || [];
   },
 
   saveNotificationRule: async (rule: Partial<NotificationRule>): Promise<NotificationRule> => {
@@ -2943,17 +3410,40 @@ export const api = {
 
   // Field Reporting API
   getChecklistTemplates: async (jobType: string): Promise<ChecklistTemplate[]> => {
-    const { data, error } = await supabase
-      .from('checklist_templates')
-      .select('*')
-      .eq('job_type', jobType)
-      .eq('is_active', true)
-      .order('version', { ascending: false });
-    if (error) throw error;
-    return (data || []).map(toCamelCase);
+    const status = await Network.getStatus();
+    if (status.connected) {
+       try {
+         const { data, error } = await supabase
+           .from('checklist_templates')
+           .select('*')
+           .eq('job_type', jobType)
+           .eq('is_active', true)
+           .order('version', { ascending: false });
+         if (error) throw error;
+         const formatted = (data || []).map(toCamelCase);
+         await offlineDb.setCache(`checklist_${jobType}`, formatted);
+         return formatted;
+       } catch (err) {
+         console.warn('Failed to fetch checklist templates from cloud, falling back to cache');
+       }
+    }
+    return await offlineDb.getCache(`checklist_${jobType}`) || [];
   },
 
   submitFieldReport: async (reportData: Partial<FieldReport>): Promise<FieldReport> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+        const offlineId = `offline_${Date.now()}`;
+        const offlineReport = { ...reportData, id: offlineId, status: 'pending' } as FieldReport;
+        await offlineDb.addToOutbox({ table_name: 'field_reports', action: 'INSERT', payload: reportData });
+        
+        // Update local cache
+        const cached = await offlineDb.getCache('field_reports') || [];
+        await offlineDb.setCache('field_reports', [offlineReport, ...cached]);
+        
+        return offlineReport;
+    }
+
     const { data, error } = await supabase
       .from('field_reports')
       .insert(toSnakeCase(reportData))
@@ -3335,6 +3825,11 @@ export const api = {
     }
   },
   submitExtraWorkClaim: async (claimData: Omit<ExtraWorkLog, 'id' | 'createdAt' | 'status'>): Promise<void> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ table_name: 'extra_work_logs', action: 'INSERT', payload: claimData });
+      return;
+    }
     const { error } = await supabase.from('extra_work_logs').insert(toSnakeCase({ ...claimData, status: 'Pending' }));
     if (error) throw error;
   },
@@ -3394,6 +3889,13 @@ export const api = {
     if (error) throw error;
   },
   addCompOffLog: async (logData: Omit<CompOffLog, 'id'>): Promise<CompOffLog> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      const offlineId = `col_offline_${Date.now()}`;
+      const offlineLog = { ...logData, id: offlineId } as CompOffLog;
+      await offlineDb.addToOutbox({ table_name: 'comp_off_logs', action: 'INSERT', payload: logData });
+      return offlineLog;
+    }
     const { data, error } = await supabase.from('comp_off_logs').insert(toSnakeCase(logData)).select().single();
     if (error) throw error;
     return toCamelCase(data);
@@ -3750,16 +4252,35 @@ export const api = {
     if (error) throw error;
   },
   getAllSiteAssets: async (): Promise<Record<string, Asset[]>> => {
-    const { data, error } = await supabase.from('site_configurations').select('organization_id, config_data');
-    if (error) throw error;
-    const result: Record<string, Asset[]> = {};
-    data.forEach(item => {
-      const config = item.config_data as any;
-      result[item.organization_id] = toCamelCase(config?.assets || []);
-    });
-    return result;
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const { data, error } = await supabase.from('site_configurations').select('organization_id, config_data');
+        if (error) throw error;
+        const result: Record<string, Asset[]> = {};
+        data.forEach(item => {
+          const config = item.config_data as any;
+          result[item.organization_id] = toCamelCase(config?.assets || []);
+        });
+        await offlineDb.setCache('site_assets', result);
+        return result;
+      } catch (err) {
+        console.warn('Failed to fetch assets from cloud, falling back to cache');
+      }
+    }
+    return await offlineDb.getCache('site_assets') || {};
   },
   updateSiteAssets: async (siteId: string, assets: Asset[]): Promise<void> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ 
+        table_name: 'site_configurations', 
+        action: 'UPDATE_ASSETS', 
+        payload: { organization_id: siteId, assets } 
+      });
+      return;
+    }
+
     // Fetch existing config to avoid overwriting other fields
     const { data: existing, error: fetchError } = await supabase
       .from('site_configurations')
@@ -3822,6 +4343,16 @@ export const api = {
     return toCamelCase(data.master_tools);
   },
   updateSiteIssuedTools: async (siteId: string, tools: IssuedTool[]): Promise<void> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ 
+        table_name: 'site_configurations', 
+        action: 'UPDATE_TOOLS', 
+        payload: { organization_id: siteId, tools } 
+      });
+      return;
+    }
+
     // Fetch existing config to avoid overwriting other fields
     const { data: existing, error: fetchError } = await supabase
       .from('site_configurations')
@@ -3903,21 +4434,60 @@ export const api = {
     if (error) throw error;
   },
   getUniformRequests: async (): Promise<UniformRequest[]> => {
-    const { data, error } = await supabase.from('uniform_requests').select('*');
-    if (error) throw error;
-    return (data || []).map(toCamelCase);
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const { data, error } = await supabase.from('uniform_requests').select('*');
+        if (error) throw error;
+        const formatted = (data || []).map(toCamelCase);
+        await offlineDb.setCache('uniform_requests', formatted);
+        return formatted;
+      } catch (err) {
+        console.warn('Failed to fetch uniform requests from cloud, falling back to cache');
+      }
+    }
+    return await offlineDb.getCache('uniform_requests') || [];
   },
   submitUniformRequest: async (request: UniformRequest): Promise<UniformRequest> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      const offlineId = `unif_offline_${Date.now()}`;
+      const offlineRecord = { ...request, id: offlineId, status: 'Pending' } as UniformRequest;
+      await offlineDb.addToOutbox({ table_name: 'uniform_requests', action: 'INSERT', payload: request });
+      
+      const cached = await offlineDb.getCache('uniform_requests') || [];
+      await offlineDb.setCache('uniform_requests', [offlineRecord, ...cached]);
+      return offlineRecord;
+    }
+
     const { data, error } = await supabase.from('uniform_requests').insert(toSnakeCase(request)).select().single();
     if (error) throw error;
     return toCamelCase(data);
   },
   updateUniformRequest: async (request: UniformRequest): Promise<UniformRequest> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ table_name: 'uniform_requests', action: 'UPDATE', payload: request });
+      
+      const cached = await offlineDb.getCache('uniform_requests') || [];
+      await offlineDb.setCache('uniform_requests', cached.map((r: any) => r.id === request.id ? { ...r, ...request } : r));
+      return request;
+    }
+
     const { data, error } = await supabase.from('uniform_requests').update(toSnakeCase(request)).eq('id', request.id).select().single();
     if (error) throw error;
     return toCamelCase(data);
   },
   deleteUniformRequest: async (id: string): Promise<void> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ table_name: 'uniform_requests', action: 'DELETE', payload: { id } });
+      
+      const cached = await offlineDb.getCache('uniform_requests') || [];
+      await offlineDb.setCache('uniform_requests', cached.filter((r: any) => r.id !== id));
+      return;
+    }
+
     const { error } = await supabase.from('uniform_requests').delete().eq('id', id);
     if (error) throw error;
   },
@@ -3930,9 +4500,23 @@ export const api = {
     return Promise.resolve({ siteName: 'Mock Site', siteAddress: 'Mock Address', invoiceNumber: 'INV-001', invoiceDate: '2023-01-31', statementMonth: 'January-2023', lineItems: [] });
   },
   getSupportTickets: async (): Promise<SupportTicket[]> => {
-    const { data, error } = await supabase.from('support_tickets').select('*, posts:ticket_posts(*, comments:ticket_comments(*))');
-    if (error) throw error;
-    return (data || []).map(toCamelCase);
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const { data, error } = (await withTimeout(
+          supabase.from('support_tickets').select('*, posts:ticket_posts(*, comments:ticket_comments(*))') as any,
+          20000,
+          'Fetch support tickets timed out'
+        )) as any;
+        if (error) throw error;
+        const formatted = (data || []).map(toCamelCase);
+        await offlineDb.setCache('support_tickets', formatted);
+        return formatted;
+      } catch (err) {
+        console.warn('Failed to fetch support tickets from cloud, falling back to cache');
+      }
+    }
+    return await offlineDb.getCache('support_tickets') || [];
   },
   getSupportTicketById: async (id: string): Promise<SupportTicket | null> => {
     const { data, error } = await supabase.from('support_tickets').select('*, posts:ticket_posts(*, comments:ticket_comments(*))').eq('id', id).single();
@@ -3940,6 +4524,17 @@ export const api = {
     return toCamelCase(data);
   },
   createSupportTicket: async (ticketData: Partial<SupportTicket>): Promise<SupportTicket> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      const offlineId = `st_offline_${Date.now()}`;
+      const offlineTicket = { ...ticketData, id: offlineId, status: 'Open', createdAt: new Date().toISOString(), posts: [] } as any as SupportTicket;
+      await offlineDb.addToOutbox({ table_name: 'support_tickets', action: 'INSERT', payload: ticketData });
+      
+      const cached = await offlineDb.getCache('support_tickets') || [];
+      await offlineDb.setCache('support_tickets', [offlineTicket, ...cached]);
+      return offlineTicket;
+    }
+
     // If an attachment was provided with a File object, upload it to the support attachments bucket
     const attachment: any = (ticketData as any).attachment;
     if (attachment && attachment.file instanceof File) {
@@ -3992,6 +4587,17 @@ export const api = {
     return toCamelCase(data);
   },
   addTicketPost: async (ticketId: string, postData: Partial<TicketPost>): Promise<TicketPost> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+        const offlineId = `post_offline_${Date.now()}`;
+        const offlinePost = { ...postData, id: offlineId, ticketId, createdAt: new Date().toISOString(), comments: [] } as TicketPost;
+        await offlineDb.addToOutbox({ table_name: 'ticket_posts', action: 'INSERT', payload: { ticketId, post: postData } });
+        
+        const cached = await offlineDb.getCache('support_tickets') || [];
+        const updated = cached.map((t: any) => t.id === ticketId ? { ...t, posts: [...(t.posts || []), offlinePost] } : t);
+        await offlineDb.setCache('support_tickets', updated);
+        return offlinePost;
+    }
     const { data, error } = await supabase.from('ticket_posts').insert(toSnakeCase(postData)).select('*, comments:ticket_comments(*)').single();
     if (error) throw error;
 
@@ -4014,6 +4620,13 @@ export const api = {
     if (updateError) throw updateError;
   },
   addPostComment: async (postId: string, commentData: Partial<TicketComment>): Promise<TicketComment> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+        const offlineId = `comm_offline_${Date.now()}`;
+        const offlineComment = { ...commentData, id: offlineId, postId, createdAt: new Date().toISOString() } as TicketComment;
+        await offlineDb.addToOutbox({ table_name: 'ticket_comments', action: 'INSERT', payload: { postId, comment: commentData } });
+        return offlineComment;
+    }
     const { data, error } = await supabase.from('ticket_comments').insert(toSnakeCase(commentData)).select().single();
     if (error) throw error;
     return toCamelCase(data);
@@ -4197,6 +4810,11 @@ export const api = {
     return (data || []).map(toCamelCase);
   },
   addBiometricDevice: async (device: Partial<BiometricDevice>): Promise<BiometricDevice> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ table_name: 'biometric_devices', action: 'INSERT', payload: device });
+      return { ...device, id: `bio_offline_${Date.now()}` } as BiometricDevice;
+    }
     const dataToInsert = { ...device };
     if (dataToInsert.sn) dataToInsert.sn = dataToInsert.sn.toLowerCase();
     const { data, error } = await supabase.from('biometric_devices').insert(toSnakeCase(dataToInsert)).select().single();
@@ -4204,10 +4822,20 @@ export const api = {
     return toCamelCase(data);
   },
   deleteBiometricDevice: async (id: string): Promise<void> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ table_name: 'biometric_devices', action: 'DELETE', payload: { id } });
+      return;
+    }
     const { error } = await supabase.from('biometric_devices').delete().eq('id', id);
     if (error) throw error;
   },
   updateBiometricDevice: async (id: string, device: Partial<BiometricDevice>): Promise<BiometricDevice> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ table_name: 'biometric_devices', action: 'UPDATE', payload: { id, updates: device } });
+      return { id, ...device } as BiometricDevice;
+    }
     const dataToUpdate = { ...device };
     if (dataToUpdate.sn) dataToUpdate.sn = dataToUpdate.sn.toLowerCase();
     const { data, error } = await supabase.from('biometric_devices').update(toSnakeCase(dataToUpdate)).eq('id', id).select().single();
@@ -4228,6 +4856,11 @@ export const api = {
   },
 
   addViolation: async (violationData: Partial<any>): Promise<any> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ table_name: 'attendance_violations', action: 'INSERT', payload: violationData });
+      return null;
+    }
     const { data, error } = await supabase
       .from('attendance_violations')
       .insert(toSnakeCase(violationData))
@@ -4248,6 +4881,11 @@ export const api = {
   },
 
   resetViolations: async (userId: string, month: string, reason: string, adminId: string): Promise<void> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ table_name: 'violation_resets', action: 'INSERT', payload: { userId, month, reason, adminId } });
+      return;
+    }
     // Get current violation count
     const count = await api.getViolationCount(userId, month);
     
@@ -4738,26 +5376,41 @@ export const api = {
   },
 
   async getSiteFinanceRecords(billingMonth?: string, managerId?: string): Promise<SiteFinanceRecord[]> {
-    let query = supabase
-      .from('site_finance_tracker')
-      .select('*')
-      .is('deleted_at', null)
-      .order('site_name');
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        let query = supabase
+          .from('site_finance_tracker')
+          .select('*')
+          .is('deleted_at', null)
+          .order('site_name');
 
-    if (billingMonth) {
-        query = query.eq('billing_month', billingMonth);
+        const { data, error } = await query;
+        if (error) throw error;
+        const formatted = (data || []).map(toCamelCase);
+        await offlineDb.setCache('site_finance_records', formatted);
+        return formatted;
+      } catch (err) {
+        console.warn('Failed to fetch site finance records from cloud, falling back to cache');
+      }
     }
-
-    if (managerId) {
-        query = query.eq('created_by', managerId);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return (data || []).map(toCamelCase);
+    return await offlineDb.getCache('site_finance_records') || [];
   },
 
   async saveSiteFinanceRecord(record: Partial<SiteFinanceRecord>): Promise<SiteFinanceRecord> {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+        const offlineId = `fin_offline_${Date.now()}`;
+        const offlineRecord = { ...record, id: offlineId, status: 'pending' } as SiteFinanceRecord;
+        await offlineDb.addToOutbox({ table_name: 'site_finance_tracker', action: 'INSERT', payload: record });
+        
+        // Update local cache
+        const cached = await offlineDb.getCache('site_finance_records') || [];
+        await offlineDb.setCache('site_finance_records', [offlineRecord, ...cached]);
+        
+        return offlineRecord;
+    }
+
     const dbRecord = toSnakeCase(record);
     // Omit generated columns before upsert
     delete dbRecord.total_billed_amount;
@@ -4999,13 +5652,23 @@ export const api = {
 
   // --- User Children CRUD ---
   getUserChildren: async (userId: string): Promise<UserChild[]> => {
-    const { data, error } = await supabase
-      .from('user_children')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true });
-    if (error) throw error;
-    return (data || []).map(toCamelCase) as UserChild[];
+    const status = await Network.getStatus();
+    if (status.connected) {
+      try {
+        const { data, error } = await supabase
+          .from('user_children')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        const formatted = (data || []).map(toCamelCase) as UserChild[];
+        await offlineDb.setCache(`user_children_${userId}`, formatted);
+        return formatted;
+      } catch (err) {
+        console.warn('Failed to fetch user children from cloud, falling back to cache');
+      }
+    }
+    return await offlineDb.getCache(`user_children_${userId}`) || [];
   },
   getAllChildrenRecords: async (): Promise<(UserChild & { userName: string })[]> => {
     const { data, error } = await supabase
@@ -5025,8 +5688,18 @@ export const api = {
   },
 
   addChild: async (userId: string, child: { childName: string; dateOfBirth: string; birthCertificateDataUrl?: string | null }): Promise<UserChild> => {
-    let birthCertUrl: string | null = null;
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      const offlineId = `child_offline_${Date.now()}`;
+      const offlineChild = { ...child, id: offlineId, userId, verificationStatus: 'pending' } as any;
+      await offlineDb.addToOutbox({ table_name: 'user_children', action: 'INSERT', payload: { userId, ...child } });
+      
+      const cached = await offlineDb.getCache(`user_children_${userId}`) || [];
+      await offlineDb.setCache(`user_children_${userId}`, [...cached, offlineChild]);
+      return offlineChild;
+    }
 
+    let birthCertUrl: string | null = null;
     if (child.birthCertificateDataUrl && child.birthCertificateDataUrl.startsWith('data:')) {
       const blob = await dataUrlToBlob(child.birthCertificateDataUrl);
       const fileExt = child.birthCertificateDataUrl.split(';')[0].split('/')[1] || 'jpg';
@@ -5049,6 +5722,11 @@ export const api = {
   },
 
   updateChild: async (childId: string, updates: Partial<{ childName: string; dateOfBirth: string; birthCertificateDataUrl: string | null }>): Promise<UserChild> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+        await offlineDb.addToOutbox({ table_name: 'user_children', action: 'UPDATE', payload: { id: childId, updates } });
+        return { id: childId, ...updates } as any;
+    }
     const dbUpdates: any = {};
     if (updates.childName !== undefined) dbUpdates.child_name = updates.childName;
     if (updates.dateOfBirth !== undefined) dbUpdates.date_of_birth = updates.dateOfBirth;
@@ -5072,13 +5750,23 @@ export const api = {
   },
 
   deleteChild: async (childId: string): Promise<void> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ table_name: 'user_children', action: 'DELETE', payload: { id: childId } });
+      return;
+    }
     const { error } = await supabase.from('user_children').delete().eq('id', childId);
     if (error) throw error;
   },
 
-  verifyChild: async (childId: string, status: 'approved' | 'rejected', verifierId: string): Promise<UserChild> => {
+  verifyChild: async (childId: string, statusText: 'approved' | 'rejected', verifierId: string): Promise<UserChild> => {
+    const status = await Network.getStatus();
+    if (!status.connected) {
+      await offlineDb.addToOutbox({ table_name: 'user_children', action: 'UPDATE', payload: { id: childId, updates: { verificationStatus: statusText, verifiedBy: verifierId, verifiedAt: new Date().toISOString() } } });
+      return { id: childId, verificationStatus: statusText } as any;
+    }
     const { data, error } = await supabase.from('user_children').update({
-      verification_status: status,
+      verification_status: statusText,
       verified_by: verifierId,
       verified_at: new Date().toISOString()
     }).eq('id', childId).select().single();

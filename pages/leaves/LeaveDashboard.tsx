@@ -12,7 +12,7 @@ import Select from '../../components/ui/Select';
 import { useForm, Controller, SubmitHandler, Resolver } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { format, differenceInCalendarDays, isSameDay, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns';
+import { format, differenceInCalendarDays, isSameDay, startOfMonth, endOfMonth, differenceInMinutes, getDay } from 'date-fns';
 import { calculateWorkingHours } from '../../utils/attendanceCalculations';
 import DatePicker from '../../components/ui/DatePicker';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -25,6 +25,7 @@ import YearlyAttendanceChart from './YearlyAttendanceChart';
 import EmployeeLog from './EmployeeLog';
 import Modal from '../../components/ui/Modal';
 import HolidayCalendar from './HolidayCalendar';
+import ShortfallCalendar from './ShortfallCalendar';
 import LoadingScreen from '../../components/ui/LoadingScreen';
 
 // --- Reusable Components ---
@@ -122,11 +123,14 @@ const LeaveDashboard: React.FC = () => {
     const isMobile = useMediaQuery('(max-width: 767px)');
     const navigate = useNavigate();
     const [calculatedOTHours, setCalculatedOTHours] = useState<number>(0);
+    const [calculatedShortfallMins, setCalculatedShortfallMins] = useState<number>(0);
 
     // Holiday Selection State
     const [userHolidays, setUserHolidays] = useState<UserHoliday[]>([]);
     const [isHolidaySelectionEnabled, setIsHolidaySelectionEnabled] = useState(false);
     const [activeHolidayPool, setActiveHolidayPool] = useState<{ name: string; date: string }[]>([]);
+    const [isOtConversionEnabled, setIsOtConversionEnabled] = useState(false);
+    const [isShortfallEnabled, setIsShortfallEnabled] = useState(false);
 
     // Emergency Self-Healing for Attendance Rules
     useEffect(() => {
@@ -291,16 +295,30 @@ const LeaveDashboard: React.FC = () => {
             });
 
             let totalOTHours = 0;
-            Object.values(dayLogs).forEach(dayEvents => {
+            let totalShortfallMinutes = 0;
+            const targetHours = 8;
+
+            Object.entries(dayLogs).forEach(([dateStr, dayEvents]) => {
+                const date = new Date(dateStr);
                 const { workingHours } = calculateWorkingHours(dayEvents);
+                
+                // OT
                 if (workingHours > shiftThreshold) {
                     totalOTHours += (workingHours - shiftThreshold);
+                }
+
+                // Shortfall - Skip Sundays
+                if (getDay(date) !== 0 && workingHours < targetHours) {
+                    totalShortfallMinutes += (targetHours * 60) - (workingHours * 60);
                 }
             });
 
             setCalculatedOTHours(parseFloat(totalOTHours.toFixed(1)));
+            setCalculatedShortfallMins(totalShortfallMinutes);
             setIsHolidaySelectionEnabled(userRules?.enableCustomHolidays || false);
             setActiveHolidayPool(userRules?.holidayPool || HOLIDAY_SELECTION_POOL);
+            setIsOtConversionEnabled(userRules?.enableOtToCompOffConversion || false);
+            setIsShortfallEnabled(userRules?.enableShortfall || false);
 
         } catch (err: any) {
             console.error('Error fetching dashboard data:', err);
@@ -389,6 +407,13 @@ const LeaveDashboard: React.FC = () => {
             icon: CalendarClock,
             isExpired: balanceDataState.expiryStates?.compOff
         },
+        ...(isShortfallEnabled ? [{
+            title: 'Monthly Shortfall',
+            value: formatPreciseHours(calculatedShortfallMins / 60),
+            description: `8h Shortfall = 1 Day Deduction. Est. Loss: ${(calculatedShortfallMins / (8 * 60)).toFixed(1)} Days.`,
+            icon: Clock,
+            isExpired: false
+        }] : [])
     ].filter(card => !card.isExpired) : [
         { title: 'Earned Leave', value: '0 / 0', icon: Briefcase, isLoading: true },
         { title: 'Sick Leave', value: '0 / 0', icon: HeartPulse, isLoading: true },
@@ -429,30 +454,32 @@ const LeaveDashboard: React.FC = () => {
 
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
                 {balanceCards.map(b => <div key={b.title} className="w-full h-full flex"><LeaveBalanceCard {...b} /></div>)}
-                {/* Show Overtime card for everyone now that we track it persistent */}
-                <div className="relative group w-full h-full flex">
-                    <LeaveBalanceCard 
-                        title="Monthly OT Hours" 
-                        value={formatPreciseHours(calculatedOTHours || user?.monthlyOtHours || 0)} 
-                        description={`Calculated from hours exceeding ${threshold}h daily.`}
-                        icon={Clock} 
-                        isLoading={isLoading}
-                    />
-                    {/* Position tooltip below or above so it doesn't overlap text, and use solid bg-card */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
-                        <div className="bg-card text-primary-text text-[10px] p-3 rounded-lg shadow-xl border border-border w-56 relative text-center lg:text-left">
-                            {/* Small triangle arrow at the top */}
-                            <div className="absolute -top-2 left-1/2 -translate-x-1/2 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-border" />
-                            <div className="absolute -top-[7px] left-1/2 -translate-x-1/2 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-card" />
-                            
-                            <p className="font-bold border-b border-border mb-1.5 pb-1">OT Accumulation</p>
-                            <p className="mb-1">Current Bank: <span className="text-accent-dark font-bold text-[11px]">
-                                {formatPreciseHours(user?.otHoursBank || 0)}
-                            </span></p>
-                            <p className="text-muted-foreground italic leading-tight">Every 8h of accumulated OT is automatically converted to 1 Comp Off.</p>
+                {/* Show Overtime card only if OT conversion is enabled for the user's role */}
+                {isOtConversionEnabled && (
+                    <div className="relative group w-full h-full flex">
+                        <LeaveBalanceCard 
+                            title="Monthly OT Hours" 
+                            value={formatPreciseHours(calculatedOTHours || user?.monthlyOtHours || 0)} 
+                            description={`Calculated from hours exceeding ${threshold}h daily.`}
+                            icon={Clock} 
+                            isLoading={isLoading}
+                        />
+                        {/* Position tooltip below or above so it doesn't overlap text, and use solid bg-card */}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                            <div className="bg-card text-primary-text text-[10px] p-3 rounded-lg shadow-xl border border-border w-56 relative text-center lg:text-left">
+                                {/* Small triangle arrow at the top */}
+                                <div className="absolute -top-2 left-1/2 -translate-x-1/2 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-border" />
+                                <div className="absolute -top-[7px] left-1/2 -translate-x-1/2 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-card" />
+                                
+                                <p className="font-bold border-b border-border mb-1.5 pb-1">OT Accumulation</p>
+                                <p className="mb-1">Current Bank: <span className="text-accent-dark font-bold text-[11px]">
+                                    {formatPreciseHours(user?.otHoursBank || 0)}
+                                </span></p>
+                                <p className="text-muted-foreground italic leading-tight">Every 8h of accumulated OT is automatically converted to 1 Comp Off.</p>
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* Maternity & Child Care Cards */}
@@ -556,13 +583,24 @@ const LeaveDashboard: React.FC = () => {
                     onDateChange={setViewingDate}
                 />
                 <YearlyAttendanceChart />
-                <OTCalendar 
-                    viewingDate={viewingDate}
-                    onDateChange={setViewingDate}
-                    events={events}
-                    settings={attendanceSettings}
-                    isLoading={isLoading}
-                />
+                {isOtConversionEnabled && (
+                    <OTCalendar 
+                        viewingDate={viewingDate}
+                        onDateChange={setViewingDate}
+                        events={events}
+                        settings={attendanceSettings}
+                        isLoading={isLoading}
+                    />
+                )}
+                {isShortfallEnabled && (
+                    <ShortfallCalendar 
+                        viewingDate={viewingDate}
+                        onDateChange={setViewingDate}
+                        events={events}
+                        settings={attendanceSettings}
+                        isLoading={isLoading}
+                    />
+                )}
             </div>
 
             {isMobile && (

@@ -778,6 +778,7 @@ export interface StaffAttendanceRules {
   enableCustomHolidays?: boolean; // Whether users can pick their own holidays
   enableOtToCompOffConversion?: boolean; // Convert OT to Comp Off day
   otConversionThreshold?: number; // Hours required for 1 Comp Off (e.g., 8)
+  enableShortfall?: boolean; // Show shortfall card and calendar
   // Weekly off configuration
   weeklyOffDays?: number[]; // [0] for Sunday, [0,6] for Sunday and Saturday
   // Field Staff Site/Travel Tracking
