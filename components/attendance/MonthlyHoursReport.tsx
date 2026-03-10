@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { format, getDaysInMonth, startOfMonth, endOfMonth, eachDayOfInterval, startOfDay, isAfter, isSameDay, isWithinInterval, endOfDay } from 'date-fns';
+import { format, getDaysInMonth, startOfMonth, endOfMonth, eachDayOfInterval, startOfDay, isAfter, isSameDay, isWithinInterval, endOfDay, startOfWeek } from 'date-fns';
 import { Download } from 'lucide-react';
 import { api } from '../../services/api';
 import { processDailyEvents, calculateWorkingHours, isLateCheckIn, isEarlyCheckOut } from '../../utils/attendanceCalculations';
@@ -113,7 +113,10 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
       setUserHolidaysPool(userHolidaysData || []);
 
       for (const user of targetUsers) {
-        const events = await api.getAttendanceEvents(user.id, format(startDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd HH:mm:ss'));
+        // Fetch events from the start of the week containing the month's first day
+        // to correctly calculate W/O for early Sundays.
+        const fetchStartDate = startOfWeek(startDate, { weekStartsOn: 1 }); // Monday
+        const events = await api.getAttendanceEvents(user.id, format(fetchStartDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd HH:mm:ss'));
         const userLeaves = (leavesData || []).filter((l: any) => l.userId === user.id && l.status === 'approved');
         // Pass userHolidaysData directly to avoid stale state issues
         const monthlyData = processEmployeeMonth(user, events, userLeaves, userHolidaysData || [], year, month);
@@ -139,7 +142,6 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
     let presentDays = 0;
     let absentDays = 0;
     let halfDays = 0;
-    let weekOffs = 0; // alias for weeklyOff
     let holidaysCount = 0;
     let leavesCount = 0;
     let floatingHolidays = 0;
@@ -151,7 +153,7 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
     let compOffs = 0;
     let workFromHomeDays = 0;
 
-    let weeklyOff = 0; // legacy counter if still used in the loop
+    let weekOffs = 0; 
 
     const shiftCounts: { [key: string]: number } = {};
     let daysPresentInWeek = 0;
@@ -159,6 +161,25 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
     const category = getStaffCategory(user.role);
     const rules = attendance[category];
     const categoryHolidays = category === 'office' ? officeHolidays : category === 'field' ? fieldHolidays : siteHolidays;
+
+    // PRE-CALCULATE daysPresentInWeek for the first week if it started in the previous month
+    const monthStartDate = new Date(year, month - 1, 1);
+    const weekStartDate = startOfWeek(monthStartDate, { weekStartsOn: 1 }); // Monday
+    
+    if (isAfter(monthStartDate, weekStartDate)) {
+        let checkDate = weekStartDate;
+        while (isAfter(monthStartDate, checkDate) && !isSameDay(monthStartDate, checkDate)) {
+            const dateStr = format(checkDate, 'yyyy-MM-dd');
+            const dayEvents = events.filter(e => e.timestamp.startsWith(dateStr));
+            if (dayEvents.length > 0) {
+                const { workingHours: netHours } = processDailyEvents(dayEvents);
+                if (netHours >= (rules.minimumHoursHalfDay || 4)) {
+                    daysPresentInWeek++;
+                }
+            }
+            checkDate = new Date(checkDate.getTime() + 24 * 60 * 60 * 1000);
+        }
+    }
 
     // Process each day of the month
     for (let day = 1; day <= daysInMonth; day++) {
@@ -226,9 +247,16 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
           matchesDate(h.date, currentDate)
       );
 
-      // 4. Check Recurring holiday (Floating Holiday)
-      const isRecurringHoliday = recurringHolidays.some(rule => {
+      // 4. Check Recurring holiday (Floating Holiday - Male only)
+      const isRecurringHoliday = (user.gender?.toLowerCase() !== 'female') && recurringHolidays.some(rule => {
           if (rule.day.toLowerCase() !== format(currentDate, 'EEEE').toLowerCase()) return false;
+          
+          // Check expiry
+          if (rules.floatingLeavesExpiryDate) {
+              const expiryDate = startOfDay(new Date(rules.floatingLeavesExpiryDate));
+              if (startOfDay(currentDate) > expiryDate) return false;
+          }
+
           const occurrence = Math.ceil(currentDate.getDate() / 7);
           const ruleType = rule.type || 'office';
           return rule.n === occurrence && ruleType === (category === 'site' ? 'office' : category); 
@@ -397,9 +425,8 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
         currentDayShift = shift || '-';
 
       } else if (isSunday) {
-          const isFirstSunday = day <= 7;
           if (!isFuture) {
-              if (isFirstSunday || daysPresentInWeek >= 4) {
+              if (daysPresentInWeek >= 4) {
                   status = 'W/O';
                   weekOffs++; // Increment weekOffs counter
               } else {
@@ -449,7 +476,7 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
       presentDays,
       halfDays,
       absentDays,
-      weekOffs: weeklyOff,
+      weekOffs,
       holidays: holidaysCount,
       holidayPresents,
       weekendPresents,
@@ -466,7 +493,7 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
       dailyData,
       present: presentDays,
       absent: absentDays,
-      weeklyOff,
+      weeklyOff: weekOffs, // legacy support
       leaves: leavesCount,
       lossOfPay
     };

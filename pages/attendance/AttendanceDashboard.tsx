@@ -1083,18 +1083,20 @@ const AttendanceDashboard: React.FC = () => {
                     };
                 });
 
-                // 2. Apply Weekend Rule: If 4+ absences in the preceding week, mark Sunday as Absent
+                // 2. Apply Weekend Rule: If < 4 present days in the preceding week, mark Sunday as Absent
                 logs.forEach((log, index) => {
                     if (log.status === 'W/O' && log.day === 'Sunday') {
-                        let absentCount = 0;
+                        let presentCount = 0;
                         // Look back up to 6 days
                         const lookBackLimit = Math.max(0, index - 6);
                         for (let i = index - 1; i >= lookBackLimit; i--) {
-                            if (logs[i].status === 'A') {
-                                absentCount++;
+                            // Check if the status starts with 'P' or is 'W/H', 'W/P', 'HP', '0.5P' etc.
+                            const s = logs[i].status;
+                            if (s === 'P' || s === 'W/H' || s === 'W/P' || s === 'HP' || s === '0.5P' || s === '1/2P') {
+                                presentCount++;
                             }
                         }
-                        if (absentCount >= 4) {
+                        if (presentCount < 4) {
                             log.status = 'A';
                         }
                     }

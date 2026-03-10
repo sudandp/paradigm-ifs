@@ -190,7 +190,7 @@ const ApplyLeave: React.FC = () => {
                                 <Select label="Leave Type" {...field} error={errors.leaveType?.message} className={isMobile ? 'pro-select pro-select-arrow' : ''}>
                                     <option value="Earned">Earned</option>
                                     <option value="Sick">Sick</option>
-                                    <option value={isFemale ? "Pink Leave" : "Floating"}>{isFemale ? "Pink Leave" : "Floating Holiday"}</option>
+                                    <option value={isFemale ? "Pink Leave" : "Floating"}>{isFemale ? "Pink Leave" : "3rd Saturday Leave"}</option>
                                     <option value="Comp Off">Comp Off</option>
                                     <option value="Loss of Pay">Loss of Pay</option>
                                     {isFemale && <option value="Maternity">Maternity</option>}

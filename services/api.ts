@@ -2677,7 +2677,8 @@ export const api = {
         const dateStr = format(day, 'yyyy-MM-dd');
         const dayName = format(day, 'EEEE');
         
-        const isFloatingRecurringHoliday = (recurringHolidays || []).some(rh => {
+        const isMale = (userData.gender || '').toLowerCase() !== 'female';
+        const isFloatingRecurringHoliday = isMale && ((recurringHolidays || []).some(rh => {
              const rhType = rh.type || rh.roleType;
              const rhN = typeof rh.n !== 'undefined' ? rh.n : rh.occurrence;
              
@@ -2686,7 +2687,7 @@ export const api = {
              if (rhN === 0) return true; 
              const nth = Math.ceil(day.getDate() / 7);
              return rhN === nth;
-        }) || (dayName === 'Saturday' && Math.ceil(day.getDate() / 7) === 3);
+        }) || (dayName === 'Saturday' && Math.ceil(day.getDate() / 7) === 3));
 
         if (isFloatingRecurringHoliday) {
             floatingHolidayDates.push(day);
@@ -2848,6 +2849,12 @@ export const api = {
         if (!expiryStates.floating || (rules.floatingLeavesExpiryDate && leaveStart <= rules.floatingLeavesExpiryDate)) {
           balance.floatingUsed += leaveAmount;
         }
+      } else if (type.includes('pink')) {
+        balance.pinkUsed += leaveAmount;
+      } else if (type.includes('child care') || type.includes('childcare')) {
+        balance.childCareUsed += leaveAmount;
+      } else if (type.includes('maternity')) {
+          balance.maternityUsed += leaveAmount;
       } else if (type.includes('comp') || type === 'co') {
         if (!expiryStates.compOff || (rules.compOffLeavesExpiryDate && leaveStart <= rules.compOffLeavesExpiryDate)) {
           balance.compOffUsed += leaveAmount;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { startOfYear, endOfYear, format, getMonth, eachDayOfInterval, getDay, isSameDay, startOfMonth, endOfMonth } from 'date-fns';
+import { startOfYear, endOfYear, format, getMonth, eachDayOfInterval, getDay, isSameDay, startOfMonth, endOfMonth, subDays, startOfDay } from 'date-fns';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../services/api';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -26,7 +26,16 @@ Chart.register(
     Legend
 );
 
-const YearlyAttendanceChart: React.FC = () => {
+interface YearlyAttendanceChartProps {
+    data?: {
+        events: AttendanceEvent[];
+        userHolidays: UserHoliday[];
+        leaves: LeaveRequest[];
+    } | null;
+    isLoading?: boolean;
+}
+
+const YearlyAttendanceChart: React.FC<YearlyAttendanceChartProps> = ({ data, isLoading: isLoadingProp }) => {
     const { user } = useAuthStore();
     const { recurringHolidays, attendance, fieldHolidays, officeHolidays } = useSettingsStore();
     const [events, setEvents] = useState<AttendanceEvent[]>([]);
@@ -39,8 +48,20 @@ const YearlyAttendanceChart: React.FC = () => {
     const chartInstance = useRef<Chart | null>(null);
 
     useEffect(() => {
+        if (data) {
+            setEvents(data.events);
+            setUserHolidays(data.userHolidays.map(h => h.holidayName));
+            setLeaves(data.leaves);
+            setIsLoading(false);
+        } else if (isLoadingProp) {
+            setIsLoading(true);
+        }
+    }, [data, isLoadingProp]);
+
+    // Internal fallback for year changes (if data not provided for new year)
+    useEffect(() => {
         const fetchData = async () => {
-            if (!user) return;
+            if (!user || data) return; // Skip if data is passed from parent (Dashboard)
             setIsLoading(true);
             try {
                 const start = startOfYear(new Date(currentYear, 0, 1)).toISOString();
@@ -101,6 +122,10 @@ const YearlyAttendanceChart: React.FC = () => {
             : attendance?.office?.monthlyFloatingLeaves) ?? 0;
 
         const configHolidays = user?.role === 'field_staff' ? fieldHolidays : officeHolidays;
+        const expiryDateStr = user?.role === 'field_staff'
+            ? attendance?.field?.floatingLeavesExpiryDate
+            : attendance?.office?.floatingLeavesExpiryDate;
+        const expiryDate = expiryDateStr ? startOfDay(new Date(expiryDateStr)) : null;
 
         for (let m = 0; m < 12; m++) {
             const start = startOfMonth(new Date(currentYear, m, 1));
@@ -135,8 +160,12 @@ const YearlyAttendanceChart: React.FC = () => {
                 const isUserSelected = matchingFixed ? userHolidays.includes(matchingFixed.name) : false;
                 
                 let isRecurring = false;
-                if (floatingCount < allowedFloating) {
+                const isFemale = user?.gender?.toLowerCase() === 'female';
+                if (!isFemale && floatingCount < allowedFloating) {
                     for (const rule of activeRecurringRules) {
+                        // Check expiry
+                        if (expiryDate && startOfDay(day) > expiryDate) continue;
+
                         if (format(day, 'EEEE').toLowerCase() === rule.day.toLowerCase()) {
                             const prevDaysInMonth = eachDayOfInterval({ start, end: day });
                             const occurrence = prevDaysInMonth.filter(d => format(d, 'EEEE').toLowerCase() === rule.day.toLowerCase()).length;
@@ -156,7 +185,27 @@ const YearlyAttendanceChart: React.FC = () => {
 
                 // 4. Week Offs (Sundays)
                 if (getDay(day) === 0) {
-                    monthSundayCount++;
+                    let presentInWeek = 0;
+                    // Look back 6 days (Mon-Sat)
+                    // If we are at the start of the year, we might need to fetch data from previous year
+                    // but for simplicity in this chart, we check the current events array which is already fetched for the year.
+                    // However, we need to handle the first week of Jan specifically.
+                    
+                    const weekDays = eachDayOfInterval({ 
+                        start: subDays(day, 6), 
+                        end: subDays(day, 1) 
+                    });
+
+                    weekDays.forEach(wd => {
+                        const wdStr = format(wd, 'yyyy-MM-dd');
+                        if (workedDaysSet.has(wdStr)) {
+                            presentInWeek++;
+                        }
+                    });
+
+                    if (presentInWeek >= 4) {
+                        monthSundayCount++;
+                    }
                     return;
                 }
             });

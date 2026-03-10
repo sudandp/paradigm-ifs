@@ -12,7 +12,7 @@ import Select from '../../components/ui/Select';
 import { useForm, Controller, SubmitHandler, Resolver } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { format, differenceInCalendarDays, isSameDay, startOfMonth, endOfMonth, differenceInMinutes, getDay } from 'date-fns';
+import { format, differenceInCalendarDays, isSameDay, startOfMonth, endOfMonth, differenceInMinutes, getDay, startOfYear, endOfYear } from 'date-fns';
 import { calculateWorkingHours } from '../../utils/attendanceCalculations';
 import DatePicker from '../../components/ui/DatePicker';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -131,6 +131,11 @@ const LeaveDashboard: React.FC = () => {
     const [activeHolidayPool, setActiveHolidayPool] = useState<{ name: string; date: string }[]>([]);
     const [isOtConversionEnabled, setIsOtConversionEnabled] = useState(false);
     const [isShortfallEnabled, setIsShortfallEnabled] = useState(false);
+    const [yearlyData, setYearlyData] = useState<{
+        events: AttendanceEvent[];
+        userHolidays: UserHoliday[];
+        leaves: LeaveRequest[];
+    } | null>(null);
 
     // Emergency Self-Healing for Attendance Rules
     useEffect(() => {
@@ -217,8 +222,11 @@ const LeaveDashboard: React.FC = () => {
             const startStr = startOfMonth(viewingDate).toISOString();
             const endStr = endOfMonth(viewingDate).toISOString();
 
+            const startOfYearStr = startOfYear(viewingDate).toISOString();
+            const endOfYearStr = endOfYear(viewingDate).toISOString();
+
             // Fetch base data points
-            const [balanceData, requestsData, compOffData, eventsData, settings, recurringData, selections] = await Promise.all([
+            const [balanceData, requestsData, compOffData, eventsData, settings, recurringData, selections, yearlyEvents, yearlyRequests] = await Promise.all([
                 api.getLeaveBalancesForUser(user.id, dateStr),
                 api.getLeaveRequests({
                     userId: user.id,
@@ -228,7 +236,14 @@ const LeaveDashboard: React.FC = () => {
                 api.getAttendanceEvents(user.id, startStr, endStr),
                 api.getAttendanceSettings(),
                 api.getRecurringHolidays(),
-                api.getUserHolidays(user.id).catch(() => [])
+                api.getUserHolidays(user.id).catch(() => []),
+                api.getAttendanceEvents(user.id, startOfYearStr, endOfYearStr),
+                api.getLeaveRequests({
+                    userId: user.id,
+                    status: 'approved',
+                    startDate: startOfYearStr,
+                    endDate: endOfYearStr
+                }).then(res => res.data)
             ]);
 
             setBalance(balanceData);
@@ -238,6 +253,11 @@ const LeaveDashboard: React.FC = () => {
             setAttendanceSettings(settings);
             setRecurringHolidays(recurringData);
             setUserHolidays(selections);
+            setYearlyData({
+                events: yearlyEvents,
+                userHolidays: selections,
+                leaves: yearlyRequests
+            });
             
             // Refetch current user profile to get latest persistent OT fields (bank, monthly)
             // This ensures we have the most up-to-date role and balance information
@@ -389,17 +409,29 @@ const LeaveDashboard: React.FC = () => {
             icon: HeartPulse,
             isExpired: balanceDataState.expiryStates?.sick
         },
-        { 
-            title: isFemale ? 'Pink Leave' : 'Annual Leave', 
-            value: isFemale 
-                ? `${parseFloat((balanceDataState.pinkTotal - balanceDataState.pinkUsed).toFixed(0))} / ${balanceDataState.pinkTotal}`
-                : `${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))} / ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}`, 
-            description: isFemale
-                ? `1 day per month (mandatory, non-carry forward). Available: ${parseFloat((balanceDataState.pinkTotal - balanceDataState.pinkUsed).toFixed(0))}d.`
-                : `Total: ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))}d.`,
-            icon: isFemale ? Heart : Plane,
-            isExpired: !isFemale && balanceDataState.expiryStates?.floating
-        },
+        ...(isFemale ? [
+            { 
+                title: 'Pink Leave', 
+                value: `${parseFloat((balanceDataState.pinkTotal - balanceDataState.pinkUsed).toFixed(0))} / ${balanceDataState.pinkTotal}`,
+                description: `1 day per month (mandatory, non-carry forward). Available: ${parseFloat((balanceDataState.pinkTotal - balanceDataState.pinkUsed).toFixed(0))}d.`,
+                icon: Heart,
+                isExpired: false
+            },
+            {
+                title: 'Child Care Leave',
+                value: `${parseFloat((balanceDataState.childCareTotal - balanceDataState.childCareUsed).toFixed(0))} / ${parseFloat(balanceDataState.childCareTotal.toFixed(0))}`,
+                description: `Available: ${parseFloat((balanceDataState.childCareTotal - balanceDataState.childCareUsed).toFixed(0))} days for child care.`,
+                icon: Baby, // Corrected from babyIcon
+            }
+        ] : [
+            { 
+                title: '3rd Saturday Leave', 
+                value: `${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))} / ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}`, 
+                description: `Total: ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))}d.`,
+                icon: Plane,
+                isExpired: balanceDataState.expiryStates?.floating
+            }
+        ]),
         { 
             title: 'Compensatory Off', 
             value: `${parseFloat((balanceDataState.compOffTotal - balanceDataState.compOffUsed).toFixed(1))} / ${parseFloat(balanceDataState.compOffTotal.toFixed(1))}`, 
@@ -417,23 +449,18 @@ const LeaveDashboard: React.FC = () => {
     ].filter(card => !card.isExpired) : [
         { title: 'Earned Leave', value: '0 / 0', icon: Briefcase, isLoading: true },
         { title: 'Sick Leave', value: '0 / 0', icon: HeartPulse, isLoading: true },
-        { title: 'Annual Leave', value: '0 / 0', icon: Plane, isLoading: true },
+        { title: '3rd Saturday Leave', value: '0 / 0', icon: Plane, isLoading: true },
+        ...(isFemale ? [{ title: 'Pink Leave', value: '0 / 0', icon: Heart, isLoading: true }] : []),
         { title: 'Compensatory Off', value: '0 / 0', icon: CalendarClock, isLoading: true },
     ];
 
-    // Maternity & Child Care cards (only for female users with non-zero balances)
+    // Maternity card (only for female users with non-zero balances)
     const maternityCards = (balanceDataState && isFemale) ? [
         ...(balanceDataState.maternityTotal > 0 ? [{
             title: 'Maternity Leave',
             value: `${parseFloat((balanceDataState.maternityTotal - balanceDataState.maternityUsed).toFixed(0))} / ${parseFloat(balanceDataState.maternityTotal.toFixed(0))} days`,
             description: `${Math.round(balanceDataState.maternityTotal / 7)} weeks total. Available: ${parseFloat((balanceDataState.maternityTotal - balanceDataState.maternityUsed).toFixed(0))} days.`,
             icon: Baby,
-        }] : []),
-        ...(balanceDataState.childCareTotal > 0 ? [{
-            title: 'Child Care Leave',
-            value: `${parseFloat((balanceDataState.childCareTotal - balanceDataState.childCareUsed).toFixed(0))} / ${parseFloat(balanceDataState.childCareTotal.toFixed(0))}`,
-            description: `Available: ${parseFloat((balanceDataState.childCareTotal - balanceDataState.childCareUsed).toFixed(0))} days for child care.`,
-            icon: Heart,
         }] : []),
     ] : [];
 
@@ -582,7 +609,10 @@ const LeaveDashboard: React.FC = () => {
                     viewingDate={viewingDate}
                     onDateChange={setViewingDate}
                 />
-                <YearlyAttendanceChart />
+                <YearlyAttendanceChart 
+                    data={yearlyData}
+                    isLoading={isLoading}
+                />
                 {isOtConversionEnabled && (
                     <OTCalendar 
                         viewingDate={viewingDate}
@@ -651,7 +681,9 @@ const LeaveDashboard: React.FC = () => {
                             ) : (
                                 requests.map(req => (
                                     <tr key={req.id}>
-                                        <td data-label="Type" className="px-4 py-3 font-medium text-base">{req.leaveType} {req.dayOption && `(${req.dayOption})`}</td>
+                                        <td data-label="Type" className="px-4 py-3 font-medium text-base">
+                                            {req.leaveType === 'Floating' ? '3rd Saturday Leave' : req.leaveType} {req.dayOption && `(${req.dayOption})`}
+                                        </td>
                                         <td data-label="Dates" className="px-4 py-3 text-muted text-base">{format(new Date(req.startDate.replace(/-/g, '/')), 'dd MMM')} - {format(new Date(req.endDate.replace(/-/g, '/')), 'dd MMM')}</td>
                                         <td data-label="Reason" className="px-4 py-3 text-muted max-w-xs truncate text-base">{req.reason}</td>
                                          <td data-label="Status" className="px-4 py-3 text-base"><LeaveStatusChip status={req.status} /></td>
