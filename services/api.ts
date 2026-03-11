@@ -3403,26 +3403,61 @@ export const api = {
         p_link_to: data.link || null
       });
       if (error) throw error;
+
+      // Trigger real push broadcast via OneSignal Edge Function
+      const { error: pushError } = await supabase.functions.invoke('send-push', {
+        body: {
+          broadcast: true,
+          title: data.title || 'Important Alert',
+          message: data.message,
+          url: data.link || null
+        }
+      });
+      
+      if (pushError) {
+        console.error('Failed to trigger push broadcast:', pushError);
+        throw pushError;
+      }
+
       return;
     }
     
     if (data.role) {
-      const { data: users, error } = await supabase.from('users').select('id').eq('role', data.role);
-      if (error) throw error;
+      console.log('Fetching users for role:', data.role);
+      const { data: users, error } = await supabase.from('users').select('id').eq('role_id', data.role);
+      if (error) {
+        console.error('Error fetching users for role:', error);
+        throw error;
+      }
+      console.log(`Found ${users?.length || 0} users for role ${data.role}`);
       finalUserIds = [...new Set([...finalUserIds, ...users.map(u => u.id)])];
     }
 
-    const notifications = finalUserIds.map(userId => toSnakeCase({
-      userId,
-      message: data.message,
-      // title: data.title, // Table does not support title
-      type: data.type || 'info',
-      linkTo: data.link,
-      severity: data.severity || 'Low',
-    }));
+    if (finalUserIds.length === 0) return;
 
-    const { error: insertError } = await supabase.from('notifications').insert(notifications);
-    if (insertError) throw insertError;
+    // Trigger real push notification via OneSignal Edge Function for specific recipients
+    // The edge function will handle inserting the notifications into the database natively to bypass RLS.
+    console.log("Sending push notification payload:", {
+      userIds: finalUserIds,
+      title: data.title || 'Important Alert',
+      message: data.message,
+      url: data.link || null,
+      originalRole: data.role
+    });
+
+    const { error: pushError } = await supabase.functions.invoke('send-push', {
+      body: {
+        userIds: finalUserIds,
+        title: data.title || 'Important Alert',
+        message: data.message,
+        url: data.link || null
+      }
+    });
+
+    if (pushError) {
+      console.error('Failed to trigger push notification:', pushError);
+      throw pushError;
+    }
   },
 
   // Field Reporting API

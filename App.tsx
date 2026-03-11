@@ -305,7 +305,10 @@ const App: React.FC = () => {
     // Initialize OneSignal
     const oneSignalAppId = useSettingsStore.getState().apiSettings.oneSignalAppId || import.meta.env.VITE_ONESIGNAL_APP_ID;
     if (oneSignalAppId && oneSignalAppId !== 'YOUR_ONESIGNAL_APP_ID' && oneSignalAppId !== '') {
+      console.log('[App] Initializing OneSignal with ID:', oneSignalAppId);
       oneSignalService.init(oneSignalAppId);
+    } else {
+      console.warn('[App] OneSignal App ID not found or invalid');
     }
 
   }, []);

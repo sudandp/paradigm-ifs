@@ -21,8 +21,8 @@ export const oneSignalService = {
         }
 
         try {
-            // Uncomment this to enable debug logs
-            // (window as any).plugins.OneSignal.setLogLevel(6, 0);
+            // Enable debug logs for troubleshooting
+            (window as any).plugins?.OneSignal?.setLogLevel(6, 0);
 
             OneSignal.initialize(appId);
 
