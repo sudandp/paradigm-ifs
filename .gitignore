@@ -54,3 +54,11 @@ build/
 # Build logs
 build_log*.txt
 build_error.txt
+
+# Debug & analysis artifacts
+**/debug_*.ts
+**/debug_*.js
+*_analysis.json
+*_errors.txt
+tsc_output.txt
+*.pyc
