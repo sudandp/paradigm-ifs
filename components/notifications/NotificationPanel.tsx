@@ -431,7 +431,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
     if (!isOpen) return null;
 
     return (
-        <div className={`h-full w-full flex flex-col animate-slide-in-right ${isMobile ? 'bg-[#0A3D2E]' : 'bg-white'}`}>
+        <div className={`h-full w-full flex flex-col animate-slide-in-right ${isMobile ? 'bg-[#0A3D2E] pt-5' : 'bg-white'}`}>
             {/* Header */}
             <div className={`flex items-center justify-between px-6 pt-6 pb-5 border-b ${isMobile ? 'bg-[#0A3D2E] border-white/10' : 'bg-white border-gray-100'}`}>
                 <div className="flex items-center gap-3">

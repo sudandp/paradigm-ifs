@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface LoadingScreenProps {
     message?: string;
@@ -39,8 +40,8 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message = 'Loading...', f
     }, []);
 
     const containerStyle = fullScreen 
-        ? "fixed inset-0 z-[9999] overflow-hidden bg-white flex items-center justify-center font-['Inter',_sans-serif]"
-        : "relative overflow-hidden bg-white flex flex-col items-center justify-center min-h-[400px] w-full font-['Inter',_sans-serif] rounded-xl shadow-[0_0_40px_rgba(0,0,0,0.05)] transition-all duration-300";
+        ? "fixed inset-0 overflow-hidden bg-[#041b0f] lg:bg-white flex items-center justify-center font-['Inter',_sans-serif]"
+        : "relative overflow-hidden bg-[#041b0f] lg:bg-white flex flex-col items-center justify-center min-h-[400px] w-full font-['Inter',_sans-serif] rounded-xl shadow-2xl transition-all duration-300";
 
     return (
         <div className={containerStyle}>
@@ -82,7 +83,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message = 'Loading...', f
                         <div className={`logo-container ${fullScreen ? 'w-64 h-64' : 'w-48 h-48'}`}>
                             <div className="rotate-wrapper">
                                 <img 
-                                    src="/logo-simple.png" 
+                                    src="/paradigm-correct-logo.png" 
                                     alt="Paradigm Logo" 
                                     className="w-full h-full object-contain p-2"
                                 />
@@ -91,21 +92,21 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message = 'Loading...', f
                     </div>
                     
                     <div className="company-text flex flex-col items-center">
-                        <h2 className={`${fullScreen ? 'text-5xl' : 'text-3xl'} font-black text-[#1A4331] tracking-[0.2em] uppercase mb-1`}>
+                        <h2 className={`${fullScreen ? 'text-5xl' : 'text-3xl'} font-black text-white lg:text-[#1A4331] tracking-[0.2em] uppercase mb-1`}>
                             PARADIGM
                         </h2>
-                        <h3 className={`${fullScreen ? 'text-2xl' : 'text-xl'} font-bold text-[#2f6a42] tracking-[0.4em] uppercase opacity-90`}>
+                        <h3 className={`${fullScreen ? 'text-2xl' : 'text-xl'} font-bold text-gray-200 lg:text-[#2f6a42] tracking-[0.4em] uppercase opacity-90`}>
                             SERVICES
                         </h3>
                     </div>
                 </div>
 
                 <div className={`${fullScreen ? 'px-6' : 'px-4'} relative z-30`}>
-                    <p className="text-[#1A4331] text-xs font-mono tracking-widest animate-pulse mb-4 font-semibold">
+                    <p className="text-[#22c55e] lg:text-[#1A4331] text-xs font-mono tracking-widest animate-pulse mb-4 font-semibold">
                         {message === 'Loading...' ? '> Initializing System...' : `> ${message}`}
                     </p>
-                    <div className={`${fullScreen ? 'w-72' : 'w-48'} h-1 bg-gray-200 rounded-full overflow-hidden border border-gray-300`}>
-                        <div className="h-full bg-gradient-to-r from-[#1A4331] via-[#2f6a42] to-[#1A4331] rounded-full animate-[progress_3s_linear_infinite] bg-[length:200%_100%]"></div>
+                    <div className={`${fullScreen ? 'w-72' : 'w-48'} h-1 bg-[#1f3d2b] lg:bg-gray-200 rounded-full overflow-hidden lg:border lg:border-gray-300`}>
+                        <div className="h-full bg-gradient-to-r from-[#22c55e] via-[#4ade80] to-[#22c55e] lg:from-[#1A4331] lg:via-[#2f6a42] lg:to-[#1A4331] rounded-full animate-[progress_3s_linear_infinite] bg-[length:200%_100%]"></div>
                     </div>
                 </div>
             </div>
