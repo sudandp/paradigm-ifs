@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useLoadingScreenStore } from '../../store/loadingScreenStore';
 
 interface LoadingScreenProps {
     message?: string;
@@ -8,6 +9,15 @@ interface LoadingScreenProps {
 
 const LoadingScreen: React.FC<LoadingScreenProps> = ({ message = 'Loading...', fullScreen = true }) => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const setFullScreenLoading = useLoadingScreenStore((s) => s.setFullScreenLoading);
+
+    // Signal MobileLayout to hide header/footer during fullscreen loading
+    useEffect(() => {
+        if (fullScreen) {
+            setFullScreenLoading(true);
+            return () => setFullScreenLoading(false);
+        }
+    }, [fullScreen, setFullScreenLoading]);
 
     useEffect(() => {
         // Professional motion/whoosh sound for rotation
@@ -43,8 +53,8 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message = 'Loading...', f
         ? "fixed inset-0 overflow-hidden bg-[#041b0f] lg:bg-white flex items-center justify-center font-['Inter',_sans-serif]"
         : "relative overflow-hidden bg-[#041b0f] lg:bg-white flex flex-col items-center justify-center min-h-[400px] w-full font-['Inter',_sans-serif] rounded-xl shadow-2xl transition-all duration-300";
 
-    return (
-        <div className={containerStyle}>
+    const content = (
+        <div className={containerStyle} style={{ zIndex: 999999 }}>
             <style>{`
                 @keyframes slowRotate {
                     from { transform: rotate(0deg); }
@@ -77,9 +87,9 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message = 'Loading...', f
                 }
             `}</style>
 
-            <div className="text-center z-10 flex flex-col items-center">
-                <div className={`${fullScreen ? 'mb-12' : 'mb-8'} relative flex flex-col justify-center items-center`}>
-                    <div className="relative mb-8">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center text-center">
+                <div className={`${fullScreen ? 'mb-6' : 'mb-4'} relative flex flex-col justify-center items-center`}>
+                    <div className="relative mb-4">
                         <div className={`logo-container ${fullScreen ? 'w-64 h-64' : 'w-48 h-48'}`}>
                             <div className="rotate-wrapper">
                                 <img 
@@ -112,6 +122,12 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message = 'Loading...', f
             </div>
         </div>
     );
+
+    if (fullScreen) {
+        return createPortal(content, document.body);
+    }
+    
+    return content;
 };
 
 export default LoadingScreen;

@@ -53,7 +53,7 @@ const Header: React.FC<HeaderProps> = ({ setIsMobileMenuOpen }) => {
         <>
             <header
                 className={`sticky top-0 z-40 transition-all duration-200 ${isMobile ? 'bg-[#041b0f] shadow-md' : 'bg-transparent shadow-none'}`}
-                style={{ paddingTop: 'env(safe-area-inset-top)' }}
+                style={{ paddingTop: 'calc(env(safe-area-inset-top) + 20px)' }}
             >
                 <div className="px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center h-16">

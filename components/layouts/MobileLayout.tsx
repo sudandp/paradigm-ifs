@@ -6,6 +6,7 @@ import { NotificationPanel } from '../notifications/NotificationPanel';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useLoadingScreenStore } from '../../store/loadingScreenStore';
 
 const MobileLayout: React.FC = () => {
     const store = useSettingsStore();
@@ -16,6 +17,7 @@ const MobileLayout: React.FC = () => {
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const lastScrollY = useRef(0);
     const ticking = useRef(false);
+    const isFullScreenLoading = useLoadingScreenStore((s) => s.isFullScreenLoading);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -53,7 +55,8 @@ const MobileLayout: React.FC = () => {
         <div className="flex flex-col min-h-screen bg-[#041b0f]">
             {/* Mobile Header - Auto-hide on scroll (FAST) */}
             {/* Hide global header for specific standalone pages like Apply for Leave or Site Attendance Tracker */}
-            {!location.pathname.startsWith('/leaves/apply') && 
+            {!isFullScreenLoading &&
+             !location.pathname.startsWith('/leaves/apply') && 
              !location.pathname.startsWith('/onboarding/aadhaar-scan') && 
              !location.pathname.startsWith('/finance/attendance/add') && 
              !location.pathname.startsWith('/finance/attendance/edit') && 
@@ -80,16 +83,19 @@ const MobileLayout: React.FC = () => {
                 <Outlet />
                 
                 {/* App Version Footer */}
+                {!isFullScreenLoading && (
                 <div className="mt-8 mb-4 py-4 flex flex-col items-center justify-center opacity-30 select-none">
                     <div className="h-[1px] w-8 bg-gradient-to-r from-transparent via-white/40 to-transparent mb-3" />
                     <p className="text-[10px] text-white font-semibold tracking-[0.15em] uppercase">
                         Paradigm v{appVersion}
                     </p>
                 </div>
+                )}
             </main>
 
             {/* Bottom Navigation */}
-            {!location.pathname.includes('/add') && 
+            {!isFullScreenLoading &&
+             !location.pathname.includes('/add') && 
              !location.pathname.includes('/edit') && (
                 <BottomNav />
             )}
