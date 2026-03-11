@@ -97,7 +97,25 @@ export const dispatchNotificationFromRules = async (eventType: string, data: Not
             }));
             
             await supabase.from('notifications').insert(notifications);
+
+            // Trigger real push notification via OneSignal Edge Function for specific types
+            const triggerPushTypes = ['security', 'approval_request', 'task_assigned', 'team_activity', 'emergency_broadcast'];
+            const pushRecipients = notifications
+                .filter(n => triggerPushTypes.includes(n.type))
+                .map(n => n.user_id);
+
+            if (pushRecipients.length > 0) {
+                supabase.functions.invoke('send-push', {
+                    body: {
+                        userIds: pushRecipients,
+                        title: data.title || 'Paradigm Office',
+                        message,
+                        url: data.link
+                    }
+                }).catch(err => console.warn('Failed to trigger push notification:', err));
+            }
         }
+
     } catch (err) {
         console.warn(`Failed to dispatch notifications for ${eventType}:`, err);
     }
@@ -116,11 +134,15 @@ const getNotificationTypeForEvent = (eventType: string): any => {
     if (eventType.includes('request')) {
         return 'approval_request';
     }
+    if (eventType === 'emergency_broadcast') {
+        return 'emergency_broadcast';
+    }
     if (eventType === 'greeting') {
         return 'greeting';
     }
     if (['check_in', 'check_out', 'site_check_in', 'site_check_out', 'break_in', 'break_out', 'break_start', 'break_end', 'not_reported_by_12pm'].includes(eventType)) {
-        return 'info'; // These will be filtered into Team section via metadata
+        return 'team_activity'; // These will be filtered into Team section via metadata
     }
     return 'info';
 };
+

@@ -3320,9 +3320,19 @@ export const api = {
         p_link_to: validData.linkTo || (validData as any).link || null
       });
       if (error) throw error;
-      
-      return { ...data, id: 'broadcast', createdAt: new Date().toISOString(), isRead: false } as Notification;
-    }
+    
+    // Trigger real push broadcast via OneSignal Edge Function
+    supabase.functions.invoke('send-push', {
+      body: {
+        broadcast: true,
+        title: 'Important Alert',
+        message: validData.message,
+        url: validData.linkTo || (validData as any).link || null
+      }
+    }).catch(err => console.warn('Failed to trigger push broadcast:', err));
+
+    return { ...data, id: 'broadcast', createdAt: new Date().toISOString(), isRead: false } as Notification;
+  }
 
     const { data: inserted, error } = await supabase.from('notifications').insert(toSnakeCase(validData)).select().single();
     if (error) throw error;

@@ -1,6 +1,6 @@
 // Trigger Rebuild: 2026-01-08 18:25
 // App.tsx
-import React, { useEffect, lazy, Suspense } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
@@ -23,6 +23,7 @@ import { usePWAStore } from './store/pwaStore';
 import { useNotificationStore } from './store/notificationStore';
 import { syncService } from './services/offline/syncService';
 import OfflineStatusBanner from './components/OfflineStatusBanner';
+import { oneSignalService } from './services/oneSignalService';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 
 
@@ -31,6 +32,8 @@ import { withTimeout } from './utils/async';
 import { lazyWithRetry } from './utils/lazyLoad';
 import { useAppUpdate } from './hooks/useAppUpdate';
 import { UpdatePromptModal } from './components/UpdatePromptModal';
+import UpdateRequiredBanner, { isVersionOutdated } from './components/UpdateRequiredBanner';
+import { APP_VERSION } from './src/config/appVersion';
 
 // Layouts
 import MainLayout from './components/layouts/MainLayout';
@@ -285,6 +288,7 @@ const App: React.FC = () => {
   const { setDeferredPrompt } = usePWAStore();
   const { isUpdateRequired, updateInfo } = useAppUpdate();
   const { isOnline } = useNetworkStatus();
+  const [isAppOutdated, setIsAppOutdated] = useState(false);
 
   // Initialize offline sync service
   useEffect(() => {
@@ -297,6 +301,13 @@ const App: React.FC = () => {
     
     // Notify Capgo that the app has successfully loaded
     CapacitorUpdater.notifyAppReady();
+
+    // Initialize OneSignal
+    const oneSignalAppId = useSettingsStore.getState().apiSettings.oneSignalAppId || import.meta.env.VITE_ONESIGNAL_APP_ID;
+    if (oneSignalAppId && oneSignalAppId !== 'YOUR_ONESIGNAL_APP_ID' && oneSignalAppId !== '') {
+      oneSignalService.init(oneSignalAppId);
+    }
+
   }, []);
 
 
@@ -503,6 +514,9 @@ const App: React.FC = () => {
                   }).catch(() => {});
                   localStorage.setItem(greetKey, '1');
                 }
+
+                // Tag user for OneSignal push notifications
+                oneSignalService.login(appUser.id);
               }
             } catch (err) {
               console.error('Failed to fetch user profile after auth change:', err);
@@ -516,6 +530,7 @@ const App: React.FC = () => {
           resetAttendance();
           useOnboardingStore.getState().reset();
           Preferences.remove({ key: 'supabase.auth.rememberMe' }).catch(() => {});
+          oneSignalService.logout();
         }
       }
     });
@@ -582,6 +597,15 @@ const App: React.FC = () => {
             siteManagementSettings: settings.siteManagementSettings,
             notificationSettings: settings.notificationSettings,
           });
+
+          // --- Version Check: only on native mobile apps, not web ---
+          if (Capacitor.isNativePlatform()) {
+            const serverVersion = settings.apiSettings?.appVersion;
+            if (serverVersion && isVersionOutdated(APP_VERSION, serverVersion)) {
+              console.warn(`[VersionCheck] App v${APP_VERSION} is outdated. Server requires v${serverVersion}.`);
+              setIsAppOutdated(true);
+            }
+          }
         }
       } catch (error) {
         console.error('Failed to load initial application data:', error);
@@ -672,6 +696,7 @@ const App: React.FC = () => {
       <ScrollToTop />
       <ThemeManager />
       <OfflineStatusBanner />
+      {isAppOutdated && <UpdateRequiredBanner />}
       {isUpdateRequired && <UpdatePromptModal updateInfo={updateInfo} />}
       <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div></div>}>
       <Routes>

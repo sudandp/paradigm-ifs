@@ -186,8 +186,10 @@ const initialApiSettings: ApiSettings = {
     dayOfMonth: 1,
     monthOfYear: 1,
   },
-  appVersion: '1.0.0'
+  appVersion: '1.0.0',
+  oneSignalAppId: ''
 };
+
 
 const initialNotifications: NotificationSettings = {
   email: {

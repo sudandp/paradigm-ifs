@@ -200,20 +200,35 @@ export const ApiSettings: React.FC = () => {
                             <Checkbox id="pincode-verification" label="Enable Pincode API Verification" description="Auto-fill City/State from pincode during onboarding." checked={store.address.enablePincodeVerification} onChange={e => store.updateAddressSettings({ enablePincodeVerification: e.target.checked })} />
                             
                             <div className={`p-4 border rounded-lg ${isMobile ? 'border-[#1f3d2b] bg-[#041b0f]' : 'border-border bg-gray-50'}`}>
-                                <label htmlFor="app-version" className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Application Version</label>
+                                <label htmlFor="app-version" className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>Minimum Required App Version</label>
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                                     <Input 
                                         id="app-version"
-                                        placeholder="e.g., 1.0.0" 
+                                        placeholder="e.g., 7.0.0" 
                                         className="max-w-[150px]"
                                         value={store.apiSettings.appVersion || ''} 
                                         onChange={e => store.updateApiSettings({ appVersion: e.target.value })}
                                     />
-                                    <p className="text-xs text-muted italic">This version is displayed in the sidebar/footer. Ensure it matches the build version for consistency.</p>
+                                    <p className="text-xs text-muted italic">Users with an app version older than this will be forced to update from aap.paradigmfms.com. Set this to the latest released APK version.</p>
                                 </div>
                             </div>
 
                             <div className={`p-4 border rounded-lg ${isMobile ? 'border-[#1f3d2b] bg-[#041b0f]' : 'border-border bg-gray-50'}`}>
+                                <label htmlFor="onesignal-app-id" className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isMobile ? 'text-white/70' : 'text-muted'}`}>OneSignal App ID</label>
+                                <div className="flex flex-col gap-4">
+                                    <Input 
+                                        id="onesignal-app-id"
+                                        placeholder="e.g., 550e8400-e29b-41d4-a716-446655440000" 
+                                        className="w-full"
+                                        value={store.apiSettings.oneSignalAppId || ''} 
+                                        onChange={e => store.updateApiSettings({ oneSignalAppId: e.target.value })}
+                                    />
+                                    <p className="text-xs text-muted">Used for native push notifications. Get this from your OneSignal Dashboard Settings.</p>
+                                </div>
+                            </div>
+
+                            <div className={`p-4 border rounded-lg ${isMobile ? 'border-[#1f3d2b] bg-[#041b0f]' : 'border-border bg-gray-50'}`}>
+
                                 <Checkbox 
                                     id="auto-backup" 
                                     label="Enable Automated Backups" 
