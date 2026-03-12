@@ -39,24 +39,7 @@ serve(async (req) => {
       }
       payload.include_external_user_ids = userIds;
 
-      // Insert notifications into the database
-      console.log(`Inserting notifications for ${userIds.length} users`);
-      const notifications = userIds.map((userId: string) => ({
-        user_id: userId,
-        message: message,
-        type: 'emergency_broadcast',
-        severity: 'High',
-        link_to: url || null,
-        metadata: {}
-      }));
-
-      const { data: insertResult, error: insertError } = await supabase.from('notifications').insert(notifications).select();
-      if (insertError) {
-        console.error('Failed to insert notifications:', insertError);
-        // We continue even if DB insert fails so push notification still goes out
-      } else {
-        console.log(`Successfully inserted ${insertResult?.length || 0} notifications`);
-      }
+      payload.include_external_user_ids = userIds;
     }
 
     console.log('Sending push via OneSignal...');

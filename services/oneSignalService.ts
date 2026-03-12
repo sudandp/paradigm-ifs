@@ -18,8 +18,13 @@ export const oneSignalService = {
 
         if (Capacitor.isNativePlatform()) {
             try {
-                // Enable debug logs for troubleshooting
-                (window as any).plugins?.OneSignal?.setLogLevel(6, 0);
+                // OneSignal 5.x uses Debug.setLogLevel
+                if ((window as any).OneSignal?.Debug) {
+                    (window as any).OneSignal.Debug.setLogLevel(6);
+                } else {
+                    // Fallback for older/cordova versions if needed
+                    (window as any).plugins?.OneSignal?.setLogLevel(6, 0);
+                }
 
                 OneSignalNative.initialize(appId);
 
@@ -46,10 +51,9 @@ export const oneSignalService = {
         } else {
             // Web Integration
             try {
-                // Prevent duplicate initialization on web
-                if ((window as any).OneSignal?.initialized) {
-                    console.log('[OneSignal Web] Already initialized');
-                    return;
+                // Avoid re-initialization if already active
+                if (OneSignalWeb.Notifications.permission) {
+                    console.log('[OneSignal Web] Already initialized or permission exists');
                 }
 
                 await OneSignalWeb.init({

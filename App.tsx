@@ -301,17 +301,19 @@ const App: React.FC = () => {
     
     // Notify Capgo that the app has successfully loaded
     CapacitorUpdater.notifyAppReady();
+  }, []);
 
-    // Initialize OneSignal
+  // Initialize/Update OneSignal when App ID changes
+  useEffect(() => {
     const oneSignalAppId = useSettingsStore.getState().apiSettings.oneSignalAppId || import.meta.env.VITE_ONESIGNAL_APP_ID;
+    
     if (oneSignalAppId && oneSignalAppId !== 'YOUR_ONESIGNAL_APP_ID' && oneSignalAppId !== '') {
       console.log('[App] Initializing OneSignal with ID:', oneSignalAppId);
       oneSignalService.init(oneSignalAppId);
     } else {
       console.warn('[App] OneSignal App ID not found or invalid');
     }
-
-  }, []);
+  }, [useSettingsStore.getState().apiSettings.oneSignalAppId]);
 
 
     useEffect(() => {
