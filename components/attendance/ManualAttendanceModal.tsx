@@ -358,7 +358,7 @@ const ManualAttendanceModal: React.FC<ManualAttendanceModalProps> = ({
                                 required
                             >
                                 <option value="">Select Employee</option>
-                                {users.map(user => (
+                                {[...users].sort((a, b) => a.name.localeCompare(b.name)).map(user => (
                                     <option key={user.id} value={user.id}>{user.name}</option>
                                 ))}
                             </select>

@@ -23,6 +23,7 @@ import type {
     StaffAttendanceRules
 } from '../../types';
 import ManualAttendanceModal from '../../components/attendance/ManualAttendanceModal';
+import AssignLeaveModal from '../../components/attendance/AssignLeaveModal';
 import AttendanceAuditReport from '../../components/attendance/AttendanceAuditReport';
 import MonthlyHoursReport from '../../components/attendance/MonthlyHoursReport';
 import {
@@ -832,6 +833,7 @@ const AttendanceDashboard: React.FC = () => {
     
     // Manual Entry State
     const [isManualEntryModalOpen, setIsManualEntryModalOpen] = useState(false);
+    const [isAssignLeaveModalOpen, setIsAssignLeaveModalOpen] = useState(false);
     const [previewMode, setPreviewMode] = useState<'summary' | 'full'>('summary');
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
     const [selectedRecordType, setSelectedRecordType] = useState<string>('all');
@@ -989,7 +991,7 @@ const AttendanceDashboard: React.FC = () => {
                     // Check Holidays/Weekends
                     const dayName = format(day, 'EEEE');
                     const isWeekend = dayName === 'Sunday';
-                    const officeRoles = ['admin', 'super_admin', 'hr', 'finance'];
+                    const officeRoles = ['admin', 'super_admin', 'hr', 'hr_ops', 'finance'];
                     const isOfficeRole = officeRoles.includes(user.role?.toLowerCase() || '');
 
                     // 1. Recurring
@@ -2263,14 +2265,23 @@ const AttendanceDashboard: React.FC = () => {
         <div className="min-h-screen p-4 space-y-6 md:bg-transparent bg-[#041b0f]">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <h2 className="text-2xl font-bold text-primary-text md:text-gray-900">Attendance Dashboard</h2>
-                {['admin', 'hr', 'super_admin'].includes(currentUserRole || '') && (
-                    <Button 
-                        onClick={() => setIsManualEntryModalOpen(true)}
-                        className="w-full md:w-auto bg-[#22c55e] hover:bg-[#16a34a] text-white shadow-lg flex items-center justify-center gap-2 py-3 rounded-xl font-semibold"
-                    >
-                        <UserCheck className="w-5 h-5" />
-                        Add Manual Entry
-                    </Button>
+                {['admin', 'hr', 'hr_ops', 'super_admin'].includes(currentUserRole || '') && (
+                    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                        <Button 
+                            onClick={() => setIsManualEntryModalOpen(true)}
+                            className="w-full md:w-auto bg-[#22c55e] hover:bg-[#16a34a] text-white shadow-lg flex items-center justify-center gap-2 py-3 rounded-xl font-semibold"
+                        >
+                            <UserCheck className="w-5 h-5" />
+                            Add Manual Entry
+                        </Button>
+                        <Button 
+                            onClick={() => setIsAssignLeaveModalOpen(true)}
+                            className="w-full md:w-auto bg-[#3b82f6] hover:bg-[#2563eb] text-white shadow-lg flex items-center justify-center gap-2 py-3 rounded-xl font-semibold"
+                        >
+                            <Calendar className="w-5 h-5" />
+                            Assign Leave
+                        </Button>
+                    </div>
                 )}
             </div>
 
@@ -2290,6 +2301,20 @@ const AttendanceDashboard: React.FC = () => {
                 users={users}
                 currentUserRole={currentUserRole || ''}
                 currentUserId={user?.id || ''}
+            />
+
+            <AssignLeaveModal 
+                isOpen={isAssignLeaveModalOpen}
+                onClose={() => setIsAssignLeaveModalOpen(false)}
+                onSuccess={() => {
+                    setToast({ message: 'Leave assigned successfully', type: 'success' });
+                    // No need to refresh attendance dashboard data here as it won't show the leave until it's approved
+                    // but we can refresh to be safe if there are approved leaves in view
+                    if (dateRange.startDate && dateRange.endDate) {
+                        fetchDashboardData(dateRange.startDate, dateRange.endDate);
+                    }
+                }}
+                users={users}
             />
 
             {/* Filters Section */}
@@ -2412,6 +2437,7 @@ const AttendanceDashboard: React.FC = () => {
                             <option value="all">All Employees</option>
                             {users
                                 .filter(u => (selectedRole === 'all' || u.role === selectedRole) && (selectedSite === 'all' || u.organizationId === selectedSite))
+                                .sort((a, b) => a.name.localeCompare(b.name))
                                 .map(u => (
                                     <option key={u.id} value={u.id}>{u.name}</option>
                                 ))
