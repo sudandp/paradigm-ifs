@@ -209,7 +209,7 @@ export const ApiSettings: React.FC = () => {
                                         value={store.apiSettings.appVersion || ''} 
                                         onChange={e => store.updateApiSettings({ appVersion: e.target.value })}
                                     />
-                                    <p className="text-xs text-muted italic">Users with an app version older than this will be forced to update from aap.paradigmfms.com. Set this to the latest released APK version.</p>
+                                    <p className="text-xs text-muted italic">Users with an app version older than this will be forced to update from app.paradigmfms.com. Set this to the latest released APK version.</p>
                                 </div>
                             </div>
 

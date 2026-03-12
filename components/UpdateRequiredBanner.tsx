@@ -18,7 +18,7 @@ export function isVersionOutdated(current: string, required: string): boolean {
   return false;
 }
 
-const DOWNLOAD_URL = 'https://aap.paradigmfms.com';
+const DOWNLOAD_URL = 'https://app.paradigmfms.com';
 
 /**
  * Full-screen blocking banner shown when the app version is outdated.

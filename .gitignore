@@ -62,3 +62,6 @@ build_error.txt
 *_errors.txt
 tsc_output.txt
 *.pyc
+
+# Backups
+android_backup_native/
