@@ -85,12 +85,34 @@ const AssignLeaveModal: React.FC<AssignLeaveModalProps> = ({
     const availableBalance = useMemo(() => {
         if (!balance || !leaveType) return 0;
         
-        // Match the logic in ApplyLeave.tsx/api.ts
-        const typeKeyStr = `${leaveType.toLowerCase()}Total`.replace('earnedtotal', 'earnedTotal').replace('sicktotal', 'sickTotal').replace('floatingtotal', 'floatingTotal').replace('compofftotal', 'compOffTotal');
-        const usedKeyStr = typeKeyStr.replace('Total', 'Used');
+        // Map leaveType to LeaveBalance keys
+        const typeKeyMap: Record<string, keyof LeaveBalance> = {
+            'Earned': 'earnedTotal',
+            'Sick': 'sickTotal',
+            'Floating': 'floatingTotal',
+            'Comp Off': 'compOffTotal',
+            'Maternity': 'maternityTotal',
+            'Child Care': 'childCareTotal',
+            'Pink Leave': 'pinkTotal'
+        };
+
+        const usedKeyMap: Record<string, keyof LeaveBalance> = {
+            'Earned': 'earnedUsed',
+            'Sick': 'sickUsed',
+            'Floating': 'floatingUsed',
+            'Comp Off': 'compOffUsed',
+            'Maternity': 'maternityUsed',
+            'Child Care': 'childCareUsed',
+            'Pink Leave': 'pinkUsed'
+        };
+
+        const totalKey = typeKeyMap[leaveType];
+        const usedKey = usedKeyMap[leaveType];
+
+        if (!totalKey || !usedKey) return 0;
         
-        const total = balance[typeKeyStr as keyof LeaveBalance] || 0;
-        const used = balance[usedKeyStr as keyof LeaveBalance] || 0;
+        const total = (balance[totalKey] as number) || 0;
+        const used = (balance[usedKey] as number) || 0;
         
         return total - used;
     }, [balance, leaveType]);
@@ -111,6 +133,7 @@ const AssignLeaveModal: React.FC<AssignLeaveModalProps> = ({
         }
 
         // Balance Check
+        // Allow Loss of Pay or if balance is sufficient
         if (leaveType !== 'Loss of Pay' && availableBalance < duration) {
             setToast({ 
                 message: `Insufficient ${leaveType} balance. Available: ${availableBalance} days, requested: ${duration} days.`, 
@@ -202,11 +225,12 @@ const AssignLeaveModal: React.FC<AssignLeaveModalProps> = ({
                             >
                                 <option value="Earned">Earned</option>
                                 <option value="Sick">Sick</option>
-                                <option value={isFemale ? "Pink Leave" : "Floating"}>{isFemale ? "Pink Leave" : "3rd Saturday Leave"}</option>
+                                <option value="Floating">3rd Saturday Leave</option>
+                                <option value="Pink Leave">Pink Leave</option>
                                 <option value="Comp Off">Comp Off</option>
                                 <option value="Loss of Pay">Loss of Pay</option>
-                                {isFemale && <option value="Maternity">Maternity</option>}
-                                {isFemale && <option value="Child Care">Child Care</option>}
+                                <option value="Maternity">Maternity</option>
+                                <option value="Child Care">Child Care</option>
                             </select>
                         </div>
 
