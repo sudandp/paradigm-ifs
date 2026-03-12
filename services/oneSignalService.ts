@@ -46,12 +46,15 @@ export const oneSignalService = {
         } else {
             // Web Integration
             try {
+                // Prevent duplicate initialization on web
+                if ((window as any).OneSignal?.initialized) {
+                    console.log('[OneSignal Web] Already initialized');
+                    return;
+                }
+
                 await OneSignalWeb.init({
                     appId: appId,
                     allowLocalhostAsSecureOrigin: true,
-                    notifyButton: {
-                        enable: true,
-                    },
                 });
                 console.log('[OneSignal Web] Initialized with App ID:', appId);
             } catch (error) {
