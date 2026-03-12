@@ -1,5 +1,6 @@
-import OneSignal from 'onesignal-cordova-plugin';
+import OneSignalNative from 'onesignal-cordova-plugin';
 import { Capacitor } from '@capacitor/core';
+import OneSignalWeb from 'react-onesignal';
 
 /**
  * Service to manage OneSignal push notifications.
@@ -9,60 +10,66 @@ export const oneSignalService = {
     /**
      * Initializes OneSignal and sets up event listeners.
      */
-    init: (appId: string) => {
-        if (!Capacitor.isNativePlatform()) {
-            console.log('[OneSignal] Skipping initialization: Not on a native platform');
-            return;
-        }
-
+    init: async (appId: string) => {
         if (!appId) {
             console.error('[OneSignal] Error: No App ID provided');
             return;
         }
 
-        try {
-            // Enable debug logs for troubleshooting
-            (window as any).plugins?.OneSignal?.setLogLevel(6, 0);
+        if (Capacitor.isNativePlatform()) {
+            try {
+                // Enable debug logs for troubleshooting
+                (window as any).plugins?.OneSignal?.setLogLevel(6, 0);
 
-            OneSignal.initialize(appId);
+                OneSignalNative.initialize(appId);
 
-            // Handler for when a notification is received while the app is in the foreground
-            OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event) => {
-                console.log('[OneSignal] Notification received in foreground:', event);
-                // Optionally display a custom alert or update UI
-            });
+                OneSignalNative.Notifications.addEventListener('foregroundWillDisplay', (event) => {
+                    console.log('[OneSignal Native] Notification received in foreground:', event);
+                });
 
-            // Handler for when a notification is clicked/opened
-            OneSignal.Notifications.addEventListener('click', (event) => {
-                console.log('[OneSignal] Notification clicked:', event);
-                const data = event.notification.additionalData as any;
-                if (data && data.url) {
-                    // Navigate to the deep link if provided
-                    window.location.href = data.url;
-                }
-            });
+                OneSignalNative.Notifications.addEventListener('click', (event) => {
+                    console.log('[OneSignal Native] Notification clicked:', event);
+                    const data = event.notification.additionalData as any;
+                    if (data && data.url) {
+                        window.location.href = data.url;
+                    }
+                });
 
+                OneSignalNative.Notifications.requestPermission(true).then((granted) => {
+                    console.log('[OneSignal Native] Permission granted:', granted);
+                });
 
-            // Request push notification permissions
-            OneSignal.Notifications.requestPermission(true).then((granted) => {
-                console.log('[OneSignal] Permission granted:', granted);
-            });
-
-            console.log('[OneSignal] Initialized with App ID:', appId);
-        } catch (error) {
-            console.error('[OneSignal] Initialization failed:', error);
+                console.log('[OneSignal Native] Initialized with App ID:', appId);
+            } catch (error) {
+                console.error('[OneSignal Native] Initialization failed:', error);
+            }
+        } else {
+            // Web Integration
+            try {
+                await OneSignalWeb.init({
+                    appId: appId,
+                    allowLocalhostAsSecureOrigin: true,
+                    notifyButton: {
+                        enable: true,
+                    },
+                });
+                console.log('[OneSignal Web] Initialized with App ID:', appId);
+            } catch (error) {
+                console.error('[OneSignal Web] Initialization failed:', error);
+            }
         }
     },
 
     /**
      * Associates the device with the current Supabase user ID.
-     * This allows the backend to send targeted push notifications using the user's ID.
      */
     login: (userId: string) => {
-        if (!Capacitor.isNativePlatform()) return;
-
         try {
-            OneSignal.login(userId);
+            if (Capacitor.isNativePlatform()) {
+                OneSignalNative.login(userId);
+            } else {
+                OneSignalWeb.login(userId);
+            }
             console.log('[OneSignal] User logged in/tagged:', userId);
         } catch (error) {
             console.error('[OneSignal] Failed to set external user ID:', error);
@@ -73,10 +80,12 @@ export const oneSignalService = {
      * Disassociates the device from the user on logout.
      */
     logout: () => {
-        if (!Capacitor.isNativePlatform()) return;
-
         try {
-            OneSignal.logout();
+            if (Capacitor.isNativePlatform()) {
+                OneSignalNative.logout();
+            } else {
+                OneSignalWeb.logout();
+            }
             console.log('[OneSignal] User logged out/untagged');
         } catch (error) {
             console.error('[OneSignal] Failed to remove external user ID:', error);
