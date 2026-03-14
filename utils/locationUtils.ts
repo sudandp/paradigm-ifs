@@ -138,8 +138,15 @@ export async function getPrecisePosition(accuracyThreshold: number = 50, timeout
           console.log('[Location] Fallback 3 (WebView navigator.geolocation) succeeded, accuracy:', webPos.coords.accuracy);
           safeResolve(webPos);
           return;
-        } catch (err) {
+        } catch (err: any) {
           console.warn('[Location] Fallback 3 (WebView navigator.geolocation) failed:', err);
+          if (err.code === 1 || err.message?.toLowerCase().includes('permission')) {
+            const pError = new Error('Location permission denied in browser. Please check your browser settings.');
+            (pError as any).isPermissionError = true;
+            clearTimeout(timer);
+            reject(pError);
+            return;
+          }
         }
 
         // Fallback 3b: WebView high-accuracy as absolute last resort
@@ -154,8 +161,15 @@ export async function getPrecisePosition(accuracyThreshold: number = 50, timeout
           console.log('[Location] Fallback 3b (WebView high-accuracy) succeeded, accuracy:', webPos.coords.accuracy);
           safeResolve(webPos);
           return;
-        } catch (err) {
+        } catch (err: any) {
           console.warn('[Location] Fallback 3b (WebView high-accuracy) failed:', err);
+          if (err.code === 1 || err.message?.toLowerCase().includes('permission')) {
+            const pError = new Error('Location permission denied in browser. Please check your browser settings.');
+            (pError as any).isPermissionError = true;
+            clearTimeout(timer);
+            reject(pError);
+            return;
+          }
         }
       }
 
