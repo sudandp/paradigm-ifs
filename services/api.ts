@@ -2723,21 +2723,14 @@ export const api = {
     }
 
     const monthEnd = endOfMonth(referenceDate);
-    const compOffTotal = (compOffData || []).filter(log => {
-      const isEarnedOrUsed = log.status === 'earned' || log.status === 'used';
-      const earnedDate = log.date_earned ? new Date(log.date_earned) : new Date(log.created_at);
-      return isEarnedOrUsed && earnedDate <= monthEnd;
-    }).length + dynamicCompOffTotal;
+    
+    // User requested simplified Comp Off calculation:
+    // Total Comp Off = (Attendance on Holidays/Sundays)
+    const compOffTotal = dynamicCompOffTotal;
 
-    // OT to Comp Off Conversion Rule
-    let otCompOffContribution = 0;
+    const finalCompOffTotal = compOffTotal;
+
     const otHoursThisMonth = (otData || []).reduce((sum, log) => sum + (log.hours_worked || 0), 0);
-    const otThreshold = rules.otConversionThreshold || 8;
-    if (rules.enableOtToCompOffConversion && otHoursThisMonth >= otThreshold) {
-      otCompOffContribution = Math.floor(otHoursThisMonth / otThreshold);
-    }
-
-    const finalCompOffTotal = compOffTotal + otCompOffContribution;
 
     const expiryStates = {
       earned: isExpired(rules.earnedLeavesExpiryDate),
@@ -2754,7 +2747,7 @@ export const api = {
       sickUsed: 0,
       floatingTotal: 0, // Calculated below via overflow rules
       floatingUsed: 0,
-      compOffTotal: finalCompOffTotal, // Dynamic + base + OT conversion
+      compOffTotal: finalCompOffTotal, // Only Attendance on Holidays/Sundays
       compOffUsed: 0,
       maternityTotal: 0,
       maternityUsed: 0,

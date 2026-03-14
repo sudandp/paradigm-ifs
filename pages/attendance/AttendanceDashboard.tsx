@@ -67,8 +67,10 @@ import { useLogoStore } from '../../store/logoStore';
 import {
     exportAttendanceToExcel,
     exportGenericReportToExcel,
+    exportLeaveBalancesToExcel,
     MonthlyReportRow,
-    GenericReportColumn
+    GenericReportColumn,
+    LeaveBalanceRow
 } from '../../utils/excelExport';
 import { calculateWorkingHours } from '../../utils/attendanceCalculations';
 import { FIXED_HOLIDAYS } from '../../utils/constants';
@@ -839,6 +841,7 @@ const AttendanceDashboard: React.FC = () => {
     const [selectedRecordType, setSelectedRecordType] = useState<string>('all');
     const [reportType, setReportType] = useState<'basic' | 'log' | 'monthly' | 'audit' | 'workHours'>('basic');
     const [isDownloading, setIsDownloading] = useState(false);
+    const [isExportingLeaves, setIsExportingLeaves] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
 
@@ -2048,6 +2051,100 @@ const AttendanceDashboard: React.FC = () => {
         }
     };
 
+    const handleExportLeaveBalances = async () => {
+        setIsExportingLeaves(true);
+        try {
+            // Determine users to export
+            let targetUsers = users;
+            if (selectedUser !== 'all') {
+                targetUsers = users.filter(u => u.id === selectedUser);
+            }
+            if (selectedRole !== 'all') {
+                targetUsers = targetUsers.filter(u => u.role === selectedRole);
+            }
+            if (selectedSite !== 'all') {
+                targetUsers = targetUsers.filter(u => u.organizationId === selectedSite);
+            }
+
+            // Exclude management if needed (usually reports exclude them)
+            targetUsers = targetUsers.filter(u => u.role !== 'management' && u.role !== 'super_admin');
+
+            if (targetUsers.length === 0) {
+                setToast({ message: 'No users found with current filters.', type: 'error' });
+                setIsExportingLeaves(false);
+                return;
+            }
+
+            // Fetch balances for all target users
+            const balancePromises = targetUsers.map(async (u) => {
+                try {
+                    const balance = await api.getLeaveBalancesForUser(u.id);
+                    return {
+                        userName: u.name,
+                        earnedTotal: balance.earnedTotal || 0,
+                        earnedUsed: balance.earnedUsed || 0,
+                        sickTotal: balance.sickTotal || 0,
+                        sickUsed: balance.sickUsed || 0,
+                        floatingTotal: balance.floatingTotal || 0,
+                        floatingUsed: balance.floatingUsed || 0,
+                        compOffTotal: balance.compOffTotal || 0,
+                        compOffUsed: balance.compOffUsed || 0,
+                        maternityTotal: balance.maternityTotal || 0,
+                        maternityUsed: balance.maternityUsed || 0,
+                        childCareTotal: balance.childCareTotal || 0,
+                        childCareUsed: balance.childCareUsed || 0,
+                        totalBalance: (balance.earnedTotal - balance.earnedUsed) + 
+                                       (balance.sickTotal - balance.sickUsed) + 
+                                       (balance.floatingTotal - balance.floatingUsed) + 
+                                       (balance.compOffTotal - balance.compOffUsed)
+                    } as LeaveBalanceRow;
+                } catch (e) {
+                    console.error(`Failed to fetch balance for ${u.name}`, e);
+                    return null;
+                }
+            });
+
+            const balances = (await Promise.all(balancePromises)).filter(b => b !== null) as LeaveBalanceRow[];
+
+            const logo = useLogoStore.getState().currentLogo;
+            let logoBase64 = '';
+
+            if (logo && logo.startsWith('data:image')) {
+                logoBase64 = logo;
+            } else {
+                 const logoUrl = (logo && (logo.startsWith('http') || logo.startsWith('/'))) ? logo : pdfLogoLocalPath;
+                 if (logoUrl) {
+                    try {
+                        const response = await fetch(logoUrl);
+                        if (response.ok) {
+                            const blob = await response.blob();
+                            logoBase64 = await new Promise((resolve) => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => resolve(reader.result as string);
+                                reader.readAsDataURL(blob);
+                            });
+                        }
+                    } catch (e) {
+                         console.error("Logo fetch failed", e);
+                    }
+                 }
+            }
+
+            await exportLeaveBalancesToExcel(
+                balances,
+                logoBase64,
+                user?.name || 'Unknown User'
+            );
+
+            setToast({ message: 'Leave balances exported successfully.', type: 'success' });
+        } catch (error) {
+            console.error("Leave Export failed:", error);
+            setToast({ message: 'Failed to export leave balances.', type: 'error' });
+        } finally {
+            setIsExportingLeaves(false);
+        }
+    };
+
     if (isLoading && !dashboardData && !isEmployeeView) {
         return <LoadingScreen message="Fetching attendance data..." />;
     }
@@ -2280,6 +2377,18 @@ const AttendanceDashboard: React.FC = () => {
                         >
                             <Calendar className="w-5 h-5" />
                             Assign Leave
+                        </Button>
+                        <Button 
+                            onClick={handleExportLeaveBalances}
+                            disabled={isExportingLeaves}
+                            className="w-full md:w-auto bg-[#8b5cf6] hover:bg-[#7c3aed] text-white shadow-lg flex items-center justify-center gap-2 py-3 rounded-xl font-semibold disabled:opacity-50"
+                        >
+                            {isExportingLeaves ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                                <FileDown className="w-5 h-5" />
+                            )}
+                            Export Leave Balances
                         </Button>
                     </div>
                 )}
