@@ -2544,6 +2544,7 @@ export const api = {
     let holidays: any[] = [];
     let recurringHolidays: any[] = [];
     let yearEvents: any[] = [];
+    let userHolidaysData: any[] = [];
 
     if (status.connected) {
       try {
@@ -2584,18 +2585,16 @@ export const api = {
         holidays = holidaysRes.data || [];
         recurringHolidays = recurringRes || [];
         yearEvents = eventsRes.data || [];
-        const userHolidays = userHolidaysRes?.data || [];
+        userHolidaysData = userHolidaysRes?.data || [];
         
         // Cache these for offline balance simulation
         await offlineDb.setCache(`leave_data_bundle_${userId}_${currentYear}`, {
-          approvedLeaves, compOffData, otData, holidays, recurringHolidays, yearEvents, userHolidays
+          approvedLeaves, compOffData, otData, holidays, recurringHolidays, yearEvents, userHolidays: userHolidaysData
         });
       } catch (err) {
         console.warn('Failed to fetch detailed leave data from cloud, using cache if available');
       }
     }
-
-    let userHolidaysLocal: any[] = [];
     if (!approvedLeaves.length && !yearEvents.length) {
       const cached = await offlineDb.getCache(`leave_data_bundle_${userId}_${currentYear}`);
       if (cached) {
@@ -2605,11 +2604,8 @@ export const api = {
         holidays = cached.holidays || [];
         recurringHolidays = cached.recurringHolidays || [];
         yearEvents = cached.yearEvents || [];
-        userHolidaysLocal = cached.userHolidays || [];
+        userHolidaysData = cached.userHolidays || [];
       }
-    } else {
-        // We have fresh data, update userHolidays from the fetch above
-        // We'll extract it from the local variable later or use the results from Promise.all
     }
 
     // Expiry Check Logic Helper
@@ -2651,7 +2647,7 @@ export const api = {
     
     // User requested refinement: Only count Sundays, Fixed (Gov) holidays, and SELECTED optional holidays.
     // If we have fresh data, use the results from userHolidaysRes. If cached, use userHolidaysLocal.
-    const finalUserHolidays = (typeof userHolidaysRes !== 'undefined' && userHolidaysRes?.data) ? userHolidaysRes.data : userHolidaysLocal;
+    const finalUserHolidays = userHolidaysData;
     (finalUserHolidays || []).forEach((uh: any) => {
         if (uh.holiday_date) {
             holidayDates.add(uh.holiday_date);
