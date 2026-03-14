@@ -25,6 +25,10 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need your location to verify attendance at your assigned work site.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need your location to verify attendance at your assigned work site.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>We need access to your camera to upload photos.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

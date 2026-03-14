@@ -61,7 +61,9 @@ export async function getPrecisePosition(accuracyThreshold: number = 50, timeout
       if (permission.location !== 'granted') {
         const requestResult = await Geolocation.requestPermissions();
         if (requestResult.location !== 'granted') {
-          throw new Error('Location permission denied');
+          const error = new Error('Location permission denied. Please enable location access in settings.');
+          (error as any).isPermissionError = true;
+          throw error;
         }
       }
     } catch (err) {
@@ -174,6 +176,12 @@ export async function getPrecisePosition(accuracyThreshold: number = 50, timeout
         (position, err) => {
           if (err) {
             console.warn('[Location] watchPosition error:', err);
+            if (err.message?.toLowerCase().includes('permission')) {
+              const pError = new Error('Location permission denied. Please check your app settings.');
+              (pError as any).isPermissionError = true;
+              clearTimeout(timer);
+              reject(pError);
+            }
             return;
           }
 

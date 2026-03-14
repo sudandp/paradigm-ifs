@@ -114,6 +114,7 @@
     "replace": "^1.2.2",
     "readdir-glob": "^2.0.1",
     "filelist": "^1.0.4",
-    "serialize-javascript": "^7.0.3"
+    "serialize-javascript": "^7.0.3",
+    "yauzl": "^3.2.1"
   }
 }
