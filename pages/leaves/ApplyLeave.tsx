@@ -133,22 +133,37 @@ const ApplyLeave: React.FC = () => {
                 const endDate = new Date(formData.endDate.replace(/-/g, '/'));
                 const duration = formData.dayOption === 'half' ? 0.5 : differenceInCalendarDays(endDate, startDate) + 1;
                 
-                const typeKeyStr = `${formData.leaveType.toLowerCase()}Total`.replace('earnedtotal', 'earnedTotal').replace('sicktotal', 'sickTotal').replace('floatingtotal', 'floatingTotal').replace('compofftotal', 'compOffTotal');
+                const typeKeyStr = `${formData.leaveType.toLowerCase()}Total`
+                    .replace('earnedtotal', 'earnedTotal')
+                    .replace('sicktotal', 'sickTotal')
+                    .replace('floatingtotal', 'floatingTotal')
+                    .replace('compofftotal', 'compOffTotal')
+                    .replace('maternitytotal', 'maternityTotal')
+                    .replace('childcaretotal', 'childCareTotal')
+                    .replace('child caretotal', 'childCareTotal')
+                    .replace('pink leavetotal', 'pinkTotal')
+                    .replace('pinktotal', 'pinkTotal');
+                
                 const usedKeyStr = typeKeyStr.replace('Total', 'Used');
+                const pendingKeyStr = typeKeyStr.replace('Total', 'Pending');
                 
                 // Expiry Check
-                const leaveTypeLower = formData.leaveType.toLowerCase().replace(' ', '') as 'earned' | 'sick' | 'floating' | 'compOff';
-                const isExpired = balance.expiryStates && balance.expiryStates[leaveTypeLower as keyof NonNullable<typeof balance.expiryStates>];
+                const leaveTypeLower = formData.leaveType.toLowerCase().replace(' ', '') as 'earned' | 'sick' | 'floating' | 'compoff' | 'maternity' | 'childcare' | 'pinkleave';
+                const leaveTypeMapped = leaveTypeLower === 'pinkleave' ? 'pink' : leaveTypeLower;
+                const isExpired = balance.expiryStates && balance.expiryStates[leaveTypeMapped as keyof NonNullable<typeof balance.expiryStates>];
                 
                 if (isExpired) {
                     setToast({ message: `The ${formData.leaveType} allocation has expired and is no longer available for use.`, type: 'error' });
                     return;
                 }
 
-                const available = (balance[typeKeyStr as keyof LeaveBalance] as number) - (balance[usedKeyStr as keyof LeaveBalance] as number);
+                const total = (balance[typeKeyStr as keyof LeaveBalance] as number) || 0;
+                const used = (balance[usedKeyStr as keyof LeaveBalance] as number) || 0;
+                const pending = (balance[pendingKeyStr as keyof LeaveBalance] as number) || 0;
+                const available = total - used - pending;
                 
                 if (available < duration) {
-                    setToast({ message: `Insufficient ${formData.leaveType} balance. You have ${available} days available, but requested ${duration} days.`, type: 'error' });
+                    setToast({ message: `Insufficient ${formData.leaveType} balance. You have ${available.toFixed(1)} days available (including pending requests), but requested ${duration} days.`, type: 'error' });
                     return;
                 }
             }

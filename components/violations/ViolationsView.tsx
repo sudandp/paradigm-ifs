@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { AlertTriangle, CheckCircle, Download, FileText } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Download, FileText, ShieldAlert } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import type { FieldAttendanceViolation, User } from '../../types';
@@ -13,6 +14,7 @@ interface ViolationsViewProps {
 }
 
 const ViolationsView: React.FC<ViolationsViewProps> = ({ userId, userName, isManager = false }) => {
+  const { user: manager } = useAuthStore();
   const [violations, setViolations] = useState<FieldAttendanceViolation[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedViolation, setSelectedViolation] = useState<FieldAttendanceViolation | null>(null);
@@ -135,6 +137,7 @@ const ViolationsView: React.FC<ViolationsViewProps> = ({ userId, userName, isMan
                 <th className="px-4 py-3 text-left text-sm font-medium text-primary-text">Travel %</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-primary-text">Required Site %</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-primary-text">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-primary-text">User Reason</th>
                 {isManager && <th className="px-4 py-3 text-left text-sm font-medium text-primary-text">Action</th>}
               </tr>
             </thead>
@@ -167,6 +170,9 @@ const ViolationsView: React.FC<ViolationsViewProps> = ({ userId, userName, isMan
                     }`}>
                       {violation.status.charAt(0).toUpperCase() + violation.status.slice(1)}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-muted italic max-w-xs truncate">
+                    {violation.userReason || '-'}
                   </td>
                   {isManager && (
                     <td className="px-4 py-3 text-sm">
@@ -258,6 +264,43 @@ const ViolationsView: React.FC<ViolationsViewProps> = ({ userId, userName, isMan
                 Cancel
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Monthly Reset Section for Managers */}
+      {isManager && violations.length >= 3 && (
+        <div className="p-6 bg-orange-500/5 border border-orange-500/20 rounded-xl mt-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-1">
+              <h4 className="text-lg font-bold text-orange-400 flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5" />
+                Monthly Strike Reset
+              </h4>
+              <p className="text-sm text-muted max-w-xl">
+                If the employee has provided valid reasons for all violations this month, you can reset their strike count. 
+                This will unblock their access and remove salary holds.
+              </p>
+            </div>
+            <Button 
+               variant="outline" 
+               className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+               onClick={async () => {
+                 const reason = prompt('Please provide a reason for resetting this month\'s violations:');
+                 if (!reason) return;
+                 try {
+                   const currentMonth = format(new Date(), 'yyyy-MM');
+                   await api.resetFieldViolationsForMonth(userId, currentMonth, manager?.id || '', reason);
+                   alert('Month reset successful. Strikes cleared and salary hold removed.');
+                   loadViolations();
+                 } catch (e) {
+                   console.error('Reset failed:', e);
+                   alert('Failed to reset month.');
+                 }
+               }}
+            >
+              Reset Current Month
+            </Button>
           </div>
         </div>
       )}

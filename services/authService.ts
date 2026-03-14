@@ -63,6 +63,9 @@ export const getAppUserProfile = async (supabaseUser: SupabaseUser): Promise<App
             photoUrl: data.photo_url,
             gender: data.gender,
             biometricId: data.biometric_id,
+            salaryHold: data.salary_hold,
+            salaryHoldReason: data.salary_hold_reason,
+            salaryHoldDate: data.salary_hold_date,
         };
     } catch (e) {
         console.error("Exception fetching profile:", e);

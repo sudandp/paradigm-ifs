@@ -397,45 +397,45 @@ const LeaveDashboard: React.FC = () => {
     const balanceCards = balanceDataState ? [
         { 
             title: 'Earned Leave', 
-            value: `${parseFloat((balanceDataState.earnedTotal - balanceDataState.earnedUsed).toFixed(1))} / ${parseFloat(balanceDataState.earnedTotal.toFixed(1))}`, 
-            description: `Total: ${parseFloat(balanceDataState.earnedTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.earnedTotal - balanceDataState.earnedUsed).toFixed(1))}d.`,
+            value: `${parseFloat((balanceDataState.earnedTotal - balanceDataState.earnedUsed - (balanceDataState.earnedPending || 0)).toFixed(1))} / ${parseFloat(balanceDataState.earnedTotal.toFixed(1))}`, 
+            description: `Total: ${parseFloat(balanceDataState.earnedTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.earnedTotal - balanceDataState.earnedUsed - (balanceDataState.earnedPending || 0)).toFixed(1))}d.${(balanceDataState.earnedPending || 0) > 0 ? ` (Pending: ${balanceDataState.earnedPending}d)` : ''}`,
             icon: Briefcase,
             isExpired: balanceDataState.expiryStates?.earned
         },
         { 
             title: 'Sick Leave', 
-            value: `${parseFloat((balanceDataState.sickTotal - balanceDataState.sickUsed).toFixed(1))} / ${parseFloat(balanceDataState.sickTotal.toFixed(1))}`, 
-            description: `Total: ${parseFloat(balanceDataState.sickTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.sickTotal - balanceDataState.sickUsed).toFixed(1))}d.`,
+            value: `${parseFloat((balanceDataState.sickTotal - balanceDataState.sickUsed - (balanceDataState.sickPending || 0)).toFixed(1))} / ${parseFloat(balanceDataState.sickTotal.toFixed(1))}`, 
+            description: `Total: ${parseFloat(balanceDataState.sickTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.sickTotal - balanceDataState.sickUsed - (balanceDataState.sickPending || 0)).toFixed(1))}d.${(balanceDataState.sickPending || 0) > 0 ? ` (Pending: ${balanceDataState.sickPending}d)` : ''}`,
             icon: HeartPulse,
             isExpired: balanceDataState.expiryStates?.sick
         },
         ...(isFemale ? [
             { 
                 title: 'Pink Leave', 
-                value: `${parseFloat((balanceDataState.pinkTotal - balanceDataState.pinkUsed).toFixed(0))} / ${balanceDataState.pinkTotal}`,
-                description: `1 day per month (mandatory, non-carry forward). Available: ${parseFloat((balanceDataState.pinkTotal - balanceDataState.pinkUsed).toFixed(0))}d.`,
+                value: `${parseFloat((balanceDataState.pinkTotal - balanceDataState.pinkUsed - (balanceDataState.pinkPending || 0)).toFixed(0))} / ${balanceDataState.pinkTotal}`,
+                description: `1 day per month (mandatory, non-carry forward). Available: ${parseFloat((balanceDataState.pinkTotal - balanceDataState.pinkUsed - (balanceDataState.pinkPending || 0)).toFixed(0))}d.${(balanceDataState.pinkPending || 0) > 0 ? ` (Pending: ${balanceDataState.pinkPending}d)` : ''}`,
                 icon: Heart,
                 isExpired: false
             },
             {
                 title: 'Child Care Leave',
-                value: `${parseFloat((balanceDataState.childCareTotal - balanceDataState.childCareUsed).toFixed(0))} / ${parseFloat(balanceDataState.childCareTotal.toFixed(0))}`,
-                description: `Available: ${parseFloat((balanceDataState.childCareTotal - balanceDataState.childCareUsed).toFixed(0))} days for child care.`,
-                icon: Baby, // Corrected from babyIcon
+                value: `${parseFloat((balanceDataState.childCareTotal - balanceDataState.childCareUsed - (balanceDataState.childCarePending || 0)).toFixed(0))} / ${parseFloat(balanceDataState.childCareTotal.toFixed(0))}`,
+                description: `Available: ${parseFloat((balanceDataState.childCareTotal - balanceDataState.childCareUsed - (balanceDataState.childCarePending || 0)).toFixed(0))} days for child care.${(balanceDataState.childCarePending || 0) > 0 ? ` (Pending: ${balanceDataState.childCarePending}d)` : ''}`,
+                icon: Baby, 
             }
         ] : [
             { 
                 title: '3rd Saturday Leave', 
-                value: `${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))} / ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}`, 
-                description: `Total: ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed).toFixed(1))}d.`,
+                value: `${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed - (balanceDataState.floatingPending || 0)).toFixed(1))} / ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}`, 
+                description: `Total: ${parseFloat(balanceDataState.floatingTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.floatingTotal - balanceDataState.floatingUsed - (balanceDataState.floatingPending || 0)).toFixed(1))}d.${(balanceDataState.floatingPending || 0) > 0 ? ` (Pending: ${balanceDataState.floatingPending}d)` : ''}`,
                 icon: Plane,
                 isExpired: balanceDataState.expiryStates?.floating
             }
         ]),
         { 
             title: 'Compensatory Off', 
-            value: `${parseFloat((balanceDataState.compOffTotal - balanceDataState.compOffUsed).toFixed(1))} / ${parseFloat(balanceDataState.compOffTotal.toFixed(1))}`, 
-            description: `Total: ${parseFloat(balanceDataState.compOffTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.compOffTotal - balanceDataState.compOffUsed).toFixed(1))}d.`,
+            value: `${parseFloat((balanceDataState.compOffTotal - balanceDataState.compOffUsed - (balanceDataState.compOffPending || 0)).toFixed(1))} / ${parseFloat(balanceDataState.compOffTotal.toFixed(1))}`, 
+            description: `Total: ${parseFloat(balanceDataState.compOffTotal.toFixed(1))}d. Available: ${parseFloat((balanceDataState.compOffTotal - balanceDataState.compOffUsed - (balanceDataState.compOffPending || 0)).toFixed(1))}d.${(balanceDataState.compOffPending || 0) > 0 ? ` (Pending: ${balanceDataState.compOffPending}d)` : ''}`,
             icon: CalendarClock,
             isExpired: balanceDataState.expiryStates?.compOff
         },
@@ -458,8 +458,8 @@ const LeaveDashboard: React.FC = () => {
     const maternityCards = (balanceDataState && isFemale) ? [
         ...(balanceDataState.maternityTotal > 0 ? [{
             title: 'Maternity Leave',
-            value: `${parseFloat((balanceDataState.maternityTotal - balanceDataState.maternityUsed).toFixed(0))} / ${parseFloat(balanceDataState.maternityTotal.toFixed(0))} days`,
-            description: `${Math.round(balanceDataState.maternityTotal / 7)} weeks total. Available: ${parseFloat((balanceDataState.maternityTotal - balanceDataState.maternityUsed).toFixed(0))} days.`,
+            value: `${parseFloat((balanceDataState.maternityTotal - balanceDataState.maternityUsed - (balanceDataState.maternityPending || 0)).toFixed(0))} / ${parseFloat(balanceDataState.maternityTotal.toFixed(0))} days`,
+            description: `${Math.round(balanceDataState.maternityTotal / 7)} weeks total. Available: ${parseFloat((balanceDataState.maternityTotal - balanceDataState.maternityUsed - (balanceDataState.maternityPending || 0)).toFixed(0))} days.${(balanceDataState.maternityPending || 0) > 0 ? ` (Pending: ${balanceDataState.maternityPending}d)` : ''}`,
             icon: Baby,
         }] : []),
     ] : [];

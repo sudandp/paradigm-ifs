@@ -911,6 +911,7 @@ export interface FieldAttendanceViolation {
   managerNotes?: string;
   
   // Escalation
+  userReason?: string;
   escalatedTo?: string;
   escalatedAt?: string;
   escalationLevel: number; // 0=direct manager, 1=HR/Admin
@@ -971,18 +972,25 @@ export interface LeaveBalance {
   [key: string]: any; // Broadened to allow debug and other dynamic fields
   earnedTotal: number;
   earnedUsed: number;
+  earnedPending: number;
   sickTotal: number;
   sickUsed: number;
+  sickPending: number;
   floatingTotal: number;
   floatingUsed: number;
+  floatingPending: number;
   compOffTotal: number;
   compOffUsed: number;
+  compOffPending: number;
   maternityTotal: number;
   maternityUsed: number;
+  maternityPending: number;
   childCareTotal: number;
   childCareUsed: number;
+  childCarePending: number;
   pinkTotal: number;
   pinkUsed: number;
+  pinkPending: number;
   otHoursThisMonth: number;
   expiryStates?: {
     earned: boolean;

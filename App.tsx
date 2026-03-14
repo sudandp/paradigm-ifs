@@ -51,6 +51,7 @@ const ForgotPassword = lazyWithRetry(() => import('./pages/auth/ForgotPassword')
 const UpdatePassword = lazyWithRetry(() => import('./pages/auth/UpdatePassword'));
 const LogoutPage = lazyWithRetry(() => import('./pages/auth/LogoutPage'));
 const PendingApproval = lazyWithRetry(() => import('./pages/PendingApproval'));
+const BlockedAccessPage = lazyWithRetry(() => import('./components/auth/BlockedAccessPage'));
 const Forbidden = lazyWithRetry(() => import('./pages/Forbidden'));
 const OnboardingHome = lazyWithRetry(() => import('./pages/OnboardingHome'));
 const SelectOrganization = lazyWithRetry(() => import('./pages/onboarding/SelectOrganization'));
@@ -236,7 +237,7 @@ class GlobalErrorBoundary extends React.Component<{ children: React.ReactNode },
 // across browser reloads and tab closures.  This enables the app to
 // return the user to the same page after a refresh or PWA relaunch.
 const LAST_PATH_KEY = 'app:lastPath';
-const IGNORED_PATH_PREFIXES = ['/auth', '/splash', '/pending-approval', '/forbidden'];
+const IGNORED_PATH_PREFIXES = ['/auth', '/splash', '/pending-approval', '/forbidden', '/blocked-access'];
 
 const shouldStorePath = (path: string) => {
   // ignore auth pages, splash, pending, forbidden or catch-all redirects
@@ -271,6 +272,26 @@ const MainLayoutWrapper: React.FC = () => {
     // Logged in but not approved, redirect to pending page
     return <Navigate to="/pending-approval" replace />;
   }
+
+  // Handle Salary Hold / Strike 3 Block
+  // If user is on salary hold, they must provide reasoning and agree to terms.
+  // We allow them to access the profile page specifically if they've acknowledged (which we check via reason).
+  if (user.salaryHold) {
+    const isAllowedPath = location.pathname === '/blocked-access' || 
+                          location.pathname === '/profile' || 
+                          location.pathname === '/auth/logout';
+                          
+    if (!isAllowedPath) {
+      // Check if they've already acknowledged/provided reasons (this is a simple heuristic)
+      // If the reason starts with 'Acknowledged', they might be in the 'Profile Access' state.
+      const hasAcknowledged = user.salaryHoldReason?.startsWith('Acknowledged');
+      
+      if (!hasAcknowledged || location.pathname !== '/profile') {
+         return <Navigate to="/blocked-access" replace />;
+      }
+    }
+  }
+
   // User is authenticated and verified, show the main layout and its nested routes
   // Use MobileLayout for mobile devices, MainLayout for desktop
 
@@ -726,6 +747,7 @@ const App: React.FC = () => {
 
         {/* 3. Forbidden page for unauthorized access */}
         <Route path="/forbidden" element={<Forbidden />} />
+        <Route path="/blocked-access" element={<BlockedAccessPage />} />
 
         {/* 4. All protected main application routes are nested here */}
         <Route path="/" element={

@@ -2558,9 +2558,9 @@ export const api = {
         ] = (await withTimeout(
           Promise.all([
             supabase.from('leave_requests')
-              .select('leave_type, start_date, end_date, day_option')
+              .select('leave_type, start_date, end_date, day_option, status')
               .eq('user_id', userId)
-              .eq('status', 'approved')
+              .in('status', ['approved', 'pending_manager_approval', 'pending_hr_confirmation'])
               .gte('start_date', yearStart)
               .lte('start_date', `${currentYear}-12-31`),
             supabase.from('comp_off_logs').select('*').eq('user_id', userId),
@@ -2754,18 +2754,25 @@ export const api = {
       userId,
       earnedTotal,
       earnedUsed: 0,
+      earnedPending: 0,
       sickTotal,
       sickUsed: 0,
+      sickPending: 0,
       floatingTotal: 0, // Calculated below via overflow rules
       floatingUsed: 0,
+      floatingPending: 0,
       compOffTotal: finalCompOffTotal, // Only Attendance on Holidays/Sundays
       compOffUsed: 0,
+      compOffPending: 0,
       maternityTotal: 0,
       maternityUsed: 0,
+      maternityPending: 0,
       childCareTotal: 0,
       childCareUsed: 0,
+      childCarePending: 0,
       pinkTotal: 0,
       pinkUsed: 0,
+      pinkPending: 0,
       otHoursThisMonth,
       expiryStates
     };
@@ -2823,6 +2830,7 @@ export const api = {
       const leaveStart = leave.start_date;
       const leaveEndDate = leave.end_date;
       const type = (leave.leave_type || '').toLowerCase();
+      const status = leave.status;
       
       const leaveStartDateObj = new Date(leaveStart.replace(/-/g, '/'));
       if (leaveStartDateObj > endOfMonth(referenceDate)) return;
@@ -2837,41 +2845,46 @@ export const api = {
       processedLeaves.push({
           type: leave.leave_type,
           start: leaveStart,
-          amount: leaveAmount
+          amount: leaveAmount,
+          status: leave.status
       });
+
+      const isApproved = status === 'approved';
+      const isPending = status === 'pending_manager_approval' || status === 'pending_hr_confirmation';
 
       // Robust matching: Check if type contains key words (earned, sick/sl, floating, comp)
       if (type.includes('earned') || type === 'el') {
         if (!expiryStates.earned || (rules.earnedLeavesExpiryDate && leaveStart <= rules.earnedLeavesExpiryDate)) {
-          balance.earnedUsed += leaveAmount;
+          if (isApproved) balance.earnedUsed += leaveAmount;
+          if (isPending) balance.earnedPending += leaveAmount;
         }
       } else if (type.includes('sick') || type === 'sl' || type === 's/l') {
         if (!expiryStates.sick || (rules.sickLeavesExpiryDate && leaveStart <= rules.sickLeavesExpiryDate)) {
-          balance.sickUsed += leaveAmount;
+          if (isApproved) balance.sickUsed += leaveAmount;
+          if (isPending) balance.sickPending += leaveAmount;
         }
       } else if (type.includes('floating') || type === 'fh' || type === 'hp') {
         if (!expiryStates.floating || (rules.floatingLeavesExpiryDate && leaveStart <= rules.floatingLeavesExpiryDate)) {
-          balance.floatingUsed += leaveAmount;
+          if (isApproved) balance.floatingUsed += leaveAmount;
+          if (isPending) balance.floatingPending += leaveAmount;
         }
-      } else if (type.includes('pink')) {
-        balance.pinkUsed += leaveAmount;
-      } else if (type.includes('child care') || type.includes('childcare')) {
-        balance.childCareUsed += leaveAmount;
-      } else if (type.includes('maternity')) {
-          balance.maternityUsed += leaveAmount;
-      } else if (type.includes('comp') || type === 'co') {
-        if (!expiryStates.compOff || (rules.compOffLeavesExpiryDate && leaveStart <= rules.compOffLeavesExpiryDate)) {
-          balance.compOffUsed += leaveAmount;
-        }
-      } else if (type.includes('child') || type.includes('child care')) {
-        balance.childCareUsed += leaveAmount;
-      } else if (type.includes('maternity')) {
-        balance.maternityUsed += leaveAmount;
       } else if (type.includes('pink')) {
         // Pink Leave is monthly and non-carry forward. Only count if it's within the viewed month.
         const monthStart = startOfMonth(referenceDate);
         if (leaveStartDateObj >= monthStart && leaveStartDateObj <= monthEnd) {
-          balance.pinkUsed += leaveAmount;
+          if (isApproved) balance.pinkUsed += leaveAmount;
+          if (isPending) balance.pinkPending += leaveAmount;
+        }
+      } else if (type.includes('child care') || type.includes('childcare') || type.includes('child')) {
+        if (isApproved) balance.childCareUsed += leaveAmount;
+        if (isPending) balance.childCarePending += leaveAmount;
+      } else if (type.includes('maternity')) {
+        if (isApproved) balance.maternityUsed += leaveAmount;
+        if (isPending) balance.maternityPending += leaveAmount;
+      } else if (type.includes('comp') || type === 'co') {
+        if (!expiryStates.compOff || (rules.compOffLeavesExpiryDate && leaveStart <= rules.compOffLeavesExpiryDate)) {
+          if (isApproved) balance.compOffUsed += leaveAmount;
+          if (isPending) balance.compOffPending += leaveAmount;
         }
       }
     });
@@ -5202,6 +5215,20 @@ export const api = {
     }
   },
 
+  async submitFieldViolationReason(violationId: string, reason: string): Promise<void> {
+    const { error } = await supabase
+      .from('field_attendance_violations')
+      .update({
+        user_reason: reason,
+      })
+      .eq('id', violationId);
+
+    if (error) {
+      console.error('Error submitting violation reason:', error);
+      throw error;
+    }
+  },
+
   async exportFieldViolations(userId: string, userName: string): Promise<void> {
     const violations = await this.getFieldViolations(userId);
     
@@ -5355,37 +5382,113 @@ export const api = {
           }
         }
       } else if (existingForDay && (existingForDay.status === 'pending' || existingForDay.status === 'escalated')) {
-        // Violation was fixed (e.g. user visited more sites later in the day)
-        // Delete violations that are no longer valid, even if they were already escalated.
-        await supabase
-          .from('field_attendance_violations')
-          .delete()
-          .eq('id', existingForDay.id);
+        // ... (rest of the existing cleanup logic)
+      }
 
-        // Also delete related notifications to avoid clutter in HR/Admin panel
-        const violationDate = format(new Date(date), 'yyyy-MM-dd');
-        // Clear notifications that specifically mention this violation for this user
-        // We look for both the user ID and the date to be precise.
-        await supabase
-          .from('notifications')
-          .delete()
-          .ilike('message', `%${userId}%`)
-          .ilike('message', `%${violationDate}%`)
-          .ilike('message', '%Field attendance violation%');
-          
-        // Additionally try searching by name if the ID was replaced by the cleanup script
-        await supabase
-          .from('notifications')
-          .delete()
-          .ilike('message', `%${user.name}%`)
-          .ilike('message', `%${violationDate}%`)
-          .ilike('message', '%Field attendance violation%');
+      // Check for 3 strikes (salary hold / blocking)
+      const currentMonth = format(new Date(date), 'yyyy-MM');
+      const startOfMon = startOfMonth(new Date(date)).toISOString();
+      const endOfMon = endOfMonth(new Date(date)).toISOString();
+      
+      const monViolations = await this.getFieldViolations(userId);
+      const pendingCount = monViolations.filter(v => 
+        v.date.startsWith(currentMonth) && 
+        (v.status === 'pending' || v.status === 'escalated')
+      ).length;
+
+      const { maxViolationsPerMonth } = await this.getGeofencingSettings();
+
+      if (pendingCount >= maxViolationsPerMonth) {
+        // 3 strikes reached!
+        await this.setSalaryHold(userId, true, `Attendance Violation Strike Policy: ${pendingCount} violations reached in ${format(new Date(date), 'MMMM yyyy')}.`);
+        
+        // Notify user
+        await this.createNotification({
+          userId,
+          message: `URGENT: You have reached ${pendingCount} attendance violations this month. Your access has been restricted and salary is on hold. Please provide reasons for your violations to resume.`,
+        });
       }
     } catch (error) {
       console.error('Error processing field attendance violations:', error);
     }
-  }
-,
+  },
+
+  async resetFieldViolationsForMonth(userId: string, month: string, adminId: string, reason: string): Promise<void> {
+    const { error: updateError } = await supabase
+      .from('field_attendance_violations')
+      .update({ status: 'acknowledged', manager_notes: `Reset by Admin: ${reason}` })
+      .eq('user_id', userId)
+      .ilike('date', `${month}%`)
+      .in('status', ['pending', 'escalated']);
+
+    if (updateError) throw updateError;
+
+    const { error: resetError } = await supabase
+      .from('violation_resets')
+      .insert({
+        user_id: userId,
+        reset_month: month,
+        reset_by: adminId,
+        reset_reason: reason
+      });
+
+    if (resetError) throw resetError;
+
+    // Remove salary hold
+    await this.setSalaryHold(userId, false, `Violations reset for ${month}. Reason: ${reason}`);
+  },
+
+  async checkForMissedPunchOut(userId: string, date: string): Promise<void> {
+    try {
+      const start = startOfDay(new Date(date)).toISOString();
+      const end = endOfDay(new Date(date)).toISOString();
+      const events = await this.getAttendanceEvents(userId, start, end);
+      
+      const lastIn = events.reverse().find(e => e.type === 'punch-in' || e.type === 'check-in');
+      if (!lastIn) return;
+
+      const hasOut = events.some(e => (e.type === 'punch-out' || e.type === 'check-out') && new Date(e.timestamp) > new Date(lastIn.timestamp));
+
+      if (!hasOut) {
+        const inTime = new Date(lastIn.timestamp);
+        const now = new Date();
+        const diffHours = (now.getTime() - inTime.getTime()) / (1000 * 60 * 60);
+
+        // If it's the same day and more than 10 hours have passed, or if it's a past day
+        const isPastDay = !isSameDay(new Date(date), now);
+        if (isPastDay || diffHours > 10) {
+          // Check if violation already exists
+          const violations = await this.getFieldViolations(userId);
+          const existing = violations.find(v => v.date === date && v.violationType === 'missed_punch_out');
+
+          if (!existing) {
+            await this.createFieldViolation({
+              userId,
+              date,
+              totalHours: diffHours > 24 ? 0 : diffHours,
+              siteHours: 0,
+              travelHours: 0,
+              sitePercentage: 0,
+              travelPercentage: 0,
+              violationType: 'missed_punch_out',
+              requiredSitePercentage: 0,
+              status: 'pending',
+              severity: 'Medium'
+            });
+
+            await this.createNotification({
+              userId,
+              message: `You forgot to punch out for ${format(new Date(date), 'MMM dd')}. This has been recorded as an attendance violation.`,
+              type: 'warning'
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for missed punch out:', error);
+    }
+  },
+
   // Site Finance
   async getPendingFinanceRecords(managerId?: string): Promise<SiteFinanceRecord[]> {
     let query = supabase
