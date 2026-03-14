@@ -9,9 +9,19 @@
 	"android": {
 		"allowMixedContent": true
 	},
+	"plugins": {
+		"PushNotifications": {
+			"presentationOptions": [
+				"badge",
+				"sound",
+				"alert"
+			]
+		}
+	},
 	"packageClassList": [
 		"BluetoothLe",
 		"ContactsPlugin",
+		"CapacitorSQLitePlugin",
 		"AppPlugin",
 		"CAPCameraPlugin",
 		"DevicePlugin",
