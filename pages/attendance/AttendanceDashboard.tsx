@@ -1042,11 +1042,13 @@ const AttendanceDashboard: React.FC = () => {
                     if (isHoliday) {
                         status = hasActivity ? 'HP' : 'H';
                     } else if (approvedLeave) {
+                        const isHalfDay = (approvedLeave as any).dayOption === 'half' || (approvedLeave as any).day_option === 'half';
+                        const prefix = isHalfDay ? '1/2' : '';
                         const leaveType = approvedLeave.leaveType?.toLowerCase();
-                        if (leaveType === 'sick') status = 'S/L';
-                        else if (leaveType === 'comp off' || leaveType === 'compoff' || leaveType === 'c/o') status = 'C/O';
-                        else if (leaveType === 'loss of pay' || leaveType === 'lop') status = 'A';
-                        else status = 'E/L';
+                        if (leaveType === 'sick') status = prefix + 'S/L';
+                        else if (leaveType === 'comp off' || leaveType === 'compoff' || leaveType === 'c/o') status = prefix + 'C/O';
+                        else if (leaveType === 'loss of pay' || leaveType === 'lop') status = isHalfDay ? '1/2A' : 'A';
+                        else status = prefix + 'E/L';
                     } else if (hasActivity) {
                         const isWorkFromHome = dayEvents.some(e => e.locationName?.toLowerCase().includes('work from home'));
                         if (isWeekend) status = 'W/P';
@@ -1111,8 +1113,12 @@ const AttendanceDashboard: React.FC = () => {
                 const displayLogs = logs.filter(l => l.rawDate >= dateRange.startDate!);
 
                 // 4. Calculate Final Stats based on displayLogs
-                const present = displayLogs.filter(l => l.status === 'P' || l.status === 'W/H' || l.status === 'W/P' || l.status === 'H/P' || l.status === '0.5P').length;
-                const absent = displayLogs.filter(l => l.status === 'A' && l.rawDate <= new Date()).length;
+                const present = displayLogs.reduce((acc, l) => {
+                    if (l.status === 'P' || l.status === 'W/H' || l.status === 'W/P' || l.status === 'H/P') return acc + 1;
+                    if (l.status === '0.5P' || l.status.startsWith('1/2P')) return acc + 0.5;
+                    return acc;
+                }, 0);
+                const absent = displayLogs.filter(l => (l.status === 'A' || l.status === '1/2A') && l.rawDate <= new Date()).length;
                 const otHours = displayLogs.reduce((acc, l) => acc + l.ot, 0);
 
                 // Comp Offs (Count earned in this period)
@@ -1481,7 +1487,22 @@ const AttendanceDashboard: React.FC = () => {
                     const minutes = Math.round((workingHours - hours) * 60);
                     duration = `${hours}h ${minutes}m`;
                 } else if (hasApprovedLeave) {
-                    status = 'E/L'; // Default to E/L for basic report, can be specific if needed
+                    const approvedLeave = leaves.find(l => 
+                        l.userId === user.id && 
+                        l.status === 'approved' &&
+                        isWithinInterval(day, { 
+                            start: startOfDay(new Date(l.startDate)), 
+                            end: endOfDay(new Date(l.endDate)) 
+                        })
+                    );
+                    const isHalfDay = approvedLeave?.dayOption === 'half' || (approvedLeave as any)?.day_option === 'half';
+                    const prefix = isHalfDay ? '1/2' : '';
+                    const leaveType = approvedLeave?.leaveType?.toLowerCase();
+                    
+                    if (leaveType === 'sick') status = prefix + 'S/L';
+                    else if (leaveType === 'comp off' || leaveType === 'compoff' || leaveType === 'c/o') status = prefix + 'C/O';
+                    else if (leaveType === 'loss of pay' || leaveType === 'lop') status = isHalfDay ? '1/2A' : 'A';
+                    else status = prefix + 'E/L';
                 }
 
                 const checkInEvent = dayEvents.find(e => e.type === 'punch-in');
@@ -1744,23 +1765,38 @@ const AttendanceDashboard: React.FC = () => {
                         floatingHolidays++;
                     }
                 } else if (approvedLeave) {
+                    const isHalfDay = approvedLeave.dayOption === 'half' || (approvedLeave as any).day_option === 'half';
+                    const increment = isHalfDay ? 0.5 : 1;
+                    const prefix = isHalfDay ? '1/2' : '';
                     const leaveType = approvedLeave.leaveType?.toLowerCase();
+                    
                     if (leaveType === 'sick') {
-                        status = 'S/L';
-                        sickLeaves++;
+                        status = prefix + 'S/L';
+                        sickLeaves += increment;
                     } else if (leaveType === 'comp off' || leaveType === 'comp-off' || leaveType === 'compoff' || leaveType === 'c/o') {
-                        status = 'C/O';
-                        compOffs++;
+                        status = prefix + 'C/O';
+                        compOffs++; // Usually comp-off is 1 log per half/full day as per existing logic
                     } else if (leaveType === 'floating' || leaveType === 'floating holiday') {
-                        status = 'F/H';
-                        floatingHolidays++;
+                        status = prefix + 'F/H';
+                        floatingHolidays += increment;
                     } else if (leaveType === 'loss of pay' || leaveType === 'loss-of-pay' || leaveType === 'lop') {
-                        status = 'A';
-                        absentDays++;
-                        lossOfPays++;
+                        status = isHalfDay ? '1/2A' : 'A';
+                        absentDays += increment;
+                        lossOfPays += increment;
                     } else {
-                        status = 'E/L';
-                        earnedLeaves++;
+                        status = prefix + 'E/L';
+                        earnedLeaves += increment;
+                    }
+
+                    // For half-day leaves, if they worked, handle status merging (like MonthlyHoursReport)
+                    if (isHalfDay && hasActivity) {
+                         const { workingHours } = calculateWorkingHours(dayEvents);
+                         if (workingHours >= 4) {
+                             status = 'P ' + status;
+                             presentDays += 0.5;
+                         } else if (workingHours > 0) {
+                             status = '1/2P ' + status;
+                         }
                     }
                 } else if (hasActivity) {
                     // Calculate worked hours

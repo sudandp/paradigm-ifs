@@ -265,6 +265,8 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
             console.error('Error responding to request:', err);
         } finally {
             setIsActionLoading(null);
+            // Refresh counts to update badge
+            useNotificationStore.getState().fetchNotifications();
         }
     };
 
@@ -279,6 +281,8 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
             console.error('Error responding to leave request:', err);
         } finally {
             setIsActionLoading(null);
+            // Refresh counts to update badge
+            useNotificationStore.getState().fetchNotifications();
         }
     };
 
@@ -292,6 +296,8 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
             console.error('Error responding to claim:', err);
         } finally {
             setIsActionLoading(null);
+            // Refresh counts to update badge
+            useNotificationStore.getState().fetchNotifications();
         }
     };
 
@@ -304,6 +310,8 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
             console.error('Error responding to finance record:', err);
         } finally {
             setIsActionLoading(null);
+            // Refresh counts to update badge
+            useNotificationStore.getState().fetchNotifications();
         }
     };
 

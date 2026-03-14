@@ -9,6 +9,8 @@ import { Capacitor } from '@capacitor/core';
 interface NotificationState {
   notifications: Notification[];
   unreadCount: number;
+  pendingApprovalsCount: number;
+  totalUnreadCount: number;
   isLoading: boolean;
   error: string | null;
   isPanelOpen: boolean;
@@ -25,6 +27,8 @@ interface NotificationState {
 export const useNotificationStore = create<NotificationState>()((set, get) => ({
   notifications: [],
   unreadCount: 0,
+  pendingApprovalsCount: 0,
+  totalUnreadCount: 0,
   isLoading: false,
   error: null,
   isPanelOpen: false,
@@ -40,7 +44,71 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
     try {
       const notifications = await api.getNotifications(user.id);
       const unreadCount = notifications.filter(n => !n.isRead).length;
-      set({ notifications, unreadCount, isLoading: false });
+
+      // Also fetch pending approvals count for admins/managers
+      let pendingApprovalsCount = 0;
+      const role = (user.role || '').toLowerCase();
+      const isManagerRole = !['field_staff', 'unverified'].includes(role);
+
+      if (isManagerRole) {
+        try {
+          const isSuperAdmin = ['admin', 'super_admin', 'developer', 'management'].includes(role);
+          const isHR = ['hr', 'hr_ops'].includes(role);
+          
+          let leavesPromise;
+          if (isSuperAdmin) {
+              leavesPromise = Promise.all([
+                  api.getLeaveRequests({ status: 'pending_manager_approval' }),
+                  api.getLeaveRequests({ status: 'pending_hr_confirmation' })
+              ]).then(([res1, res2]) => ({ data: [...res1.data, ...res2.data] }));
+          } else if (isHR) {
+              leavesPromise = Promise.all([
+                  api.getLeaveRequests({ status: 'pending_manager_approval', forApproverId: user.id }),
+                  api.getLeaveRequests({ status: 'pending_hr_confirmation' })
+              ]).then(([res1, res2]) => ({ data: [...res1.data, ...res2.data] }));
+          } else {
+              leavesPromise = api.getLeaveRequests({ 
+                  status: 'pending_manager_approval',
+                  forApproverId: user.id 
+              });
+          }
+
+          const [unlocks, leaves, claims, finance, invoices] = await Promise.all([
+              api.getAttendanceUnlockRequests(isSuperAdmin ? undefined : user.id),
+              leavesPromise,
+              api.getExtraWorkLogs({ 
+                  status: 'Pending', 
+                  managerId: isSuperAdmin ? undefined : user.id 
+              }),
+              api.getPendingFinanceRecords(user.id),
+              api.getSiteInvoiceRecords(user.id)
+          ]);
+
+          const today = new Date().toISOString().split('T')[0];
+          
+          const counts = [
+            (unlocks || []).filter((r: any) => r.userId !== user.id).length,
+            (leaves?.data || []).filter((r: any) => r.userId !== user.id).length,
+            (claims?.data || []).filter((c: any) => c.userId !== user.id).length,
+            (finance || []).filter((f: any) => f.createdBy !== user.id).length,
+            (invoices || []).filter((inv: any) => 
+                !inv.invoiceSentDate && inv.invoiceSharingTentativeDate && inv.invoiceSharingTentativeDate <= today
+            ).length
+          ];
+          
+          pendingApprovalsCount = counts.reduce((a, b) => a + b, 0);
+        } catch (approvalErr) {
+          console.warn('Failed to fetch pending approvals count:', approvalErr);
+        }
+      }
+
+      set({ 
+        notifications, 
+        unreadCount, 
+        pendingApprovalsCount,
+        totalUnreadCount: unreadCount + pendingApprovalsCount,
+        isLoading: false 
+      });
       get().updateBadgeCount();
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
@@ -54,12 +122,16 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
 
     try {
       await api.markNotificationAsRead(notificationId);
-      set((state) => ({
-        notifications: state.notifications.map(n =>
-          n.id === notificationId ? { ...n, isRead: true } : n
-        ),
-        unreadCount: Math.max(0, state.unreadCount - 1),
-      }));
+      set((state) => {
+        const newUnreadCount = Math.max(0, state.unreadCount - 1);
+        return {
+          notifications: state.notifications.map(n =>
+            n.id === notificationId ? { ...n, isRead: true } : n
+          ),
+          unreadCount: newUnreadCount,
+          totalUnreadCount: newUnreadCount + state.pendingApprovalsCount
+        };
+      });
       get().updateBadgeCount();
     } catch (err) {
       console.error("Failed to mark notification as read:", err);
@@ -77,6 +149,7 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
       set((state) => ({
         notifications: state.notifications.map(n => ({ ...n, isRead: true })),
         unreadCount: 0,
+        totalUnreadCount: state.pendingApprovalsCount
       }));
       get().updateBadgeCount();
     } catch (err) {
@@ -87,12 +160,17 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
   acknowledgeNotification: async (notificationId: string) => {
     try {
       await api.acknowledgeNotification(notificationId);
-      set((state) => ({
-        notifications: state.notifications.map(n =>
-          n.id === notificationId ? { ...n, acknowledgedAt: new Date().toISOString(), isRead: true } : n
-        ),
-        unreadCount: Math.max(0, state.unreadCount - (state.notifications.find(n => n.id === notificationId)?.isRead ? 0 : 1)),
-      }));
+      set((state) => {
+        const isCurrentlyUnread = !state.notifications.find(n => n.id === notificationId)?.isRead;
+        const newUnreadCount = Math.max(0, state.unreadCount - (isCurrentlyUnread ? 1 : 0));
+        return {
+          notifications: state.notifications.map(n =>
+            n.id === notificationId ? { ...n, acknowledgedAt: new Date().toISOString(), isRead: true } : n
+          ),
+          unreadCount: newUnreadCount,
+          totalUnreadCount: newUnreadCount + state.pendingApprovalsCount
+        };
+      });
       get().updateBadgeCount();
     } catch (err) {
       console.error("Failed to acknowledge notification:", err);
@@ -102,7 +180,7 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
   updateBadgeCount: async () => {
     if (!Capacitor.isNativePlatform()) return;
     try {
-      const count = get().unreadCount;
+      const count = get().totalUnreadCount;
       // Use a variable to bypass Vite's static import analysis which causes 500 errors if the plugin is missing from node_modules
       const pluginPath = '@capawesome/capacitor-badge';
       // @ts-ignore
@@ -132,10 +210,14 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
         async (payload) => {
           const newNotif = api.toCamelCase(payload.new) as Notification;
           
-          set((state) => ({
-            notifications: [newNotif, ...state.notifications],
-            unreadCount: state.unreadCount + 1,
-          }));
+          set((state) => {
+            const newUnreadCount = state.unreadCount + 1;
+            return {
+              notifications: [newNotif, ...state.notifications],
+              unreadCount: newUnreadCount,
+              totalUnreadCount: newUnreadCount + state.pendingApprovalsCount
+            };
+          });
 
           if (Capacitor.isNativePlatform()) {
             try {

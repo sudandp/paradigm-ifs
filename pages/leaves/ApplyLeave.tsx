@@ -81,7 +81,7 @@ const ApplyLeave: React.FC = () => {
         return isSameDay(new Date(watchStartDate.replace(/-/g, '/')), new Date(watchEndDate.replace(/-/g, '/')));
     }, [watchStartDate, watchEndDate]);
 
-    const showHalfDayOption = isSingleDay && watchLeaveType === 'Earned';
+    const showHalfDayOption = isSingleDay;
     const showDoctorCertUpload = useMemo(() => {
         if (watchLeaveType !== 'Sick' || !watchStartDate || !watchEndDate) return false;
         const duration = differenceInCalendarDays(new Date(watchEndDate.replace(/-/g, '/')), new Date(watchStartDate.replace(/-/g, '/'))) + 1;
@@ -169,7 +169,7 @@ const ApplyLeave: React.FC = () => {
     if (!user) return null;
 
     return (
-        <div className={`min-h-screen bg-page ${isMobile ? 'pb-20' : 'p-6'}`}>
+        <div className={`min-h-screen bg-page ${isMobile ? '' : 'p-6'}`}>
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             
             <div className="w-full bg-card rounded-2xl shadow-card overflow-hidden">
@@ -256,7 +256,7 @@ const ApplyLeave: React.FC = () => {
                             </div>
                         )}
 
-                        <div className={`flex items-center gap-4 ${isMobile ? 'fixed bottom-20 left-4 right-4' : 'pt-4'}`}>
+                        <div className={`flex items-center gap-4 ${isMobile ? 'pb-10 pt-4' : 'pt-4'}`}>
                             <Button type="button" variant="secondary" onClick={() => navigate(-1)} className="flex-1">Cancel</Button>
                             <Button type="submit" form="leave-form" className="flex-2">{isEditMode ? 'Update Request' : 'Submit Request'}</Button>
                         </div>

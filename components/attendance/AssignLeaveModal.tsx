@@ -40,7 +40,7 @@ const AssignLeaveModal: React.FC<AssignLeaveModalProps> = ({
         return isSameDay(new Date(startDate.replace(/-/g, '/')), new Date(endDate.replace(/-/g, '/')));
     }, [startDate, endDate]);
 
-    const showHalfDayOption = isSingleDay && leaveType === 'Earned';
+    const showHalfDayOption = isSingleDay;
 
     const duration = useMemo(() => {
         if (!startDate || !endDate) return 0;

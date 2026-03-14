@@ -309,22 +309,72 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
               if (!isFuture) floatingHolidays++;
           }
       } else if (approvedLeave) {
+          const isHalfDayLeave = approvedLeave.dayOption === 'half';
+          const increment = isHalfDayLeave ? 0.5 : 1;
+          const prefix = isHalfDayLeave ? '1/2' : '';
           const leaveType = (approvedLeave.leaveType || (approvedLeave as any).leave_type || '').toLowerCase();
+          
           if (leaveType === 'sick' || leaveType === 'sick leave') {
-              status = 'S/L';
-              sickLeaves++;
+              status = prefix + 'S/L';
+              sickLeaves += increment;
           } else if (leaveType === 'comp off' || leaveType === 'comp-off' || leaveType === 'compoff' || leaveType === 'c/o') {
-              status = 'C/O';
-              compOffs++;
+              status = prefix + 'C/O';
+              compOffs++; // comp-off remains 1 log per day/half-day usually, but matching behavior
           } else if (leaveType === 'floating' || leaveType === 'floating holiday') {
-              status = 'F/H';
-              floatingHolidays++;
+              status = prefix + 'F/H';
+              floatingHolidays += increment;
           } else if (leaveType === 'loss of pay' || leaveType === 'lop') {
-              status = 'A';
-              lossOfPay++; // Increment lossOfPay counter
+              status = isHalfDayLeave ? '1/2A' : 'A';
+              lossOfPay += increment; 
           } else {
-              status = 'E/L';
-              earnedLeaves++;
+              status = prefix + 'E/L';
+              earnedLeaves += increment;
+          }
+
+          // If half day leave, we still want to see if they worked
+          if (isHalfDayLeave && hasActivity) {
+            const { 
+              checkIn, 
+              checkOut, 
+              firstBreakIn, 
+              lastBreakIn, 
+              breakOut: lastBreakOut, 
+              workingHours: netHours, 
+              breakHours, 
+              totalHours: grossHours 
+            } = processDailyEvents(dayEvents);
+    
+            totalNetWorkDuration += netHours;
+            totalGrossWorkDuration += grossHours;
+            totalBreakDuration += breakHours;
+            
+            // For half-day leave, they are "Present" for the other half if they work >= 4h
+            if (netHours >= 4) {
+               status = 'P ' + status;
+               presentDays += 0.5;
+            } else if (netHours > 0) {
+               status = '1/2P ' + status;
+            }
+
+            currentDayInTime = checkIn ? format(new Date(checkIn), 'HH:mm') : '-';
+            currentDayOutTime = checkOut ? format(new Date(checkOut), 'HH:mm') : '-';
+            currentDayGrossDuration = grossHours > 0 ? formatTime(grossHours) : '-';
+            currentDayBreakIn = firstBreakIn ? format(new Date(firstBreakIn), 'HH:mm') : '-';
+            currentDayBreakOut = lastBreakOut ? format(new Date(lastBreakOut), 'HH:mm') : '-';
+            currentDayBreakDuration = breakHours > 0 ? formatTime(breakHours) : '-';
+            currentDayNetWorkedHours = netHours > 0 ? formatTime(netHours) : '-';
+            
+            // For OT on half-day leave: anything above 4h or just keep use same rule?
+            // Usually OT is calculated against full shift. But let's assume 8h target.
+            const targetNetHours = 4; // Because 4h is covered by leave
+            const shortfall = Math.max(0, targetNetHours - netHours);
+            currentDayShortfall = (shortfall > 0 && netHours > 0) ? formatTime(shortfall) : '-';
+            
+            // OT logic
+            const maxDailyHours = rules.dailyWorkingHours?.max || 9;
+            const ot = Math.max(0, netHours - (maxDailyHours / 2)); // Shift A is usually 9h, so 4.5h is half?
+            totalOT += ot;
+            currentDayOT = ot > 0 ? formatTime(ot) : '-';
           }
       } else if (hasActivity) {
         const { 
@@ -565,12 +615,12 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
                   {employee.dailyData.map((day) => (
                     <td key={day.date} className="p-1 text-center border-l border-gray-300 font-bold text-gray-900">
                       <span className={
-                        day.status === 'P' ? 'text-green-600' : 
-                        (day.status === '1/2P' || day.status === 'C/O') ? 'text-blue-600' : 
+                        day.status === 'P' || day.status.includes('P ') ? 'text-green-600' : 
+                        (day.status === '1/2P' || day.status.includes('1/2P ') || day.status.includes('C/O')) ? 'text-blue-600' : 
                         day.status === 'W/O' ? 'text-gray-500' : 
-                        day.status === 'H' ? 'text-orange-600' :
-                        day.status === 'F/H' ? 'text-yellow-600' :
-                        day.status === 'LOP' ? 'text-red-400' :
+                        (day.status === 'H' || day.status.includes('H')) ? 'text-orange-600' :
+                        day.status.includes('F/H') ? 'text-yellow-600' :
+                        (day.status.includes('LOP') || day.status.includes('1/2A') || day.status === 'A') ? 'text-red-500' :
                         'text-red-600'
                       }>
                         {day.status}

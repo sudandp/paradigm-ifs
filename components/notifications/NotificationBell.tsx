@@ -58,7 +58,7 @@ const NotificationIcon: React.FC<{ type: NotificationType; size?: string }> = ({
 };
 
 const NotificationBell: React.FC<{ className?: string }> = ({ className = '' }) => {
-    const { unreadCount, togglePanel, isPanelOpen } = useNotificationStore();
+    const { totalUnreadCount, togglePanel, isPanelOpen } = useNotificationStore();
 
     return (
         <div className={`relative ${className}`}>
@@ -71,11 +71,11 @@ const NotificationBell: React.FC<{ className?: string }> = ({ className = '' }) 
                 }`}
             >
                 <Bell className={`h-5 w-5 transition-transform duration-300 ${isPanelOpen ? 'scale-110' : 'group-hover:rotate-12'}`} />
-                {unreadCount > 0 && (
+                {totalUnreadCount > 0 && (
                     <span className="absolute top-1.5 right-1.5 flex h-4 w-4">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-4 w-4 bg-red-600 text-[10px] items-center justify-center font-bold text-white shadow-lg border border-white">
-                            {unreadCount > 9 ? '9+' : unreadCount}
+                            {totalUnreadCount > 9 ? '9+' : totalUnreadCount}
                         </span>
                     </span>
                 )}

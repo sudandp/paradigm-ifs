@@ -1015,7 +1015,7 @@ export interface LeaveRequest {
   endDate: string; // YYYY-MM-DD
   reason: string;
   status: LeaveRequestStatus;
-  dayOption?: 'full' | 'half'; // only for single-day earned leave
+  dayOption?: 'full' | 'half'; // for single-day leave requests
   currentApproverId: string | null;
   currentApproverName?: string | null;
   approvalHistory: ApprovalRecord[];
