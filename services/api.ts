@@ -17,7 +17,7 @@ import { getObjectDiff } from '../utils/diff';
 // FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { 
   differenceInCalendarDays, differenceInCalendarMonths, format, startOfMonth, endOfMonth, 
-  startOfDay, endOfDay, eachDayOfInterval, isSameDay, getDay, getDate, getDaysInMonth, addMonths
+  startOfDay, endOfDay, eachDayOfInterval, isSameDay, getDay, getDate, getDaysInMonth, addMonths, addDays
 } from 'date-fns';
 import { dispatchNotificationFromRules } from './notificationService';
 import { offlineDb } from './offline/database';
@@ -2553,7 +2553,8 @@ export const api = {
           otRes, 
           holidaysRes, 
           recurringRes, 
-          eventsRes
+          eventsRes,
+          userHolidaysRes
         ] = (await withTimeout(
           Promise.all([
             supabase.from('leave_requests')
@@ -2570,7 +2571,8 @@ export const api = {
               .select('timestamp')
               .eq('user_id', userId)
               .gte('timestamp', yearStart)
-              .lte('timestamp', `${currentYear}-12-31`)
+              .lte('timestamp', `${currentYear}-12-31`),
+            supabase.from('user_holidays').select('*').eq('user_id', userId)
           ]) as any,
           20000,
           'Leave balance detailed data fetch timed out'
@@ -2582,16 +2584,18 @@ export const api = {
         holidays = holidaysRes.data || [];
         recurringHolidays = recurringRes || [];
         yearEvents = eventsRes.data || [];
+        const userHolidays = userHolidaysRes?.data || [];
         
         // Cache these for offline balance simulation
         await offlineDb.setCache(`leave_data_bundle_${userId}_${currentYear}`, {
-          approvedLeaves, compOffData, otData, holidays, recurringHolidays, yearEvents
+          approvedLeaves, compOffData, otData, holidays, recurringHolidays, yearEvents, userHolidays
         });
       } catch (err) {
         console.warn('Failed to fetch detailed leave data from cloud, using cache if available');
       }
     }
 
+    let userHolidaysLocal: any[] = [];
     if (!approvedLeaves.length && !yearEvents.length) {
       const cached = await offlineDb.getCache(`leave_data_bundle_${userId}_${currentYear}`);
       if (cached) {
@@ -2601,7 +2605,11 @@ export const api = {
         holidays = cached.holidays || [];
         recurringHolidays = cached.recurringHolidays || [];
         yearEvents = cached.yearEvents || [];
+        userHolidaysLocal = cached.userHolidays || [];
       }
+    } else {
+        // We have fresh data, update userHolidays from the fetch above
+        // We'll extract it from the local variable later or use the results from Promise.all
     }
 
     // Expiry Check Logic Helper
@@ -2641,14 +2649,17 @@ export const api = {
     const attendedDates = new Set((yearEvents || []).map(e => format(new Date(e.timestamp), 'yyyy-MM-dd')));
     const holidayDates = new Set(holidays.map(h => format(new Date(h.date), 'yyyy-MM-dd')));
     
-    // Include holidays from the pool (e.g. -01-01) for the current year
-    if (rules.holidayPool) {
-        rules.holidayPool.forEach((hp: any) => {
-            if (hp.date.startsWith('-')) {
-                holidayDates.add(`${currentYear}${hp.date}`);
-            }
-        });
-    }
+    // User requested refinement: Only count Sundays, Fixed (Gov) holidays, and SELECTED optional holidays.
+    // If we have fresh data, use the results from userHolidaysRes. If cached, use userHolidaysLocal.
+    const finalUserHolidays = (typeof userHolidaysRes !== 'undefined' && userHolidaysRes?.data) ? userHolidaysRes.data : userHolidaysLocal;
+    (finalUserHolidays || []).forEach((uh: any) => {
+        if (uh.holiday_date) {
+            holidayDates.add(uh.holiday_date);
+        }
+    });
+
+    // We NO LONGER automatically add all entries from rules.holidayPool.
+    // This fixed the issue where unselected elective holidays were earning Comp Offs.
     
     let floatingTotal = 0;
     let dynamicCompOffTotal = 0;
@@ -2869,32 +2880,50 @@ export const api = {
     if (userGender === 'female') {
       balance.floatingTotal = 0;
       balance.floatingUsed = 0;
+    } else {
+      // --- Floating Holiday Logic for Males (3rd Saturday) ---
+      // User says: "3rd saturday if he A that means he availed the leave so it need to show 0/1, if he worked 1/1"
+      
+      let finalFHTotal = 0;
+      const usedFHDates = new Set<string>();
+
+      // 1. Add manual floating leave requests to the used set
+      approvedLeaves.forEach(leave => {
+          const type = (leave.leave_type || '').toLowerCase();
+          if (type.includes('floating') || type === 'fh' || type === 'hp') {
+              const start = leave.start_date;
+              const duration = differenceInCalendarDays(new Date(leave.end_date.replace(/-/g, '/')), new Date(start.replace(/-/g, '/'))) + 1;
+              for (let i = 0; i < duration; i++) {
+                  usedFHDates.add(format(addDays(new Date(start.replace(/-/g, '/')), i), 'yyyy-MM-dd'));
+              }
+          }
+      });
+
+      const fhExpiryDateStr = rules.floatingLeavesExpiryDate;
+      const fhExpiryDate = fhExpiryDateStr ? new Date(fhExpiryDateStr.replace(/-/g, '/')) : null;
+
+      floatingHolidayDates.sort((a, b) => a.getTime() - b.getTime()).forEach(fhDate => {
+          const dateStr = format(fhDate, 'yyyy-MM-dd');
+          
+          // Check expiry
+          const isExpiredByRules = fhExpiryDate && fhDate > fhExpiryDate;
+          const isExpiredByView = fhExpiryDate && fhExpiryDate < startOfMonth(referenceDate);
+          if (isExpiredByRules || isExpiredByView) return;
+
+          finalFHTotal++;
+
+          // If the date has passed (or is today) and they didn't work, mark it as used (availed)
+          // fhDate is at 00:00, so we check against startOfDay(today)
+          if (fhDate <= startOfDay(new Date())) {
+              if (!attendedDates.has(dateStr)) {
+                  usedFHDates.add(dateStr);
+              }
+          }
+      });
+
+      balance.floatingTotal = finalFHTotal;
+      balance.floatingUsed = usedFHDates.size;
     }
-
-    // --- Floating Holiday Expiry Logic ---
-    // Floating holidays simply expire once past their validity date.
-    // They do NOT convert to Comp Offs.
-    let remainingFHUsed = balance.floatingUsed;
-    let finalFHTotal = 0;
-
-    const fhExpiryDateStr = rules.floatingLeavesExpiryDate; // e.g. "2026-02-01"
-    const fhExpiryDate = fhExpiryDateStr ? new Date(fhExpiryDateStr.replace(/-/g, '/')) : null;
-
-    floatingHolidayDates.sort((a, b) => a.getTime() - b.getTime()).forEach(fhDate => {
-        // If an expiry date is set, check if the holiday is still valid as of the START of the month viewed.
-        // OR if the holiday itself is past the expiry date.
-        const isExpiredByRules = fhExpiryDate && fhDate > fhExpiryDate;
-        const isExpiredByView = fhExpiryDate && fhExpiryDate < startOfMonth(referenceDate);
-
-        if (isExpiredByRules || isExpiredByView) {
-            // This holiday is expired and no longer counts towards the balance.
-            return;
-        }
-
-        finalFHTotal++;
-    });
-
-    balance.floatingTotal = finalFHTotal;
 
     balance.debug = {
         staffType,
