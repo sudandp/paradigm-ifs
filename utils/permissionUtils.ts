@@ -11,6 +11,8 @@ const NOTIFICATION_IDS = {
     BREAK_END: 1002,
 };
 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 /**
  * Request ALL required device permissions at once.
  * This ensures the user is prompted for everything upfront.
@@ -18,7 +20,7 @@ const NOTIFICATION_IDS = {
 export const requestAllPermissions = async () => {
     if (!Capacitor.isNativePlatform()) return;
 
-    console.log('[PermissionUtils] Starting unified permission request...');
+    console.log('[PermissionUtils] Starting staggered unified permission request...');
 
     // 1. Notifications
     try {
@@ -26,24 +28,39 @@ export const requestAllPermissions = async () => {
         console.log('[PermissionUtils] Notification permission:', notifResult.display);
     } catch (e) { console.warn('Notification permission request failed', e); }
 
+    await delay(1200); // Give the OS time to breathe
+
     // 2. Location
     try {
         const geoResult = await Geolocation.requestPermissions();
         console.log('[PermissionUtils] Location permission:', geoResult.location);
     } catch (e) { console.warn('Location permission request failed', e); }
 
+    await delay(1200);
+
     // 3. Camera & Photos
     try {
-        const cameraResult = await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
-        console.log('[PermissionUtils] Camera/Photos permission:', cameraResult);
+        // Explicitly asking for both camera and photos
+        // This targets both the Camera and "Photos and videos" sections
+        const cameraResult = await Camera.requestPermissions({ 
+            permissions: ['camera', 'photos'] 
+        });
+        console.log('[PermissionUtils] Camera/Photos permission result:', cameraResult);
     } catch (e) { console.warn('Camera/Photos permission request failed', e); }
+
+    await delay(1200);
 
     // 4. Nearby Devices (Bluetooth)
     try {
-        // Just initializing or checking permissions via Bluetooth LE plugin triggers the prompt if configured
-        const bleResult = await BleClient.initialize();
-        console.log('[PermissionUtils] Bluetooth initialized (Nearby Devices)');
-    } catch (e) { console.warn('Bluetooth permission request failed', e); }
+        console.log('[PermissionUtils] Initializing BleClient for Nearby Devices prompt...');
+        // BleClient initialize is the most reliable way to trigger the Bluetooth system prompt
+        await BleClient.initialize();
+        console.log('[PermissionUtils] Bluetooth LE initialized');
+    } catch (e) { 
+        console.warn('Bluetooth/Nearby Devices permission request failed or rejected', e); 
+    }
+
+    await delay(1200);
 
     // 5. Contacts
     try {
@@ -51,7 +68,7 @@ export const requestAllPermissions = async () => {
         console.log('[PermissionUtils] Contacts permission:', contactsResult.contacts);
     } catch (e) { console.warn('Contacts permission request failed', e); }
 
-    console.log('[PermissionUtils] All permission requests completed.');
+    console.log('[PermissionUtils] All staggered permission requests completed.');
 };
 
 /**
