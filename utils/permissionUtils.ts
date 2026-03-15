@@ -2,6 +2,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { Camera } from '@capacitor/camera';
 import { Geolocation } from '@capacitor/geolocation';
 import { Contacts } from '@capacitor-community/contacts';
+import { BleClient } from '@capacitor-community/bluetooth-le';
 import { Capacitor } from '@capacitor/core';
 
 // Notification IDs to ensure we can cancel them specifically
@@ -19,27 +20,38 @@ export const requestAllPermissions = async () => {
 
     console.log('[PermissionUtils] Starting unified permission request...');
 
+    // 1. Notifications
     try {
-        // 1. Notifications
         const notifResult = await LocalNotifications.requestPermissions();
         console.log('[PermissionUtils] Notification permission:', notifResult.display);
+    } catch (e) { console.warn('Notification permission request failed', e); }
 
-        // 2. Location (Approximate/Coarse as fallbacks are handled by Geolocation plugin)
+    // 2. Location
+    try {
         const geoResult = await Geolocation.requestPermissions();
         console.log('[PermissionUtils] Location permission:', geoResult.location);
+    } catch (e) { console.warn('Location permission request failed', e); }
 
-        // 3. Camera
-        const cameraResult = await Camera.requestPermissions();
-        console.log('[PermissionUtils] Camera permission:', cameraResult.camera);
+    // 3. Camera & Photos
+    try {
+        const cameraResult = await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
+        console.log('[PermissionUtils] Camera/Photos permission:', cameraResult);
+    } catch (e) { console.warn('Camera/Photos permission request failed', e); }
 
-        // 4. Contacts
+    // 4. Nearby Devices (Bluetooth)
+    try {
+        // Just initializing or checking permissions via Bluetooth LE plugin triggers the prompt if configured
+        const bleResult = await BleClient.initialize();
+        console.log('[PermissionUtils] Bluetooth initialized (Nearby Devices)');
+    } catch (e) { console.warn('Bluetooth permission request failed', e); }
+
+    // 5. Contacts
+    try {
         const contactsResult = await Contacts.requestPermissions();
         console.log('[PermissionUtils] Contacts permission:', contactsResult.contacts);
+    } catch (e) { console.warn('Contacts permission request failed', e); }
 
-        console.log('[PermissionUtils] All permission requests completed.');
-    } catch (error) {
-        console.error('[PermissionUtils] Unified permission request failed:', error);
-    }
+    console.log('[PermissionUtils] All permission requests completed.');
 };
 
 /**
