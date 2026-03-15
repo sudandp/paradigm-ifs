@@ -27,7 +27,7 @@ serve(async (req) => {
     };
 
     if (broadcast) {
-      payload.included_segments = ["All"];
+      payload.included_segments = ["Subscribed Users"];
     } else {
       if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
         return new Response(JSON.stringify({ error: 'No user IDs provided' }), { 
