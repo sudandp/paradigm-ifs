@@ -3449,27 +3449,32 @@ export const api = {
       }
 
       // Trigger real push broadcast via OneSignal Edge Function
-      const { error: pushError } = await supabase.functions.invoke('send-push', {
-        body: {
-          broadcast: true,
-          title: data.title || 'Important Alert',
-          message: data.message,
-          url: data.link || null,
-          type: data.type || 'info',
-          severity: data.severity || 'Low',
-          metadata: {
-            isBroadcast: true,
-            sentAt: new Date().toISOString()
+      try {
+        const { error: pushError } = await supabase.functions.invoke('send-push', {
+          body: {
+            broadcast: true,
+            title: data.title || 'Important Alert',
+            message: data.message,
+            url: data.link || null,
+            type: data.type || 'info',
+            severity: data.severity || 'Low',
+            metadata: {
+              isBroadcast: true,
+              sentAt: new Date().toISOString()
+            }
           }
+        });
+        
+        if (pushError) {
+          console.warn('[API] Warning: Broadcast database insert succeeded, but Push Notification Edge Function failed:', pushError);
+          // We intentionally DO NOT throw here. The broadcast exists in the DB, so it's a partial success.
+        } else {
+          console.log('[API] Broadcast sent successfully (DB + Push).');
         }
-      });
-      
-      if (pushError) {
-        console.error('[API] send-push (broadcast) Edge Function failed:', pushError);
-        throw pushError;
+      } catch (err) {
+        console.warn('[API] Warning: Broadcast DB insert succeeded, but Push threw an exception:', err);
       }
-
-      console.log('[API] Broadcast sent successfully.');
+      
       return;
     }
     
@@ -3496,24 +3501,29 @@ export const api = {
       originalRole: data.role
     });
 
-    const { error: pushError } = await supabase.functions.invoke('send-push', {
-      body: {
-        userIds: finalUserIds,
-        title: data.title || 'Important Alert',
-        message: data.message,
-        url: data.link || null,
-        type: data.type || 'info',
-        severity: data.severity || 'Low',
-        metadata: {
-          originalRole: data.role,
-          sentAt: new Date().toISOString()
+    try {
+      const { error: pushError } = await supabase.functions.invoke('send-push', {
+        body: {
+          userIds: finalUserIds,
+          title: data.title || 'Important Alert',
+          message: data.message,
+          url: data.link || null,
+          type: data.type || 'info',
+          severity: data.severity || 'Low',
+          metadata: {
+            originalRole: data.role,
+            sentAt: new Date().toISOString()
+          }
         }
-      }
-    });
+      });
 
-    if (pushError) {
-      console.error('Failed to trigger push notification:', pushError);
-      throw pushError;
+      if (pushError) {
+        console.warn('[API] Warning: Targeted DB insert succeeded, but Push Edge Function failed:', pushError);
+      } else {
+        console.log('[API] Targeted Push sent successfully.');
+      }
+    } catch (err) {
+      console.warn('[API] Warning: Targeted DB insert succeeded, but Push threw an exception:', err);
     }
   },
 
