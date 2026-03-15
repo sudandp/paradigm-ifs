@@ -35,7 +35,6 @@ export const requestAllPermissions = async () => {
 
     const reqDelay = 1200; // Increased delay
 
-    // 1. Camera & Photos
     try {
         console.log('[PermissionUtils] REQUESTING: Camera & Photos');
         await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
@@ -115,6 +114,22 @@ export const requestNotificationPermissions = async () => {
         }
     } catch (error) {
         console.error('Error requesting notification permissions:', error);
+    }
+};
+
+/**
+ * Request camera permissions specifically (targeted)
+ */
+export const requestCameraPermissions = async () => {
+    if (!Capacitor.isNativePlatform()) return;
+    
+    try {
+        const result = await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
+        if (result.camera !== 'granted') {
+            console.warn('Camera permissions not granted');
+        }
+    } catch (error) {
+        console.error('Error requesting camera permissions:', error);
     }
 };
 
