@@ -14,11 +14,11 @@ import type {
   CommunicationLog, RevisionLog, UserChild
 } from '../types';
 import { getObjectDiff } from '../utils/diff';
-// FIX: Add 'startOfMonth' and 'endOfMonth' to date-fns import to resolve errors.
 import { 
   differenceInCalendarDays, differenceInCalendarMonths, format, startOfMonth, endOfMonth, 
   startOfDay, endOfDay, eachDayOfInterval, isSameDay, getDay, getDate, getDaysInMonth, addMonths, addDays
 } from 'date-fns';
+import { useAuthStore } from '../store/authStore';
 import { dispatchNotificationFromRules } from './notificationService';
 import { offlineDb } from './offline/database';
 import { Network } from '@capacitor/network';
@@ -5470,9 +5470,18 @@ export const api = {
   },
 
   async resetFieldViolationsForMonth(userId: string, month: string, adminId: string, reason: string): Promise<void> {
+    // Determine note
+    let managerInfo = "Admin";
+    const managerUser = useAuthStore.getState().user;
+    if (managerUser && managerUser.name) {
+      managerInfo = managerUser.name;
+    }
+
+    const noteText = reason ? `Reset by ${managerInfo}: ${reason}` : `approved by ${managerInfo}`;
+
     const { error: updateError } = await supabase
       .from('field_attendance_violations')
-      .update({ status: 'acknowledged', manager_notes: `Reset by Admin: ${reason}` })
+      .update({ status: 'acknowledged', manager_notes: noteText })
       .eq('user_id', userId)
       .ilike('date', `${month}%`)
       .in('status', ['pending', 'escalated']);

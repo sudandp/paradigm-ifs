@@ -286,8 +286,9 @@ const ViolationsView: React.FC<ViolationsViewProps> = ({ userId, userName, isMan
                variant="outline" 
                className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
                onClick={async () => {
-                 const reason = prompt('Please provide a reason for resetting this month\'s violations:');
-                 if (!reason) return;
+                 const reason = prompt('Please provide a reason for resetting this month\'s violations (Optional):');
+                 if (reason === null) return; // User clicked Cancel
+
                  try {
                    const currentMonth = format(new Date(), 'yyyy-MM');
                    await api.resetFieldViolationsForMonth(userId, currentMonth, manager?.id || '', reason);
