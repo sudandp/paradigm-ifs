@@ -134,6 +134,69 @@ export const requestCameraPermissions = async () => {
 };
 
 /**
+ * Request location permissions specifically (targeted)
+ */
+export const requestLocationPermissions = async () => {
+    if (!Capacitor.isNativePlatform()) return;
+    
+    try {
+        const result = await Geolocation.requestPermissions();
+        if (result.location !== 'granted' && result.coarseLocation !== 'granted') {
+            console.warn('Location permissions not granted');
+        } else {
+            // Force a location check to trigger system dialog if pending/background
+            await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 3000 }).catch(() => {});
+        }
+    } catch (error) {
+        console.error('Error requesting location permissions:', error);
+    }
+};
+
+/**
+ * Request photo and video permissions specifically (targeted)
+ */
+export const requestPhotoVideoPermissions = async () => {
+    if (!Capacitor.isNativePlatform()) return;
+    
+    try {
+        // On modern Android (13+), images and videos are separate permissions
+        // Capacitor's Camera plugin handles 'photos' but for complete coverage 
+        // we can also use the native bridge for READ_MEDIA_VIDEO if needed.
+        const result = await Camera.requestPermissions({ permissions: ['photos'] });
+        if (result.photos !== 'granted') {
+            console.warn('Photo/Video permissions not granted');
+        }
+    } catch (error) {
+        console.error('Error requesting photo/video permissions:', error);
+    }
+};
+
+/**
+ * Request music and audio permissions specifically (targeted, Android 13+)
+ */
+export const requestMusicAudioPermissions = async () => {
+    if (!Capacitor.isNativePlatform()) return;
+    
+    const isAndroid = Capacitor.getPlatform() === 'android';
+    if (!isAndroid) return;
+
+    try {
+        const permissions = (window as any).plugins?.permissions;
+        if (permissions && permissions.READ_MEDIA_AUDIO) {
+            console.log('[PermissionUtils] REQUESTING: Media Audio');
+            await new Promise((resolve) => {
+                permissions.requestPermission(permissions.READ_MEDIA_AUDIO, (s: any) => resolve(s), (err: any) => resolve(err));
+            });
+        }
+    } catch (error) {
+        console.error('Error requesting music/audio permissions:', error);
+    }
+};
+
+
+
+
+/**
  * Schedule a "Shift End" reminder.
  */
 export const scheduleShiftEndReminder = async (startTime: Date, shiftDurationHours: number = 9) => {
