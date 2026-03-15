@@ -328,17 +328,19 @@ const App: React.FC = () => {
   // Subscribe reactively to OneSignal App ID from settings store
   const oneSignalAppId = useSettingsStore(state => state.apiSettings.oneSignalAppId);
 
-  // Initialize/Update OneSignal when App ID changes
+  // Initialize/Update OneSignal when App ID changes and app is past splash
   useEffect(() => {
+    // Only initialize OneSignal after the main initialization (session check) is done
+    // to avoid conflicting with the startup permission primer.
+    if (!isInitialized) return;
+
     const effectiveAppId = oneSignalAppId || import.meta.env.VITE_ONESIGNAL_APP_ID;
     
     if (effectiveAppId && effectiveAppId !== 'YOUR_ONESIGNAL_APP_ID' && effectiveAppId !== '') {
       console.log('[App] Initializing OneSignal with ID:', effectiveAppId);
       oneSignalService.init(effectiveAppId);
-    } else {
-      console.warn('[App] OneSignal App ID not found or invalid');
     }
-  }, [oneSignalAppId]);
+  }, [oneSignalAppId, isInitialized]);
 
 
     useEffect(() => {
@@ -722,11 +724,12 @@ const App: React.FC = () => {
   }, [isInitialized, user, location.pathname, navigate, isLoginAnimationPending]);
 
 
-  // While the initial authentication check is running, show the splash screen.
+  const [permissionsComplete, setPermissionsComplete] = useState(false);
+
+  // While the initial authentication check OR permissions check is running, show the splash screen.
   // This prevents the router from rendering and making incorrect navigation decisions.
-  if (!isInitialized) {
-    // Temporarily disabled splash screen by commenting out the return.
-    return <Splash />;
+  if (!isInitialized || !permissionsComplete) {
+    return <Splash onComplete={() => setPermissionsComplete(true)} />;
   }
 
   // Once initialized, render the main application structure.
