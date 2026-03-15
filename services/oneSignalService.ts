@@ -90,7 +90,12 @@ export const oneSignalService = {
                 // Prompt for notification permission on web
                 if (!OneSignalWeb.Notifications.permission) {
                     console.log('[OneSignal Web] Requesting notification permission via Slidedown...');
-                    await OneSignalWeb.Slidedown.showNotifications();
+                    try {
+                        await (OneSignalWeb.Slidedown as any).promptNotifications();
+                    } catch (e) {
+                        console.warn('[OneSignal Web] Slidedown prompt failed, trying native prompt:', e);
+                        await OneSignalWeb.Notifications.requestPermission();
+                    }
                 }
             } catch (error) {
                 console.error('[OneSignal Web] Initialization failed:', error);
