@@ -153,6 +153,7 @@ export const ApiSettings: React.FC = () => {
                                         className="w-full" 
                                         value={store.perfiosApi.clientId} 
                                         onChange={e => store.updatePerfiosApiSettings({ clientId: e.target.value })} 
+                                        autoCapitalizeCustom={false}
                                     />
                                     <Input 
                                         label="Perfios Client Secret" 
@@ -222,6 +223,7 @@ export const ApiSettings: React.FC = () => {
                                         className="w-full"
                                         value={store.apiSettings.oneSignalAppId || ''} 
                                         onChange={e => store.updateApiSettings({ oneSignalAppId: e.target.value })}
+                                        autoCapitalizeCustom={false}
                                     />
                                     <p className="text-xs text-muted">Used for native push notifications. Get this from your OneSignal Dashboard Settings.</p>
                                 </div>

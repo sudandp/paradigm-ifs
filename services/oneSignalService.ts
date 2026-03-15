@@ -20,6 +20,9 @@ export const oneSignalService = {
             return;
         }
 
+        // OneSignal App IDs must be lowercase UUIDs
+        const normalizedAppId = appId.toLowerCase().trim();
+
         if (Capacitor.isNativePlatform()) {
             if (_nativeInitialized) {
                 console.log('[OneSignal Native] Already initialized, skipping.');
@@ -34,7 +37,7 @@ export const oneSignalService = {
                     (window as any).plugins?.OneSignal?.setLogLevel(6, 0);
                 }
 
-                OneSignalNative.initialize(appId);
+                OneSignalNative.initialize(normalizedAppId);
 
                 OneSignalNative.Notifications.addEventListener('foregroundWillDisplay', (event) => {
                     console.log('[OneSignal Native] Notification received in foreground:', event);
@@ -53,7 +56,7 @@ export const oneSignalService = {
                 });
 
                 _nativeInitialized = true;
-                console.log('[OneSignal Native] Initialized with App ID:', appId);
+                console.log('[OneSignal Native] Initialized with App ID:', normalizedAppId);
             } catch (error) {
                 console.error('[OneSignal Native] Initialization failed:', error);
             }
@@ -65,13 +68,13 @@ export const oneSignalService = {
             }
             try {
                 await OneSignalWeb.init({
-                    appId: appId,
+                    appId: normalizedAppId,
                     allowLocalhostAsSecureOrigin: true,
                     serviceWorkerParam: { scope: '/' },
                     serviceWorkerPath: '/OneSignalSDKWorker.js',
                 });
                 _webInitialized = true;
-                console.log('[OneSignal Web] Initialized with App ID:', appId);
+                console.log('[OneSignal Web] Initialized with App ID:', normalizedAppId);
 
                 // Prompt for notification permission on web
                 if (Notification.permission === 'default') {
