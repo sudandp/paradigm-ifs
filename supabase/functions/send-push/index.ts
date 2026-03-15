@@ -16,13 +16,21 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const { userIds, title, message, url, broadcast, type, severity, metadata, link_to } = body;
-    console.log('Received send-push request:', { userIdsCount: userIds?.length, title, broadcast });
+    console.log('Received send-push request:', { 
+      userIdsCount: userIds?.length, 
+      title, 
+      broadcast,
+      appIdPrefix: ONESIGNAL_APP_ID?.substring(0, 4),
+      keyPrefix: ONESIGNAL_REST_API_KEY?.substring(0, 7)
+    });
 
     // 1. Send Push via OneSignal
     const payload: Record<string, unknown> = {
       app_id: ONESIGNAL_APP_ID,
       headings: { en: title },
       contents: { en: message },
+      url: url || null, // URL to open on click (Root level is required for Web)
+      web_url: url || null, // Explicitly for Web Push
       data: { url, ...metadata },
     };
 
@@ -35,7 +43,7 @@ serve(async (req) => {
     }
 
     if (broadcast) {
-      payload.included_segments = ["Subscribed Users"];
+      payload.included_segments = ["Subscribed Users", "Total Subscriptions", "Active Users"];
     } else {
       if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
         return new Response(JSON.stringify({ error: 'No user IDs provided' }), { 
