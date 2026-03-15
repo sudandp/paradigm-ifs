@@ -3358,7 +3358,14 @@ export const api = {
         broadcast: true,
         title: 'Important Alert',
         message: validData.message,
-        url: validData.linkTo || (validData as any).link || null
+        url: validData.linkTo || (validData as any).link || null,
+        type: validData.type || 'info',
+        severity: (validData as any).severity || 'Low',
+        metadata: {
+          ...(validData as any).metadata,
+          isBroadcast: true,
+          sentAt: new Date().toISOString()
+        }
       }
     }).catch(err => console.warn('Failed to trigger push broadcast:', err));
 
@@ -3441,7 +3448,13 @@ export const api = {
           broadcast: true,
           title: data.title || 'Important Alert',
           message: data.message,
-          url: data.link || null
+          url: data.link || null,
+          type: data.type || 'info',
+          severity: data.severity || 'Low',
+          metadata: {
+            isBroadcast: true,
+            sentAt: new Date().toISOString()
+          }
         }
       });
       
@@ -3481,7 +3494,13 @@ export const api = {
         userIds: finalUserIds,
         title: data.title || 'Important Alert',
         message: data.message,
-        url: data.link || null
+        url: data.link || null,
+        type: data.type || 'info',
+        severity: data.severity || 'Low',
+        metadata: {
+          originalRole: data.role,
+          sentAt: new Date().toISOString()
+        }
       }
     });
 
