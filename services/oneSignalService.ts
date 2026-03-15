@@ -49,10 +49,8 @@ export const oneSignalService = {
                     }
                 });
 
-                OneSignalNative.Notifications.requestPermission(true).then((granted) => {
-                    console.log('[OneSignal Native] Permission granted:', granted);
-                });
-
+                // OneSignal initialization is enough. 
+                // Permissions are handled by the unified flow in permissionUtils.ts
                 _nativeInitialized = true;
                 
                 // Log subscription status for debugging
