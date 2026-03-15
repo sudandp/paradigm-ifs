@@ -349,6 +349,13 @@ const AttendanceSettings: React.FC = () => {
                             checked={currentRules.enableShortfall || false}
                             onChange={(e) => handleSettingChange('enableShortfall', e.target.checked)}
                         />
+                        <Checkbox
+                            id="enableViolationBlocking"
+                            label="Enable Violation Blocking"
+                            description="Restrict app access and hold salary automatically when a user reaches the strike limit (default 3)."
+                            checked={currentRules.enableViolationBlocking ?? true}
+                            onChange={(e) => handleSettingChange('enableViolationBlocking', e.target.checked)}
+                        />
                         {currentRules.enableOtToCompOffConversion && (
                             <div className="pl-8 w-full max-w-xs">
                                 <Input

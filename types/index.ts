@@ -787,6 +787,7 @@ export interface StaffAttendanceRules {
   minimumSitePercentage?: number; // e.g., 75 - minimum % of time that must be on-site
   maximumTravelPercentage?: number; // e.g., 25 - maximum % of time for travel
   enableSiteTimeTracking?: boolean; // Enable site vs travel validation for field staff
+  enableViolationBlocking?: boolean; // Whether violations should block the user and hold salary
   earnedLeaveAccrual?: {
     daysRequired: number; // e.g., 10
     amountEarned: number; // e.g., 0.5

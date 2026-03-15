@@ -5453,16 +5453,25 @@ export const api = {
       ).length;
 
       const { maxViolationsPerMonth } = await this.getGeofencingSettings();
+      const enableBlocking = rules.enableViolationBlocking ?? true;
 
       if (pendingCount >= maxViolationsPerMonth) {
-        // 3 strikes reached!
-        await this.setSalaryHold(userId, true, `Attendance Violation Strike Policy: ${pendingCount} violations reached in ${format(new Date(date), 'MMMM yyyy')}.`);
-        
-        // Notify user
-        await this.createNotification({
-          userId,
-          message: `URGENT: You have reached ${pendingCount} attendance violations this month. Your access has been restricted and salary is on hold. Please provide reasons for your violations to resume.`,
-        });
+        if (enableBlocking) {
+          // 3 strikes reached!
+          await this.setSalaryHold(userId, true, `Attendance Violation Strike Policy: ${pendingCount} violations reached in ${format(new Date(date), 'MMMM yyyy')}.`);
+          
+          // Notify user
+          await this.createNotification({
+            userId,
+            message: `URGENT: You have reached ${pendingCount} attendance violations this month. Your access has been restricted and salary is on hold. Please provide reasons for your violations to resume.`,
+          });
+        } else {
+          // Blocking disabled, just notify
+          await this.createNotification({
+            userId,
+            message: `NOTICE: You have reached ${pendingCount} attendance violations this month. Please review and provide reasons to avoid future restrictions.`,
+          });
+        }
       }
     } catch (error) {
       console.error('Error processing field attendance violations:', error);
