@@ -299,7 +299,7 @@ const ViolationsView: React.FC<ViolationsViewProps> = ({ userId, userName, isMan
                  }
                }}
             >
-              Reset Current Month
+              Allow user to work and start fresh
             </Button>
           </div>
         </div>
