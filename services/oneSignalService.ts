@@ -73,14 +73,24 @@ export const oneSignalService = {
                     serviceWorkerParam: { scope: '/' },
                     serviceWorkerPath: '/OneSignalSDKWorker.js',
                 });
+                // Display handler for foreground (when tab is active)
+                OneSignalWeb.Notifications.addEventListener('foregroundWillDisplay', (event) => {
+                    console.log('[OneSignal Web] Foreground notification received:', event);
+                });
+
+                OneSignalWeb.Notifications.addEventListener('click', (event) => {
+                    console.log('[OneSignal Web] Notification clicked:', event);
+                });
+
                 _webInitialized = true;
                 console.log('[OneSignal Web] Initialized with App ID:', normalizedAppId);
+                console.log('[OneSignal Web] Notification Permission:', OneSignalWeb.Notifications.permission);
+                console.log('[OneSignal Web] Subscription ID:', OneSignalWeb.User.PushSubscription.id);
 
                 // Prompt for notification permission on web
-                if (Notification.permission === 'default') {
-                    console.log('[OneSignal Web] Requesting notification permission...');
-                    const permission = await Notification.requestPermission();
-                    console.log('[OneSignal Web] Permission result:', permission);
+                if (!OneSignalWeb.Notifications.permission) {
+                    console.log('[OneSignal Web] Requesting notification permission via Slidedown...');
+                    await OneSignalWeb.Slidedown.showNotifications();
                 }
             } catch (error) {
                 console.error('[OneSignal Web] Initialization failed:', error);
