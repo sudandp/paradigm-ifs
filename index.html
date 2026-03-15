@@ -143,6 +143,7 @@
           );
         }
 
+        /* Commented out to avoid conflict with OneSignal Service Worker registration
         window.addEventListener("load", () => {
           navigator.serviceWorker.register("/sw.js")
             .then((reg) =>
@@ -152,6 +153,7 @@
               console.log("Service Worker registration failed:", err)
             );
         });
+        */
       }
     </script>
   </body>

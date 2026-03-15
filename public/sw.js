@@ -1,3 +1,6 @@
+// OneSignal SDK Import (Consolidated Service Worker)
+importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
+
 // Generate a unique cache version based on timestamp to force cache invalidation on each deployment
 const CACHE_VERSION = 'v-' + new Date().getTime();
 const CACHE_NAME = 'paradigm-' + CACHE_VERSION;

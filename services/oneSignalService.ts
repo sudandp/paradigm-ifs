@@ -71,7 +71,7 @@ export const oneSignalService = {
                     appId: normalizedAppId,
                     allowLocalhostAsSecureOrigin: true,
                     serviceWorkerParam: { scope: '/' },
-                    serviceWorkerPath: '/OneSignalSDKWorker.js',
+                    serviceWorkerPath: '/sw.js',
                 });
                 _webInitialized = true;
                 console.log('[OneSignal Web] Initialized with App ID:', normalizedAppId);
