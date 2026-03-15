@@ -240,9 +240,14 @@ const PermissionGuard: React.FC<PermissionGuardProps> = ({ children }) => {
         permissions.contacts &&
         permissions.activity;
 
+    // PERMISSION GUARD DISABLED PER PROJECT REQUIREMENT
+    return <>{children}</>;
+    
+    /*
     if (allGranted) {
         return <>{children}</>;
     }
+    */
 
     const openSettings = async () => {
         try {

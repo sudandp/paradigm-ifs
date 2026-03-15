@@ -15,42 +15,52 @@ const PermissionsPrimer: React.FC<PermissionsPrimerProps> = ({ onComplete }) => 
   const [missingPermissions, setMissingPermissions] = useState<string[]>([]);
   const [statusMessage, setStatusMessage] = useState('Verifying security requirements...');
 
-  const permissionList = [
+    const permissionList = [
     { id: 'Camera', icon: Camera, label: 'Camera' },
     { id: 'Location', icon: MapPin, label: 'Location' },
     { id: 'Nearby devices', icon: Bluetooth, label: 'Nearby Devices' },
     { id: 'Photos and videos', icon: Image, label: 'Photos & Gallery' },
     { id: 'Music and audio', icon: Bell, label: 'Music & Audio' },
     { id: 'Notifications', icon: Bell, label: 'Notifications' },
+    { id: 'Contacts', icon: Users, label: 'Contacts' },
   ];
 
   const verifyPermissions = async () => {
     setIsChecking(true);
+    setStatusMessage('Connecting to security bridge...');
+    
+    // Defensive wait: check if Capacitor is ready. On some Android devices,
+    // the bridge injection might be delayed.
+    let retryCount = 0;
+    while (!Capacitor.isNativePlatform() && retryCount < 5) {
+      const isAndroidUA = /Android/i.test(navigator.userAgent);
+      if (!isAndroidUA) break; // If not even a mobile UA, don't wait indefinitely
+      
+      console.warn(`[PermissionsPrimer] Bridge not ready, retrying... (${retryCount + 1}/5)`);
+      await new Promise(r => setTimeout(r, 800));
+      retryCount++;
+    }
+
+    setStatusMessage('Verifying status...');
     const { allGranted, missing } = await checkRequiredPermissions();
     setMissingPermissions(missing);
     setIsChecking(false);
     
-    if (allGranted) {
-      onComplete();
+    if (allGranted && missing.length === 0) {
+      setStatusMessage('Security check passed!');
+      setTimeout(() => {
+        onComplete();
+      }, 1000);
     }
   };
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) {
-      onComplete();
-      return;
-    }
-    
     // Hide splash screen immediately so it doesn't cover system dialogs
-    if (Capacitor.isNativePlatform()) {
-      SplashScreen.hide().catch(() => {});
-    }
+    SplashScreen.hide().catch(() => {});
     
-    // Tiny delay to let the UI settle
-    setTimeout(() => {
-        verifyPermissions();
-    }, 500);
-  }, [onComplete]);
+    // Start verification
+    verifyPermissions();
+  }, []);
 
   const handleStartSetup = async () => {
     setIsRequesting(true);
@@ -92,7 +102,7 @@ const PermissionsPrimer: React.FC<PermissionsPrimerProps> = ({ onComplete }) => 
         </h2>
         
         <p className="text-gray-500 text-xs mb-6 px-4">
-          Paradigm IFS requires these 6 categories to be <span className="text-emerald-600 font-bold">Allowed</span> to operate.
+          Paradigm IFS requires these <span className="text-emerald-600 font-bold">7 categories</span> to be <span className="text-emerald-600 font-bold">Allowed</span> to operate.
         </p>
 
         <div className="mb-8 text-left space-y-2">

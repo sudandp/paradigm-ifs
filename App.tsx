@@ -310,6 +310,7 @@ const App: React.FC = () => {
   const { setDeferredPrompt } = usePWAStore();
   const { isUpdateRequired, updateInfo } = useAppUpdate();
   const { isOnline } = useNetworkStatus();
+  const [permissionsComplete, setPermissionsComplete] = useState(false);
   const [isAppOutdated, setIsAppOutdated] = useState(false);
 
   // Initialize offline sync service
@@ -330,9 +331,10 @@ const App: React.FC = () => {
 
   // Initialize/Update OneSignal when App ID changes and app is past splash
   useEffect(() => {
-    // Only initialize OneSignal after the main initialization (session check) is done
-    // to avoid conflicting with the startup permission primer.
-    if (!isInitialized) return;
+    // CRITICAL: Only initialize OneSignal after BOTH session check and permissions check are 100% complete.
+    // This prevents OneSignal from stealing focus or showing a notification prompt
+    // while the user is still in the compliance check sequence.
+    if (!isInitialized || !permissionsComplete) return;
 
     const effectiveAppId = oneSignalAppId || import.meta.env.VITE_ONESIGNAL_APP_ID;
     
@@ -340,7 +342,7 @@ const App: React.FC = () => {
       console.log('[App] Initializing OneSignal with ID:', effectiveAppId);
       oneSignalService.init(effectiveAppId);
     }
-  }, [oneSignalAppId, isInitialized]);
+  }, [oneSignalAppId, isInitialized, permissionsComplete]);
 
 
     useEffect(() => {
@@ -724,12 +726,23 @@ const App: React.FC = () => {
   }, [isInitialized, user, location.pathname, navigate, isLoginAnimationPending]);
 
 
-  const [permissionsComplete, setPermissionsComplete] = useState(false);
 
-  // While the initial authentication check OR permissions check is running, show the splash screen.
+  // Robust check for native platform at the App level
+  const isAndroidUA = /Android/i.test(navigator.userAgent);
+  const isIOSUA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isLikelyMobile = isAndroidUA || isIOSUA || Capacitor.isNativePlatform();
+
+  // While the initial authentication check is running, show the splash screen.
   // This prevents the router from rendering and making incorrect navigation decisions.
-  if (!isInitialized || !permissionsComplete) {
-    return <Splash onComplete={() => setPermissionsComplete(true)} />;
+  if (!isInitialized) {
+    return (
+      <Splash 
+        onComplete={() => {
+          console.log('[App] Session check complete.');
+          setPermissionsComplete(true);
+        }} 
+      />
+    );
   }
 
   // Once initialized, render the main application structure.

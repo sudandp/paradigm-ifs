@@ -14,10 +14,15 @@ const Splash: React.FC<SplashProps> = ({ onComplete }) => {
         onComplete();
     };
 
-    // Show permissions primer on mobile
+    /* 
+    // Permissions check disabled per project requirement.
     if (!permissionsComplete) {
         return <PermissionsPrimer onComplete={handlePermissionsComplete} />;
     }
+    */
+
+    // Directly trigger completion if needed, though App.tsx now handles it better.
+    // We'll just show the loading screen until the app is ready.
 
     // Show the same LoadingScreen used everywhere else
     return <LoadingScreen message="Initializing Application..." />;
