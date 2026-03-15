@@ -26,6 +26,14 @@ serve(async (req) => {
       data: { url, ...metadata },
     };
 
+    // Optimization for High/Critical priority
+    if (severity === 'High') {
+      payload.priority = 10;
+      payload.android_visibility = 1; // Show on lock screen
+    } else {
+      payload.priority = 5;
+    }
+
     if (broadcast) {
       payload.included_segments = ["Subscribed Users"];
     } else {
