@@ -16,7 +16,7 @@ import { calculateDistanceMeters, reverseGeocode, getPrecisePosition } from '../
 import { processDailyEvents } from '../utils/attendanceCalculations';
 import { dispatchNotificationFromRules } from '../services/notificationService';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { scheduleShiftEndReminder, scheduleBreakEndReminder, cancelNotification } from '../utils/notificationUtils';
+import { scheduleShiftEndReminder, scheduleBreakEndReminder, cancelNotification } from '../utils/permissionUtils';
 
 // Centralized friendly error message handler for Supabase
 // Centralized friendly error message handler for Supabase

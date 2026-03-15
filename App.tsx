@@ -352,9 +352,9 @@ const App: React.FC = () => {
 
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         
-        // Request notification permissions early
-        import('./utils/notificationUtils').then(({ requestNotificationPermissions }) => {
-            requestNotificationPermissions();
+        // Request ALL required permissions early (Camera, Location, Contacts, Notifications)
+        import('./utils/permissionUtils').then(({ requestAllPermissions }) => {
+            requestAllPermissions();
         });
 
         return () => {
@@ -574,6 +574,16 @@ const App: React.FC = () => {
       if (isActive) {
         console.log('[AppState] App returned to foreground. Verifying session...');
         const { data: { session } } = await supabase.auth.getSession();
+        
+        // Refresh notifications and badge count when app returns to foreground
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser) {
+          console.log('[AppState] Refreshing notifications on resume...');
+          useNotificationStore.getState().fetchNotifications().catch(err => {
+            console.error('[AppState] Failed to refresh notifications on resume:', err);
+          });
+        }
+
         if (!session) {
           // If session is lost in background, we might need to restore it
           const { value: refreshToken } = await Preferences.get({ key: 'supabase.auth.rememberMe' });

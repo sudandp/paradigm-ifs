@@ -5,6 +5,7 @@ import { useAuthStore } from './authStore';
 import { supabase } from '../services/supabase';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
+import { Badge } from '@capawesome/capacitor-badge';
 
 interface NotificationState {
   notifications: Notification[];
@@ -181,15 +182,13 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
     if (!Capacitor.isNativePlatform()) return;
     try {
       const count = get().totalUnreadCount;
-      // Use a variable to bypass Vite's static import analysis which causes 500 errors if the plugin is missing from node_modules
-      const pluginPath = '@capawesome/capacitor-badge';
-      // @ts-ignore
-      const { Badge } = await import(/* @vite-ignore */ pluginPath).catch(() => ({ Badge: null }));
-      if (Badge && typeof Badge.set === 'function') {
-        await Badge.set({ count });
-      }
+      console.log(`[NotificationStore] Updating badge count to: ${count}`);
+      
+      // Ensure the count is valid
+      const badgeCount = isNaN(count) ? 0 : Math.max(0, count);
+      await Badge.set({ count: badgeCount });
     } catch (err) {
-      console.warn('Badge plugin notification failed:', err);
+      console.warn('[NotificationStore] Badge update failed:', err);
     }
   },
 

@@ -82,6 +82,30 @@ serve(async (req) => {
       }
     }
 
+    // 2. Fetch Unread Count for Badge (if single user and targeted)
+    if (!broadcast && userIds && userIds.length === 1) {
+      try {
+        const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+        const { count } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userIds[0])
+          .eq('is_read', false);
+
+        if (count !== null) {
+          // If the notification hasn't been persisted yet, it might be 1 less than it should be
+          // But since most callers (like notificationService) insert BEFORE calling this, it should be correct.
+          payload.ios_badgeType = 'SetTo';
+          payload.ios_badgeCount = count;
+          payload.android_badge_type = 'SetTo';
+          payload.android_badge_count = count;
+          console.log(`[OneSignal] Setting badge count to ${count} for user ${userIds[0]}`);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch unread count for badge:', err);
+      }
+    }
+
     console.log('Sending message via OneSignal...');
     const osResponse = await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",

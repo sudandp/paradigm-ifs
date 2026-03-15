@@ -30,17 +30,15 @@ export const oneSignalService = {
             }
             try {
                 // OneSignal 5.x uses Debug.setLogLevel
-                if ((window as any).OneSignal?.Debug) {
-                    (window as any).OneSignal.Debug.setLogLevel(6);
-                } else {
-                    // Fallback for older/cordova versions if needed
-                    (window as any).plugins?.OneSignal?.setLogLevel(6, 0);
-                }
+                OneSignalNative.Debug.setLogLevel(6);
 
                 OneSignalNative.initialize(normalizedAppId);
 
                 OneSignalNative.Notifications.addEventListener('foregroundWillDisplay', (event) => {
                     console.log('[OneSignal Native] Notification received in foreground:', event);
+                    // In OneSignal 5.x, foreground notifications are often suppressed.
+                    // We explicitly tell it to display.
+                    event.getNotification().display();
                 });
 
                 OneSignalNative.Notifications.addEventListener('click', (event) => {
@@ -56,7 +54,13 @@ export const oneSignalService = {
                 });
 
                 _nativeInitialized = true;
+                
+                // Log subscription status for debugging
+                const pushSub = OneSignalNative.User.pushSubscription;
                 console.log('[OneSignal Native] Initialized with App ID:', normalizedAppId);
+                console.log('[OneSignal Native] Subscription ID:', pushSub.id);
+                console.log('[OneSignal Native] Opted In:', pushSub.optedIn);
+                
             } catch (error) {
                 console.error('[OneSignal Native] Initialization failed:', error);
             }
