@@ -352,11 +352,6 @@ const App: React.FC = () => {
 
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         
-        // Request ALL required permissions early (Camera, Location, Contacts, Notifications)
-        import('./utils/permissionUtils').then(({ requestAllPermissions }) => {
-            requestAllPermissions();
-        });
-
         return () => {
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         };

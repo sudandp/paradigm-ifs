@@ -14,76 +14,119 @@ const NOTIFICATION_IDS = {
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * Request ALL required device permissions at once.
- * This ensures the user is prompted for everything upfront.
+ * Robustly check if all 6 required permissions are granted.
+ */
+export const checkRequiredPermissions = async () => {
+    if (!Capacitor.isNativePlatform()) return { allGranted: true, missing: [] };
+
+    const missing: string[] = [];
+    
+    try {
+        // 1. Notifications
+        const notif = await LocalNotifications.checkPermissions();
+        if (notif.display !== 'granted') missing.push('Notifications');
+
+        // 2. Location
+        const loc = await Geolocation.checkPermissions();
+        if (loc.location !== 'granted') missing.push('Location');
+
+        // 3. Camera
+        const cam = await Camera.checkPermissions();
+        if (cam.camera !== 'granted') missing.push('Camera');
+
+        // 4. Photos/Videos (Gallery)
+        if (cam.photos !== 'granted') missing.push('Photos and videos');
+
+        // 5. Contacts
+        const contacts = await Contacts.checkPermissions();
+        if (contacts.contacts !== 'granted') missing.push('Contacts');
+
+        // 6. Nearby Devices (Bluetooth) - Use direct native check if possible
+        const permissions = (window as any).plugins?.permissions;
+        if (permissions && Capacitor.getPlatform() === 'android') {
+            await new Promise((resolve) => {
+                permissions.checkPermission(permissions.BLUETOOTH_SCAN, (status: any) => {
+                    if (!status.hasPermission) missing.push('Nearby devices');
+                    resolve(true);
+                });
+            });
+            
+            // Also check Audio for Android 13
+            await new Promise((resolve) => {
+                permissions.checkPermission(permissions.READ_MEDIA_AUDIO, (status: any) => {
+                    if (!status.hasPermission) missing.push('Music and audio');
+                    resolve(true);
+                });
+            });
+        }
+    } catch (e) {
+        console.error('[PermissionUtils] Error during check:', e);
+    }
+
+    return {
+        allGranted: missing.length === 0,
+        missing
+    };
+};
+
+/**
+ * Request ALL required device permissions at once in a strict, sequential way.
  */
 export const requestAllPermissions = async () => {
     if (!Capacitor.isNativePlatform()) return;
 
-    console.log('[PermissionUtils] Starting permanent unified permission request flow...');
+    console.log('[PermissionUtils] Starting STRICT unified permission request flow...');
 
-    // 1. Notifications (System level)
+    // We start with Location & Camera (highest priority for app core features)
+    
+    // 1. Location
     try {
-        console.log('[PermissionUtils] Requesting Notifications...');
-        await LocalNotifications.requestPermissions();
-    } catch (e) { console.error('Notifications request error:', e); }
+        console.log('[PermissionUtils] Step 1: Location');
+        await Geolocation.requestPermissions();
+    } catch (e) {}
 
-    await delay(1000);
+    await delay(1500);
 
-    // 2. Direct Android Permissions (Native Brute Force)
-    // This uses the cordova-plugin-android-permissions already in the project
+    // 2. Camera & Photos
+    try {
+        console.log('[PermissionUtils] Step 2: Camera & Photos');
+        await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
+    } catch (e) {}
+
+    await delay(1500);
+
+    // 3. Direct Android Block (Bluetooth, Media, Contacts)
     const permissions = (window as any).plugins?.permissions;
     if (permissions && Capacitor.getPlatform() === 'android') {
-        const list = [
-            permissions.CAMERA,
-            permissions.ACCESS_FINE_LOCATION,
-            permissions.ACCESS_COARSE_LOCATION,
-            permissions.BLUETOOTH_SCAN,
-            permissions.BLUETOOTH_CONNECT,
-            permissions.READ_MEDIA_IMAGES,
-            permissions.READ_MEDIA_VIDEO,
-            permissions.READ_MEDIA_AUDIO,
-            permissions.READ_CONTACTS
-        ];
-
-        console.log('[PermissionUtils] Requesting native Android permission block...');
-        
-        // We request them in groups to avoid overwhelming the OS
         const groups = [
-            [permissions.CAMERA, permissions.READ_MEDIA_IMAGES, permissions.READ_MEDIA_VIDEO],
-            [permissions.ACCESS_FINE_LOCATION, permissions.ACCESS_COARSE_LOCATION],
             [permissions.BLUETOOTH_SCAN, permissions.BLUETOOTH_CONNECT],
             [permissions.READ_MEDIA_AUDIO, permissions.READ_CONTACTS]
         ];
 
         for (const group of groups) {
             try {
-                await new Promise((resolve, reject) => {
-                    permissions.requestPermissions(group, 
-                        (status: any) => resolve(status), 
-                        (err: any) => reject(err)
-                    );
+                console.log('[PermissionUtils] Step 3: Native Group', group);
+                await new Promise((resolve) => {
+                    permissions.requestPermissions(group, (s: any) => resolve(s), (err: any) => resolve(err));
                 });
-                console.log('[PermissionUtils] Finished permission group:', group);
-                await delay(1000); // Wait between groups
-            } catch (err) {
-                console.error('[PermissionUtils] Error in permission group:', group, err);
-            }
+                await delay(1500);
+            } catch (err) {}
         }
     } else {
-        // Fallback or iOS logic (using standard Capacitor plugins)
-        console.log('[PermissionUtils] Native permissions plugin not found or not Android, falling back to Capacitor plugins...');
-        
-        try { await Camera.requestPermissions({ permissions: ['camera', 'photos'] }); } catch (e) {}
-        await delay(800);
-        try { await Geolocation.requestPermissions(); } catch (e) {}
-        await delay(800);
+        // iOS / Fallback
         try { await BleClient.initialize(); } catch (e) {}
-        await delay(800);
+        await delay(1500);
         try { await Contacts.requestPermissions(); } catch (e) {}
+        await delay(1500);
     }
 
-    console.log('[PermissionUtils] Permanent unified permission flow finished.');
+    // 4. Notifications (Final step)
+    try {
+        console.log('[PermissionUtils] Step 4: Notifications');
+        await LocalNotifications.requestPermissions();
+    } catch (e) {}
+
+    console.log('[PermissionUtils] Strict flow finished.');
 };
 
 /**
