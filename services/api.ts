@@ -3430,9 +3430,12 @@ export const api = {
 
   broadcastNotification: async (data: { role?: string; userIds?: string[]; message: string; title?: string; type?: NotificationType; link?: string; severity?: 'Low' | 'Medium' | 'High' }): Promise<void> => {
     let finalUserIds: string[] = data.userIds || [];
+    const isBroadcast = data.role?.toLowerCase() === 'all' || (finalUserIds.length === 0 && !data.role);
+
+    console.log('[API] broadcastNotification request:', { ...data, isBroadcast });
     
     // Check for "all" role or no specific targets
-    if (data.role === 'all' || (finalUserIds.length === 0 && !data.role)) {
+    if (isBroadcast) {
       const { error } = await supabase.rpc('broadcast_notification', {
         p_message: data.message,
         p_type: data.type || 'info',
@@ -3440,7 +3443,10 @@ export const api = {
         p_metadata: {},
         p_link_to: data.link || null
       });
-      if (error) throw error;
+      if (error) {
+        console.error('[API] broadcast_notification RPC failed:', error);
+        throw error;
+      }
 
       // Trigger real push broadcast via OneSignal Edge Function
       const { error: pushError } = await supabase.functions.invoke('send-push', {
@@ -3459,10 +3465,11 @@ export const api = {
       });
       
       if (pushError) {
-        console.error('Failed to trigger push broadcast:', pushError);
+        console.error('[API] send-push (broadcast) Edge Function failed:', pushError);
         throw pushError;
       }
 
+      console.log('[API] Broadcast sent successfully.');
       return;
     }
     

@@ -19,6 +19,26 @@ async function test() {
   });
   console.log('RPC Status:', res.status);
   console.log('RPC Error:', await res.text());
+
+  const pushRes = await fetch(`${supabaseUrl}/functions/v1/send-push`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': anonKey,
+      'Authorization': `Bearer ${anonKey}`
+    },
+    body: JSON.stringify({
+      broadcast: true,
+      title: 'Alert From fetch',
+      message: 'Testing broadcast',
+      url: null,
+      type: 'info',
+      severity: 'Low',
+      metadata: { isBroadcast: true }
+    })
+  });
+  console.log('Edge Function Status:', pushRes.status);
+  console.log('Edge Function Error:', await pushRes.text());
 }
 
 test();

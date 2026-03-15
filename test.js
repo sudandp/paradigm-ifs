@@ -15,9 +15,24 @@ async function test() {
   console.log('Error from RPC:', error);
 
   const { data, error: tableError } = await supabase.from('notifications').select('severity').limit(1);
-  console.log('Sample severity:', data?.[0]);
-  if (tableError) console.error(tableError);
+  console.log('Sample severity available?', !!data?.[0]);
+  if (tableError) console.error('Table Error:', tableError);
   
+  console.log('Calling send-push Edge Function...');
+  const { data: pushData, error: pushError } = await supabase.functions.invoke('send-push', {
+    body: {
+      broadcast: true,
+      title: 'Alert From CLI',
+      message: 'Testing broadcast',
+      url: null,
+      type: 'info',
+      severity: 'Low',
+      metadata: { isBroadcast: true }
+    }
+  });
+
+  console.log('Edge Function Data:', pushData);
+  if (pushError) console.error('Edge Function Error:', pushError);
 }
 
 test();
