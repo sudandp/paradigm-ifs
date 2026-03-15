@@ -20,7 +20,8 @@ import type {
     Organization,
     CompOffLog,
     UserHoliday,
-    StaffAttendanceRules
+    StaffAttendanceRules,
+    FieldAttendanceViolation
 } from '../../types';
 import ManualAttendanceModal from '../../components/attendance/ManualAttendanceModal';
 import AssignLeaveModal from '../../components/attendance/AssignLeaveModal';
@@ -73,6 +74,7 @@ import {
     LeaveBalanceRow
 } from '../../utils/excelExport';
 import { calculateWorkingHours } from '../../utils/attendanceCalculations';
+import { getFieldStaffStatus } from '../../utils/fieldStaffTracking';
 import { FIXED_HOLIDAYS } from '../../utils/constants';
 import LoadingScreen from '../../components/ui/LoadingScreen';
 import {
@@ -812,6 +814,8 @@ const AttendanceDashboard: React.FC = () => {
     const [attendanceEvents, setAttendanceEvents] = useState<AttendanceEvent[]>([]);
     const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
     const [userHolidaysPool, setUserHolidaysPool] = useState<UserHoliday[]>([]);
+    // Map of userId -> FieldAttendanceViolation[] for field staff
+    const [fieldViolationsMap, setFieldViolationsMap] = useState<Record<string, FieldAttendanceViolation[]>>({});
     const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -1183,6 +1187,19 @@ const AttendanceDashboard: React.FC = () => {
             const leavesData = Array.isArray(leavesResponse) ? leavesResponse : leavesResponse.data;
             setLeaves(leavesData);
             setUserHolidaysPool(holidaysResponse || []);
+
+            // Fetch field violations for field staff users (for site-time-percentage status)
+            const fieldRoles = ['field_staff', 'site_manager'];
+            const fieldUsers = usersRef.current.filter(u => fieldRoles.includes(u.role?.toLowerCase() || ''));
+            const violationsMap: Record<string, FieldAttendanceViolation[]> = {};
+            await Promise.all(fieldUsers.map(async (fu) => {
+                try {
+                    violationsMap[fu.id] = await api.getFieldViolations(fu.id);
+                } catch {
+                    violationsMap[fu.id] = [];
+                }
+            }));
+            setFieldViolationsMap(violationsMap);
 
             // --- Calculate "Today" Stats ---
             const todayStr = format(today, 'yyyy-MM-dd');
@@ -1822,6 +1839,18 @@ const AttendanceDashboard: React.FC = () => {
                     } else if (isWorkFromHome) {
                         status = 'W/H';
                         workFromHomeDays++; 
+                    } else if (userCategory === 'field' && attendance.field?.enableSiteTimeTracking) {
+                        // FIELD STAFF: Use site-time-percentage logic
+                        const userViolations = fieldViolationsMap[user.id] || [];
+                        const dayViolation = userViolations.find(v => v.date === dateStr);
+                        const fieldResult = getFieldStaffStatus(dayEvents, attendance.field, dayViolation);
+                        status = fieldResult.status;
+
+                        if (status === 'P') {
+                            presentDays++;
+                        } else if (status === '1/2P' || status === '0.5P') {
+                            halfDays++;
+                        }
                     } else {
                         if (isFullDay) {
                             status = 'P';
@@ -1882,7 +1911,7 @@ const AttendanceDashboard: React.FC = () => {
             return row.statuses.includes(selectedStatus);
         });
 
-    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, selectedSite, recurringHolidays, leaves, userHolidaysPool, officeHolidays, fieldHolidays]);
+    }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, selectedSite, recurringHolidays, leaves, userHolidaysPool, officeHolidays, fieldHolidays, fieldViolationsMap]);
 
 
     // Determine which PDF component to render

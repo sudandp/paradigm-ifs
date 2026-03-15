@@ -3,7 +3,8 @@ import { format, getDaysInMonth, startOfMonth, endOfMonth, eachDayOfInterval, st
 import { Download } from 'lucide-react';
 import { api } from '../../services/api';
 import { processDailyEvents, calculateWorkingHours, isLateCheckIn, isEarlyCheckOut } from '../../utils/attendanceCalculations';
-import type { AttendanceEvent, User, StaffAttendanceRules, UserHoliday } from '../../types';
+import { getFieldStaffStatus } from '../../utils/fieldStaffTracking';
+import type { AttendanceEvent, User, StaffAttendanceRules, UserHoliday, FieldAttendanceViolation } from '../../types';
 import Button from '../ui/Button';
 import { useSettingsStore } from '../../store/settingsStore';
 import { FIXED_HOLIDAYS } from '../../utils/constants';
@@ -118,8 +119,20 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
         const fetchStartDate = startOfWeek(startDate, { weekStartsOn: 1 }); // Monday
         const events = await api.getAttendanceEvents(user.id, format(fetchStartDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd HH:mm:ss'));
         const userLeaves = (leavesData || []).filter((l: any) => l.userId === user.id && l.status === 'approved');
+
+        // Fetch field violations for field staff to check manager acknowledgments
+        let fieldViolations: FieldAttendanceViolation[] = [];
+        const userCategory = getStaffCategory(user.role);
+        if (userCategory === 'field') {
+          try {
+            fieldViolations = await api.getFieldViolations(user.id);
+          } catch (err) {
+            console.warn('Could not fetch field violations for', user.id, err);
+          }
+        }
+
         // Pass userHolidaysData directly to avoid stale state issues
-        const monthlyData = processEmployeeMonth(user, events, userLeaves, userHolidaysData || [], year, month);
+        const monthlyData = processEmployeeMonth(user, events, userLeaves, userHolidaysData || [], year, month, fieldViolations);
         employeeReports.push(monthlyData);
       }
 
@@ -131,7 +144,7 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
     }
   };
 
-  const processEmployeeMonth = (user: User, events: AttendanceEvent[], userLeaves: any[], userHolidays: any[], year: number, month: number): EmployeeMonthlyData => {
+  const processEmployeeMonth = (user: User, events: AttendanceEvent[], userLeaves: any[], userHolidays: any[], year: number, month: number, fieldViolations: FieldAttendanceViolation[] = []): EmployeeMonthlyData => {
     const daysInMonth = getDaysInMonth(new Date(year, month - 1));
     const dailyData: DailyData[] = [];
     
@@ -441,19 +454,28 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
           shiftCounts[shift] = (shiftCounts[shift] || 0) + 1;
         }
 
-        // GLOBAL RULE: 8h target for shortfall, 4h threshold for "Present" (P)
-        const fullDayHours = 8; 
-        const halfDayHours = 4; 
-        
+        // --- STATUS DETERMINATION ---
         if (isSunday) {
             status = 'WOP';
             if (!isFuture) weekendPresents++;
+        } else if (category === 'field' && rules.enableSiteTimeTracking) {
+            // FIELD STAFF: Use site-time-percentage logic
+            const dayViolation = fieldViolations.find(v => v.date === dateStr);
+            const fieldResult = getFieldStaffStatus(dayEvents, rules, dayViolation);
+            status = fieldResult.status;
+
+            if (status === 'P') {
+                // presentDays already incremented above via duration check
+            } else if (status === '1/2P') {
+                halfDays++;
+            }
         } else {
+            // OFFICE / SITE STAFF: Use hours-based logic
+            const fullDayHours = 8; 
+
             if (duration >= fullDayHours) {
-                // Rules based: 8hrs above means P
                 status = 'P';
             } else if (duration > 0) {
-                // Rules based: 4 hrs below (and anything less than 8) means 1/2p
                 status = '1/2P';
                 halfDays++; 
             } else {

@@ -1,5 +1,5 @@
 import { differenceInMinutes, parseISO } from 'date-fns';
-import type { AttendanceEvent } from '../types';
+import type { AttendanceEvent, StaffAttendanceRules, FieldAttendanceViolation } from '../types';
 
 export interface SiteTravelBreakdown {
   totalHours: number;
@@ -107,4 +107,50 @@ export function validateFieldStaffAttendance(
     violations,
     status,
   };
+}
+
+/**
+ * Consolidated field staff attendance status determination.
+ *
+ * Uses site-time-percentage logic:
+ *  - P  → site % >= minimumSitePercentage (default 75%)
+ *  - P  → violation exists but manager acknowledged it (attendanceGranted = true)
+ *  - 1/2P → worked but site % below threshold and no acknowledgment
+ *  - A  → no activity
+ *
+ * @param events All attendance events for the day
+ * @param rules  Field staff attendance rules from settings
+ * @param violation Optional existing field violation record for the day
+ */
+export function getFieldStaffStatus(
+  events: AttendanceEvent[],
+  rules: StaffAttendanceRules,
+  violation?: Pick<FieldAttendanceViolation, 'attendanceGranted' | 'status'> | null,
+): {
+  status: 'P' | '1/2P' | 'A';
+  breakdown: SiteTravelBreakdown;
+  hasViolation: boolean;
+  grantedByManager: boolean;
+} {
+  const breakdown = calculateSiteTravelTime(events);
+  const minSite = rules.minimumSitePercentage ?? 75;
+
+  // No activity
+  if (breakdown.totalHours === 0) {
+    return { status: 'A', breakdown, hasViolation: false, grantedByManager: false };
+  }
+
+  // Site time meets the threshold → Present
+  if (breakdown.sitePercentage >= minSite) {
+    return { status: 'P', breakdown, hasViolation: false, grantedByManager: false };
+  }
+
+  // Below threshold — check if manager acknowledged the violation
+  const grantedByManager = !!(violation && violation.attendanceGranted === true);
+  if (grantedByManager) {
+    return { status: 'P', breakdown, hasViolation: true, grantedByManager: true };
+  }
+
+  // Below threshold, no acknowledgment → half day
+  return { status: '1/2P', breakdown, hasViolation: true, grantedByManager: false };
 }
