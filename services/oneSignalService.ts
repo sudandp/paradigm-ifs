@@ -6,6 +6,10 @@ import OneSignalWeb from 'react-onesignal';
  * Service to manage OneSignal push notifications.
  * Uses the external_user_id to target notifications to specific Supabase users.
  */
+
+let _webInitialized = false;
+let _nativeInitialized = false;
+
 export const oneSignalService = {
     /**
      * Initializes OneSignal and sets up event listeners.
@@ -17,6 +21,10 @@ export const oneSignalService = {
         }
 
         if (Capacitor.isNativePlatform()) {
+            if (_nativeInitialized) {
+                console.log('[OneSignal Native] Already initialized, skipping.');
+                return;
+            }
             try {
                 // OneSignal 5.x uses Debug.setLogLevel
                 if ((window as any).OneSignal?.Debug) {
@@ -44,23 +52,33 @@ export const oneSignalService = {
                     console.log('[OneSignal Native] Permission granted:', granted);
                 });
 
+                _nativeInitialized = true;
                 console.log('[OneSignal Native] Initialized with App ID:', appId);
             } catch (error) {
                 console.error('[OneSignal Native] Initialization failed:', error);
             }
         } else {
             // Web Integration
+            if (_webInitialized) {
+                console.log('[OneSignal Web] Already initialized, skipping.');
+                return;
+            }
             try {
-                // Avoid re-initialization if already active
-                if (OneSignalWeb.Notifications.permission) {
-                    console.log('[OneSignal Web] Already initialized or permission exists');
-                }
-
                 await OneSignalWeb.init({
                     appId: appId,
                     allowLocalhostAsSecureOrigin: true,
+                    serviceWorkerParam: { scope: '/' },
+                    serviceWorkerPath: '/OneSignalSDKWorker.js',
                 });
+                _webInitialized = true;
                 console.log('[OneSignal Web] Initialized with App ID:', appId);
+
+                // Prompt for notification permission on web
+                if (Notification.permission === 'default') {
+                    console.log('[OneSignal Web] Requesting notification permission...');
+                    const permission = await Notification.requestPermission();
+                    console.log('[OneSignal Web] Permission result:', permission);
+                }
             } catch (error) {
                 console.error('[OneSignal Web] Initialization failed:', error);
             }
@@ -75,7 +93,11 @@ export const oneSignalService = {
             if (Capacitor.isNativePlatform()) {
                 OneSignalNative.login(userId);
             } else {
-                OneSignalWeb.login(userId);
+                if (_webInitialized) {
+                    OneSignalWeb.login(userId);
+                } else {
+                    console.warn('[OneSignal Web] Not initialized yet, deferring login.');
+                }
             }
             console.log('[OneSignal] User logged in/tagged:', userId);
         } catch (error) {
@@ -91,7 +113,9 @@ export const oneSignalService = {
             if (Capacitor.isNativePlatform()) {
                 OneSignalNative.logout();
             } else {
-                OneSignalWeb.logout();
+                if (_webInitialized) {
+                    OneSignalWeb.logout();
+                }
             }
             console.log('[OneSignal] User logged out/untagged');
         } catch (error) {

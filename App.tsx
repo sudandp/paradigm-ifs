@@ -324,17 +324,20 @@ const App: React.FC = () => {
     CapacitorUpdater.notifyAppReady();
   }, []);
 
+  // Subscribe reactively to OneSignal App ID from settings store
+  const oneSignalAppId = useSettingsStore(state => state.apiSettings.oneSignalAppId);
+
   // Initialize/Update OneSignal when App ID changes
   useEffect(() => {
-    const oneSignalAppId = useSettingsStore.getState().apiSettings.oneSignalAppId || import.meta.env.VITE_ONESIGNAL_APP_ID;
+    const effectiveAppId = oneSignalAppId || import.meta.env.VITE_ONESIGNAL_APP_ID;
     
-    if (oneSignalAppId && oneSignalAppId !== 'YOUR_ONESIGNAL_APP_ID' && oneSignalAppId !== '') {
-      console.log('[App] Initializing OneSignal with ID:', oneSignalAppId);
-      oneSignalService.init(oneSignalAppId);
+    if (effectiveAppId && effectiveAppId !== 'YOUR_ONESIGNAL_APP_ID' && effectiveAppId !== '') {
+      console.log('[App] Initializing OneSignal with ID:', effectiveAppId);
+      oneSignalService.init(effectiveAppId);
     } else {
       console.warn('[App] OneSignal App ID not found or invalid');
     }
-  }, [useSettingsStore.getState().apiSettings.oneSignalAppId]);
+  }, [oneSignalAppId]);
 
 
     useEffect(() => {
@@ -448,7 +451,11 @@ const App: React.FC = () => {
         if (session) {
           try {
             const appUser = await authService.getAppUserProfile(session.user);
-            if (isMounted) setUser(appUser);
+            if (isMounted) {
+              setUser(appUser);
+              // Tag user for OneSignal push on initial session load
+              oneSignalService.login(appUser.id);
+            }
           } catch (e) {
             console.error('Failed to fetch user profile during initialization:', e);
             if (isMounted) {

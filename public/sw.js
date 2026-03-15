@@ -48,6 +48,11 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // BYPASS: Never intercept OneSignal service worker requests
+  if (url.pathname.includes('OneSignal') || url.hostname.includes('onesignal.com')) {
+    return; // Let OneSignal handle its own service worker
+  }
+
   // BYPASS: Never handle Auth callback URLs (Supabase/Google redirects)
   // These URLs contain unique temporary codes and should always hit the network/Vite dev server
   if (url.search.includes('code=') || url.search.includes('error=')) {

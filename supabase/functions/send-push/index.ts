@@ -33,9 +33,9 @@ serve(async (req) => {
           status: 400 
         });
       }
-      payload.include_external_user_ids = userIds;
-
-      payload.include_external_user_ids = userIds;
+      // Use include_aliases with external_id (current OneSignal REST API standard)
+      payload.include_aliases = { external_id: userIds };
+      payload.target_channel = "push";
     }
 
     console.log('Sending push via OneSignal...');
