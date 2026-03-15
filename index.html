@@ -126,17 +126,22 @@
     <script>
       // Service worker recovery logic: Unregister existing workers if they are in a broken state
       if ("serviceWorker" in navigator) {
-        const FIX_KEY = "pifs_sw_fix_v1";
+        const FIX_KEY = "pifs_sw_fix_v2";
         if (!localStorage.getItem(FIX_KEY)) {
           navigator.serviceWorker.getRegistrations().then(
             (registrations) => {
               for (let registration of registrations) {
                 registration.unregister();
                 console.log(
-                  "Unregistered legacy service worker for fix update.",
+                  "Unregistered legacy service worker for fix update (" + registration.scope + ")",
                 );
               }
               localStorage.setItem(FIX_KEY, "true");
+              // Clear any OneSignal specific flags that might prevent re-registration
+              localStorage.removeItem("onesignal-notification-prompt");
+              localStorage.removeItem("isPushNotificationsEnabled");
+              
+              console.log("Cleanup complete. Reloading...");
               // Reload to ensure clean registration
               window.location.reload();
             },
