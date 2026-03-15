@@ -64,6 +64,7 @@ const RoleManagement = lazyWithRetry(() => import('./pages/admin/RoleManagement'
 const ModuleManagement = lazyWithRetry(() => import('./pages/admin/ModuleManagement'));
 const ManageDevices = lazyWithRetry(() => import('./pages/admin/ManageDevices'));
 const DeviceApprovals = lazyWithRetry(() => import('./pages/admin/DeviceApprovals'));
+const AdvancedNotificationSettings = lazyWithRetry(() => import('./pages/admin/AdvancedNotificationSettings'));
 const ApiSettings = lazyWithRetry(() => import('./pages/developer/ApiSettings').then(m => ({ default: m.ApiSettings })));
 const OperationsDashboard = lazyWithRetry(() => import('./pages/operations/OperationsDashboard'));
 const TeamActivity = lazyWithRetry(() => import('./pages/operations/TeamActivity'));
@@ -883,6 +884,7 @@ const App: React.FC = () => {
           <Route element={<ProtectedRoute requiredPermission="manage_attendance_rules" />}>
             <Route path="hr/attendance-settings" element={<AttendanceSettings />} />
             <Route path="hr/notification-management" element={<NotificationsControl />} />
+            <Route path="hr/advanced-notifications" element={<AdvancedNotificationSettings />} />
             <Route path="hr/family-verification" element={<FamilyVerification />} />
           </Route>
           <Route element={<ProtectedRoute requiredPermission="manage_leave_requests" />}>

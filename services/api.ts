@@ -9,7 +9,7 @@ import type {
   SubmissionCostBreakdown, AppModule, Role, SupportTicket, TicketPost, TicketComment, VerificationResult, CompOffLog,
   ExtraWorkLog, PerfiosVerificationData, HolidayListItem, UniformRequestItem, IssuedTool, RecurringHolidayRule,
   BiometricDevice, ChecklistTemplate, FieldReport, FieldAttendanceViolation,
-  NotificationRule, NotificationType, Company, GmcPolicySettings, StaffAttendanceRules,
+  NotificationRule, AutomatedNotificationRule, NotificationType, Company, GmcPolicySettings, StaffAttendanceRules,
   GmcSubmission, UserHoliday, AttendanceUnlockRequest, LeaveType, SiteAttendanceRecord, SiteInvoiceRecord, SiteInvoiceDefault, SiteFinanceRecord,
   CommunicationLog, RevisionLog, UserChild
 } from '../types';
@@ -1870,7 +1870,7 @@ export const api = {
     
     let filteredData = data;
     if (managerId) {
-        filteredData = data.filter((row: any) => 
+        filteredData = filteredData.filter((row: any) => 
             row.user?.reporting_manager_id === managerId || 
             row.user?.reporting_manager_2_id === managerId || 
             row.user?.reporting_manager_3_id === managerId
@@ -3428,6 +3428,30 @@ export const api = {
     if (error) throw error;
   },
 
+  getAutomatedRules: async (): Promise<AutomatedNotificationRule[]> => {
+    const { data, error } = await supabase.from('automated_notification_rules').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(toCamelCase);
+  },
+
+  saveAutomatedRule: async (rule: Partial<AutomatedNotificationRule>): Promise<AutomatedNotificationRule> => {
+    const data = toSnakeCase(rule);
+    if (rule.id) {
+      const { data: updated, error } = await supabase.from('automated_notification_rules').update(data).eq('id', rule.id).select().single();
+      if (error) throw error;
+      return toCamelCase(updated);
+    } else {
+      const { data: inserted, error } = await supabase.from('automated_notification_rules').insert(data).select().single();
+      if (error) throw error;
+      return toCamelCase(inserted);
+    }
+  },
+
+  deleteAutomatedRule: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('automated_notification_rules').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   broadcastNotification: async (data: { role?: string; userIds?: string[]; message: string; title?: string; type?: NotificationType; link?: string; severity?: 'Low' | 'Medium' | 'High' }): Promise<void> => {
     let finalUserIds: string[] = data.userIds || [];
     const isBroadcast = data.role?.toLowerCase() === 'all' || (finalUserIds.length === 0 && !data.role);
@@ -3851,7 +3875,7 @@ export const api = {
         const { data: finalApprover } = await supabase.from('users').select('id').eq('role_id', finalConfirmationRole).limit(1).single();
         const { error } = await supabase.from('leave_requests').update({ 
             status: 'pending_hr_confirmation', 
-            current_approver_id: finalApprover?.id || null,
+            current_approver_id: finalApprover?.id || null, 
             approval_history: updatedHistory 
         }).eq('id', id);
         if (error) throw error;

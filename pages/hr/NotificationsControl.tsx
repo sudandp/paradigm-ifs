@@ -24,8 +24,9 @@ import {
     XCircle,
     UserCheck,
     MessageSquare,
-    DollarSign,
-    FileText
+    DollarSign, 
+    FileText,
+    Zap
 } from 'lucide-react';
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import Button from '../../components/ui/Button';
@@ -36,35 +37,11 @@ import Checkbox from '../../components/ui/Checkbox';
 import { api } from '../../services/api';
 import type { NotificationRule, NotificationType, User as AppUser, Role } from '../../types';
 import LoadingScreen from '../../components/ui/LoadingScreen';
+import AdvancedNotificationSettings from '../admin/AdvancedNotificationSettings';
+import { APP_EVENT_TYPES } from '../../utils/notificationTypes';
 
 
-const EVENT_TYPES = [
-    { value: 'check_in', label: 'Office Punch In (General)', icon: CheckCircle2 },
-    { value: 'check_out', label: 'Office Punch Out (General)', icon: LogOutIcon },
-    { value: 'site_check_in', label: 'Site Check-in (Field Activity)', icon: CheckCircle2 },
-    { value: 'site_check_out', label: 'Site Check-out (Field Activity)', icon: LogOutIcon },
-    { value: 'break_start', label: 'Break Start', icon: Coffee },
-    { value: 'break_end', label: 'Break End', icon: Clock },
-    { value: 'violation', label: 'Geofencing Violation', icon: AlertTriangle },
-    { value: 'field_report', label: 'Field Report Submission', icon: Target },
-    { value: 'onboarding_submitted', label: 'New Enrollment Submission', icon: UserIcon },
-    { value: 'onboarding_verified', label: 'Enrollment Verified', icon: UserCheck },
-    { value: 'onboarding_rejected', label: 'Enrollment Rejected / Change Request', icon: XCircle },
-    { value: 'task_assigned', label: 'Task Assigned', icon: Users },
-    { value: 'task_completed', label: 'Task Completed', icon: ClipboardCheck },
-    { value: 'leave_request', label: 'Leave Request Applied', icon: Mail },
-    { value: 'leave_approved', label: 'Leave Approved', icon: CheckCircle2 },
-    { value: 'leave_rejected', label: 'Leave Rejected', icon: XCircle },
-    { value: 'salary_request', label: 'Salary Change Request', icon: DollarSign },
-    { value: 'salary_approved', label: 'Salary Change Approved', icon: CheckCircle2 },
-    { value: 'salary_rejected', label: 'Salary Change Rejected', icon: XCircle },
-    { value: 'support_ticket', label: 'New Support Ticket', icon: MessageSquare },
-    { value: 'support_response', label: 'Support Response Received', icon: Bell },
-    { value: 'billing_invoice', label: 'Invoice Generated', icon: FileText },
-    { value: 'punch_unlock_request', label: 'Punch Unlock Request', icon: Shield },
-    { value: 'ot_punch', label: 'Overtime (OT) Punch', icon: Clock },
-    { value: 'security_alert', label: 'Emergency / Security Alert', icon: Shield }
-];
+const EVENT_TYPES = APP_EVENT_TYPES.map(e => ({ value: e.id, label: e.label, icon: e.icon }));
 
 const RECIPIENT_ROLES = [
     { value: 'direct_manager', label: 'Direct Reporting Manager' },
@@ -83,7 +60,7 @@ const NOTIFICATION_TYPES: { value: NotificationType; label: string }[] = [
 ];
 
 const NotificationsControl: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'rules' | 'broadcast'>('rules');
+    const [activeTab, setActiveTab] = useState<'rules' | 'broadcast' | 'automated'>('rules');
     const [rules, setRules] = useState<NotificationRule[]>([]);
     const [roles, setRoles] = useState<Role[]>([]);
     const [users, setUsers] = useState<AppUser[]>([]);
@@ -228,6 +205,9 @@ const NotificationsControl: React.FC = () => {
                     </Button>
                     <Button variant="secondary" onClick={() => setActiveTab('broadcast')} className={activeTab === 'broadcast' ? 'bg-accent text-white' : ''}>
                         <Send className="mr-2 h-4 w-4" /> Broadcast
+                    </Button>
+                    <Button variant="secondary" onClick={() => setActiveTab('automated')} className={activeTab === 'automated' ? 'bg-accent text-white' : ''}>
+                        <Zap className="mr-2 h-4 w-4" /> Automated Alerts
                     </Button>
                 </div>
             </AdminPageHeader>
@@ -405,6 +385,8 @@ const NotificationsControl: React.FC = () => {
                         )}
                     </div>
                 </div>
+            ) : activeTab === 'automated' ? (
+                <AdvancedNotificationSettings hideHeader={true} />
             ) : (
                 <div className="space-y-6">
                     <section className="bg-card p-8 rounded-2xl border border-border shadow-lg">

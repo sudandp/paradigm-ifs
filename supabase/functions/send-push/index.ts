@@ -15,13 +15,25 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { userIds, title, message, url, broadcast, type, severity, metadata, link_to } = body;
+    const { 
+      userIds, 
+      title, 
+      message, 
+      url, 
+      broadcast, 
+      type, 
+      severity, 
+      metadata, 
+      link_to,
+      enable_sms,
+      sms_message
+    } = body;
+
     console.log('Received send-push request:', { 
       userIdsCount: userIds?.length, 
       title, 
       broadcast,
-      appIdPrefix: ONESIGNAL_APP_ID?.substring(0, 4),
-      keyPrefix: ONESIGNAL_REST_API_KEY?.substring(0, 7)
+      enable_sms
     });
 
     // 1. Send Push via OneSignal
@@ -29,15 +41,27 @@ serve(async (req) => {
       app_id: ONESIGNAL_APP_ID,
       headings: { en: title },
       contents: { en: message },
-      url: url || null, // URL to open on click (Root level is required for Web)
-      web_url: url || null, // Explicitly for Web Push
+      url: url || null,
+      web_url: url || null,
       data: { url, ...metadata },
     };
+
+    // SMS Support
+    if (enable_sms && (sms_message || message)) {
+      payload.sms_from = Deno.env.get('ONESIGNAL_SMS_FROM') || undefined;
+      payload.sms_contents = { en: sms_message || message };
+    }
+
+    // iOS Live Activities Support (if metadata contains activity info)
+    if (metadata?.activity_id) {
+      payload.event = metadata.event || 'update';
+      payload.content_available = true;
+    }
 
     // Optimization for High/Critical priority
     if (severity === 'High') {
       payload.priority = 10;
-      payload.android_visibility = 1; // Show on lock screen
+      payload.android_visibility = 1;
     } else {
       payload.priority = 5;
     }
@@ -51,12 +75,14 @@ serve(async (req) => {
           status: 400 
         });
       }
-      // Use include_aliases with external_id (current OneSignal REST API standard)
       payload.include_aliases = { external_id: userIds };
-      payload.target_channel = "push";
+      // If SMS is enabled, we don't strictly set target_channel to push
+      if (!enable_sms) {
+        payload.target_channel = "push";
+      }
     }
 
-    console.log('Sending push via OneSignal...');
+    console.log('Sending message via OneSignal...');
     const osResponse = await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
       headers: {

@@ -1250,6 +1250,32 @@ export interface NotificationRule {
   updatedAt: string;
 }
 
+export interface AutomatedNotificationRule {
+  id: string;
+  name: string;
+  description?: string;
+  triggerType: 'missed_punch_out' | 'late_arrival' | string;
+  isActive: boolean;
+  config: {
+    time?: string;
+    frequency?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    dayOfWeek?: number; // 0-6
+    dayOfMonth?: number; // 1-31
+    monthOfYear?: number; // 1-12
+    durationMinutes?: number; // For "lasts for X duration" logic
+    chainedRuleId?: string; // Rule to trigger after this one
+    notifyManager?: boolean; // Also notify the reporting manager
+    [key: string]: any;
+  };
+  pushTitleTemplate?: string;
+  pushBodyTemplate?: string;
+  smsTemplate?: string;
+  enablePush: boolean;
+  enableSms: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Manpower Details Type
 export interface ManpowerDetail {
   designation: string;
