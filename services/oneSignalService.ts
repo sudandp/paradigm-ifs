@@ -74,6 +74,50 @@ export const oneSignalService = {
                     allowLocalhostAsSecureOrigin: true,
                     serviceWorkerParam: { scope: '/' },
                     serviceWorkerPath: '/OneSignalSDKWorker.js',
+                    notifyButton: {
+                        enable: true,
+                        position: 'bottom-right',
+                        size: 'medium',
+                        prenotify: true,
+                        showCredit: false,
+                        text: {
+                            'tip.state.unsubscribed': 'Subscribe to notifications',
+                            'tip.state.subscribed': "You're subscribed to notifications",
+                            'tip.state.blocked': "You've blocked notifications",
+                            'message.prenotify': 'Click to subscribe to notifications',
+                            'message.action.subscribing': "Subscribing...",
+                            'message.action.subscribed': "Thanks for subscribing!",
+                            'message.action.resubscribed': "You're subscribed to notifications",
+                            'message.action.unsubscribed': "You won't receive notifications anymore",
+                            'dialog.main.title': 'Manage Site Notifications',
+                            'dialog.main.button.subscribe': 'SUBSCRIBE',
+                            'dialog.main.button.unsubscribe': 'UNSUBSCRIBE',
+                            'dialog.blocked.title': 'Unblock Notifications',
+                            'dialog.blocked.message': 'Follow these instructions to allow notifications:'
+                        },
+                        displayPredicate: () => {
+                            return !OneSignalWeb.Notifications.permission || !OneSignalWeb.User.PushSubscription.id;
+                        }
+                    },
+                    promptOptions: {
+                        slidedown: {
+                            prompts: [
+                                {
+                                    type: 'push',
+                                    autoPrompt: true,
+                                    text: {
+                                        actionMessage: "We'd like to send you notifications for updates and alerts.",
+                                        acceptButton: "Allow",
+                                        cancelButton: "Cancel",
+                                    },
+                                    delay: {
+                                        pageViews: 1,
+                                        timeDelay: 10,
+                                    }
+                                }
+                            ]
+                        }
+                    }
                 });
                 // Display handler for foreground (when tab is active)
                 OneSignalWeb.Notifications.addEventListener('foregroundWillDisplay', (event) => {
