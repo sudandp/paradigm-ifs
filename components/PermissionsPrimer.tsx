@@ -71,6 +71,11 @@ const PermissionsPrimer: React.FC<PermissionsPrimerProps> = ({ onComplete }) => 
   };
 
   const handleOpenSettings = () => {
+    if (!Capacitor.isNativePlatform()) {
+      alert('To manage permissions on Web:\n1. Click the lock/info icon in the browser address bar.\n2. Ensure "Notifications" is set to "Allow".\n3. Reload the page.');
+      return;
+    }
+
     const permissions = (window as any).plugins?.permissions;
     if (permissions) {
       permissions.openSettings();

@@ -331,10 +331,13 @@ const App: React.FC = () => {
 
   // Initialize/Update OneSignal when App ID changes and app is past splash
   useEffect(() => {
-    // CRITICAL: Only initialize OneSignal after BOTH session check and permissions check are 100% complete.
-    // This prevents OneSignal from stealing focus or showing a notification prompt
-    // while the user is still in the compliance check sequence.
-    if (!isInitialized || !permissionsComplete) return;
+    // Splash and permissions sequence.
+    // On native mobile, we MUST wait for the splash screen and its mandatory permission bridge
+    // to complete before initializing OneSignal.
+    // On Web, we can initialize OneSignal immediately because it handles the notification
+    // permission prompt itself and doesn't block the UI with native modal dialogs.
+    const isWeb = !Capacitor.isNativePlatform();
+    if (!isInitialized || (!permissionsComplete && !isWeb)) return;
 
     const effectiveAppId = oneSignalAppId || import.meta.env.VITE_ONESIGNAL_APP_ID;
     
@@ -732,13 +735,14 @@ const App: React.FC = () => {
   const isIOSUA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
   const isLikelyMobile = isAndroidUA || isIOSUA || Capacitor.isNativePlatform();
 
-  // While the initial authentication check is running, show the splash screen.
-  // This prevents the router from rendering and making incorrect navigation decisions.
-  if (!isInitialized) {
+  // While the initial authentication check OR the permissions check is running, show the splash screen.
+  // This prevents the router from rendering and making incorrect navigation decisions
+  // and ensures OneSignal and other dependent services have the required state to initialize.
+  if (!isInitialized || !permissionsComplete) {
     return (
       <Splash 
         onComplete={() => {
-          console.log('[App] Session check complete.');
+          console.log('[App] Splash sequence complete.');
           setPermissionsComplete(true);
         }} 
       />

@@ -7,8 +7,12 @@ import OneSignalWeb from 'react-onesignal';
  * Uses the external_user_id to target notifications to specific Supabase users.
  */
 
+// We expose to window.OneSignal and window.oneSignalService for debugging.
+// Using (window as any) internally to avoid TS conflicts with the SDK's own types.
+
 let _webInitialized = false;
 let _nativeInitialized = false;
+let _pendingUserId: string | null = null;
 
 export const oneSignalService = {
     /**
@@ -74,50 +78,6 @@ export const oneSignalService = {
                     allowLocalhostAsSecureOrigin: true,
                     serviceWorkerParam: { scope: '/' },
                     serviceWorkerPath: '/OneSignalSDKWorker.js',
-                    notifyButton: {
-                        enable: true,
-                        position: 'bottom-right',
-                        size: 'medium',
-                        prenotify: true,
-                        showCredit: false,
-                        text: {
-                            'tip.state.unsubscribed': 'Subscribe to notifications',
-                            'tip.state.subscribed': "You're subscribed to notifications",
-                            'tip.state.blocked': "You've blocked notifications",
-                            'message.prenotify': 'Click to subscribe to notifications',
-                            'message.action.subscribing': "Subscribing...",
-                            'message.action.subscribed': "Thanks for subscribing!",
-                            'message.action.resubscribed': "You're subscribed to notifications",
-                            'message.action.unsubscribed': "You won't receive notifications anymore",
-                            'dialog.main.title': 'Manage Site Notifications',
-                            'dialog.main.button.subscribe': 'SUBSCRIBE',
-                            'dialog.main.button.unsubscribe': 'UNSUBSCRIBE',
-                            'dialog.blocked.title': 'Unblock Notifications',
-                            'dialog.blocked.message': 'Follow these instructions to allow notifications:'
-                        },
-                        displayPredicate: () => {
-                            return !OneSignalWeb.Notifications.permission || !OneSignalWeb.User.PushSubscription.id;
-                        }
-                    },
-                    promptOptions: {
-                        slidedown: {
-                            prompts: [
-                                {
-                                    type: 'push',
-                                    autoPrompt: true,
-                                    text: {
-                                        actionMessage: "We'd like to send you notifications for updates and alerts.",
-                                        acceptButton: "Allow",
-                                        cancelButton: "Cancel",
-                                    },
-                                    delay: {
-                                        pageViews: 1,
-                                        timeDelay: 10,
-                                    }
-                                }
-                            ]
-                        }
-                    }
                 });
                 // Display handler for foreground (when tab is active)
                 OneSignalWeb.Notifications.addEventListener('foregroundWillDisplay', (event) => {
@@ -133,6 +93,13 @@ export const oneSignalService = {
                 console.log('[OneSignal Web] Notification Permission:', OneSignalWeb.Notifications.permission);
                 console.log('[OneSignal Web] Subscription ID:', OneSignalWeb.User.PushSubscription.id);
 
+                // Process pending login if one was deferred
+                if (_pendingUserId) {
+                    console.log('[OneSignal Web] Processing deferred login for:', _pendingUserId);
+                    OneSignalWeb.login(_pendingUserId);
+                    _pendingUserId = null;
+                }
+
                 // Prompt for notification permission on web
                 if (!OneSignalWeb.Notifications.permission) {
                     console.log('[OneSignal Web] Requesting notification permission via Slidedown...');
@@ -145,6 +112,10 @@ export const oneSignalService = {
                 }
             } catch (error) {
                 console.error('[OneSignal Web] Initialization failed:', error);
+            } finally {
+                // Always expose to window for debugging, even if init fails
+                (window as any).OneSignal = OneSignalWeb;
+                (window as any).oneSignalService = oneSignalService;
             }
         }
     },
@@ -160,10 +131,11 @@ export const oneSignalService = {
                 if (_webInitialized) {
                     OneSignalWeb.login(userId);
                 } else {
-                    console.warn('[OneSignal Web] Not initialized yet, deferring login.');
+                    console.log('[OneSignal Web] Not initialized yet, queuing login for:', userId);
+                    _pendingUserId = userId;
                 }
             }
-            console.log('[OneSignal] User logged in/tagged:', userId);
+            console.log('[OneSignal] User login/tag update requested:', userId);
         } catch (error) {
             console.error('[OneSignal] Failed to set external user ID:', error);
         }
@@ -194,15 +166,23 @@ export const oneSignalService = {
             if (Capacitor.isNativePlatform()) {
                 await OneSignalNative.Notifications.requestPermission(true);
             } else {
-                if (!_webInitialized) {
-                    console.warn('[OneSignal Web] Not initialized, cannot request permission');
-                    return;
-                }
-                console.log('[OneSignal Web] Manually requesting notification permission...');
-                try {
-                    await (OneSignalWeb.Slidedown as any).promptNotifications();
-                } catch (e) {
-                    await OneSignalWeb.Notifications.requestPermission();
+                if (_webInitialized) {
+                    console.log('[OneSignal Web] Requesting notification permission via Slidedown/SDK...');
+                    try {
+                        await (OneSignalWeb.Slidedown as any).promptNotifications();
+                    } catch (e) {
+                        await OneSignalWeb.Notifications.requestPermission();
+                    }
+                } else {
+                    // FALLBACK: If OneSignal isn't working (e.g. localhost domain restriction),
+                    // use the browser's native API so the user isn't stuck on the compliance screen.
+                    console.warn('[OneSignal Web] Not initialized, falling back to window.Notification.requestPermission()');
+                    if (window.Notification) {
+                        const result = await window.Notification.requestPermission();
+                        console.log('[OneSignal Web] Browser Notification request result:', result);
+                    } else {
+                        console.error('[OneSignal Web] Notifications not supported by this browser.');
+                    }
                 }
             }
         } catch (error) {

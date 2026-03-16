@@ -25,7 +25,7 @@ export const checkRequiredPermissions = async () => {
         const permission = (window as any).Notification?.permission;
         console.log('[PermissionUtils] Web Notification Permission:', permission);
         
-        if (permission === 'default') {
+        if (permission !== 'granted') {
             return { allGranted: false, missing: ['Notifications'] };
         }
         return { allGranted: true, missing: [] };

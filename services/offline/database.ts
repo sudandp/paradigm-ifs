@@ -3,7 +3,7 @@ import { SQLiteConnection, SQLiteDBConnection, CapacitorSQLite } from '@capacito
 import { Capacitor } from '@capacitor/core';
 
 const DB_NAME = 'paradigm_offline_db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 export interface OutboxItem {
   id?: number;
