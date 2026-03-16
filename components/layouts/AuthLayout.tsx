@@ -113,7 +113,7 @@ const AuthLayout: React.FC = () => {
             {/* Floating Download Button */}
             <button 
                 onClick={() => setIsDownloadModalOpen(true)}
-                className="fixed bottom-6 right-6 w-16 h-16 bg-emerald-500 text-white rounded-2xl shadow-xl shadow-emerald-500/20 hover:bg-emerald-600 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center justify-center z-50 group border border-white/20"
+                className="fixed bottom-6 left-6 w-16 h-16 bg-emerald-500 text-white rounded-2xl shadow-xl shadow-emerald-500/20 hover:bg-emerald-600 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center justify-center z-50 group border border-white/20"
                 title="Download App"
             >
                 <Download className="w-8 h-8 group-hover:bounce text-white" />

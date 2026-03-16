@@ -1721,40 +1721,7 @@ body.pro-dark-theme, body.pro-dark-theme #root, .pro-dark-theme .bg-page {
     letter-spacing: 0.05em !important;
 }
 
-/* OneSignal Bell Custom Positioning - Moves it to Top Right */
-#onesignal-bell-container.onesignal-reset {
-    bottom: auto !important;
-    top: 25px !important;
-    right: 25px !important;
-    left: auto !important;
-    z-index: 999999 !important;
-}
-
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher {
-    bottom: auto !important;
-    top: 0 !important;
-    right: 0 !important;
-    left: auto !important;
-}
-
-/* Move messages and tooltips BELOW the bell launcher */
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-message,
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-tooltip {
-    top: 60px !important;
-    bottom: auto !important;
-    left: auto !important;
-    right: 0 !important;
-}
-
-/* Flip arrows to point UP instead of down */
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-message-arrow,
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-tooltip-arrow {
-    border-bottom: 8px solid white !important;
-    border-top: none !important;
-    top: -8px !important;
-}
-
-/* Brand styling: Change bell color from red to green */
+/* OneSignal Bell Custom Positioning - Default Bottom Right with Brand Colors */
 #onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-button {
     background-color: #006b3f !important;
     box-shadow: 0 4px 15px rgba(0, 107, 63, 0.3) !important;
