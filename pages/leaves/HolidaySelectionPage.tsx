@@ -11,7 +11,6 @@ import Toast from '../../components/ui/Toast';
 import HolidayCalendar from './HolidayCalendar';
 import type { UserHoliday, Holiday, StaffAttendanceRules } from '../../types';
 import LoadingScreen from '../../components/ui/LoadingScreen';
-import Modal from '../../components/ui/Modal';
 
 
 const HolidaySelectionPage: React.FC = () => {
@@ -26,7 +25,7 @@ const HolidaySelectionPage: React.FC = () => {
     const [selectedHolidays, setSelectedHolidays] = useState<{ name: string; date: string }[]>([]);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [viewingDate, setViewingDate] = useState(new Date());
-    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [view, setView] = useState<'selection' | 'confirmation'>('selection');
 
     const currentYear = new Date().getFullYear();
     const userRole = user?.role?.toLowerCase();
@@ -79,13 +78,12 @@ const HolidaySelectionPage: React.FC = () => {
             return;
         }
 
-        setShowConfirmModal(true);
+        setView('confirmation');
     };
 
     const confirmSave = async () => {
         if (!user?.id) return;
 
-        setShowConfirmModal(false);
         setIsSaving(true);
         try {
             const holidaysToSave = selectedHolidays.map(h => ({
@@ -138,8 +136,87 @@ const HolidaySelectionPage: React.FC = () => {
         return <LoadingScreen message="Loading page data..." />;
     }
 
+    if (view === 'confirmation') {
+        return (
+            <div className="p-4 md:p-6 pb-40 animate-fade-in">
+                {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
+                
+                <div className="flex items-center gap-4 mb-8">
+                    <Button variant="secondary" size="md" onClick={() => setView('selection')} className="p-2 rounded-full h-10 w-10 flex items-center justify-center">
+                        <ChevronLeft className="h-6 w-6" />
+                    </Button>
+                    <div>
+                        <h1 className="text-2xl font-bold text-primary-text">Confirm Selection</h1>
+                        <p className="text-muted">Review your chosen holidays for {currentYear}</p>
+                    </div>
+                </div>
+
+                <div className="max-w-2xl mx-auto space-y-6">
+                    <div className="bg-card rounded-2xl p-6 shadow-card border border-border">
+                        <p className="text-lg mb-6">Are you sure you want to save these <span className="font-bold text-accent">{selectedHolidays.length}</span> holidays?</p>
+                        
+                        <div className="space-y-3">
+                            {[...selectedHolidays].sort((a, b) => a.date.localeCompare(b.date)).map((h, i) => {
+                                const dateStr = h.date.startsWith('-') ? `${currentYear}${h.date}` : h.date;
+                                const displayDate = new Date(dateStr.replace(/-/g, '/'));
+                                
+                                return (
+                                    <div key={i} className="flex items-center justify-between p-4 rounded-xl border border-border hover:bg-accent/5 transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-10 w-10 rounded-lg bg-accent/10 flex flex-col items-center justify-center text-accent">
+                                                <span className="text-[8px] font-bold uppercase leading-none">{displayDate.toLocaleDateString('en-IN', { month: 'short' })}</span>
+                                                <span className="text-sm font-bold leading-none mt-0.5">{displayDate.getDate()}</span>
+                                            </div>
+                                            <span className="font-semibold text-primary-text text-lg">{h.name}</span>
+                                        </div>
+                                        <span className="text-sm text-muted font-medium bg-muted/10 px-3 py-1 rounded-full">
+                                            {displayDate.toLocaleDateString('en-IN', { weekday: 'short' })}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="mt-8 p-4 bg-amber-50 rounded-xl border border-amber-100">
+                            <p className="text-sm text-amber-800 flex items-start gap-2">
+                                <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                <span>Note: You can change your selection later if the holiday selection window is still open.</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Floating Action Bar */}
+                <div 
+                    className="fixed left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-card via-card to-transparent border-t border-border z-40"
+                    style={{ 
+                        bottom: isMobile ? 'calc(4rem + env(safe-area-inset-bottom))' : '0' 
+                    }}
+                >
+                    <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
+                        <Button 
+                            variant="secondary"
+                            onClick={() => setView('selection')}
+                            className="flex-1 md:flex-none px-8 py-3 h-14 text-lg"
+                        >
+                            Back to Selection
+                        </Button>
+                        <Button 
+                            onClick={confirmSave} 
+                            isLoading={isSaving} 
+                            className="flex-[2] md:flex-none px-12 py-3 shadow-lg shadow-accent/20 text-lg h-14"
+                        >
+                            <Check className="mr-2 h-6 w-6" />
+                            Confirm & Save
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="p-4 md:p-6 pb-40">
+        <div className="p-4 md:p-6 pb-40 animate-fade-in">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             
             <div className="flex items-center gap-4 mb-8">
@@ -247,7 +324,12 @@ const HolidaySelectionPage: React.FC = () => {
             </div>
 
             {/* Floating Save Selection Bar */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-card via-card to-transparent border-t border-border z-40">
+            <div 
+                className="fixed left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-card via-card to-transparent border-t border-border z-40"
+                style={{ 
+                    bottom: isMobile ? 'calc(4rem + env(safe-area-inset-bottom))' : '0' 
+                }}
+            >
                 <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
                     {!isMobile && (
                         <div className="text-sm text-muted">
@@ -265,30 +347,6 @@ const HolidaySelectionPage: React.FC = () => {
                     </Button>
                 </div>
             </div>
-
-            {/* Confirmation Modal */}
-            <Modal
-                isOpen={showConfirmModal}
-                onClose={() => setShowConfirmModal(false)}
-                onConfirm={confirmSave}
-                title="Confirm Holiday Selection"
-                confirmButtonText="Confirm & Save"
-                confirmButtonVariant="primary"
-                isLoading={isSaving}
-            >
-                <div className="space-y-4">
-                    <p>Are you sure you want to save these <span className="font-bold text-accent">{selectedHolidays.length}</span> holidays?</p>
-                    <div className="bg-muted/5 rounded-xl border border-border overflow-hidden">
-                        {[...selectedHolidays].sort((a, b) => a.date.localeCompare(b.date)).map((h, i) => (
-                            <div key={i} className="flex items-center justify-between p-3 border-b border-border last:border-0">
-                                <span className="font-medium text-primary-text">{h.name}</span>
-                                <span className="text-xs text-muted font-mono">{new Date(`${currentYear}${h.date}`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
-                            </div>
-                        ))}
-                    </div>
-                    <p className="text-xs text-muted italic">Note: You can change your selection later if the window is still open.</p>
-                </div>
-            </Modal>
         </div>
     );
 };

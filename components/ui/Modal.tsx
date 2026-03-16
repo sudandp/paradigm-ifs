@@ -26,7 +26,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, onConfirm, title, childr
     return (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black bg-opacity-50" aria-modal="true" role="dialog">
             {/* Full screen on mobile, centered modal on desktop */}
-            <div className={`bg-card shadow-card flex flex-col animate-fade-in-scale overflow-hidden w-full h-full sm:w-full sm:h-full sm:max-w-full sm:rounded-none md:w-auto md:h-auto ${maxWidth} md:max-h-[90vh] md:rounded-xl`}>
+            <div className={`bg-card shadow-card flex flex-col overflow-hidden w-full h-full ${maxWidth} md:w-auto md:h-auto md:max-h-[90vh] md:rounded-xl md:animate-fade-in-scale`}>
                 {/* Header */}
                 <div className="flex-shrink-0 p-6 border-b border-border">
                     <h3 className="text-lg font-bold text-primary-text">{title}</h3>
