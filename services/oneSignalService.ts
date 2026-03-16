@@ -141,5 +141,28 @@ export const oneSignalService = {
         } catch (error) {
             console.error('[OneSignal] Failed to remove external user ID:', error);
         }
+    },
+    /**
+     * Explicitly requests notification permissions.
+     */
+    requestPermission: async () => {
+        try {
+            if (Capacitor.isNativePlatform()) {
+                await OneSignalNative.Notifications.requestPermission(true);
+            } else {
+                if (!_webInitialized) {
+                    console.warn('[OneSignal Web] Not initialized, cannot request permission');
+                    return;
+                }
+                console.log('[OneSignal Web] Manually requesting notification permission...');
+                try {
+                    await (OneSignalWeb.Slidedown as any).promptNotifications();
+                } catch (e) {
+                    await OneSignalWeb.Notifications.requestPermission();
+                }
+            }
+        } catch (error) {
+            console.error('[OneSignal] Request permission failed:', error);
+        }
     }
 };

@@ -4,6 +4,7 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Contacts } from '@capacitor-community/contacts';
 import { BleClient } from '@capacitor-community/bluetooth-le';
 import { Capacitor } from '@capacitor/core';
+import { oneSignalService } from '../services/oneSignalService';
 
 // Notification IDs to ensure we can cancel them specifically
 const NOTIFICATION_IDS = {
@@ -18,9 +19,21 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  * Categories: Camera, Location, Notifications, Nearby Devices, Photos/Videos, Contacts, Music/Audio
  */
 export const checkRequiredPermissions = async () => {
-    // COMPLETE BYPASS: Per project requirement, we are disabling the permission compliance check.
-    // This ensures no user is ever blocked by the security bridge or missing permissions.
-    console.log('[PermissionUtils] Permission check BYPASSED globally.');
+    // On web, we check for notification permission specifically if the user is 
+    // reporting "missing" permissions.
+    if (!Capacitor.isNativePlatform()) {
+        const permission = (window as any).Notification?.permission;
+        console.log('[PermissionUtils] Web Notification Permission:', permission);
+        
+        if (permission === 'default') {
+            return { allGranted: false, missing: ['Notifications'] };
+        }
+        return { allGranted: true, missing: [] };
+    }
+
+    // COMPLETE BYPASS: Per project requirement, we are disabling the permission compliance check for Native.
+    // This ensures no user is ever blocked by the security bridge or missing permissions on mobile.
+    console.log('[PermissionUtils] Permission check BYPASSED for Native.');
     return { allGranted: true, missing: [] };
 };
 
@@ -28,7 +41,11 @@ export const checkRequiredPermissions = async () => {
  * Request ALL required device permissions using a unified sequence of modern Capacitor calls.
  */
 export const requestAllPermissions = async () => {
-    if (!Capacitor.isNativePlatform()) return;
+    if (!Capacitor.isNativePlatform()) {
+        // Trigger OneSignal prompt on Web
+        await oneSignalService.requestPermission();
+        return;
+    }
 
     console.log('[PermissionUtils] Starting SEQUENTIAL permission request sequence...');
     const isAndroid = Capacitor.getPlatform() === 'android';
