@@ -67,7 +67,7 @@ const NotificationBell: React.FC<{ className?: string }> = ({ className = '' }) 
                 className={`group relative p-2.5 rounded-xl transition-all duration-300 btn-icon ${
                     isPanelOpen 
                     ? 'bg-accent/10 text-accent ring-2 ring-accent/20' 
-                    : 'bg-transparent text-emerald-500 md:text-muted hover:bg-page hover:text-primary-text'
+                    : 'bg-transparent text-accent md:text-muted hover:bg-page hover:text-primary-text'
                 }`}
             >
                 <Bell className={`h-5 w-5 transition-transform duration-300 ${isPanelOpen ? 'scale-110' : 'group-hover:rotate-12'}`} />

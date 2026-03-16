@@ -154,9 +154,11 @@ export const oneSignalService = {
                 console.error('[OneSignal Web] Initialization failed:', error);
             } finally {
                 _initializing = false;
-                // Always expose to window for debugging, even if init fails
-                (window as any).OneSignal = OneSignalWeb;
-                (window as any).oneSignalService = oneSignalService;
+                // Expose to window with a tiny delay to ensure SDK internal state has settled
+                setTimeout(() => {
+                    (window as any).OneSignal = OneSignalWeb;
+                    (window as any).oneSignalService = oneSignalService;
+                }, 500);
             }
         }
     },
