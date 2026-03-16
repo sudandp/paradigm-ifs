@@ -9,10 +9,16 @@ interface SplashProps {
 const Splash: React.FC<SplashProps> = ({ onComplete }) => {
     const [permissionsComplete, setPermissionsComplete] = useState(false);
 
-    const handlePermissionsComplete = () => {
-        setPermissionsComplete(true);
-        onComplete();
-    };
+    // Track if we've already triggered completion to avoid double calls
+    const [hasCompleted, setHasCompleted] = React.useState(false);
+
+    React.useEffect(() => {
+        if (!hasCompleted) {
+            console.log('[Splash] Auto-completing splash sequence...');
+            setHasCompleted(true);
+            onComplete();
+        }
+    }, [onComplete, hasCompleted]);
 
     /* 
     // Permissions check disabled per project requirement.
