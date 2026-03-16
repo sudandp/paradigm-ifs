@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, LogOut, Send, Trash2, Smartphone, Monitor } from 'lucide-react';
+import { AlertTriangle, LogOut, Send, Trash2, Smartphone, Monitor, RefreshCw } from 'lucide-react';
 import { getUserDevices, revokeDevice } from '../../services/deviceService';
 import { UserDevice } from '../../types';
 import './DeviceWarningDialog.css';
@@ -18,6 +18,7 @@ interface DeviceWarningDialogProps {
   status: 'not_found' | 'pending' | 'revoked' | 'limit_reached';
   onRequestAccess: () => void;
   onLogout: () => void;
+  onTryAgain?: () => void;
   isRequestingAccess?: boolean;
   limits?: { web: number; android: number; ios: number };
   customMessage?: string;
@@ -30,6 +31,7 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
   status,
   onRequestAccess,
   onLogout,
+  onTryAgain,
   isRequestingAccess = false,
   limits = { web: 1, android: 1, ios: 1 },
   customMessage,
@@ -104,6 +106,7 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
           ),
           actionText: 'Waiting for Approval',
           showRequestButton: false,
+          showTryAgainButton: true,
         };
       case 'revoked':
         return {
@@ -118,6 +121,7 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
           description: customMessage || 'You cannot access the application from this device.',
           actionText: '',
           showRequestButton: false,
+          showTryAgainButton: false,
         };
     }
   };
@@ -222,6 +226,16 @@ const DeviceWarningDialog: React.FC<DeviceWarningDialogProps> = ({
             </button>
           )}
           
+          {message.showTryAgainButton && (
+            <button
+              className="action-button-primary animate-pulse-subtle"
+              onClick={onTryAgain}
+            >
+              <RefreshCw size={18} />
+              <span>Try Again</span>
+            </button>
+          )}
+
           <button
             className="action-button-primary action-button-logout"
             onClick={onLogout}

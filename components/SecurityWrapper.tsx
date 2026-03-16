@@ -29,6 +29,7 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
     const [deviceMessage, setDeviceMessage] = useState('');
     const [limits, setLimits] = useState<{ web: number; android: number; ios: number }>({ web: 1, android: 1, ios: 1 });
     const [isRequestingAccess, setIsRequestingAccess] = useState(false);
+    const [checkTrigger, setCheckTrigger] = useState(0);
 
     // Track which user.id we've already checked to prevent re-running on profile updates
     const lastCheckedUserId = useRef<string | null>(null);
@@ -126,7 +127,7 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
         };
 
         checkDevice();
-    }, [user?.id]); // Only depend on user.id, not full user object
+    }, [user?.id, checkTrigger]); // Only depend on user.id and manual trigger
 
     // Handler for "Request Access" button - creates a device change request
     const handleRequestAccess = async () => {
@@ -158,6 +159,13 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
         }
     };
 
+    // Handler for "Try Again" button - forces a re-check
+    const handleTryAgain = () => {
+        setDeviceStatus('checking');
+        lastCheckedUserId.current = null;
+        setCheckTrigger(prev => prev + 1);
+    };
+
     // 1. Check basic security (Dev mode / Location spoofing)
     if (user && !isExemptFromSecurityChecks && !securityCheck.isSecure) {
         return <SecurityWarningModal issues={securityCheck.issues} />;
@@ -179,6 +187,7 @@ const SecurityWrapper: React.FC<SecurityWrapperProps> = ({ children }) => {
                 isRequestingAccess={isRequestingAccess}
                 onLogout={() => useAuthStore.getState().logout()}
                 onRequestAccess={handleRequestAccess}
+                onTryAgain={handleTryAgain}
             />
         );
     }
