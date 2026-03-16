@@ -12,6 +12,7 @@ import OneSignalWeb from 'react-onesignal';
 
 let _webInitialized = false;
 let _nativeInitialized = false;
+let _initializing = false;
 let _pendingUserId: string | null = null;
 
 export const oneSignalService = {
@@ -27,11 +28,14 @@ export const oneSignalService = {
         // OneSignal App IDs must be lowercase UUIDs
         const normalizedAppId = appId.toLowerCase().trim();
 
+        if (_initializing || _webInitialized || _nativeInitialized) {
+            console.log('[OneSignal] Initialization already in progress or completed, skipping.');
+            return;
+        }
+
+        _initializing = true;
+
         if (Capacitor.isNativePlatform()) {
-            if (_nativeInitialized) {
-                console.log('[OneSignal Native] Already initialized, skipping.');
-                return;
-            }
             try {
                 // OneSignal 5.x uses Debug.setLogLevel
                 OneSignalNative.Debug.setLogLevel(6);
@@ -68,16 +72,52 @@ export const oneSignalService = {
             }
         } else {
             // Web Integration
-            if (_webInitialized) {
-                console.log('[OneSignal Web] Already initialized, skipping.');
-                return;
-            }
             try {
                 await OneSignalWeb.init({
                     appId: normalizedAppId,
                     allowLocalhostAsSecureOrigin: true,
                     serviceWorkerParam: { scope: '/' },
                     serviceWorkerPath: '/OneSignalSDKWorker.js',
+                    promptOptions: {
+                        slidedown: {
+                            prompts: [
+                                {
+                                    type: "push",
+                                    autoPrompt: true,
+                                    text: {
+                                        actionMessage: "Subscribe to our notifications for the latest news and updates. You can disable anytime.",
+                                        acceptButton: "Subscribe",
+                                        cancelButton: "Later"
+                                    },
+                                    delay: {
+                                        pageViews: 1,
+                                        timeDelay: 5
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    notifyButton: {
+                        enable: true,
+                        position: 'bottom-right',
+                        size: 'medium',
+                        showCredit: false,
+                        prenotify: true,
+                        text: {
+                            'tip.state.unsubscribed': 'Subscribe to notifications',
+                            'tip.state.subscribed': "You're subscribed to notifications",
+                            'tip.state.blocked': "You've blocked notifications",
+                            'message.prenotify': 'Click to subscribe to notifications',
+                            'message.action.subscribed': "Thanks for subscribing!",
+                            'message.action.resubscribed': "You're subscribed to notifications",
+                            'message.action.unsubscribed': "You won't receive notifications anymore",
+                            'dialog.main.title': 'Manage Site Notifications',
+                            'dialog.main.button.subscribe': 'SUBSCRIBE',
+                            'dialog.main.button.unsubscribe': 'UNSUBSCRIBE',
+                            'dialog.blocked.title': 'Unblock Notifications',
+                            'dialog.blocked.message': "Follow these instructions to allow notifications:"
+                        }
+                    } as any
                 });
                 // Display handler for foreground (when tab is active)
                 OneSignalWeb.Notifications.addEventListener('foregroundWillDisplay', (event) => {
@@ -113,6 +153,7 @@ export const oneSignalService = {
             } catch (error) {
                 console.error('[OneSignal Web] Initialization failed:', error);
             } finally {
+                _initializing = false;
                 // Always expose to window for debugging, even if init fails
                 (window as any).OneSignal = OneSignalWeb;
                 (window as any).oneSignalService = oneSignalService;

@@ -1720,3 +1720,24 @@ body.pro-dark-theme, body.pro-dark-theme #root, .pro-dark-theme .bg-page {
     text-transform: uppercase !important;
     letter-spacing: 0.05em !important;
 }
+
+/* OneSignal Bell Custom Positioning - Moves it to Top Right */
+#onesignal-bell-container.onesignal-reset {
+    bottom: auto !important;
+    top: 20px !important;
+    right: 20px !important;
+    left: auto !important;
+    z-index: 999999 !important;
+}
+
+#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher {
+    bottom: auto !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: auto !important;
+}
+
+/* Ensure slidedown is above other elements */
+.onesignal-slidedown-container {
+    z-index: 999999 !important;
+}
