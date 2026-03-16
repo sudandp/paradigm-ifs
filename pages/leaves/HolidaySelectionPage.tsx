@@ -11,6 +11,7 @@ import Toast from '../../components/ui/Toast';
 import HolidayCalendar from './HolidayCalendar';
 import type { UserHoliday, Holiday, StaffAttendanceRules } from '../../types';
 import LoadingScreen from '../../components/ui/LoadingScreen';
+import Modal from '../../components/ui/Modal';
 
 
 const HolidaySelectionPage: React.FC = () => {
@@ -25,6 +26,7 @@ const HolidaySelectionPage: React.FC = () => {
     const [selectedHolidays, setSelectedHolidays] = useState<{ name: string; date: string }[]>([]);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [viewingDate, setViewingDate] = useState(new Date());
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
 
     const currentYear = new Date().getFullYear();
     const userRole = user?.role?.toLowerCase();
@@ -67,13 +69,23 @@ const HolidaySelectionPage: React.FC = () => {
     };
 
     const handleSave = async () => {
-        if (selectedHolidays.length !== maxEmployeeHolidays) {
-            setToast({ message: `Please select exactly ${maxEmployeeHolidays} holidays.`, type: 'error' });
+        if (selectedHolidays.length === 0) {
+            setToast({ message: `Please select at least 1 holiday.`, type: 'error' });
+            return;
+        }
+        
+        if (selectedHolidays.length > maxEmployeeHolidays) {
+            setToast({ message: `You can only select up to ${maxEmployeeHolidays} holidays.`, type: 'error' });
             return;
         }
 
+        setShowConfirmModal(true);
+    };
+
+    const confirmSave = async () => {
         if (!user?.id) return;
 
+        setShowConfirmModal(false);
         setIsSaving(true);
         try {
             const holidaysToSave = selectedHolidays.map(h => ({
@@ -127,7 +139,7 @@ const HolidaySelectionPage: React.FC = () => {
     }
 
     return (
-        <div className="p-4 md:p-6 pb-32">
+        <div className="p-4 md:p-6 pb-40">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             
             <div className="flex items-center gap-4 mb-8">
@@ -151,7 +163,7 @@ const HolidaySelectionPage: React.FC = () => {
                                 <CalendarIcon className="h-5 w-5 text-accent" />
                                 Available Holidays
                             </h2>
-                            <div className={`px-4 py-1 rounded-full text-sm font-medium ${selectedHolidays.length === maxEmployeeHolidays ? 'bg-emerald-500/10 text-emerald-500' : 'bg-accent/10 text-accent'}`}>
+                            <div className={`px-4 py-1 rounded-full text-sm font-medium ${selectedHolidays.length > 0 && selectedHolidays.length <= maxEmployeeHolidays ? 'bg-emerald-500/10 text-emerald-500' : 'bg-accent/10 text-accent'}`}>
                                 {selectedHolidays.length} / {maxEmployeeHolidays} Selected
                             </div>
                         </div>
@@ -166,20 +178,28 @@ const HolidaySelectionPage: React.FC = () => {
                                     <button
                                         key={index}
                                         onClick={() => toggleHoliday(holiday.name, holiday.date)}
-                                        className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 text-left ${
+                                        className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 text-left hover:scale-[1.01] active:scale-[0.99] ${
                                             isSelected 
-                                            ? 'bg-accent/10 border-accent shadow-sm' 
-                                            : 'bg-transparent border-border hover:border-accent/50 hover:bg-white/5'
+                                            ? 'bg-accent/10 border-accent shadow-sm ring-1 ring-accent/20' 
+                                            : 'bg-transparent border-border hover:border-accent/30 hover:bg-accent/5'
                                         }`}
                                     >
-                                        <div>
-                                            <p className={`text-xl font-semibold ${isMobile ? 'text-white' : 'text-primary-text'}`}>{holiday.name}</p>
-                                            <p className={`text-base font-bold ${isMobile ? 'text-white/70' : 'text-muted'} mt-1`}>{formattedDate}</p>
+                                        <div className="flex items-center gap-4">
+                                            <div className={`h-12 w-12 rounded-xl flex flex-col items-center justify-center transition-colors ${
+                                                isSelected ? 'bg-accent text-white' : 'bg-muted/10 text-muted'
+                                            }`}>
+                                                <span className="text-[10px] font-bold uppercase leading-none">{dateObj.toLocaleDateString('en-IN', { month: 'short' })}</span>
+                                                <span className="text-lg font-bold leading-none mt-0.5">{dateObj.getDate()}</span>
+                                            </div>
+                                            <div>
+                                                <p className={`text-lg font-semibold ${isSelected ? 'text-accent' : 'text-primary-text'}`}>{holiday.name}</p>
+                                                <p className="text-sm text-muted">{formattedDate}</p>
+                                            </div>
                                         </div>
-                                        <div className={`h-6 w-6 rounded-full flex items-center justify-center border transition-colors ${
+                                        <div className={`h-6 w-6 rounded-full flex items-center justify-center border transition-all duration-300 ${
                                             isSelected 
-                                            ? 'bg-accent border-accent text-white' 
-                                            : 'border-border bg-card'
+                                            ? 'bg-accent border-accent text-white rotate-0 scale-100' 
+                                            : 'border-border bg-card rotate-90 scale-75 opacity-50'
                                         }`}>
                                             {isSelected && <Check className="h-4 w-4" />}
                                         </div>
@@ -188,20 +208,11 @@ const HolidaySelectionPage: React.FC = () => {
                             })}
                         </div>
 
-                        <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4 pt-6 border-t border-border">
-                            <p className="text-sm text-muted flex items-center gap-2">
-                                <Info className="h-4 w-4" />
-                                Please select exactly {maxEmployeeHolidays} holidays from the pool.
+                        <div className="mt-8 pt-6 border-t border-border">
+                            <p className="text-sm text-muted flex items-start gap-2">
+                                <Info className="h-4 w-4 mt-0.5 flex-shrink-0 text-accent" />
+                                <span>You can select up to <strong>{maxEmployeeHolidays} holidays</strong> from the pool. Make sure to choose the ones that are most important to you.</span>
                             </p>
-                            <Button 
-                                onClick={handleSave} 
-                                isLoading={isSaving} 
-                                disabled={selectedHolidays.length !== maxEmployeeHolidays}
-                                className="w-full md:w-auto px-12 py-3 shadow-lg shadow-accent/20"
-                            >
-                                <Save className="mr-2 h-5 w-5" />
-                                Save Selection
-                            </Button>
                         </div>
                     </div>
                 </div>
@@ -219,17 +230,65 @@ const HolidaySelectionPage: React.FC = () => {
                         <div className="mt-6 p-4 bg-accent/5 border border-accent/10 rounded-xl space-y-3">
                             <h4 className="text-sm font-semibold text-accent-dark">Legend</h4>
                             <div className="flex items-center gap-3 text-sm">
-                                <div className="h-3 w-3 rounded-full bg-red-500"></div>
-                                <span className="text-muted">Company Holiday</span>
+                                <div className="h-3 w-3 rounded-full bg-emerald-600"></div>
+                                <span className="text-muted">Gov Holiday</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="h-3 w-3 rounded-full bg-amber-500"></div>
+                                <span className="text-muted">Admin Allocated</span>
                             </div>
                             <div className={`flex items-center gap-3 text-sm transition-opacity ${selectedHolidays.length > 0 ? 'opacity-100' : 'opacity-50'}`}>
-                                <div className="h-3 w-3 rounded-full bg-emerald-500"></div>
+                                <div className="h-3 w-3 rounded-full bg-violet-600"></div>
                                 <span className="text-muted">Your Selection</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Floating Save Selection Bar */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-card via-card to-transparent border-t border-border z-40">
+                <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+                    {!isMobile && (
+                        <div className="text-sm text-muted">
+                            <span className="font-semibold text-accent">{selectedHolidays.length}</span> of {maxEmployeeHolidays} holidays selected
+                        </div>
+                    )}
+                    <Button 
+                        onClick={handleSave} 
+                        isLoading={isSaving} 
+                        disabled={selectedHolidays.length === 0}
+                        className="w-full md:w-auto px-12 py-3 shadow-lg shadow-accent/20 text-lg h-14"
+                    >
+                        <Save className="mr-2 h-6 w-6" />
+                        Save Selection
+                    </Button>
+                </div>
+            </div>
+
+            {/* Confirmation Modal */}
+            <Modal
+                isOpen={showConfirmModal}
+                onClose={() => setShowConfirmModal(false)}
+                onConfirm={confirmSave}
+                title="Confirm Holiday Selection"
+                confirmButtonText="Confirm & Save"
+                confirmButtonVariant="primary"
+                isLoading={isSaving}
+            >
+                <div className="space-y-4">
+                    <p>Are you sure you want to save these <span className="font-bold text-accent">{selectedHolidays.length}</span> holidays?</p>
+                    <div className="bg-muted/5 rounded-xl border border-border overflow-hidden">
+                        {[...selectedHolidays].sort((a, b) => a.date.localeCompare(b.date)).map((h, i) => (
+                            <div key={i} className="flex items-center justify-between p-3 border-b border-border last:border-0">
+                                <span className="font-medium text-primary-text">{h.name}</span>
+                                <span className="text-xs text-muted font-mono">{new Date(`${currentYear}${h.date}`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="text-xs text-muted italic">Note: You can change your selection later if the window is still open.</p>
+                </div>
+            </Modal>
         </div>
     );
 };
