@@ -126,7 +126,7 @@
     <script>
       // Service worker recovery logic: Unregister existing workers if they are in a broken state
       if ("serviceWorker" in navigator) {
-        const FIX_KEY = "pifs_sw_fix_v4";
+        const FIX_KEY = "pifs_sw_fix_v5";
         if (!localStorage.getItem(FIX_KEY)) {
           navigator.serviceWorker.getRegistrations().then(
             (registrations) => {

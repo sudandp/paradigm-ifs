@@ -107,7 +107,7 @@ export const oneSignalService = {
                         showCredit: false,
                         prenotify: true,
                         colors: {
-                            'circle.background': '#006b3f',
+                            'circle.background': '#2563eb', // Blue for testing if config is used
                             'circle.foreground': 'white',
                             'badge.background': '#ef4444',
                             'badge.foreground': 'white',
@@ -164,8 +164,11 @@ export const oneSignalService = {
                     _pendingUserId = null;
                 }
 
-                // Prompt for notification permission on web
-                if (!OneSignalWeb.Notifications.permission) {
+                // Check permission correctly (await is required for OneSignal v16)
+                const permissionResult = await OneSignalWeb.Notifications.permission;
+                console.log('[OneSignal Web] Current permission state:', permissionResult);
+
+                if (!permissionResult) {
                     console.log('[OneSignal Web] Requesting notification permission via Slidedown...');
                     try {
                         await (OneSignalWeb.Slidedown as any).promptNotifications();
