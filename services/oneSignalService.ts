@@ -140,7 +140,6 @@ export const oneSignalService = {
                         }
                     } as any
                 });
-                // Display handler for foreground (when tab is active)
                 OneSignalWeb.Notifications.addEventListener('foregroundWillDisplay', (event) => {
                     console.log('[OneSignal Web] Foreground notification received:', event);
                 });
@@ -149,10 +148,20 @@ export const oneSignalService = {
                     console.log('[OneSignal Web] Notification clicked:', event);
                 });
 
+                // Add subscription change listener for debugging
+                OneSignalWeb.User.PushSubscription.addEventListener('change', (event) => {
+                    console.log('[OneSignal Web] Subscription state changed:', {
+                        current: event.current,
+                        previous: event.previous
+                    });
+                });
+
                 _webInitialized = true;
                 console.log('[OneSignal Web] Initialized with App ID:', normalizedAppId);
                 console.log('[OneSignal Web] Notification Permission:', OneSignalWeb.Notifications.permission);
                 console.log('[OneSignal Web] Subscription ID:', OneSignalWeb.User.PushSubscription.id);
+                console.log('[OneSignal Web] Opted In:', OneSignalWeb.User.PushSubscription.optedIn);
+                console.log('[OneSignal Web] Current Origin:', window.location.origin);
 
                 // Process pending login if one was deferred
                 if (_pendingUserId) {
@@ -175,6 +184,29 @@ export const oneSignalService = {
                 console.error('[OneSignal Web] Initialization failed:', error);
             } finally {
                 _initializing = false;
+                
+                // Set up a global debug helper
+                (window as any).debugOneSignal = async () => {
+                    const permission = await OneSignalWeb.Notifications.permission;
+                    const subId = OneSignalWeb.User.PushSubscription.id;
+                    const optedIn = OneSignalWeb.User.PushSubscription.optedIn;
+                    
+                    console.table({
+                        'App ID': normalizedAppId,
+                        'Initialized': _webInitialized,
+                        'Permission': permission,
+                        'Subscription ID': subId || 'None',
+                        'Opted In': optedIn,
+                        'Origin': window.location.origin,
+                        'Service Worker': !!navigator.serviceWorker.controller
+                    });
+                    
+                    if (!subId) {
+                        console.warn('[OneSignal Debug] No Subscription ID. Check OneSignal dashboard -> Settings -> Web Configuration to ensure this domain is allowed.');
+                    }
+                    return { permission, subId, optedIn };
+                };
+
                 // Expose to window with a tiny delay to ensure SDK internal state has settled
                 setTimeout(() => {
                     (window as any).OneSignal = OneSignalWeb;
