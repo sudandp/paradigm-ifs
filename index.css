@@ -1722,14 +1722,14 @@ body.pro-dark-theme, body.pro-dark-theme #root, .pro-dark-theme .bg-page {
 }
 
 /* OneSignal Bell Custom Positioning - Default Bottom Right with Brand Colors */
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-button {
+body #onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-button {
     background-color: #006b3f !important;
     box-shadow: 0 4px 15px rgba(0, 107, 63, 0.3) !important;
 }
 
 /* Fix OneSignal Message/Tooltip - Isolating from global overrides that cause "white bar" */
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-message,
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-tooltip {
+body #onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-message,
+body #onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-tooltip {
     width: 260px !important;
     max-width: 260px !important;
     min-width: 200px !important;
@@ -1749,10 +1749,10 @@ body.pro-dark-theme, body.pro-dark-theme #root, .pro-dark-theme .bg-page {
 }
 
 /* Ensure text is visible (not white on white) */
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-message-body,
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-message-body *,
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-tooltip-body,
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-tooltip-body * {
+body #onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-message-body,
+body #onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-message-body *,
+body #onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-tooltip-body,
+body #onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-tooltip-body * {
     color: #1a1a1a !important;
     font-size: 13px !important;
     line-height: 1.5 !important;
@@ -1762,13 +1762,13 @@ body.pro-dark-theme, body.pro-dark-theme #root, .pro-dark-theme .bg-page {
 }
 
 /* Fix the arrow */
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-message-arrow,
-#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-tooltip-arrow {
+body #onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-message-arrow,
+body #onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-tooltip-arrow {
     border-top-color: #ffffff !important;
     bottom: -8px !important;
 }
 
 /* Ensure slidedown (permission prompt) is not cut off */
-.onesignal-slidedown-container {
+body .onesignal-slidedown-container {
     z-index: 999999 !important;
 }
