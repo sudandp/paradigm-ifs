@@ -104,10 +104,10 @@ export const oneSignalService = {
                         showCredit: false,
                         prenotify: true,
                         displayPredicate: async () => {
-                            // Only show if the user hasn't granted notifications yet
-                            // This matches OneSignal's recommended standard behavior
+                            // Show the bell if NOT granted, so users can see the 'how to unblock' guide
                             const permission = await OneSignalWeb.Notifications.permission;
-                            return !permission;
+                            // Handle both boolean (SDK) and string (Native) permission types
+                            return (permission as any) !== true && (permission as any) !== 'granted';
                         },
                         colors: {
                             'circle.background': '#006b3f',

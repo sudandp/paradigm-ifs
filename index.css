@@ -1721,3 +1721,25 @@ body.pro-dark-theme, body.pro-dark-theme #root, .pro-dark-theme .bg-page {
     letter-spacing: 0.05em !important;
 }
 
+/* 
+ * OneSignal CSS Isolation 
+ * Global overrides in this project use !important which can make OneSignal tooltips 
+ * (which are white) have white text. This ensures OneSignal text remains dark/visible.
+ */
+#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-message-body,
+#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-message-body *,
+#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-tooltip-body,
+#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-tooltip-body * {
+    color: #1a1a1a !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+}
+
+#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-message,
+#onesignal-bell-container.onesignal-reset .onesignal-bell-launcher-tooltip {
+    z-index: 999999999 !important;
+}
+
+.onesignal-slidedown-container {
+    z-index: 999999999 !important;
+}
