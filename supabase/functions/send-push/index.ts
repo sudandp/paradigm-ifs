@@ -67,7 +67,7 @@ serve(async (req) => {
     }
 
     if (broadcast) {
-      payload.included_segments = ["Subscribed Users", "Total Subscriptions", "Active Users"];
+      payload.included_segments = ["Subscribed Users"];
     } else {
       if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
         return new Response(JSON.stringify({ error: 'No user IDs provided' }), { 
@@ -140,6 +140,8 @@ serve(async (req) => {
 
         if (dbError) {
           console.error('Database insertion error:', dbError);
+        } else {
+          console.log(`Successfully persisted ${dbNotifications.length} notifications to DB.`);
         }
       }
     }

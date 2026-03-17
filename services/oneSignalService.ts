@@ -25,8 +25,11 @@ export const oneSignalService = {
             return;
         }
 
-        // OneSignal App IDs must be lowercase UUIDs
-        const normalizedAppId = appId.toLowerCase().trim();
+        // OneSignal App IDs must be lowercase UUIDs. 
+        // We also strip quotes in case they were included in env variables.
+        const normalizedAppId = appId.toLowerCase().trim().replace(/['"]/g, '');
+
+        console.log('[OneSignal] Attempting initialization with ID:', normalizedAppId);
 
         if (_initializing || _webInitialized || _nativeInitialized) {
             console.log('[OneSignal] Initialization already in progress or completed, skipping.');
@@ -187,16 +190,17 @@ export const oneSignalService = {
     login: (userId: string) => {
         try {
             if (Capacitor.isNativePlatform()) {
+                console.log('[OneSignal Native] Setting external ID:', userId);
                 OneSignalNative.login(userId);
             } else {
                 if (_webInitialized) {
+                    console.log('[OneSignal Web] Setting external ID:', userId);
                     OneSignalWeb.login(userId);
                 } else {
                     console.log('[OneSignal Web] Not initialized yet, queuing login for:', userId);
                     _pendingUserId = userId;
                 }
             }
-            console.log('[OneSignal] User login/tag update requested:', userId);
         } catch (error) {
             console.error('[OneSignal] Failed to set external user ID:', error);
         }
@@ -208,13 +212,17 @@ export const oneSignalService = {
     logout: () => {
         try {
             if (Capacitor.isNativePlatform()) {
+                console.log('[OneSignal Native] Removing external ID');
                 OneSignalNative.logout();
             } else {
                 if (_webInitialized) {
+                    console.log('[OneSignal Web] Removing external ID');
                     OneSignalWeb.logout();
+                } else {
+                    console.log('[OneSignal Web] Logout requested but not initialized');
+                    _pendingUserId = null;
                 }
             }
-            console.log('[OneSignal] User logged out/untagged');
         } catch (error) {
             console.error('[OneSignal] Failed to remove external user ID:', error);
         }
