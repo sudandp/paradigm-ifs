@@ -103,6 +103,24 @@ export const oneSignalService = {
                         size: 'medium',
                         showCredit: false,
                         prenotify: true,
+                        displayPredicate: async () => {
+                            // Only show if the user hasn't granted notifications yet
+                            // This matches OneSignal's recommended standard behavior
+                            const permission = await OneSignalWeb.Notifications.permission;
+                            return !permission;
+                        },
+                        colors: {
+                            'circle.background': '#006b3f',
+                            'circle.foreground': 'white',
+                            'badge.background': '#ef4444',
+                            'badge.foreground': 'white',
+                            'badge.bordercolor': 'white',
+                            'pulse.color': 'white',
+                            'dialog.button.background.hover': '#005632',
+                            'dialog.button.background.active': '#005632',
+                            'dialog.button.background': '#006b3f',
+                            'dialog.button.foreground': 'white'
+                        },
                         text: {
                             'tip.state.unsubscribed': 'Subscribe to notifications',
                             'tip.state.subscribed': "You're subscribed to notifications",
