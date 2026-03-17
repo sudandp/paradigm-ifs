@@ -2201,6 +2201,25 @@ const AttendanceDashboard: React.FC = () => {
                 user?.name || 'Unknown User'
             );
 
+            // Record Audit Log
+            try {
+                await supabase.from('attendance_audit_logs').insert([{
+                    action: 'LEAVE_BALANCES_EXPORTED',
+                    performed_by: user?.id,
+                    details: {
+                        exportedBy: user?.name,
+                        userCount: balances.length,
+                        filters: {
+                            selectedUser,
+                            selectedRole,
+                            selectedSite
+                        }
+                    }
+                }]);
+            } catch (auditErr) {
+                console.error('Failed to record audit log:', auditErr);
+            }
+
             setToast({ message: 'Leave balances exported successfully.', type: 'success' });
         } catch (error) {
             console.error("Leave Export failed:", error);

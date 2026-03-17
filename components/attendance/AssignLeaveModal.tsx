@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Save, Loader2, Calendar as CalendarIcon, User, FileText, Info } from 'lucide-react';
+import { supabase } from '../../services/supabase';
 import { format, differenceInCalendarDays, isSameDay } from 'date-fns';
 import { User as UserType, LeaveType, LeaveBalance } from '../../types';
 import { api } from '../../services/api';
@@ -12,13 +13,15 @@ interface AssignLeaveModalProps {
     onClose: () => void;
     onSuccess: () => void;
     users: UserType[];
+    currentUserId: string;
 }
 
 const AssignLeaveModal: React.FC<AssignLeaveModalProps> = ({ 
     isOpen, 
     onClose, 
     onSuccess, 
-    users
+    users,
+    currentUserId
 }) => {
     const [selectedUserId, setSelectedUserId] = useState<string>('');
     const [leaveType, setLeaveType] = useState<LeaveType>('Earned');
@@ -155,6 +158,28 @@ const AssignLeaveModal: React.FC<AssignLeaveModalProps> = ({
                 reason,
                 dayOption: showHalfDayOption ? dayOption : 'full'
             });
+
+            
+            // Record Audit Log
+            try {
+                await supabase.from('attendance_audit_logs').insert([{
+                    action: 'LEAVE_ASSIGNED',
+                    performed_by: currentUserId,
+                    target_user_id: selectedUserId,
+                    details: {
+                        leaveType,
+                        startDate,
+                        endDate,
+                        duration,
+                        reason,
+                        userName: selectedUser?.name,
+                        source: 'Manual Assignment'
+                    }
+                }]);
+            } catch (auditErr) {
+                console.error('Failed to record audit log:', auditErr);
+                // Don't fail the whole request
+            }
 
             setToast({ message: 'Leave assigned successfully!', type: 'success' });
             onSuccess();

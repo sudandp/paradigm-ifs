@@ -107,7 +107,7 @@ export const oneSignalService = {
                         showCredit: false,
                         prenotify: true,
                         colors: {
-                            'circle.background': '#2563eb', // Blue for testing if config is used
+                            'circle.background': '#006b3f', // Back to green
                             'circle.foreground': 'white',
                             'badge.background': '#ef4444',
                             'badge.foreground': 'white',
@@ -183,7 +183,7 @@ export const oneSignalService = {
                 _initializing = false;
                 
                 // Set up a global debug helper
-                (window as any).debugOneSignal = async () => {
+                const debugHelper = async () => {
                     const permission = await OneSignalWeb.Notifications.permission;
                     const subId = OneSignalWeb.User.PushSubscription.id;
                     const optedIn = OneSignalWeb.User.PushSubscription.optedIn;
@@ -198,9 +198,6 @@ export const oneSignalService = {
                         'Service Worker': !!navigator.serviceWorker.controller
                     });
                     
-                    if (!subId) {
-                        console.warn('[OneSignal Debug] No Subscription ID. Check OneSignal dashboard -> Settings -> Web Configuration to ensure this domain is allowed.');
-                    }
                     return { permission, subId, optedIn };
                 };
 
@@ -208,6 +205,7 @@ export const oneSignalService = {
                 setTimeout(() => {
                     (window as any).OneSignal = OneSignalWeb;
                     (window as any).oneSignalService = oneSignalService;
+                    (window as any).debugOneSignal = debugHelper;
                 }, 500);
             }
         }
