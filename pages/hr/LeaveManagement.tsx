@@ -71,7 +71,7 @@ const LeaveManagement: React.FC = () => {
     const [userHolidays, setUserHolidays] = useState<(UserHoliday & { userName?: string })[]>([]);
     const [poolHolidays, setPoolHolidays] = useState<any[]>([]);
     const [selectedUserId, setSelectedUserId] = useState<string>('all');
-    const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+    const [selectedDate, setSelectedDate] = useState<string>('');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [actioningId, setActioningId] = useState<string | null>(null);
     const isMobile = useMediaQuery('(max-width: 767px)');
