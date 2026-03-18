@@ -2508,6 +2508,7 @@ const AttendanceDashboard: React.FC = () => {
                     }
                 }}
                 users={users}
+                currentUserId={user?.id || ''}
             />
 
             {/* Filters Section */}
