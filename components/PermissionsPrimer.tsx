@@ -66,16 +66,6 @@ const PermissionsPrimer: React.FC<PermissionsPrimerProps> = ({ onComplete }) => 
     setIsRequesting(true);
     setStatusMessage('Preparing security modules...');
     
-    // Explicitly trigger OneSignal on Web if integrated
-    if (!Capacitor.isNativePlatform() && (window as any).OneSignal) {
-        console.log('[PermissionsPrimer] Explicitly triggering OneSignal Slidedown');
-        try {
-            await (window as any).OneSignal.Slidedown.promptNotifications();
-        } catch (e) {
-            console.warn('[PermissionsPrimer] OneSignal Slidedown failed:', e);
-        }
-    }
-    
     await requestAllPermissions();
     setIsRequesting(false);
     await verifyPermissions();
