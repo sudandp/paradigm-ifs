@@ -847,6 +847,7 @@ const AttendanceDashboard: React.FC = () => {
     const [isDownloading, setIsDownloading] = useState(false);
     const [isExportingLeaves, setIsExportingLeaves] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [reportPageSize, setReportPageSize] = useState<number>(20);
 
 
     // --- Fetch Audit Logs ---
@@ -856,7 +857,7 @@ const AttendanceDashboard: React.FC = () => {
                 .from('attendance_audit_logs')
                 .select('*')
                 .order('created_at', { ascending: false })
-                .limit(100);
+                .limit(reportPageSize);
 
             if (logsError) throw logsError;
 
@@ -870,16 +871,18 @@ const AttendanceDashboard: React.FC = () => {
             if (userIds.size > 0) {
                  const { data: usersData } = await supabase
                     .from('users')
-                    .select('id, name')
+                    .select('id, name, photo_url')
                     .in('id', Array.from(userIds));
                 
-                const userMap = new Map<string, string>();
-                usersData?.forEach((u: any) => userMap.set(u.id, u.name));
+                const userMap = new Map<string, { name: string; photoUrl?: string }>();
+                usersData?.forEach((u: any) => userMap.set(u.id, { name: u.name, photoUrl: u.photo_url }));
 
                 const formattedLogs = logsData.map((log: any) => ({
                     ...log,
-                    performer_name: userMap.get(log.performed_by) || 'Unknown',
-                    target_name: userMap.get(log.target_user_id) || 'Unknown'
+                    performer_name: userMap.get(log.performed_by)?.name || 'Unknown',
+                    performer_photo: userMap.get(log.performed_by)?.photoUrl || null,
+                    target_name: userMap.get(log.target_user_id)?.name || 'Unknown',
+                    target_photo: userMap.get(log.target_user_id)?.photoUrl || null
                 }));
                 setAuditLogs(formattedLogs);
             } else {
@@ -894,7 +897,7 @@ const AttendanceDashboard: React.FC = () => {
         if (reportType === 'audit') {
             fetchAuditLogs();
         }
-    }, [reportType, fetchAuditLogs]);
+    }, [reportType, reportPageSize, fetchAuditLogs]);
 
     const canDownloadReport = user && (isAdmin(user.role) || permissions[user.role]?.includes('download_attendance_report'));
     const canViewAllAttendance = user && (isAdmin(user.role) || permissions[user.role]?.includes('view_all_attendance'));
@@ -1611,9 +1614,9 @@ const AttendanceDashboard: React.FC = () => {
                 };
             })
             .sort((a, b) => {
-                // Sort by date then time
-                if (a.date !== b.date) return a.date.localeCompare(b.date);
-                return a.time.localeCompare(b.time);
+                // Newest first: Sort by date then time descending
+                if (a.date !== b.date) return b.date.localeCompare(a.date);
+                return b.time.localeCompare(a.time);
             });
 
     }, [users, attendanceEvents, dateRange, selectedUser, selectedRole, selectedSite, leaves, recurringHolidays, userHolidaysPool, officeHolidays, fieldHolidays]);
@@ -2376,7 +2379,7 @@ const AttendanceDashboard: React.FC = () => {
 
         return (
             <div className="space-y-4 pt-4">
-                {rows.slice(0, 5).map((row, i) => (
+                {rows.slice(0, reportPageSize).map((row, i) => (
                     <div key={i} className="bg-[#041b0f] p-4 rounded-xl border border-[#1a3d2c]">
                         <div className="flex justify-between items-start mb-3">
                              <div className="font-bold text-white">{row.userName || 'Unknown'}</div>
@@ -2433,9 +2436,9 @@ const AttendanceDashboard: React.FC = () => {
                         </div>
                     </div>
                 ))}
-                {rows.length > 5 && (
+                {rows.length > reportPageSize && (
                     <div className="text-center text-xs text-gray-500 italic py-2">
-                        Showing first 5 rows in summary. Download CSV for full data.
+                        Showing first {reportPageSize} rows in summary. Download CSV/Excel for full data.
                     </div>
                 )}
             </div>
@@ -2679,6 +2682,21 @@ const AttendanceDashboard: React.FC = () => {
                             <option value="missing_checkout">Missing Punch-out</option>
                             <option value="missing_checkin">Missing Punch-in</option>
                             <option value="incomplete">Incomplete (Any Missing)</option>
+                        </select>
+                    </div>
+
+                    <div className="col-span-1">
+                        <label htmlFor="pageSize-select" className="block text-xs font-medium text-gray-400 md:text-gray-500 mb-1">Show Records</label>
+                        <select
+                            id="pageSize-select"
+                            name="pageSize"
+                            className="w-full md:w-auto border border-[#1a3d2c] md:border-gray-200 rounded-lg px-3 py-2 text-sm bg-[#041b0f] md:bg-white text-white md:text-gray-900 focus:ring-2 focus:ring-[#22c55e] outline-none appearance-none"
+                            value={reportPageSize}
+                            onChange={(e) => setReportPageSize(Number(e.target.value))}
+                        >
+                            <option value={20}>20 Records</option>
+                            <option value={50}>50 Records</option>
+                            <option value={100}>100 Records</option>
                         </select>
                     </div>
                 </div>

@@ -2737,9 +2737,9 @@ export const api = {
 
     const monthEnd = endOfMonth(referenceDate);
     
-    // User requested simplified Comp Off calculation:
-    // Total Comp Off = (Attendance on Holidays/Sundays)
-    const compOffTotal = dynamicCompOffTotal;
+    // Total Comp Off = (Attendance on Holidays/Sundays) + manual grants
+    const manualCompOffGranted = (compOffData || []).filter((log: any) => log.status === 'earned' || log.status === 'used').length;
+    const compOffTotal = dynamicCompOffTotal + manualCompOffGranted;
 
     const finalCompOffTotal = compOffTotal;
 
@@ -3148,7 +3148,7 @@ export const api = {
         return { data: cached, total: cached.length };
     }
 
-    let query = supabase.from('leave_requests').select('*, users!leave_requests_user_id_fkey(name)', { count: 'exact' });
+    let query = supabase.from('leave_requests').select('*, users!leave_requests_user_id_fkey(name, photo_url)', { count: 'exact' });
     if (filter?.userId) query = query.eq('user_id', filter.userId);
     if (filter?.userIds) query = query.in('user_id', filter.userIds);
     if (filter?.status) query = query.eq('status', filter.status);
@@ -3182,7 +3182,7 @@ export const api = {
     }
 
     const { data, count, error } = (await withTimeout(
-      query.order('start_date', { ascending: false }) as any,
+      query.order('updated_at', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }) as any,
       15000,
       'Fetch leave requests timed out'
     )) as any;
@@ -3193,23 +3193,50 @@ export const api = {
         await offlineDb.setCache('leave_requests', (data || []).map(toCamelCase));
     }
     
-    // Get unique approver IDs
-    const approverIds = [...new Set((data || []).map(item => item.current_approver_id).filter(Boolean))];
+    // Get unique approver IDs (current and historical)
+    const approverIdsSet = new Set<string>();
+    (data || []).forEach(item => {
+      if (item.current_approver_id) approverIdsSet.add(item.current_approver_id);
+      if (item.approval_history && Array.isArray(item.approval_history)) {
+        item.approval_history.forEach((record: any) => {
+          if (record.approverId || record.approver_id) {
+            approverIdsSet.add(record.approverId || record.approver_id);
+          }
+        });
+      }
+    });
+    const approverIds = [...approverIdsSet];
     
-    // Fetch approver names if there are any
+    // Fetch approver names and photos if there are any
     let approverMap: Record<string, string> = {};
+    let approverPhotoMap: Record<string, string | null> = {};
     if (approverIds.length > 0) {
-      const { data: approvers } = await supabase.from('users').select('id, name').in('id', approverIds);
-      approverMap = (approvers || []).reduce((acc, user) => ({ ...acc, [user.id]: user.name }), {});
+      const { data: approvers } = await supabase.from('users').select('id, name, photo_url').in('id', approverIds);
+      const camelApprovers = (approvers || []).map(toCamelCase);
+      approverMap = camelApprovers.reduce((acc: any, user: any) => ({ ...acc, [user.id]: user.name }), {});
+      approverPhotoMap = camelApprovers.reduce((acc: any, user: any) => ({ ...acc, [user.id]: user.photoUrl || null }), {});
     }
     
     const formattedData = (data || []).map(item => {
       const camelItem = toCamelCase(item);
       const userObj = Array.isArray(item.users) ? item.users[0] : item.users;
+      const camelUserObj = Array.isArray(camelItem.users) ? camelItem.users[0] : camelItem.users;
+      
+      let mappedApprovalHistory = camelItem.approvalHistory || [];
+      if (Array.isArray(mappedApprovalHistory)) {
+          mappedApprovalHistory = mappedApprovalHistory.map((record: any) => ({
+              ...record,
+              approverPhotoUrl: record.approverId ? (approverPhotoMap[record.approverId] || null) : null
+          }));
+      }
+
       return {
         ...camelItem,
+        approvalHistory: mappedApprovalHistory,
         userName: userObj?.name || 'Unknown',
-        currentApproverName: item.current_approver_id ? (approverMap[item.current_approver_id] || null) : null
+        userPhotoUrl: camelUserObj?.photoUrl || undefined,
+        currentApproverName: item.current_approver_id ? (approverMap[item.current_approver_id] || null) : null,
+        currentApproverPhotoUrl: item.current_approver_id ? (approverPhotoMap[item.current_approver_id] || null) : null
       };
     });
 
@@ -3983,7 +4010,7 @@ export const api = {
     if (error) throw error;
   },
   getExtraWorkLogs: async (filter?: { userId?: string, managerId?: string, status?: string, workDate?: string, page?: number, pageSize?: number }): Promise<{ data: ExtraWorkLog[], total: number }> => {
-    let query = supabase.from('extra_work_logs').select('*, user:user_id(reporting_manager_id, reporting_manager_2_id, reporting_manager_3_id)', { count: 'exact' });
+    let query = supabase.from('extra_work_logs').select('*, user:user_id(reporting_manager_id, reporting_manager_2_id, reporting_manager_3_id, photo_url)', { count: 'exact' });
     if (filter?.userId) query = query.eq('user_id', filter.userId);
     if (filter?.status) query = query.eq('status', filter.status);
     if (filter?.workDate) query = query.eq('work_date', filter.workDate);
@@ -4006,7 +4033,13 @@ export const api = {
       );
     }
 
-    return { data: filteredData.map(toCamelCase), total: count || filteredData.length };
+    return { data: filteredData.map(item => {
+      const camel = toCamelCase(item);
+      if (camel.user && camel.user.photoUrl) {
+        camel.userPhotoUrl = camel.user.photoUrl;
+      }
+      return camel;
+    }), total: count || filteredData.length };
   },
   approveExtraWorkClaim: async (claimId: string, approverId: string): Promise<void> => {
     const { data: approverData, error: nameError } = await supabase.from('users').select('name').eq('id', approverId).single();

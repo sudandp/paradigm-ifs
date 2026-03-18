@@ -17,7 +17,7 @@ import LoadingScreen from '../../components/ui/LoadingScreen';
 import EditLeaveTypeModal from '../../components/hr/EditLeaveTypeModal';
 import { exportGenericReportToExcel, GenericReportColumn } from '../../utils/excelExport';
 
-const StatusChip: React.FC<{ status: LeaveRequestStatus; approverName?: string | null; approvalHistory?: any[] }> = ({ status, approverName, approvalHistory }) => {
+const StatusChip: React.FC<{ status: LeaveRequestStatus; approverName?: string | null; approverPhotoUrl?: string | null; approvalHistory?: any[] }> = ({ status, approverName, approverPhotoUrl, approvalHistory }) => {
     const styles: Record<LeaveRequestStatus, string> = {
         pending_manager_approval: 'bg-yellow-100 text-yellow-800',
         pending_hr_confirmation: 'bg-blue-100 text-blue-800',
@@ -28,23 +28,54 @@ const StatusChip: React.FC<{ status: LeaveRequestStatus; approverName?: string |
     };
     
     let displayText = status.replace(/_/g, ' ');
+    const isPending = status === 'pending_manager_approval' || status === 'pending_hr_confirmation';
+    
+    let activeApproverName: string | null = null;
+    let activeApproverPhotoUrl: string | null = null;
     
     // Show approver name for pending statuses
-    if ((status === 'pending_manager_approval' || status === 'pending_hr_confirmation') && approverName) {
+    if (isPending && approverName) {
         displayText = `Pending from ${approverName}`;
+        activeApproverName = approverName;
+        activeApproverPhotoUrl = approverPhotoUrl || null;
     }
     // Show who approved for approved status
     else if (status === 'approved' && approvalHistory && approvalHistory.length > 0) {
         const lastApprover = approvalHistory[approvalHistory.length - 1];
-        displayText = `Approved by ${lastApprover.approverName || lastApprover.approver_name}`;
+        const name = lastApprover.approverName || lastApprover.approver_name;
+        if (name) {
+            displayText = `Approved by ${name}`;
+            activeApproverName = name;
+            activeApproverPhotoUrl = lastApprover.approverPhotoUrl || null;
+        }
     }
     // Show who rejected for rejected status
     else if (status === 'rejected' && approvalHistory && approvalHistory.length > 0) {
         const lastApprover = approvalHistory[approvalHistory.length - 1];
-        displayText = `Rejected by ${lastApprover.approverName || lastApprover.approver_name}`;
+        const name = lastApprover.approverName || lastApprover.approver_name;
+        if (name) {
+            displayText = `Rejected by ${name}`;
+            activeApproverName = name;
+            activeApproverPhotoUrl = lastApprover.approverPhotoUrl || null;
+        }
     }
     
-    return <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${styles[status]}`}>{displayText}</span>;
+    const showAvatar = !!activeApproverName;
+    
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full capitalize ${styles[status]}`}>
+            {showAvatar && activeApproverName && (
+                activeApproverPhotoUrl ? (
+                    <img src={activeApproverPhotoUrl} alt={activeApproverName} className="h-4 w-4 rounded-full object-cover shrink-0" />
+                ) : (
+                    <span className="h-4 w-4 rounded-full bg-white/50 flex items-center justify-center text-[9px] font-bold text-current shrink-0">
+                        {activeApproverName.charAt(0).toUpperCase()}
+                    </span>
+                )
+            )}
+            <span>{displayText}</span>
+        </span>
+    );
 };
 
 const ClaimStatusChip: React.FC<{ status: ExtraWorkLog['status'] }> = ({ status }) => {
@@ -67,7 +98,7 @@ const LeaveManagement: React.FC = () => {
     const [pageSize, setPageSize] = useState(20);
     const [isLoading, setIsLoading] = useState(true);
     const [filter, setFilter] = useState<LeaveRequestStatus | 'all' | 'claims' | 'holiday_selection'>('pending_manager_approval');
-    const [allUsers, setAllUsers] = useState<{ id: string; name: string }[]>([]);
+    const [allUsers, setAllUsers] = useState<{ id: string; name: string; photoUrl?: string }[]>([]);
     const [userHolidays, setUserHolidays] = useState<(UserHoliday & { userName?: string })[]>([]);
     const [poolHolidays, setPoolHolidays] = useState<any[]>([]);
     const [selectedUserId, setSelectedUserId] = useState<string>('all');
@@ -110,7 +141,7 @@ const LeaveManagement: React.FC = () => {
                 } else {
                     users = await api.getTeamMembers(user?.id || '');
                 }
-                setAllUsers(users.map(u => ({ id: u.id, name: u.name })).sort((a, b) => a.name.localeCompare(b.name)));
+                setAllUsers(users.map(u => ({ id: u.id, name: u.name, photoUrl: u.photoUrl })).sort((a, b) => a.name.localeCompare(b.name)));
             } catch (e) {
                 console.error('Failed to fetch users:', e);
             }
@@ -596,7 +627,18 @@ const LeaveManagement: React.FC = () => {
                             ) : (
                                 claims.map(claim => (
                                     <tr key={claim.id}>
-                                        <td data-label="Employee" className="px-4 py-3 font-medium">{claim.userName}</td>
+                                        <td data-label="Employee" className="px-4 py-3 font-medium">
+                                            <div className="flex items-center gap-3">
+                                                {claim.userPhotoUrl ? (
+                                                    <img src={claim.userPhotoUrl} alt={claim.userName} className="h-8 w-8 rounded-full object-cover" />
+                                                ) : (
+                                                    <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-xs shrink-0">
+                                                        {claim.userName.charAt(0).toUpperCase()}
+                                                    </div>
+                                                )}
+                                                <span className="truncate max-w-[120px]" title={claim.userName}>{claim.userName}</span>
+                                            </div>
+                                        </td>
                                         <td data-label="Date & Type" className="px-4 py-3 text-muted">{format(new Date(claim.workDate), 'dd MMM, yyyy')} ({claim.workType})</td>
                                         <td data-label="Claim" className="px-4 py-3 text-muted">{claim.claimType}{claim.claimType === 'OT' ? ` (${claim.hoursWorked} hrs)` : ''}</td>
                                         <td data-label="Reason" className="px-4 py-3 text-muted whitespace-normal break-words max-w-sm">{claim.reason}</td>
@@ -631,7 +673,18 @@ const LeaveManagement: React.FC = () => {
                                 
                                 return (
                                     <tr key={userItem.id}>
-                                        <td data-label="Employee" className="px-4 py-3 font-medium">{userItem.name}</td>
+                                        <td data-label="Employee" className="px-4 py-3 font-medium">
+                                            <div className="flex items-center gap-3">
+                                                {userItem.photoUrl ? (
+                                                    <img src={userItem.photoUrl} alt={userItem.name} className="h-8 w-8 rounded-full object-cover" />
+                                                ) : (
+                                                    <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-xs shrink-0">
+                                                        {userItem.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                )}
+                                                <span className="truncate max-w-[120px]" title={userItem.name}>{userItem.name}</span>
+                                            </div>
+                                        </td>
                                         <td data-label="Status" className="px-4 py-3">
                                             <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                                                 isComplete ? 'bg-green-100 text-green-700' : 
@@ -680,12 +733,23 @@ const LeaveManagement: React.FC = () => {
                             ) : (
                                 requests.map(req => (
                                     <tr key={req.id}>
-                                        <td data-label="Employee" className="px-4 py-3 font-medium">{req.userName}</td>
+                                        <td data-label="Employee" className="px-4 py-3 font-medium">
+                                            <div className="flex items-center gap-3">
+                                                {req.userPhotoUrl ? (
+                                                    <img src={req.userPhotoUrl} alt={req.userName} className="h-8 w-8 rounded-full object-cover" />
+                                                ) : (
+                                                    <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-xs shrink-0">
+                                                        {req.userName.charAt(0).toUpperCase()}
+                                                    </div>
+                                                )}
+                                                <span className="truncate max-w-[120px]" title={req.userName}>{req.userName}</span>
+                                            </div>
+                                        </td>
                                         <td data-label="Type" className="px-4 py-3 text-muted">{req.leaveType} {req.dayOption && `(${req.dayOption})`}</td>
                                         <td data-label="Dates" className="px-4 py-3 text-muted">{format(new Date(req.startDate.replace(/-/g, '/')), 'dd MMM')} - {format(new Date(req.endDate.replace(/-/g, '/')), 'dd MMM')}</td>
                                         <td data-label="Raised On" className="px-4 py-3 text-muted">{(req as any).createdAt ? format(new Date((req as any).createdAt), 'dd MMM, hh:mm a') : 'N/A'}</td>
                                         <td data-label="Reason" className="px-4 py-3 text-muted whitespace-normal break-words max-w-sm">{req.reason}</td>
-                                        <td data-label="Status" className="px-4 py-3"><StatusChip status={req.status} approverName={req.currentApproverName} approvalHistory={req.approvalHistory} /></td>
+                                        <td data-label="Status" className="px-4 py-3"><StatusChip status={req.status} approverName={req.currentApproverName} approverPhotoUrl={req.currentApproverPhotoUrl} approvalHistory={req.approvalHistory} /></td>
                                         <td data-label="Actions" className="px-4 py-3">
                                             <div className="flex md:justify-start justify-end">
                                                 {actioningId === req.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ActionButtons request={req} />}

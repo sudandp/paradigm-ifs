@@ -13,7 +13,9 @@ interface AuditLog {
     details: any;
     created_at: string;
     performer_name?: string;
+    performer_photo?: string | null;
     target_name?: string;
+    target_photo?: string | null;
 }
 
 interface AttendanceAuditReportProps {
@@ -67,7 +69,10 @@ const AttendanceAuditReport: React.FC<AttendanceAuditReportProps> = ({ logs, gen
                                 </td>
                                 <td className="px-6 py-4 font-medium text-gray-900">
                                     <div className="flex items-center">
-                                        <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 mr-2 text-xs">
+                                        {log.performer_photo ? (
+                                            <img src={log.performer_photo} alt={log.performer_name} className="w-6 h-6 rounded-full object-cover mr-2" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }} />
+                                        ) : null}
+                                        <div className={`w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 mr-2 text-xs ${log.performer_photo ? 'hidden' : ''}`}>
                                             {log.performer_name?.charAt(0)}
                                         </div>
                                         {log.performer_name}
@@ -75,7 +80,10 @@ const AttendanceAuditReport: React.FC<AttendanceAuditReportProps> = ({ logs, gen
                                 </td>
                                 <td className="px-6 py-4 text-gray-900">
                                     <div className="flex items-center">
-                                        <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 mr-2 text-xs">
+                                        {log.target_photo ? (
+                                            <img src={log.target_photo} alt={log.target_name} className="w-6 h-6 rounded-full object-cover mr-2" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }} />
+                                        ) : null}
+                                        <div className={`w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 mr-2 text-xs ${log.target_photo ? 'hidden' : ''}`}>
                                             {log.target_name?.charAt(0)}
                                         </div>
                                         {log.target_name}

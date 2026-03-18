@@ -951,6 +951,7 @@ export type LeaveRequestStatus = 'pending_manager_approval' | 'pending_hr_confir
 export interface ApprovalRecord {
   approverId: string;
   approverName: string;
+  approverPhotoUrl?: string | null;
   status: 'approved' | 'rejected';
   timestamp: string;
   comments?: string;
@@ -1019,6 +1020,7 @@ export interface LeaveRequest {
   id: string;
   userId: string;
   userName: string;
+  userPhotoUrl?: string;
   leaveType: LeaveType;
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
@@ -1027,6 +1029,7 @@ export interface LeaveRequest {
   dayOption?: 'full' | 'half'; // for single-day leave requests
   currentApproverId: string | null;
   currentApproverName?: string | null;
+  currentApproverPhotoUrl?: string | null;
   approvalHistory: ApprovalRecord[];
   doctorCertificate?: UploadedFile | null;
 }
@@ -1035,6 +1038,7 @@ export interface ExtraWorkLog {
   id: string;
   userId: string;
   userName: string;
+  userPhotoUrl?: string;
   workDate: string; // YYYY-MM-DD
   workType: 'Holiday' | 'Week Off' | 'Night Shift';
   claimType: 'OT' | 'Comp Off';
