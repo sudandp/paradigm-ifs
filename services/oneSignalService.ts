@@ -160,7 +160,7 @@ export const oneSignalService = {
                 // Process pending login if one was deferred
                 if (_pendingUserId) {
                     console.log('[OneSignal Web] Processing deferred login for:', _pendingUserId);
-                    OneSignalWeb.login(_pendingUserId);
+                    OneSignalWeb.login(_pendingUserId).catch(err => console.warn('[OneSignal Web] Deferred login failed:', err));
                     _pendingUserId = null;
                 }
 
@@ -171,10 +171,16 @@ export const oneSignalService = {
                 if (!permissionResult) {
                     console.log('[OneSignal Web] Requesting notification permission via Slidedown...');
                     try {
-                        await (OneSignalWeb.Slidedown as any).promptNotifications();
+                        if (OneSignalWeb.Slidedown) {
+                            await (OneSignalWeb.Slidedown as any).promptNotifications();
+                        } else if (OneSignalWeb.Notifications) {
+                            await OneSignalWeb.Notifications.requestPermission();
+                        }
                     } catch (e) {
                         console.warn('[OneSignal Web] Slidedown prompt failed, trying native prompt:', e);
-                        await OneSignalWeb.Notifications.requestPermission();
+                        if (OneSignalWeb.Notifications) {
+                            await OneSignalWeb.Notifications.requestPermission();
+                        }
                     }
                 }
             } catch (error) {
@@ -222,7 +228,7 @@ export const oneSignalService = {
             } else {
                 if (_webInitialized) {
                     console.log('[OneSignal Web] Setting external ID:', userId);
-                    OneSignalWeb.login(userId);
+                    OneSignalWeb.login(userId).catch(err => console.warn('[OneSignal Web] Login failed:', err));
                 } else {
                     console.log('[OneSignal Web] Not initialized yet, queuing login for:', userId);
                     _pendingUserId = userId;

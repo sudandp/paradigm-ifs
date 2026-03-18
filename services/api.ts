@@ -3148,7 +3148,7 @@ export const api = {
         return { data: cached, total: cached.length };
     }
 
-    let query = supabase.from('leave_requests').select('*, users(name)', { count: 'exact' });
+    let query = supabase.from('leave_requests').select('*, users!leave_requests_user_id_fkey(name)', { count: 'exact' });
     if (filter?.userId) query = query.eq('user_id', filter.userId);
     if (filter?.userIds) query = query.in('user_id', filter.userIds);
     if (filter?.status) query = query.eq('status', filter.status);
