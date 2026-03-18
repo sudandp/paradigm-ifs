@@ -1721,3 +1721,18 @@ body.pro-dark-theme, body.pro-dark-theme #root, .pro-dark-theme .bg-page {
     letter-spacing: 0.05em !important;
 }
 
+
+/* OneSignal UI Protection */
+.onesignal-reset, 
+.onesignal-reset *,
+[class*="onesignal-"],
+[id*="onesignal-"],
+#onesignal-bell-container,
+#onesignal-bell-container * {
+    border: initial !important;
+    opacity: 1 !important;
+    animation: none !important;
+    transform: none !important;
+    padding: initial !important;
+}
+
