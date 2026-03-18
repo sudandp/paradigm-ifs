@@ -156,7 +156,7 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
     let absentDays = 0;
     let halfDays = 0;
     let holidaysCount = 0;
-    let leavesCount = 0;
+    const leavesCount = 0;
     let floatingHolidays = 0;
     let lossOfPay = 0;
     let holidayPresents = 0;
@@ -164,7 +164,7 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
     let sickLeaves = 0;
     let earnedLeaves = 0;
     let compOffs = 0;
-    let workFromHomeDays = 0;
+    const workFromHomeDays = 0;
 
     let weekOffs = 0; 
 
@@ -401,7 +401,7 @@ const MonthlyHoursReport: React.FC<MonthlyHoursReportProps> = ({ month, year, us
           totalHours: grossHours 
         } = processDailyEvents(dayEvents);
 
-        let duration = netHours;
+        const duration = netHours;
         currentDayBreakIn = firstBreakIn ? format(new Date(firstBreakIn), 'HH:mm') : '-';
         currentDayBreakOut = lastBreakOut ? format(new Date(lastBreakOut), 'HH:mm') : '-';
         let ot = 0;

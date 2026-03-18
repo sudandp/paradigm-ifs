@@ -163,36 +163,64 @@ const DepartmentAccordion: React.FC<{
             </div>
             {isOpen && (
                 <div className="p-4 border-t border-border space-y-4">
-                     {designations.map((designation, desigIndex) => {
-                        const designationOptions = useMemo(() => {
-                             return departmentValue ? (departmentDesignationMap[departmentValue] || []).sort() : [];
-                        }, [departmentValue, departmentDesignationMap]);
-
-                        return (
-                            <div key={designation.id} className="p-4 border rounded-lg bg-page/50 space-y-4 relative">
-                                <Button type="button" variant="icon" size="sm" className="!absolute top-2 right-2" onClick={() => removeDesignation(desigIndex)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                                <Controller
-                                    name={`departments.${deptIndex}.designations.${desigIndex}.designation`}
-                                    control={control}
-                                    render={({ field }) => (
-                                        <Select label="Designation" {...field} disabled={!departmentValue}>
-                                            <option value="">Select Designation</option>
-                                            {designationOptions.map(desig => <option key={desig} value={desig}>{desig}</option>)}
-                                        </Select>
-                                    )}
-                                />
-                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                                    <UniformTable title="Pants" sizes={masterUniforms.pants} headers={[{key:'length',label:'L'},{key:'waist',label:'W'},{key:'hip',label:'H'},{key:'fit',label:'Fit'}]} control={control} nestingIndex={{department: deptIndex, designation: desigIndex}} quantityType="pantsQuantities" />
-                                    <UniformTable title="Shirts" sizes={masterUniforms.shirts} headers={[{key:'length',label:'L'},{key:'sleeves',label:'S'},{key:'bust',label:'B'},{key:'shoulder',label:'Sh'},{key:'fit',label:'Fit'}]} control={control} nestingIndex={{department: deptIndex, designation: desigIndex}} quantityType="shirtsQuantities" />
-                                </div>
-                            </div>
-                        )
-                    })}
+                     {designations.map((designation, desigIndex) => (
+                        <DesignationItem
+                            key={designation.id}
+                            designation={designation}
+                            desigIndex={desigIndex}
+                            deptIndex={deptIndex}
+                            control={control}
+                            departmentValue={departmentValue}
+                            departmentDesignationMap={departmentDesignationMap}
+                            removeDesignation={removeDesignation}
+                            masterUniforms={masterUniforms}
+                        />
+                    ))}
                     <Button type="button" variant="outline" size="sm" onClick={() => appendDesignation({ id: `desig_${Date.now()}`, designation: '', pantsQuantities: {}, shirtsQuantities: {} })}>
                         <Plus className="mr-2 h-4 w-4"/> Add Designation
                     </Button>
                 </div>
             )}
+        </div>
+    );
+};
+
+interface DesignationItemProps {
+    designation: any;
+    desigIndex: number;
+    deptIndex: number;
+    control: any;
+    departmentValue: string;
+    departmentDesignationMap: Record<string, string[]>;
+    removeDesignation: (index: number) => void;
+    masterUniforms: MasterLadiesUniforms;
+}
+
+const DesignationItem: React.FC<DesignationItemProps> = ({ 
+    designation, desigIndex, deptIndex, control, departmentValue, 
+    departmentDesignationMap, removeDesignation, masterUniforms 
+}) => {
+    const designationOptions = useMemo(() => {
+        return departmentValue ? (departmentDesignationMap[departmentValue] || []).sort() : [];
+    }, [departmentValue, departmentDesignationMap]);
+
+    return (
+        <div className="p-4 border rounded-lg bg-page/50 space-y-4 relative">
+            <Button type="button" variant="icon" size="sm" className="!absolute top-2 right-2" onClick={() => removeDesignation(desigIndex)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+            <Controller
+                name={`departments.${deptIndex}.designations.${desigIndex}.designation`}
+                control={control}
+                render={({ field }) => (
+                    <Select label="Designation" {...field} disabled={!departmentValue}>
+                        <option value="">Select Designation</option>
+                        {designationOptions.map(desig => <option key={desig} value={desig}>{desig}</option>)}
+                    </Select>
+                )}
+            />
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <UniformTable title="Pants" sizes={masterUniforms.pants} headers={[{key:'length',label:'L'},{key:'waist',label:'W'},{key:'hip',label:'H'},{key:'fit',label:'Fit'}]} control={control} nestingIndex={{department: deptIndex, designation: desigIndex}} quantityType="pantsQuantities" />
+                <UniformTable title="Shirts" sizes={masterUniforms.shirts} headers={[{key:'length',label:'L'},{key:'sleeves',label:'S'},{key:'bust',label:'B'},{key:'shoulder',label:'Sh'},{key:'fit',label:'Fit'}]} control={control} nestingIndex={{department: deptIndex, designation: desigIndex}} quantityType="shirtsQuantities" />
+            </div>
         </div>
     );
 };

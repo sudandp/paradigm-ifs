@@ -216,7 +216,7 @@ const SmartFieldReportModal: React.FC<SmartFieldReportModalProps> = ({
 
     const generatedSummary = useMemo(() => {
         if (!activeTemplate) return '';
-        let lines = [`Site: ${siteName}`, `Job: ${jobType}`, `Asset: ${assetArea}`, ''];
+        const lines = [`Site: ${siteName}`, `Job: ${jobType}`, `Asset: ${assetArea}`, ''];
         activeTemplate.sections.forEach(section => {
             lines.push(`-- ${section.title} --`);
             section.items.forEach(item => {

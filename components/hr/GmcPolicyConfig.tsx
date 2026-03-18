@@ -21,7 +21,7 @@ const toCSV = (data: GmcPolicySettings): string => {
     const headers = CSV_HEADERS.join(',');
     const values = CSV_HEADERS.map(header => {
         const key = header.charAt(0).toLowerCase() + header.slice(1);
-        let val = data[key as keyof GmcPolicySettings];
+        const val = data[key as keyof GmcPolicySettings];
         if (typeof val === 'string' && (val.includes(',') || val.includes('\n') || val.includes('"'))) {
             return `"${val.replace(/"/g, '""')}"`;
         }

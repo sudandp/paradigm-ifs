@@ -682,7 +682,7 @@ const ProfilePage: React.FC = () => {
                                     try {
                                         if ('serviceWorker' in navigator) {
                                             const registrations = await navigator.serviceWorker.getRegistrations();
-                                            for (let registration of registrations) {
+                                            for (const registration of registrations) {
                                                 await registration.unregister();
                                             }
                                         }

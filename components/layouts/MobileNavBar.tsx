@@ -90,7 +90,7 @@ const MobileNavBar: React.FC = () => {
                 setIndicatorStyle({ opacity: 0, transform: 'translateX(-100px)' });
                 setPathD(generatePath(navRect.width, -100, 0));
                 return;
-            };
+            }
 
             const { offsetLeft, clientWidth } = activeNode;
             setIndicatorStyle({

@@ -159,7 +159,7 @@ export const NotificationPanel: React.FC<{ isOpen: boolean; onClose: () => void;
     };
 
     const cleanMessage = (message: string) => {
-        let cleaned = message.replace(/^URGENT:\s*/i, '');
+        const cleaned = message.replace(/^URGENT:\s*/i, '');
         if (cleaned.toLowerCase().includes('for user') && cleaned.toLowerCase().includes('escalated')) {
             const typePart = cleaned.split(/for user/i)[0].trim();
             return `${typePart} escalated to HR Operation & Admin`;

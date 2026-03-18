@@ -174,15 +174,29 @@ export const oneSignalService = {
                     _pendingUserId = null;
                 }
 
-                // Check permission correctly (await is required for OneSignal v16)
+                // Check permission correctly (handle both boolean and string for OneSignal v16)
                 const permissionResult = await notifications?.permission;
                 console.log('[OneSignal Web] Current permission state:', permissionResult);
 
-                if (!permissionResult) {
+                // In v16, permission is 'default' if not yet asked.
+                // In some react-onesignal versions it might be boolean false.
+                const shouldPrompt = permissionResult === 'default' || permissionResult === false || !permissionResult;
+
+                if (shouldPrompt) {
                     console.log('[OneSignal Web] Requesting notification permission via Slidedown...');
                     try {
                         if (OneSignalWeb.Slidedown) {
-                            await (OneSignalWeb.Slidedown as any).promptNotifications();
+                            // The standard method name in react-onesignal 3.x is promptPush
+                            if (typeof (OneSignalWeb.Slidedown as any).promptPush === 'function') {
+                                await (OneSignalWeb.Slidedown as any).promptPush();
+                            } else if (typeof (OneSignalWeb.Slidedown as any).promptNotifications === 'function') {
+                                await (OneSignalWeb.Slidedown as any).promptNotifications();
+                            } else {
+                                // Fallback to generic showSlidedownPrompt if available or just requestPermission
+                                if (OneSignalWeb.Notifications) {
+                                    await OneSignalWeb.Notifications.requestPermission();
+                                }
+                            }
                         } else if (OneSignalWeb.Notifications) {
                             await OneSignalWeb.Notifications.requestPermission();
                         }

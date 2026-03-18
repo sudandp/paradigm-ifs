@@ -398,7 +398,7 @@ export const api = {
 
   getSiteInvoiceRecords: async (managerId?: string): Promise<SiteInvoiceRecord[]> => {
     return fetchWithCache(`site_invoice_records_${managerId || 'all'}`, async () => {
-      let query = supabase
+      const query = supabase
         .from('site_invoice_tracker')
         .select('*, creator:created_by(reporting_manager_id, reporting_manager_2_id, reporting_manager_3_id)')
         .is('deleted_at', null)
@@ -1214,7 +1214,7 @@ export const api = {
       const trimmed = str.trim();
       if (!trimmed) return '';
       // Remove common suffixes like "State", "City", "Union Territory"
-      let cleaned = trimmed.replace(/,\s*$/, '').replace(/\s+(State|Union\s+Territory|City)$/i, '');
+      const cleaned = trimmed.replace(/,\s*$/, '').replace(/\s+(State|Union\s+Territory|City)$/i, '');
       const n = cleaned.toLowerCase().split(/\s+/).map(word => 
         word.charAt(0).toUpperCase() + word.slice(1)
       ).join(' ');
@@ -1279,7 +1279,7 @@ export const api = {
       const combinedText = `${orgName || ''} ${orgAddr || ''}`;
       if (combinedText.trim()) {
         const state = inferState('', combinedText);
-        let city = inferCity(combinedText);
+        const city = inferCity(combinedText);
         
         if (state) {
           locations[uid] = { state, city: city || 'Other' };
@@ -1324,7 +1324,7 @@ export const api = {
   getNearbyUsers: async (currentUserId?: string): Promise<{ nearbyOnline: any[]; allUsers: any[] }> => {
     const allUsers = await api.getUsers();
     let availability: Record<string, boolean> = {};
-    let latestLocationsMap: Record<string, { locationName: string }> = {};
+    const latestLocationsMap: Record<string, { locationName: string }> = {};
 
     try {
       const start = new Date();
@@ -1859,7 +1859,7 @@ export const api = {
   },
 
   getAttendanceUnlockRequests: async (managerId?: string): Promise<AttendanceUnlockRequest[]> => {
-    let query = supabase
+    const query = supabase
       .from('attendance_unlock_requests')
       .select('*, user:user_id(name, photo_url, reporting_manager_id, reporting_manager_2_id, reporting_manager_3_id)')
       .eq('status', 'pending')
@@ -2663,7 +2663,7 @@ export const api = {
     // We NO LONGER automatically add all entries from rules.holidayPool.
     // This fixed the issue where unselected elective holidays were earning Comp Offs.
     
-    let floatingTotal = 0;
+    const floatingTotal = 0;
     let dynamicCompOffTotal = 0;
     let day17Floating = false;
     
@@ -3994,7 +3994,7 @@ export const api = {
       query = query.range(from, to);
     }
 
-    let { data, count, error } = await query.order('work_date', { ascending: false });
+    const { data, count, error } = await query.order('work_date', { ascending: false });
     if (error) throw error;
 
     let filteredData = data || [];
@@ -5571,7 +5571,7 @@ export const api = {
 
   // Site Finance
   async getPendingFinanceRecords(managerId?: string): Promise<SiteFinanceRecord[]> {
-    let query = supabase
+    const query = supabase
       .from('site_finance_tracker')
       .select('*, creator:created_by(reporting_manager_id, reporting_manager_2_id, reporting_manager_3_id)')
       .eq('status', 'pending')
@@ -5636,7 +5636,7 @@ export const api = {
     const status = await Network.getStatus();
     if (status.connected) {
       try {
-        let query = supabase
+        const query = supabase
           .from('site_finance_tracker')
           .select('*')
           .is('deleted_at', null)

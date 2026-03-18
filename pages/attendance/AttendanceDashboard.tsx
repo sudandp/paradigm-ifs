@@ -949,7 +949,7 @@ const AttendanceDashboard: React.FC = () => {
                 const extendedDays = eachDayOfInterval({ start: bufferStartDate, end: dateRange.endDate });
 
                 // 1. Generate Initial Logs (Extended)
-                let logs = extendedDays.map(day => {
+                const logs = extendedDays.map(day => {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const dayEvents = events.filter(e => format(new Date(e.timestamp), 'yyyy-MM-dd') === dateStr);
                     

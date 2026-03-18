@@ -113,7 +113,7 @@ export const parseAadhaarQR = (qrText: string): AadhaarData | null => {
 
 export const decodeSecureQR = async (numericText: string): Promise<AadhaarData | null> => {
     try {
-        let bigInt = BigInt(numericText);
+        const bigInt = BigInt(numericText);
         let hex = bigInt.toString(16);
         if (hex.length % 2 !== 0) hex = '0' + hex;
         const bytes = new Uint8Array(hex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));

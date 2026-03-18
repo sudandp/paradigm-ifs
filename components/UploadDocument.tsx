@@ -83,7 +83,7 @@ const UploadDocument: React.FC<UploadDocumentProps> = ({
         // Use captured base64 if available, otherwise create object URL
         const preview = base64FromCapture ? `data:${selectedFile.type};base64,${base64FromCapture}` : URL.createObjectURL(selectedFile);
         
-        let fileData: UploadedFile = {
+        const fileData: UploadedFile = {
             name: selectedFile.name, type: selectedFile.type, size: selectedFile.size,
             preview, file: selectedFile,
         };

@@ -127,7 +127,7 @@ const LeaveManagement: React.FC = () => {
             const isApprover = ['admin', 'hr', 'operation_manager', 'site_manager', 'reporting_manager'].includes(user.role);
             
             // Determine filter based on role and current filter tab
-            let leaveFilter: any = { 
+            const leaveFilter: any = { 
                 status: (filter !== 'all' && filter !== 'claims') ? filter : undefined,
                 userId: selectedUserId !== 'all' ? selectedUserId : undefined,
                 startDate: selectedDate || undefined,

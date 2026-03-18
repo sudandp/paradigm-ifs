@@ -179,12 +179,12 @@ const WorkflowChart3D: React.FC<WorkflowChart3DProps> = ({ users }) => {
         z *= zoom;
 
         // Rotate around Y axis
-        let x1 = x * Math.cos(rotY) - z * Math.sin(rotY);
-        let z1 = x * Math.sin(rotY) + z * Math.cos(rotY);
+        const x1 = x * Math.cos(rotY) - z * Math.sin(rotY);
+        const z1 = x * Math.sin(rotY) + z * Math.cos(rotY);
 
         // Rotate around X axis
-        let y2 = y * Math.cos(rotX) - z1 * Math.sin(rotX);
-        let z2 = y * Math.sin(rotX) + z1 * Math.cos(rotX);
+        const y2 = y * Math.cos(rotX) - z1 * Math.sin(rotX);
+        const z2 = y * Math.sin(rotX) + z1 * Math.cos(rotX);
 
         // Perspective projection
         const distance = 1200;

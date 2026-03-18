@@ -59,9 +59,10 @@ const NewTicketModal: React.FC<NewTicketModalProps> = ({ isOpen, onClose, onSucc
         return users.filter(u => u.role === 'hr');
       case 'Operational':
         return users.filter(u => ['operation_manager', 'site_manager'].includes(u.role));
-      default: // 'Other' or unselected
+      default: { // 'Other' or unselected
         const allAssignableRoles = ['hr', 'developer', 'operation_manager', 'site_manager'];
         return users.filter(u => isAdmin(u.role) || allAssignableRoles.includes(u.role));
+      }
     }
   }, [users, watchedCategory]);
 

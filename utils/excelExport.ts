@@ -215,7 +215,7 @@ export const exportAttendanceToExcel = async (
 
     // 3. Define columns
     const dayInterval: Date[] = [];
-    let d = new Date(dateRange.startDate);
+    const d = new Date(dateRange.startDate);
     while (d <= dateRange.endDate) {
         dayInterval.push(new Date(d));
         d.setDate(d.getDate() + 1);
