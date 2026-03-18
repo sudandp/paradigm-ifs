@@ -134,27 +134,37 @@ export const oneSignalService = {
                         }
                     } as any
                 });
-                OneSignalWeb.Notifications.addEventListener('foregroundWillDisplay', (event) => {
-                    console.log('[OneSignal Web] Foreground notification received:', event);
-                });
-
-                OneSignalWeb.Notifications.addEventListener('click', (event) => {
-                    console.log('[OneSignal Web] Notification clicked:', event);
-                });
-
-                // Add subscription change listener for debugging
-                OneSignalWeb.User.PushSubscription.addEventListener('change', (event) => {
-                    console.log('[OneSignal Web] Subscription state changed:', {
-                        current: event.current,
-                        previous: event.previous
-                    });
-                });
-
                 _webInitialized = true;
                 console.log('[OneSignal Web] Initialized with App ID:', normalizedAppId);
-                console.log('[OneSignal Web] Notification Permission:', OneSignalWeb.Notifications.permission);
-                console.log('[OneSignal Web] Subscription ID:', OneSignalWeb.User.PushSubscription.id);
-                console.log('[OneSignal Web] Opted In:', OneSignalWeb.User.PushSubscription.optedIn);
+                
+                // Defensive property access for OneSignal v16
+                const notifications = (OneSignalWeb as any).Notifications;
+                const user = (OneSignalWeb as any).User;
+                const pushSubscription = user?.PushSubscription;
+
+                if (notifications) {
+                    notifications.addEventListener('foregroundWillDisplay', (event: any) => {
+                        console.log('[OneSignal Web] Foreground notification received:', event);
+                    });
+
+                    notifications.addEventListener('click', (event: any) => {
+                        console.log('[OneSignal Web] Notification clicked:', event);
+                    });
+                }
+
+                // Add subscription change listener for debugging
+                if (pushSubscription) {
+                    pushSubscription.addEventListener('change', (event: any) => {
+                        console.log('[OneSignal Web] Subscription state changed:', {
+                            current: event.current,
+                            previous: event.previous
+                        });
+                    });
+                }
+
+                console.log('[OneSignal Web] Notification Permission:', notifications?.permission);
+                console.log('[OneSignal Web] Subscription ID:', pushSubscription?.id);
+                console.log('[OneSignal Web] Opted In:', pushSubscription?.optedIn);
                 console.log('[OneSignal Web] Current Origin:', window.location.origin);
 
                 // Process pending login if one was deferred
@@ -165,7 +175,7 @@ export const oneSignalService = {
                 }
 
                 // Check permission correctly (await is required for OneSignal v16)
-                const permissionResult = await OneSignalWeb.Notifications.permission;
+                const permissionResult = await notifications?.permission;
                 console.log('[OneSignal Web] Current permission state:', permissionResult);
 
                 if (!permissionResult) {
@@ -190,16 +200,20 @@ export const oneSignalService = {
                 
                 // Set up a global debug helper
                 const debugHelper = async () => {
-                    const permission = await OneSignalWeb.Notifications.permission;
-                    const subId = OneSignalWeb.User.PushSubscription.id;
-                    const optedIn = OneSignalWeb.User.PushSubscription.optedIn;
+                    const notifications = (OneSignalWeb as any).Notifications;
+                    const user = (OneSignalWeb as any).User;
+                    const pushSubscription = user?.PushSubscription;
+
+                    const permission = await notifications?.permission;
+                    const subId = pushSubscription?.id;
+                    const optedIn = pushSubscription?.optedIn;
                     
                     console.table({
                         'App ID': normalizedAppId,
                         'Initialized': _webInitialized,
-                        'Permission': permission,
+                        'Permission': permission || 'Unknown',
                         'Subscription ID': subId || 'None',
-                        'Opted In': optedIn,
+                        'Opted In': optedIn ?? 'Unknown',
                         'Origin': window.location.origin,
                         'Service Worker': !!navigator.serviceWorker.controller
                     });
@@ -271,9 +285,21 @@ export const oneSignalService = {
                 if (_webInitialized) {
                     console.log('[OneSignal Web] Requesting notification permission via Slidedown/SDK...');
                     try {
-                        await (OneSignalWeb.Slidedown as any).promptNotifications();
+                        const slidedown = (OneSignalWeb as any).Slidedown;
+                        const notifications = (OneSignalWeb as any).Notifications;
+                        
+                        if (slidedown && typeof slidedown.promptNotifications === 'function') {
+                            await slidedown.promptNotifications();
+                        } else if (notifications && typeof notifications.requestPermission === 'function') {
+                            await notifications.requestPermission();
+                        } else {
+                            throw new Error('OneSignal Slidedown/Notifications not available');
+                        }
                     } catch (e) {
-                        await OneSignalWeb.Notifications.requestPermission();
+                        console.warn('[OneSignal Web] SDK prompt failed, falling back to browser:', e);
+                        if (window.Notification) {
+                            await window.Notification.requestPermission();
+                        }
                     }
                 } else {
                     // FALLBACK: If OneSignal isn't working (e.g. localhost domain restriction),
