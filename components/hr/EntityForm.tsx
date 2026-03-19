@@ -20,7 +20,7 @@ interface EntityFormProps {
 
 const entitySchema = yup.object({
   id: yup.string().required(),
-  name: yup.string().required('Client name is required'),
+  name: yup.string().required('Society name is required'),
   organizationId: yup.string().optional(),
   location: yup.string().optional(),
   registeredAddress: yup.string().optional(),
@@ -91,7 +91,7 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
       <div className="bg-card rounded-xl shadow-card p-6 w-full max-w-3xl my-8 mx-auto animate-fade-in-scale" onClick={e => e.stopPropagation()}>
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="mb-4">
-            <h3 className="text-xl font-bold text-primary-text">{isEditing ? 'Edit Client' : 'Add New Client'}</h3>
+            <h3 className="text-xl font-bold text-primary-text">{isEditing ? 'Edit Society' : 'Add New Society'}</h3>
             <p className="text-sm text-muted">for {companyName}</p>
           </div>
           
@@ -107,7 +107,7 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
           <div className="space-y-6 min-h-[300px]">
             {activeTab === 'General' && (
                 <div className="space-y-4">
-                    <Input label="Client Name (as per document)" id="name" registration={register('name')} error={errors.name?.message} />
+                    <Input label="Society Name (as per document)" id="name" registration={register('name')} error={errors.name?.message} />
                     <Input label="Location / City" id="location" registration={register('location')} error={errors.location?.message} />
                     <Input label="Registered Address" id="registeredAddress" registration={register('registeredAddress')} error={errors.registeredAddress?.message} />
                 </div>
@@ -197,7 +197,7 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
           </div>
           <div className="mt-8 pt-6 border-t border-border flex justify-end space-x-3">
             <Button type="button" onClick={onClose} variant="secondary">Cancel</Button>
-            <Button type="submit">{isEditing ? 'Save Changes' : 'Add Client'}</Button>
+            <Button type="submit">{isEditing ? 'Save Changes' : 'Add Society'}</Button>
           </div>
         </form>
       </div>

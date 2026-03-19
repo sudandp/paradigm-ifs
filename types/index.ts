@@ -486,6 +486,9 @@ export interface Company {
   name: string;
   entities: Entity[];
   groupId?: string;
+  location?: string;
+  address?: string;
+  logoUrl?: string;
 }
 
 export interface OrganizationGroup {

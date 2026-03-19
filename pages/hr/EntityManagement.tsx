@@ -9,6 +9,7 @@ import { Plus, Save, Edit, Trash2, Building, ChevronRight, Upload, Download, Eye
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import EntityForm from '../../components/hr/EntityForm';
+import CompanyForm from '../../components/hr/CompanyForm';
 // FIX: Changed to a named import as SiteConfigurationForm is not a default export.
 import { SiteConfigurationForm } from '../../components/hr/SiteConfigurationForm';
 import Modal from '../../components/ui/Modal';
@@ -186,11 +187,24 @@ const EntityManagement: React.FC = () => {
         title: string;
         label: string
     }>({ isOpen: false, mode: 'add', type: 'group', title: '', label: '' });
+    const [companyFormState, setCompanyFormState] = useState<{
+        isOpen: boolean;
+        mode: 'add' | 'edit';
+        groupId: string;
+        groupName: string;
+        initialData: Partial<Company> | null;
+    }>({ isOpen: false, mode: 'add', groupId: '', groupName: '', initialData: null });
     const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean; type: 'group' | 'company' | 'client'; id: string; name: string }>({ isOpen: false, type: 'group', id: '', name: '' });
     const [siteConfigForm, setSiteConfigForm] = useState<{ isOpen: boolean; org: Organization | null }>({ isOpen: false, org: null });
 
     const allClients = useMemo(() => {
         return groups.flatMap(g => g.companies.flatMap(c => c.entities.map(e => ({ ...e, companyName: c.name }))));
+    }, [groups]);
+
+    const existingLocations = useMemo(() => {
+        return Array.from(new Set(
+            groups.flatMap(g => g.companies.map(c => c.location).filter(Boolean) as string[])
+        )).sort();
     }, [groups]);
 
     useEffect(() => {
@@ -297,7 +311,7 @@ const EntityManagement: React.FC = () => {
                 })
             })));
 
-            setToast({ message: clientData.id.startsWith('new_') ? 'Client added.' : 'Client updated.', type: 'success' });
+            setToast({ message: clientData.id.startsWith('new_') ? 'Society added.' : 'Society updated.', type: 'success' });
             setEntityFormState({ isOpen: false, initialData: null, companyName: '' });
         } catch (error) {
             setToast({ message: 'Failed to save client.', type: 'error' });
@@ -328,11 +342,52 @@ const EntityManagement: React.FC = () => {
                     }))
                 })));
             }
-            setToast({ message: `${type.charAt(0).toUpperCase() + type.slice(1)} '${name}' deleted.`, type: 'success' });
+            const typeLabel = type === 'client' ? 'Society' : type === 'company' ? 'Company / LLP / Partnership / Society' : 'Group';
+            setToast({ message: `${typeLabel} '${name}' deleted.`, type: 'success' });
         } catch (error) {
             setToast({ message: `Failed to delete ${type}.`, type: 'error' });
         }
         setDeleteModalState({ isOpen: false, type: 'group', id: '', name: '' });
+    };
+
+    const handleSaveCompanyData = async (data: Partial<Company>, file?: File) => {
+        try {
+            const { mode, groupId } = companyFormState;
+            const newGroups = [...groups];
+            const groupIndex = newGroups.findIndex(g => g.id === groupId);
+            if (groupIndex === -1) return;
+
+            let updatedData = { ...data };
+            if (file) {
+                setToast({ message: 'Uploading logo...', type: 'success' });
+                const logoUrl = await api.uploadLogo(file);
+                updatedData.logoUrl = logoUrl;
+            }
+
+            if (mode === 'add') {
+                const newCompany = await api.createCompany({ 
+                    id: `comp_${Date.now()}`, 
+                    groupId,
+                    ...updatedData
+                });
+                newGroups[groupIndex].companies.push({ ...newCompany, entities: [] });
+                setToast({ message: `Company '${data.name}' added.`, type: 'success' });
+            } else if (data.id) {
+                const updatedCompany = await api.updateCompany(data.id, updatedData);
+                 const compIndex = newGroups[groupIndex].companies.findIndex(c => c.id === data.id);
+                 if (compIndex !== -1) {
+                     newGroups[groupIndex].companies[compIndex] = {
+                         ...newGroups[groupIndex].companies[compIndex],
+                         ...updatedCompany
+                     };
+                 }
+                setToast({ message: 'Company updated.', type: 'success' });
+            }
+            setGroups(newGroups);
+            setCompanyFormState({ ...companyFormState, isOpen: false });
+        } catch (error) {
+            setToast({ message: 'Failed to save company details.', type: 'error' });
+        }
     };
 
     const handleSaveName = async (name: string) => {
@@ -532,7 +587,7 @@ const EntityManagement: React.FC = () => {
                     });
 
                     setGroups(newGroups);
-                    setToast({ message: `Successfully imported ${parsedData.length} client records.`, type: 'success' });
+                    setToast({ message: `Successfully imported ${parsedData.length} society records.`, type: 'success' });
 
                 } else if (activeSubcategory === 'site_configuration') {
                     if (fileHeaders.join(',') !== siteConfigCsvColumns.join(',')) {
@@ -611,7 +666,7 @@ const EntityManagement: React.FC = () => {
                                             <span className="font-semibold">{group.name}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <Button size="sm" className="!p-1.5" onClick={() => setNameModalState({ isOpen: true, mode: 'add', type: 'company', groupId: group.id, title: `Add Company to ${group.name}`, label: 'Company Name' })} title="Add Company">
+                                            <Button size="sm" className="!p-1.5" onClick={() => setCompanyFormState({ isOpen: true, mode: 'add', groupId: group.id, groupName: group.name, initialData: null })} title="Add Company / LLP / Partnership / Society">
                                                 <Plus className="h-4 w-4" />
                                             </Button>
                                             <Button variant="icon" onClick={() => setNameModalState({ isOpen: true, mode: 'edit', type: 'group', id: group.id, initialName: group.name, title: 'Edit Group Name', label: 'Group Name' })} title="Edit group name" className="p-2 hover:bg-blue-500/10 rounded-full transition-colors"><Edit className="h-5 w-5" /></Button>
@@ -625,13 +680,13 @@ const EntityManagement: React.FC = () => {
                                                     <div className="p-2 flex items-center justify-between bg-card">
                                                         <div className="flex items-center gap-2">
                                                             <button onClick={() => toggleExpand(company.id)}><ChevronRight className={`h-5 w-5 transition-transform ${expanded[company.id] ? 'rotate-90' : ''}`} /></button>
-                                                            <span>{company.name} ({company.entities.length} clients)</span>
+                                                            <span>{company.name} ({company.entities.length} societies)</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <Button variant="icon" size="sm" title={`View ${company.entities.length} clients`} onClick={() => setViewingClients({ companyName: company.name, clients: company.entities })}><Eye className="h-4 w-4" /></Button>
-                                                            <Button variant="icon" size="sm" onClick={() => handleAddClient(company.name)} title="Add client"><Plus className="h-4 w-4" /></Button>
-                                                            <Button variant="icon" onClick={() => setNameModalState({ isOpen: true, mode: 'edit', type: 'company', id: company.id, groupId: group.id, initialName: company.name, title: 'Edit Company Name', label: 'Company Name' })} title="Edit company name" className="p-2 hover:bg-blue-500/10 rounded-full transition-colors"><Edit className="h-5 w-5" /></Button>
-                                                            <Button variant="icon" onClick={() => handleDeleteClick('company', company.id, company.name)} title="Delete company" className="p-2 hover:bg-red-500/10 rounded-full transition-colors"><Trash2 className="h-5 w-5 text-red-500" /></Button>
+                                                            <Button variant="icon" size="sm" title={`View ${company.entities.length} societies`} onClick={() => setViewingClients({ companyName: company.name, clients: company.entities })}><Eye className="h-4 w-4" /></Button>
+                                                            <Button variant="icon" size="sm" onClick={() => handleAddClient(company.name)} title="Add Society"><Plus className="h-4 w-4" /></Button>
+                                                            <Button variant="icon" onClick={() => setCompanyFormState({ isOpen: true, mode: 'edit', groupId: group.id, groupName: group.name, initialData: company })} title="Edit company name" className="p-2 hover:bg-blue-500/10 rounded-full transition-colors"><Edit className="h-5 w-5" /></Button>
+                                                            <Button variant="icon" onClick={() => handleDeleteClick('company', company.id, company.name)} title="Delete Company / LLP / Partnership / Society" className="p-2 hover:bg-red-500/10 rounded-full transition-colors"><Trash2 className="h-5 w-5 text-red-500" /></Button>
                                                         </div>
                                                     </div>
                                                     {expanded[company.id] && (
@@ -732,6 +787,7 @@ const EntityManagement: React.FC = () => {
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             <TemplateInstructionsModal isOpen={isInstructionsOpen} onClose={() => setIsInstructionsOpen(false)} />
             {entityFormState.isOpen && <EntityForm {...entityFormState} onClose={() => setEntityFormState(p => ({ ...p, isOpen: false }))} onSave={handleSaveClient} />}
+            {companyFormState.isOpen && <CompanyForm {...companyFormState} onClose={() => setCompanyFormState(p => ({ ...p, isOpen: false }))} onSave={handleSaveCompanyData} existingLocations={existingLocations} />}
             <NameInputModal
                 isOpen={nameModalState.isOpen}
                 onClose={() => setNameModalState({ isOpen: false, mode: 'add', type: 'group', title: '', label: '' })}
@@ -773,7 +829,7 @@ const EntityManagement: React.FC = () => {
             {viewingClients && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60" onClick={() => setViewingClients(null)}>
                     <div className="bg-card rounded-xl shadow-card p-6 w-full max-w-md m-4 animate-fade-in-scale" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-bold text-primary-text mb-4">Clients in {viewingClients.companyName}</h3>
+                        <h3 className="text-lg font-bold text-primary-text mb-4">Societies in {viewingClients.companyName}</h3>
                         {viewingClients.clients.length > 0 ? (
                             <ul className="space-y-2 max-h-60 overflow-y-auto pr-2">
                                 {viewingClients.clients.map(client => (
@@ -781,7 +837,7 @@ const EntityManagement: React.FC = () => {
                                 ))}
                             </ul>
                         ) : (
-                            <p className="text-muted text-center py-4">No clients found for this company.</p>
+                            <p className="text-muted text-center py-4">No societies found for this company.</p>
                         )}
                         <div className="mt-6 text-right">
                             <Button onClick={() => setViewingClients(null)} variant="secondary">Close</Button>
