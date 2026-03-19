@@ -3,15 +3,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
-import type { Organization, SiteConfiguration, Entity, ManpowerDetail, SiteStaffDesignation } from '../../types';
+import type { Organization, Entity, ManpowerDetail, SiteStaffDesignation } from '../../types';
 import Button from '../../components/ui/Button';
 import { Plus, Edit, Trash2, Eye, Loader2, Upload, Download, CheckCircle, AlertCircle, Building, Users, Settings } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 
 import Toast from '../../components/ui/Toast';
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
-// FIX: Changed to a named import as SiteConfigurationForm is not a default export.
-import { SiteConfigurationForm } from '../../components/hr/SiteConfigurationForm';
+import EntityForm from '../../components/hr/EntityForm';
 import ManpowerDetailsModal from '../../components/admin/ManpowerDetailsModal';
 import TableSkeleton from '../../components/skeletons/TableSkeleton';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -74,7 +73,6 @@ const fromCSV = (csvText: string): Record<string, string>[] => {
 export const SiteManagement: React.FC = () => {
     const navigate = useNavigate();
     const [organizations, setOrganizations] = useState<Organization[]>([]);
-    const [siteConfigs, setSiteConfigs] = useState<SiteConfiguration[]>([]);
     const [allClients, setAllClients] = useState<(Entity & { companyName: string })[]>([]);
     const [siteStaffDesignations, setSiteStaffDesignations] = useState<SiteStaffDesignation[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -86,11 +84,10 @@ export const SiteManagement: React.FC = () => {
 
 
 
-    const [isSiteConfigFormOpen, setIsSiteConfigFormOpen] = useState(false);
+    const [entityFormState, setEntityFormState] = useState<{ isOpen: boolean; initialData: Entity | null; companyName: string }>({ isOpen: false, initialData: null, companyName: '' });
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
-    const [editingOrgForConfig, setEditingOrgForConfig] = useState<Organization | null>(null);
     const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -104,20 +101,17 @@ export const SiteManagement: React.FC = () => {
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
-            const [orgsResult, structureResult, sitesResult, designationsResult] = await Promise.all([
+            const [orgsResult, structureResult, designationsResult] = await Promise.all([
                 api.getOrganizations().catch(e => { console.error("Failed to fetch organizations:", e); return []; }),
                 api.getOrganizationStructure().catch(e => { console.error("Failed to fetch organization structure:", e); return []; }),
-                api.getSiteConfigurations().catch(e => { console.error("Failed to fetch site configurations:", e); return []; }),
                 api.getSiteStaffDesignations().catch(e => {
                     console.error("Failed to fetch site staff designations:", e);
                     setToast({ message: 'Could not load designation list. Manpower editing may be affected.', type: 'error' });
                     return [];
                 }),
             ]);
-
             setOrganizations(orgsResult);
             setTotalSites(orgsResult.length);
-            setSiteConfigs(sitesResult);
             setSiteStaffDesignations(designationsResult);
             const clients = structureResult.flatMap(group =>
                 group.companies.flatMap(company =>
@@ -142,8 +136,54 @@ export const SiteManagement: React.FC = () => {
     }, [fetchData]);
 
     const handleEdit = (org: Organization) => {
-        setEditingOrgForConfig(org);
-        setIsSiteConfigFormOpen(true);
+        const entity = allClients.find(e => e.organizationId === org.id);
+        if (entity) {
+            setEntityFormState({ isOpen: true, initialData: entity, companyName: entity.companyName || '' });
+        } else {
+            setEntityFormState({ 
+                isOpen: true, 
+                initialData: { 
+                    id: `new_${Date.now()}`, 
+                    name: org.shortName, 
+                    organizationId: org.id 
+                } as Entity, 
+                companyName: '' 
+            });
+        }
+    };
+
+    const handleSaveEntity = async (entityData: Entity, pendingFiles: Record<string, File>) => {
+        try {
+            // Re-use logic for file uploads if needed, or stick to simple save if no files
+            // For now, let's process files similar to EntityManagement.tsx
+            const updatedData = { ...entityData };
+            const fileEntries = Object.entries(pendingFiles);
+            
+            if (fileEntries.length > 0) {
+                setToast({ message: 'Uploading documents...', type: 'success' });
+                for (const [path, file] of fileEntries) {
+                    const uploadResult = await api.uploadDocument(file, 'onboarding-documents', undefined, path);
+                    const pathParts = path.split('.');
+                    let current: any = updatedData;
+                    for (let i = 0; i < pathParts.length - 1; i++) {
+                        if (!current[pathParts[i]]) current[pathParts[i]] = {};
+                        current = current[pathParts[i]];
+                    }
+                    current[`${pathParts[pathParts.length - 1]}Url`] = uploadResult.url;
+                }
+            }
+
+            const saved = await api.saveEntity(updatedData);
+            setAllClients(prev => {
+                const exists = prev.some(e => e.id === saved.id);
+                return exists ? prev.map(e => e.id === saved.id ? { ...saved, companyName: e.companyName } : e) : [...prev, { ...saved, companyName: '' }];
+            });
+            setToast({ message: 'Site configuration saved successfully.', type: 'success' });
+            setEntityFormState({ isOpen: false, initialData: null, companyName: '' });
+        } catch (error) {
+            console.error("Failed to save site configuration:", error);
+            setToast({ message: 'Failed to save site configuration.', type: 'error' });
+        }
     };
 
     const handleDelete = (org: Organization) => {
@@ -153,22 +193,10 @@ export const SiteManagement: React.FC = () => {
 
 
 
-    const handleSaveSiteConfig = (orgId: string, configData: SiteConfiguration) => {
-        setSiteConfigs(prev => {
-            const newConfigs = [...prev];
-            const index = newConfigs.findIndex(c => c.organizationId === orgId);
-            if (index > -1) newConfigs[index] = configData;
-            else newConfigs.push(configData);
-            return newConfigs;
-        });
-        setToast({ message: 'Site configuration saved.', type: 'success' });
-        setIsSiteConfigFormOpen(false);
-    };
 
     const handleConfirmDelete = async () => {
         if (currentOrg) {
             setOrganizations(prev => prev.filter(o => o.id !== currentOrg.id));
-            setSiteConfigs(prev => prev.filter(sc => sc.organizationId !== currentOrg.id));
             setToast({ message: 'Site deleted.', type: 'success' });
             setIsDeleteModalOpen(false);
         }
@@ -273,18 +301,6 @@ export const SiteManagement: React.FC = () => {
 
             <input type="file" ref={importRef} className="hidden" accept=".csv" onChange={handleImport} />
 
-            <input type="file" ref={importRef} className="hidden" accept=".csv" onChange={handleImport} />
-
-            {isSiteConfigFormOpen && editingOrgForConfig && (
-                <SiteConfigurationForm
-                    isOpen={isSiteConfigFormOpen}
-                    onClose={() => setIsSiteConfigFormOpen(false)}
-                    onSave={handleSaveSiteConfig}
-                    organization={editingOrgForConfig}
-                    allClients={allClients}
-                    initialData={siteConfigs.find(c => c.organizationId === editingOrgForConfig.id)}
-                />
-            )}
 
             {currentOrg && (
                 <ManpowerDetailsModal
@@ -356,149 +372,159 @@ export const SiteManagement: React.FC = () => {
                 )}
             </div>
 
-            {/* Organizations Table */}
-            <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
-                {isLoading ? (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <tbody className="divide-y divide-border">
-                                <TableSkeleton cols={5} rows={5} />
-                            </tbody>
-                        </table>
-                    </div>
-                ) : organizations.length === 0 ? (
-                    <div className="p-8 text-center text-muted">
-                        <Building className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                        <p>No sites found. Add a new site to get started.</p>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-muted/50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Site Name</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Location</th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-muted uppercase tracking-wider">Manpower</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Key Staff</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {organizations
-                                .filter(org => 
-                                    searchTerm === '' || 
-                                    org.shortName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                    org.fullName.toLowerCase().includes(searchTerm.toLowerCase())
-                                )
-                                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-                                .map((org) => {
-                                    const config = siteConfigs.find(c => c.organizationId === org.id);
-                                    const isProvisional = !!org.provisionalCreationDate;
-                                    const daysLeft = isProvisional && org.provisionalCreationDate
-                                        ? 90 - differenceInDays(new Date(), new Date(org.provisionalCreationDate))
-                                        : 0;
+            {entityFormState.isOpen ? (
+                <div className="bg-card rounded-2xl p-6 shadow-sm border border-border">
+                    <EntityForm 
+                        isOpen={entityFormState.isOpen}
+                        onClose={() => setEntityFormState({ ...entityFormState, isOpen: false })}
+                        onSave={handleSaveEntity}
+                        initialData={entityFormState.initialData}
+                        companyName={entityFormState.companyName}
+                    />
+                </div>
+            ) : (
+                <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+                    {isLoading ? (
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <tbody className="divide-y divide-border">
+                                    <TableSkeleton cols={5} rows={5} />
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : organizations.length === 0 ? (
+                        <div className="p-8 text-center text-muted">
+                            <Building className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                            <p>No sites found. Add a new site to get started.</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-muted/50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Site Name</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Location</th>
+                                        <th className="px-6 py-3 text-center text-xs font-medium text-muted uppercase tracking-wider">Manpower</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Key Staff</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {organizations
+                                    .filter(org => 
+                                        searchTerm === '' || 
+                                        org.shortName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        org.fullName.toLowerCase().includes(searchTerm.toLowerCase())
+                                    )
+                                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                    .map((org) => {
+                                        const isProvisional = !!org.provisionalCreationDate;
+                                        const daysLeft = isProvisional && org.provisionalCreationDate
+                                            ? 90 - differenceInDays(new Date(), new Date(org.provisionalCreationDate))
+                                            : 0;
 
-                                    return (
-                                        <tr key={org.id} className="hover:bg-muted/5 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center">
-                                                    <div>
-                                                        <div className="font-medium text-primary-text">{org.shortName}</div>
-                                                        <div className="text-xs text-muted">{org.fullName}</div>
-                                                        {isProvisional && (
-                                                            <div className={`mt-1 text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${daysLeft > 30 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                                                                <AlertCircle className="w-3 h-3" />
-                                                                {daysLeft > 0 ? `${daysLeft} days left` : 'Expired'}
+                                        return (
+                                            <tr key={org.id} className="hover:bg-muted/5 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center">
+                                                        <div>
+                                                            <div className="font-medium text-primary-text">{org.shortName}</div>
+                                                            <div className="text-xs text-muted">{org.fullName}</div>
+                                                            {isProvisional && (
+                                                                <div className={`mt-1 text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${daysLeft > 30 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                                                                    <AlertCircle className="w-3 h-3" />
+                                                                    {daysLeft > 0 ? `${daysLeft} days left` : 'Expired'}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="text-sm text-primary-text max-w-xs truncate" title={org.address}>
+                                                        {org.address}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                        {org.manpowerApprovedCount || 0}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="text-xs space-y-1">
+                                                        {org.reportingManagerName && (
+                                                            <div className="flex items-center gap-1" title="Reporting Manager">
+                                                                <span className="font-semibold text-primary-text">RM:</span> {org.reportingManagerName}
+                                                            </div>
+                                                        )}
+                                                        {org.managerName && (
+                                                            <div className="flex items-center gap-1" title="Site Manager">
+                                                                <span className="font-semibold text-primary-text">SM:</span> {org.managerName}
+                                                            </div>
+                                                        )}
+                                                        {org.fieldStaffNames && org.fieldStaffNames.length > 0 && (
+                                                            <div className="flex items-start gap-1" title="Field Staff">
+                                                                <span className="font-semibold text-primary-text whitespace-nowrap">FS:</span>
+                                                                <span className="truncate max-w-[150px]">{org.fieldStaffNames.join(', ')}</span>
+                                                            </div>
+                                                        )}
+                                                        {org.backendFieldStaffName && (
+                                                            <div className="flex items-start gap-1" title="Backend Field Staff">
+                                                                <span className="font-semibold text-primary-text whitespace-nowrap">bfs:</span>
+                                                                <span className="truncate max-w-[150px]">{org.backendFieldStaffName}</span>
                                                             </div>
                                                         )}
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="text-sm text-primary-text max-w-xs truncate" title={org.address}>
-                                                    {org.address}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                    {org.manpowerApprovedCount || 0}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="text-xs space-y-1">
-                                                    {org.reportingManagerName && (
-                                                        <div className="flex items-center gap-1" title="Reporting Manager">
-                                                            <span className="font-semibold text-primary-text">RM:</span> {org.reportingManagerName}
-                                                        </div>
-                                                    )}
-                                                    {org.managerName && (
-                                                        <div className="flex items-center gap-1" title="Site Manager">
-                                                            <span className="font-semibold text-primary-text">SM:</span> {org.managerName}
-                                                        </div>
-                                                    )}
-                                                    {org.fieldStaffNames && org.fieldStaffNames.length > 0 && (
-                                                        <div className="flex items-start gap-1" title="Field Staff">
-                                                            <span className="font-semibold text-primary-text whitespace-nowrap">FS:</span>
-                                                            <span className="truncate max-w-[150px]">{org.fieldStaffNames.join(', ')}</span>
-                                                        </div>
-                                                    )}
-                                                    {org.backendFieldStaffName && (
-                                                        <div className="flex items-start gap-1" title="Backend Field Staff">
-                                                            <span className="font-semibold text-primary-text whitespace-nowrap">bfs:</span>
-                                                            <span className="truncate max-w-[150px]">{org.backendFieldStaffName}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-right whitespace-nowrap">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <Button
-                                                        variant="icon"
-                                                        size="sm"
-                                                        onClick={() => handleViewDetails(org)}
-                                                        title="Manpower Details"
-                                                    >
-                                                        <Users className="w-4 h-4 text-blue-600" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="icon"
-                                                        size="sm"
-                                                        onClick={() => handleEdit(org)}
-                                                        title="Configure Site"
-                                                    >
-                                                        <Settings className="w-4 h-4 text-gray-600" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="icon"
-                                                        size="sm"
-                                                        onClick={() => handleDelete(org)}
-                                                        title="Delete Site"
-                                                    >
-                                                        <Trash2 className="w-4 h-4 text-red-600" />
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                                                </td>
+                                                <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <Button
+                                                            variant="icon"
+                                                            size="sm"
+                                                            onClick={() => handleViewDetails(org)}
+                                                            title="Manpower Details"
+                                                        >
+                                                            <Users className="w-4 h-4 text-blue-600" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="icon"
+                                                            size="sm"
+                                                            onClick={() => handleEdit(org)}
+                                                            title="Configure Site"
+                                                        >
+                                                            <Settings className="w-4 h-4 text-gray-600" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="icon"
+                                                            size="sm"
+                                                            onClick={() => handleDelete(org)}
+                                                            title="Delete Site"
+                                                        >
+                                                            <Trash2 className="w-4 h-4 text-red-600" />
+                                                        </Button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
 
-                        <Pagination 
-                            currentPage={currentPage}
-                            totalItems={organizations.filter(org => 
-                                searchTerm === '' || 
-                                org.shortName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                org.fullName.toLowerCase().includes(searchTerm.toLowerCase())
-                            ).length}
-                            pageSize={pageSize}
-                            onPageChange={setCurrentPage}
-                            onPageSizeChange={setPageSize}
-                            className="mt-4"
-                        />
-                    </div>
-                )}
-            </div>
+                            <Pagination 
+                                currentPage={currentPage}
+                                totalItems={organizations.filter(org => 
+                                    searchTerm === '' || 
+                                    org.shortName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                    org.fullName.toLowerCase().includes(searchTerm.toLowerCase())
+                                ).length}
+                                pageSize={pageSize}
+                                onPageChange={setCurrentPage}
+                                onPageSizeChange={setPageSize}
+                                className="mt-4 p-4"
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
-};
+};

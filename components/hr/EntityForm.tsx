@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useForm, Controller, useFieldArray, SubmitHandler, Resolver } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import type { Entity, RegistrationType, Policy, Insurance, UploadedFile } from '../../types';
+import type { Entity, RegistrationType, Policy, Insurance, UploadedFile, Company } from '../../types';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import Button from '../ui/Button';
@@ -18,6 +18,7 @@ interface EntityFormProps {
   onSave: (data: Entity, pendingFiles: Record<string, File>) => void;
   initialData: Entity | null;
   companyName: string;
+  companies?: Company[];
 }
 
 const entitySchema = yup.object({
@@ -71,7 +72,11 @@ const entitySchema = yup.object({
     form6ValidityFrom: yup.string().nullable().optional(),
     form6ValidityTo: yup.string().nullable().optional(),
     form6RenewalInterval: yup.number().nullable().optional(),
+    form6DocumentUrl: yup.string().nullable().optional(),
     minWageRevisionApplicable: yup.boolean().default(false),
+    minWageRevisionDocumentUrl: yup.string().nullable().optional(),
+    minWageRevisionValidityFrom: yup.string().nullable().optional(),
+    minWageRevisionValidityTo: yup.string().nullable().optional(),
   }).optional(),
   
   holidayConfig: yup.object({
@@ -93,6 +98,31 @@ const entitySchema = yup.object({
     salaryDate: yup.string().optional().nullable(),
     uniformDeductions: yup.boolean().default(false),
     deductionCategory: yup.string().optional(),
+  }).optional(),
+  
+  assetTracking: yup.object({
+    tools: yup.array().of(yup.object({ 
+      name: yup.string().required(), 
+      brand: yup.string().optional(), 
+      size: yup.string().optional(), 
+      quantity: yup.number().nullable().optional(), 
+      issueDate: yup.string().required() 
+    })).optional(),
+    dcCopy1Url: yup.string().nullable().optional(),
+    dcCopy2Url: yup.string().nullable().optional(),
+    sims: yup.object({
+        count: yup.number().nullable().optional(),
+        details: yup.array().of(yup.object({ number: yup.string().required(), phone: yup.string().required() })).optional(),
+    }).optional(),
+    equipment: yup.array().of(yup.object({
+        name: yup.string().required(),
+        brand: yup.string().optional(),
+        model: yup.string().optional(),
+        serial: yup.string().optional(),
+        accessories: yup.string().optional(),
+        condition: yup.string().oneOf(['New', 'Old']).optional(),
+        issueDate: yup.string().required()
+    })).optional(),
   }).optional(),
   
   verificationData: yup.object({
@@ -121,6 +151,7 @@ const entitySchema = yup.object({
     level: yup.string().oneOf(['BO', 'Site', 'Both']).required('Level is required'),
     documentUrl: yup.string().nullable().optional()
   })).optional(),
+  companyId: yup.string().optional(),
 }).defined();
 
 type Tab = 'General' | 'Management' | 'Agreement' | 'Compliance' | 'Holidays' | 'Assets' | 'Billing' | 'Verification' | 'Policies/Insurance';
@@ -183,7 +214,7 @@ const VERIFICATION_CATEGORIES = [
   }
 ];
 
-const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initialData, companyName }) => {
+const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initialData, companyName, companies }) => {
   const [activeTab, setActiveTab] = useState<Tab>('General');
   const [isLoading, setIsLoading] = useState(true);
   const [pendingFiles, setPendingFiles] = useState<Record<string, File>>({});
@@ -222,8 +253,27 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
     name: "policies"
   });
 
+  const { fields: toolFields, append: appendTool, remove: removeTool } = useFieldArray({
+    control,
+    name: "assetTracking.tools"
+  });
+
+  const { fields: equipmentFields, append: appendEquipment, remove: removeEquipment } = useFieldArray({
+    control,
+    name: "assetTracking.equipment"
+  });
+
   const isEditing = !!initialData;
   const watchForm6 = watch('complianceDetails.form6Applicable');
+  const companyId = watch('companyId');
+
+  const selectedCompanyName = useMemo(() => {
+    if (companyName) return companyName;
+    if (companyId && companies) {
+      return companies.find(c => c.id === companyId)?.name || '';
+    }
+    return '';
+  }, [companyName, companyId, companies]);
 
   useEffect(() => {
     if (isOpen) {
@@ -392,7 +442,7 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
           <div className="flex justify-between items-start mb-6">
             <div>
               <h3 className="text-2xl font-bold text-primary-text">{isEditing ? 'Edit Society' : 'Add New Society'}</h3>
-              <p className="text-sm text-muted">for {companyName}</p>
+              {selectedCompanyName && <p className="text-sm text-muted">for {selectedCompanyName}</p>}
             </div>
             <div className="flex items-center gap-3">
                <Button type="button" onClick={onClose} variant="secondary" className="px-6">Cancel</Button>
@@ -419,6 +469,14 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Input label="Society Name (as per document)" id="name" registration={register('name')} error={errors.name?.message} />
+                        {!companyName && companies && (
+                            <Select label="Select Company" id="companyId" registration={register('companyId')} error={errors.companyId?.message}>
+                                <option value="">Select Company</option>
+                                {companies.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </Select>
+                        )}
                         <Input label="Billing Name" id="billingName" registration={register('billingName')} error={errors.billingName?.message} />
                         <Input label="Location / City" id="location" registration={register('location')} error={errors.location?.message} />
                         <Controller name="siteTakeoverDate" control={control} render={({ field }) => (
@@ -553,19 +611,32 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
                         )} />
 
                         {watchForm6 && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6 animate-fade-in">
-                                <Controller name="complianceDetails.form6ValidityFrom" control={control} render={({ field }) => (
-                                    <DatePicker label="Validity From" id="form6From" value={field.value} onChange={field.onChange} />
-                                )} />
-                                <Controller name="complianceDetails.form6ValidityTo" control={control} render={({ field }) => (
-                                    <DatePicker label="Validity To" id="form6To" value={field.value} onChange={field.onChange} />
-                                )} />
-                                <Input label="Renewal Interval (Days)" id="form6Renewal" type="number" registration={register('complianceDetails.form6RenewalInterval')} />
+                            <div className="space-y-4 pl-6 animate-fade-in border-l-2 border-accent/20 ml-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Controller name="complianceDetails.form6ValidityFrom" control={control} render={({ field }) => (
+                                        <DatePicker label="Validity From" id="form6From" value={field.value} onChange={field.onChange} />
+                                    )} />
+                                    <Controller name="complianceDetails.form6ValidityTo" control={control} render={({ field }) => (
+                                        <DatePicker label="Validity To" id="form6To" value={field.value} onChange={field.onChange} />
+                                    )} />
+                                    <Input label="Renewal Interval (Days)" id="form6Renewal" type="number" registration={register('complianceDetails.form6RenewalInterval')} />
+                                </div>
+                                <div className="max-w-md">
+                                    <UploadDocument 
+                                        label="Form 6 Document" 
+                                        file={watch('complianceDetails.form6DocumentUrl') ? { name: 'Current Document', type: 'application/pdf', size: 0, preview: watch('complianceDetails.form6DocumentUrl') || '', url: watch('complianceDetails.form6DocumentUrl') || '' } : null} 
+                                        onFileChange={(file) => {
+                                            if (file?.file) {
+                                                handleFileUpload('complianceDetails.form6Document', file.file);
+                                            }
+                                        }}
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    <div className="bg-accent/5 border border-accent/20 p-4 rounded-xl">
+                    <div className="bg-accent/5 border border-accent/20 p-4 rounded-xl space-y-4">
                         <Controller name="complianceDetails.minWageRevisionApplicable" control={control} render={({ field: { value, onChange } }) => (
                             <Checkbox 
                                 id="minWageRevision" 
@@ -576,6 +647,30 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
                                 labelClassName="font-bold text-primary-text"
                             />
                         )} />
+
+                        {watch('complianceDetails.minWageRevisionApplicable') && (
+                            <div className="space-y-4 pl-6 animate-fade-in border-l-2 border-accent/20 ml-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Controller name="complianceDetails.minWageRevisionValidityFrom" control={control} render={({ field }) => (
+                                        <DatePicker label="Validity From" id="minWageFrom" value={field.value} onChange={field.onChange} />
+                                    )} />
+                                    <Controller name="complianceDetails.minWageRevisionValidityTo" control={control} render={({ field }) => (
+                                        <DatePicker label="Validity To" id="minWageTo" value={field.value} onChange={field.onChange} />
+                                    )} />
+                                </div>
+                                <div className="max-w-md">
+                                    <UploadDocument 
+                                        label="Min Wage Revision Document" 
+                                        file={watch('complianceDetails.minWageRevisionDocumentUrl') ? { name: 'Current Document', type: 'application/pdf', size: 0, preview: watch('complianceDetails.minWageRevisionDocumentUrl') || '', url: watch('complianceDetails.minWageRevisionDocumentUrl') || '' } : null} 
+                                        onFileChange={(file) => {
+                                            if (file?.file) {
+                                                handleFileUpload('complianceDetails.minWageRevisionDocument', file.file);
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
@@ -646,28 +741,38 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
                         <div className="flex items-center justify-between border-b pb-2">
                             <h4 className="text-sm font-semibold flex items-center gap-2"><Wrench className="h-4 w-4" /> Tools Tracking</h4>
                             <Button type="button" variant="secondary" size="sm" onClick={() => {
-                                const tools = watch('assetTracking.tools') || [];
-                                setValue('assetTracking.tools', [...tools, { name: '', brand: '', size: '', quantity: 1, issueDate: '' }]);
+                                appendTool({ name: '', brand: '', size: '', quantity: 1, issueDate: '' });
                             }}>
                                 <Plus className="h-4 w-4 mr-1" /> Add Tool
                             </Button>
                         </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-accent/5 p-4 rounded-xl border border-accent/20">
+                            <UploadDocument 
+                                label="DC Copy 1" 
+                                file={watch('assetTracking.dcCopy1Url') ? { name: 'DC Copy 1', type: 'image/jpeg', size: 0, preview: watch('assetTracking.dcCopy1Url') || '', url: watch('assetTracking.dcCopy1Url') || '' } : null} 
+                                onFileChange={(file) => file?.file && handleFileUpload('assetTracking.dcCopy1', file.file)}
+                            />
+                            <UploadDocument 
+                                label="DC Copy 2" 
+                                file={watch('assetTracking.dcCopy2Url') ? { name: 'DC Copy 2', type: 'image/jpeg', size: 0, preview: watch('assetTracking.dcCopy2Url') || '', url: watch('assetTracking.dcCopy2Url') || '' } : null} 
+                                onFileChange={(file) => file?.file && handleFileUpload('assetTracking.dcCopy2', file.file)}
+                            />
+                        </div>
+
                         <div className="grid grid-cols-1 gap-4 max-h-[300px] overflow-y-auto pr-2">
-                            {(watch('assetTracking.tools') || []).map((_, index) => (
-                                <div key={index} className="bg-page p-4 rounded-lg border border-border/50 relative group">
+                            {toolFields.map((field, index) => (
+                                <div key={field.id} className="bg-page p-4 rounded-lg border border-border/50 relative group">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         <Input label="Tool Name" id={`toolName-${index}`} registration={register(`assetTracking.tools.${index}.name` as const)} />
                                         <Input label="Brand" id={`toolBrand-${index}`} registration={register(`assetTracking.tools.${index}.brand` as const)} />
                                         <Input label="Size" id={`toolSize-${index}`} registration={register(`assetTracking.tools.${index}.size` as const)} />
                                         <Input label="Quantity" id={`toolQty-${index}`} type="number" registration={register(`assetTracking.tools.${index}.quantity` as const)} />
-                                        <Controller name={`assetTracking.tools.${index}.issueDate`} control={control} render={({ field }) => (
-                                            <DatePicker label="Issue Date" id={`toolDate-${index}`} value={field.value} onChange={field.onChange} />
+                                        <Controller name={`assetTracking.tools.${index}.issueDate`} control={control} render={({ field: dateField }) => (
+                                            <DatePicker label="Issue Date" id={`toolDate-${index}`} value={dateField.value} onChange={dateField.onChange} />
                                         )} />
                                     </div>
-                                    <Button type="button" variant="icon" onClick={() => {
-                                        const tools = watch('assetTracking.tools') || [];
-                                        setValue('assetTracking.tools', tools.filter((__, i) => i !== index));
-                                    }} className="absolute -top-2 -right-2 bg-white dark:bg-card border shadow-sm text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button type="button" variant="icon" onClick={() => removeTool(index)} className="absolute -top-2 -right-2 bg-white dark:bg-card border shadow-sm text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </div>
@@ -679,15 +784,14 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
                         <div className="flex items-center justify-between border-b pb-2">
                             <h4 className="text-sm font-semibold flex items-center gap-2"><HardDrive className="h-4 w-4" /> Equipment Issuance</h4>
                             <Button type="button" variant="secondary" size="sm" onClick={() => {
-                                const equipment = watch('assetTracking.equipment') || [];
-                                setValue('assetTracking.equipment', [...equipment, { name: '', brand: '', model: '', serial: '', accessories: '', condition: 'New', issueDate: '' }]);
+                                appendEquipment({ name: '', brand: '', model: '', serial: '', accessories: '', condition: 'New', issueDate: '' });
                             }}>
                                 <Plus className="h-4 w-4 mr-1" /> Add Equipment
                             </Button>
                         </div>
                          <div className="grid grid-cols-1 gap-4 max-h-[300px] overflow-y-auto pr-2">
-                            {(watch('assetTracking.equipment') || []).map((_, index) => (
-                                <div key={index} className="bg-page p-4 rounded-lg border border-border/50 relative group">
+                            {equipmentFields.map((field, index) => (
+                                <div key={field.id} className="bg-page p-4 rounded-lg border border-border/50 relative group">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         <Input label="Equip. Name" id={`equipName-${index}`} registration={register(`assetTracking.equipment.${index}.name` as const)} />
                                         <Input label="Brand" id={`equipBrand-${index}`} registration={register(`assetTracking.equipment.${index}.brand` as const)} />
@@ -696,14 +800,11 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
                                             <option value="New">New</option>
                                             <option value="Old">Old</option>
                                         </Select>
-                                        <Controller name={`assetTracking.equipment.${index}.issueDate`} control={control} render={({ field }) => (
-                                            <DatePicker label="Issue Date" id={`equipDate-${index}`} value={field.value} onChange={field.onChange} />
+                                        <Controller name={`assetTracking.equipment.${index}.issueDate`} control={control} render={({ field: dateField }) => (
+                                            <DatePicker label="Issue Date" id={`equipDate-${index}`} value={dateField.value} onChange={dateField.onChange} />
                                         )} />
                                     </div>
-                                    <Button type="button" variant="icon" onClick={() => {
-                                        const eq = watch('assetTracking.equipment') || [];
-                                        setValue('assetTracking.equipment', eq.filter((__, i) => i !== index));
-                                    }} className="absolute -top-2 -right-2 bg-white dark:bg-card border shadow-sm text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button type="button" variant="icon" onClick={() => removeEquipment(index)} className="absolute -top-2 -right-2 bg-white dark:bg-card border shadow-sm text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </div>

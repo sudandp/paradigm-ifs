@@ -510,7 +510,11 @@ export interface Entity {
     form6ValidityFrom?: string;
     form6ValidityTo?: string;
     form6RenewalInterval?: number;
+    form6DocumentUrl?: string;
     minWageRevisionApplicable: boolean;
+    minWageRevisionDocumentUrl?: string;
+    minWageRevisionValidityFrom?: string;
+    minWageRevisionValidityTo?: string;
   };
   holidayConfig?: {
     numberOfDays?: 10 | 12;
@@ -525,7 +529,17 @@ export interface Entity {
     version?: string;
   };
   assetTracking?: {
-    tools?: { name: string; brand: string; size: string; quantity: number; issueDate: string; imageUrl?: string; dcCopyRef?: string; }[];
+    tools?: { 
+      name: string; 
+      brand: string; 
+      size: string; 
+      quantity: number; 
+      issueDate: string; 
+      imageUrl?: string; 
+      dcCopyRef?: string;
+    }[];
+    dcCopy1Url?: string;
+    dcCopy2Url?: string;
     sims?: { count: number; details: { number: string; phone: string; }[]; };
     equipment?: { name: string; brand: string; model: string; serial: string; accessories: string; condition: 'New' | 'Old'; issueDate: string; }[];
   };

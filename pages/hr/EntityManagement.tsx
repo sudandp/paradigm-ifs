@@ -10,8 +10,6 @@ import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import EntityForm from '../../components/hr/EntityForm';
 import CompanyForm from '../../components/hr/CompanyForm';
-// FIX: Changed to a named import as SiteConfigurationForm is not a default export.
-import { SiteConfigurationForm } from '../../components/hr/SiteConfigurationForm';
 import Modal from '../../components/ui/Modal';
 import AdminPageHeader from '../../components/admin/AdminPageHeader';
 import Input from '../../components/ui/Input';
@@ -164,7 +162,6 @@ const EntityManagement: React.FC = () => {
     const navigate = useNavigate();
     const [groups, setGroups] = useState<OrganizationGroup[]>([]);
     const [organizations, setOrganizations] = useState<Organization[]>([]);
-    const [siteConfigs, setSiteConfigs] = useState<SiteConfiguration[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -195,12 +192,12 @@ const EntityManagement: React.FC = () => {
         initialData: Partial<Company> | null;
     }>({ isOpen: false, mode: 'add', groupId: '', groupName: '', initialData: null });
     const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean; type: 'group' | 'company' | 'client'; id: string; name: string }>({ isOpen: false, type: 'group', id: '', name: '' });
-    const [siteConfigForm, setSiteConfigForm] = useState<{ isOpen: boolean; org: Organization | null }>({ isOpen: false, org: null });
 
     const allClients = useMemo(() => {
         return groups.flatMap(g => g.companies.flatMap(c => c.entities.map(e => ({ ...e, companyName: c.name }))));
     }, [groups]);
 
+    const allCompanies = useMemo(() => groups.flatMap(g => g.companies), [groups]);
     const existingLocations = useMemo(() => {
         return Array.from(new Set(
             groups.flatMap(g => g.companies.map(c => c.location).filter(Boolean) as string[])
@@ -211,14 +208,12 @@ const EntityManagement: React.FC = () => {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                const [structure, orgs, configs] = await Promise.all([
+                const [structure, orgs] = await Promise.all([
                     api.getOrganizationStructure(),
-                    api.getOrganizations(),
-                    api.getSiteConfigurations()
+                    api.getOrganizations()
                 ]);
                 setGroups(structure);
                 setOrganizations(orgs);
-                setSiteConfigs(configs);
             } catch (error) {
                 setToast({ message: "Failed to load data.", type: 'error' });
             } finally {
@@ -290,8 +285,14 @@ const EntityManagement: React.FC = () => {
     const handleEditClient = (entity: Entity, companyName: string) => setEntityFormState({ isOpen: true, initialData: entity, companyName });
     const handleSaveClient = async (clientData: Entity, pendingFiles: Record<string, File>) => {
         try {
-            const company = groups.flatMap(g => g.companies).find(c => c.name === entityFormState.companyName);
-            if (!company) throw new Error("Company not found");
+            let company = groups.flatMap(g => g.companies).find(c => c.name === entityFormState.companyName);
+            
+            // If company not found by name (fallback for global add), use companyId from data
+            if (!company && clientData.companyId) {
+                company = allCompanies.find(c => c.id === clientData.companyId);
+            }
+
+            if (!company) throw new Error("Company not found. Please select a company.");
 
             // Process file uploads
             const updatedClientData = { ...clientData };
@@ -517,27 +518,23 @@ const EntityManagement: React.FC = () => {
         } else if (activeSubcategory === 'site_configuration') {
             columns = siteConfigCsvColumns;
             const dataToExport = organizations.map(org => {
-                const config = siteConfigs.find(c => c.organizationId === org.id);
+                const entity = allClients.find(e => e.organizationId === org.id);
                 return {
                     'Organization Id': org.id,
                     'Organization Name': org.shortName,
-                    'Location': config?.location || '',
-                    'Entity Id': config?.entityId || '',
-                    'Billing Name': config?.billingName || '',
-                    'Registered Address': config?.registeredAddress || '',
-                    'GST Number': config?.gstNumber || '',
-                    'PAN Number': config?.panNumber || '',
-                    'Email 1': config?.email1 || '',
-                    'Email 2': config?.email2 || '',
-                    'Email 3': config?.email3 || '',
-                    'E Shram Number': config?.eShramNumber || '',
-                    'Shop and Establishment Code': config?.shopAndEstablishmentCode || '',
-                    'Key Account Manager': config?.keyAccountManager || '',
-                    'Site Area (Sq Ft)': config?.siteAreaSqFt || '',
-                    'Project Type': config?.projectType || '',
-                    'Apartment Count': config?.apartmentCount || '',
-                    'Agreement Details': JSON.stringify(config?.agreementDetails || {}),
-                    'Site Operations': JSON.stringify(config?.siteOperations || {}),
+                    'Location': entity?.location || '',
+                    'Entity Id': entity?.id || '',
+                    'Billing Name': entity?.billingName || '',
+                    'Registered Address': entity?.registeredAddress || '',
+                    'GST Number': entity?.gstNumber || '',
+                    'PAN Number': entity?.panNumber || '',
+                    'Email 1': entity?.emails?.[0]?.email || '',
+                    'Email 2': entity?.emails?.[1]?.email || '',
+                    'Email 3': entity?.emails?.[2]?.email || '',
+                    'E Shram Number': entity?.eShramNumber || '',
+                    'Shop and Establishment Code': entity?.shopAndEstablishmentCode || '',
+                    'Key Account Manager': entity?.siteManagement?.keyAccountManager || '',
+                    'Site Area (Sq Ft)': entity?.siteManagement?.siteAreaSqFt || '',
                 };
             });
             csvData = toCSV(dataToExport, columns);
@@ -648,42 +645,55 @@ const EntityManagement: React.FC = () => {
                         throw new Error(`Header mismatch. Please use the downloaded template.`);
                     }
 
-                    const parsedData = fromCSV(text);
-                    if (parsedData.length === 0) throw new Error("No data rows found.");
+                    const importedData = fromCSV(text);
+                    if (importedData.length === 0) throw new Error("No data rows found.");
 
-                    const newSiteConfigs = parsedData.map(row => {
-                        return {
-                            organizationId: row['Organization Id'] || row.organizationId,
-                            location: row['Location'] || row.location,
-                            entityId: row['Entity Id'] || row.entityId,
-                            billingName: row['Billing Name'] || row.billingName,
-                            registeredAddress: row['Registered Address'] || row.registeredAddress,
-                            gstNumber: row['GST Number'] || row.gstNumber,
-                            panNumber: row['PAN Number'] || row.panNumber,
-                            email1: row['Email 1'] || row.email1,
-                            email2: row['Email 2'] || row.email2,
-                            email3: row['Email 3'] || row.email3,
-                            eShramNumber: row['E Shram Number'] || row.eShramNumber,
-                            shopAndEstablishmentCode: row['Shop and Establishment Code'] || row.shopAndEstablishmentCode,
-                            keyAccountManager: row['Key Account Manager'] || row.keyAccountManager,
-                            siteAreaSqFt: Number(row['Site Area (Sq Ft)'] || row.siteAreaSqFt) || null,
-                            projectType: row['Project Type'] || row.projectType,
-                            apartmentCount: Number(row['Apartment Count'] || row.apartmentCount) || null,
-                            agreementDetails: JSON.parse(row['Agreement Details'] || row.agreementDetails || '{}'),
-                            siteOperations: JSON.parse(row['Site Operations'] || row.siteOperations || '{}'),
-                        } as SiteConfiguration;
-                    });
+                    const newAllClients = [...allClients];
+                    importedData.forEach(row => {
+                        const orgId = row['Organization Id'];
+                        const existingIndex = newAllClients.findIndex(e => e.organizationId === orgId);
+                        const entityData: Partial<Entity> = {
+                            organizationId: orgId,
+                            location: row['Location'],
+                            billingName: row['Billing Name'],
+                            registeredAddress: row['Registered Address'],
+                            gstNumber: row['GST Number'],
+                            panNumber: row['PAN Number'],
+                            emails: [
+                                { id: `email_1_${Date.now()}`, email: row['Email 1'] || '', isPrimary: true },
+                                { id: `email_2_${Date.now()}`, email: row['Email 2'] || '', isPrimary: false },
+                                { id: `email_3_${Date.now()}`, email: row['Email 3'] || '', isPrimary: false },
+                            ].filter(e => e.email),
+                            eShramNumber: row['E Shram Number'],
+                            shopAndEstablishmentCode: row['Shop and Establishment Code'],
+                            siteManagement: {
+                                keyAccountManager: row['Key Account Manager'],
+                                siteAreaSqFt: Number(row['Site Area (Sq Ft)']) || 0
+                            }
+                        };
 
-                    setSiteConfigs(prev => {
-                        const updated = [...prev];
-                        newSiteConfigs.forEach(newConfig => {
-                            const index = updated.findIndex(c => c.organizationId === newConfig.organizationId);
-                            if (index > -1) updated[index] = newConfig;
-                            else updated.push(newConfig);
-                        });
-                        return updated;
+                        if (existingIndex >= 0) {
+                            newAllClients[existingIndex] = { ...newAllClients[existingIndex], ...entityData };
+                        } else {
+                            newAllClients.push({
+                                id: `new_${Date.now()}_${Math.random()}`,
+                                name: row['Organization Name'],
+                                ...entityData
+                            } as (Entity & { companyName: string }));
+                        }
                     });
-                    setToast({ message: `Successfully imported ${newSiteConfigs.length} site configurations.`, type: 'success' });
+                    
+                    setGroups(prev => prev.map(group => ({
+                        ...group,
+                        companies: group.companies.map(company => ({
+                            ...company,
+                            entities: company.entities.map(entity => {
+                                const updated = newAllClients.find(e => e.id === entity.id);
+                                return updated ? (updated as Entity) : entity;
+                            })
+                        }))
+                    })));
+                    setToast({ message: "Imported site configurations. Click 'Save All Changes' to persist.", type: 'success' });
                 } else {
                     setToast({ message: `Import not implemented for this view.`, type: 'error' });
                 }
@@ -771,9 +781,9 @@ const EntityManagement: React.FC = () => {
                         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
                             <h4 className="text-lg font-semibold text-primary-text">Sites Configuration</h4>
                             <div className="flex items-center gap-2 flex-wrap">
-                                <Button type="button" variant="outline" onClick={handleDownloadTemplate}><FileText className="mr-2 h-4 w-4" /> Template</Button>
-                                <Button type="button" variant="outline" onClick={() => importRef.current?.click()}><Upload className="mr-2 h-4 w-4" /> Import</Button>
-                                <Button type="button" variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" /> Export</Button>
+                                <Button onClick={() => setEntityFormState({ isOpen: true, initialData: null, companyName: '' })} style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }} className="border hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all duration-300">
+                                    <Plus className="mr-2 h-4 w-4" /> Add Society
+                                </Button>
                             </div>
                         </div>
                         <div className="overflow-x-auto">
@@ -787,8 +797,8 @@ const EntityManagement: React.FC = () => {
                                 </thead>
                                 <tbody className="divide-y divide-border md:bg-card md:divide-y-0">
                                     {filteredOrganizations.map(org => {
-                                        const config = siteConfigs.find(c => c.organizationId === org.id);
-                                        const isConfigured = !!config && (!!config.billingName || !!config.keyAccountManager);
+                                        const entity = allClients.find(e => e.organizationId === org.id);
+                                        const isConfigured = !!entity && (!!entity.billingName || !!entity.siteManagement?.keyAccountManager);
                                         return (
                                             <tr key={org.id}>
                                                 <td data-label="Site Name" className="px-4 py-3 font-medium">
@@ -804,7 +814,22 @@ const EntityManagement: React.FC = () => {
                                                     }
                                                 </td>
                                                 <td data-label="Actions" className="px-4 py-3">
-                                                    <Button size="sm" variant="outline" onClick={() => setSiteConfigForm({ isOpen: true, org })}>
+                                                    <Button size="sm" variant="outline" onClick={() => {
+                                                        if (entity) {
+                                                            setEntityFormState({ isOpen: true, initialData: entity, companyName: entity.companyName || '' });
+                                                        } else {
+                                                            // Create a skeleton entity linked to this org
+                                                            setEntityFormState({ 
+                                                                isOpen: true, 
+                                                                initialData: { 
+                                                                    id: `new_${Date.now()}`, 
+                                                                    name: org.shortName, 
+                                                                    organizationId: org.id 
+                                                                } as Entity, 
+                                                                companyName: '' 
+                                                            });
+                                                        }
+                                                    }}>
                                                         <Eye className="mr-2 h-4 w-4" /> View / Edit
                                                     </Button>
                                                 </td>
@@ -858,6 +883,7 @@ const EntityManagement: React.FC = () => {
                     {...entityFormState} 
                     onClose={() => setEntityFormState(p => ({ ...p, isOpen: false }))} 
                     onSave={handleSaveClient} 
+                    companies={allCompanies}
                 />
             </div>
         );
@@ -878,33 +904,6 @@ const EntityManagement: React.FC = () => {
             <Modal isOpen={deleteModalState.isOpen} onClose={() => setDeleteModalState(p => ({ ...p, isOpen: false }))} onConfirm={handleConfirmDelete} title="Confirm Deletion">
                 Are you sure you want to delete the {deleteModalState.type} "{deleteModalState.name}"? This action cannot be undone.
             </Modal>
-            {siteConfigForm.isOpen && siteConfigForm.org && (
-                <SiteConfigurationForm 
-                    isOpen={siteConfigForm.isOpen} 
-                    onClose={() => setSiteConfigForm({ isOpen: false, org: null })} 
-                    onSave={async (orgId, data) => {
-                        try {
-                            await api.saveSiteConfiguration(orgId, data);
-                            setSiteConfigs(prev => {
-                                const index = prev.findIndex(c => c.organizationId === orgId);
-                                if (index > -1) {
-                                    const updated = [...prev];
-                                    updated[index] = data;
-                                    return updated;
-                                }
-                                return [...prev, data];
-                            });
-                            setToast({ message: 'Site configuration saved.', type: 'success' });
-                            setSiteConfigForm({ isOpen: false, org: null });
-                        } catch (error) {
-                            setToast({ message: 'Failed to save site configuration.', type: 'error' });
-                        }
-                    }} 
-                    organization={siteConfigForm.org} 
-                    allClients={allClients} 
-                    initialData={siteConfigs.find(c => c.organizationId === siteConfigForm.org?.id)} 
-                />
-            )}
             {viewingClients && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60" onClick={() => setViewingClients(null)}>
                     <div className="bg-card rounded-xl shadow-card p-6 w-full max-w-md m-4 animate-fade-in-scale" onClick={e => e.stopPropagation()}>
