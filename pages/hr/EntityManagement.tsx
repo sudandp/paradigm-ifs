@@ -350,18 +350,50 @@ const EntityManagement: React.FC = () => {
         setDeleteModalState({ isOpen: false, type: 'group', id: '', name: '' });
     };
 
-    const handleSaveCompanyData = async (data: Partial<Company>, file?: File) => {
+    const handleSaveCompanyData = async (data: Partial<Company>, pendingFiles: Record<string, File> = {}) => {
         try {
             const { mode, groupId } = companyFormState;
             const newGroups = [...groups];
             const groupIndex = newGroups.findIndex(g => g.id === groupId);
             if (groupIndex === -1) return;
 
+            setToast({ message: 'Saving company & uploading files...', type: 'success' });
             let updatedData = { ...data };
-            if (file) {
-                setToast({ message: 'Uploading logo...', type: 'success' });
-                const logoUrl = await api.uploadLogo(file);
+            
+            // 1. Upload Logo if present
+            if (pendingFiles['logo']) {
+                const logoUrl = await api.uploadLogo(pendingFiles['logo']);
                 updatedData.logoUrl = logoUrl;
+            }
+
+            // 2. Upload Compliance Documents
+            if (updatedData.complianceDocuments) {
+                for (const doc of updatedData.complianceDocuments) {
+                    if (pendingFiles[`doc_${doc.id}`]) {
+                        const { url } = await api.uploadDocument(pendingFiles[`doc_${doc.id}`]);
+                        doc.documentUrl = url;
+                    }
+                }
+            }
+
+            // 3. Upload Insurances
+            if (updatedData.insurances) {
+                for (const ins of updatedData.insurances) {
+                    if (pendingFiles[`ins_${ins.id}`]) {
+                        const { url } = await api.uploadDocument(pendingFiles[`ins_${ins.id}`]);
+                        ins.documentUrl = url;
+                    }
+                }
+            }
+
+            // 4. Upload Policies
+            if (updatedData.policies) {
+                for (const pol of updatedData.policies) {
+                    if (pendingFiles[`pol_${pol.id}`]) {
+                        const { url } = await api.uploadDocument(pendingFiles[`pol_${pol.id}`]);
+                        pol.documentUrl = url;
+                    }
+                }
             }
 
             if (mode === 'add') {
@@ -386,6 +418,7 @@ const EntityManagement: React.FC = () => {
             setGroups(newGroups);
             setCompanyFormState({ ...companyFormState, isOpen: false });
         } catch (error) {
+            console.error(error);
             setToast({ message: 'Failed to save company details.', type: 'error' });
         }
     };
@@ -782,12 +815,25 @@ const EntityManagement: React.FC = () => {
     };
 
 
+    if (companyFormState.isOpen) {
+        return (
+            <div className="p-0">
+                {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
+                <CompanyForm 
+                    {...companyFormState} 
+                    onClose={() => setCompanyFormState(p => ({ ...p, isOpen: false }))} 
+                    onSave={handleSaveCompanyData} 
+                    existingLocations={existingLocations} 
+                />
+            </div>
+        );
+    }
+
     return (
         <div className="p-4 space-y-6">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             <TemplateInstructionsModal isOpen={isInstructionsOpen} onClose={() => setIsInstructionsOpen(false)} />
             {entityFormState.isOpen && <EntityForm {...entityFormState} onClose={() => setEntityFormState(p => ({ ...p, isOpen: false }))} onSave={handleSaveClient} />}
-            {companyFormState.isOpen && <CompanyForm {...companyFormState} onClose={() => setCompanyFormState(p => ({ ...p, isOpen: false }))} onSave={handleSaveCompanyData} existingLocations={existingLocations} />}
             <NameInputModal
                 isOpen={nameModalState.isOpen}
                 onClose={() => setNameModalState({ isOpen: false, mode: 'add', type: 'group', title: '', label: '' })}

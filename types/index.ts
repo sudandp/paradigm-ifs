@@ -481,6 +481,47 @@ export interface Entity {
   companyId?: string;
 }
 
+export interface CompanyEmail {
+  id: string;
+  email: string;
+}
+
+export interface ComplianceCodes {
+  eShramNumber?: string;
+  shopAndEstablishmentCode?: string;
+  epfoCode?: string;
+  esicCode?: string;
+  psaraLicenseNumber?: string;
+  psaraValidTill?: string | null;
+}
+
+export interface ComplianceDocument {
+  id: string;
+  type: string;
+  documentUrl?: string | null;
+  expiryDate?: string | null;
+}
+
+export interface CompanyHoliday {
+  id: string;
+  date: string;
+  year: number;
+  festivalName: string;
+}
+
+export interface CompanyInsurance {
+  id: string;
+  name: string;
+  documentUrl?: string | null;
+}
+
+export interface CompanyPolicy {
+  id: string;
+  name: string;
+  documentUrl?: string | null;
+  level: 'BO' | 'Site' | 'Both';
+}
+
 export interface Company {
   id: string;
   name: string;
@@ -489,6 +530,20 @@ export interface Company {
   location?: string;
   address?: string;
   logoUrl?: string;
+  
+  // Basic Details
+  registrationType?: RegistrationType;
+  registrationNumber?: string;
+  gstNumber?: string | null;
+  panNumber?: string | null;
+  
+  // Nested JSONB Structures
+  emails?: CompanyEmail[];
+  complianceCodes?: ComplianceCodes;
+  complianceDocuments?: ComplianceDocument[];
+  holidays?: CompanyHoliday[];
+  insurances?: CompanyInsurance[];
+  policies?: CompanyPolicy[];
 }
 
 export interface OrganizationGroup {
