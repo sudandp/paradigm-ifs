@@ -1,19 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { useForm, Controller, SubmitHandler, Resolver } from 'react-hook-form';
+import { useForm, Controller, useFieldArray, SubmitHandler, Resolver } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import type { Entity, RegistrationType, Policy, Insurance } from '../../types';
+import type { Entity, RegistrationType, Policy, Insurance, UploadedFile } from '../../types';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import Button from '../ui/Button';
 import DatePicker from '../ui/DatePicker';
+import UploadDocument from '../UploadDocument';
 import { api } from '../../services/api';
-import { Loader2 } from 'lucide-react';
+import Checkbox from '../ui/Checkbox';
+import { Loader2, Plus, Trash2, Calendar, FileText, Shield, Info, Clock, Wrench, Smartphone, HardDrive, Percent, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface EntityFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: Entity) => void;
+  onSave: (data: Entity, pendingFiles: Record<string, File>) => void;
   initialData: Entity | null;
   companyName: string;
 }
@@ -26,32 +28,180 @@ const entitySchema = yup.object({
   registeredAddress: yup.string().optional(),
   registrationType: yup.string<RegistrationType>().oneOf(['CIN', 'ROC', 'ROF', 'Society', 'Trust', '']).optional(),
   registrationNumber: yup.string().optional(),
-  gstNumber: yup.string().optional().nullable().matches(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, 'Invalid GST Number format').optional(),
-  panNumber: yup.string().transform(v => v?.toUpperCase() || '').matches(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format').optional(),
+  gstNumber: yup.string().optional().nullable().matches(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, { message: 'Invalid GST Number format', excludeEmptyString: true }),
+  panNumber: yup.string().transform(v => v?.toUpperCase() || '').matches(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, { message: 'Invalid PAN format', excludeEmptyString: true }).optional(),
   email: yup.string().email('Invalid email format').optional(),
   eShramNumber: yup.string().optional(),
   shopAndEstablishmentCode: yup.string().optional(),
-  epfoCode: yup.string().optional(),
-  esicCode: yup.string().optional(),
-  psaraLicenseNumber: yup.string().optional(),
-  psaraValidTill: yup.string().optional().nullable(),
+  
+  // Advanced Fields
+  siteTakeoverDate: yup.string().optional().nullable(),
+  billingName: yup.string().optional().nullable(),
+  emails: yup.array().of(
+    yup.object({
+      id: yup.string().required(),
+      email: yup.string().email('Invalid email format').required('Email is required'),
+      isPrimary: yup.boolean().optional()
+    })
+  ).max(10).optional(),
+  
+  siteManagement: yup.object({
+    keyAccountManager: yup.string().optional(),
+    kamEffectiveDate: yup.string().optional().nullable().when('keyAccountManager', {
+        is: (val: string) => val && val.length > 0,
+        then: schema => schema.required('Effective date is mandatory if KAM is set')
+    }),
+    siteAreaSqFt: yup.number().typeError('Must be a number').nullable().optional(),
+    projectType: yup.string().optional(),
+    unitCount: yup.number().typeError('Must be a number').nullable().optional(),
+  }).optional(),
+  
+  agreementDetails: yup.object({
+    fromDate: yup.string().optional().nullable(),
+    toDate: yup.string().optional().nullable(),
+    renewalTriggerDays: yup.number().nullable().optional(),
+    minWageTriggerDays: yup.number().nullable().optional(),
+    agreementDate: yup.string().optional().nullable(),
+    addendum1Date: yup.string().optional().nullable(),
+    addendum2Date: yup.string().optional().nullable(),
+  }).optional(),
+  
+  complianceDetails: yup.object({
+    form6Applicable: yup.boolean().default(false),
+    form6ValidityFrom: yup.string().nullable().optional(),
+    form6ValidityTo: yup.string().nullable().optional(),
+    form6RenewalInterval: yup.number().nullable().optional(),
+    minWageRevisionApplicable: yup.boolean().default(false),
+  }).optional(),
+  
+  holidayConfig: yup.object({
+    numberOfDays: yup.number().oneOf([10, 12]).optional(),
+    holidays: yup.array().of(yup.object({ date: yup.string().required(), description: yup.string().required() })).optional(),
+    salaryRule: yup.string().oneOf(['Full', 'Duty', 'Nil', 'Category']).optional(),
+    billingRule: yup.string().oneOf(['Full', 'Duty', 'Nil', 'Category']).optional(),
+    logicVariation: yup.string().optional(),
+  }).optional(),
+  
+  financialLinkage: yup.object({
+    costingSheetUrl: yup.string().optional().nullable(),
+    effectiveDate: yup.string().optional().nullable(),
+    version: yup.string().optional().nullable(),
+  }).optional(),
+  
+  billingControls: yup.object({
+    billingCycleStart: yup.string().optional().nullable(),
+    salaryDate: yup.string().optional().nullable(),
+    uniformDeductions: yup.boolean().default(false),
+    deductionCategory: yup.string().optional(),
+  }).optional(),
+  
+  verificationData: yup.object({
+    categories: yup.array().of(
+      yup.object({
+        name: yup.string().required(),
+        employmentPlusPolice: yup.array().of(yup.string().required()).defined(),
+        policeOnly: yup.array().of(yup.string().required()).defined(),
+      })
+    ).optional(),
+  }).optional(),
+  
   insuranceIds: yup.array().of(yup.string().required()).optional(),
   policyIds: yup.array().of(yup.string().required()).optional(),
 }).defined();
 
-type Tab = 'General' | 'Registration' | 'Compliance' | 'Policies & Insurance';
+type Tab = 'General' | 'Management' | 'Agreement' | 'Compliance' | 'Holidays' | 'Assets' | 'Billing' | 'Verification' | 'Policies/Insurance';
+
+const VERIFICATION_CATEGORIES = [
+  { 
+    name: 'Administrative Staff', 
+    empPlusPol: ['GM', 'Manager', 'Executive', 'Engineer', 'Accounts', 'Front Office', 'CRM'],
+    polOnly: ['Office Assistant', 'Office Boy', 'Pantry Boy']
+  },
+  { 
+    name: 'Housekeeping', 
+    empPlusPol: ['Housekeeping Manager', 'Housekeeping Executive'],
+    polOnly: ['Supervisor', 'Driver', 'Janitor']
+  },
+  { 
+    name: 'Landscaping & Horticulture', 
+    empPlusPol: ['Horticulturist', 'Manager', 'Executive'],
+    polOnly: ['Supervisor', 'Gardener', 'Helper']
+  },
+  { 
+    name: 'Security', 
+    empPlusPol: ['Field Officer', 'Security Officer', 'Assistant Security Officer'],
+    polOnly: ['Senior Guard', 'Junior Guard', 'Lady Guard', 'Supervisor']
+  },
+  { 
+    name: 'Plumbing', 
+    empPlusPol: [],
+    polOnly: ['Supervisor', 'Plumber', 'Operator', 'Handy Man']
+  },
+  { 
+    name: 'Electrical & Engineering', 
+    empPlusPol: ['Engineering Services Manager', 'Shift Engineer'],
+    polOnly: ['Technician', 'Supervisor', 'Operator']
+  },
+  { 
+    name: 'Fire Safety', 
+    empPlusPol: ['EHS Executive', 'Fire Officer'],
+    polOnly: ['Fire Warden', 'Technician']
+  },
+  { 
+    name: 'STP (Sewage Treatment Plant)', 
+    empPlusPol: [],
+    polOnly: ['Supervisor', 'Operator']
+  },
+  { 
+    name: 'Swimming Pool Maintenance', 
+    empPlusPol: [],
+    polOnly: ['Pool Operator']
+  },
+  { 
+    name: 'Pest Control Services', 
+    empPlusPol: [],
+    polOnly: ['Operator']
+  },
+  { 
+    name: 'Back Office Staff', 
+    empPlusPol: ['Operations - Head', 'Operations - Field Executive', 'HR', 'Accounts & Finance', 'Admin'],
+    polOnly: ['Driver', 'Office Assistant', 'Office Boy', 'Security Guard']
+  }
+];
 
 const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initialData, companyName }) => {
   const [activeTab, setActiveTab] = useState<Tab>('General');
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [insurances, setInsurances] = useState<Insurance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingFiles, setPendingFiles] = useState<Record<string, File>>({});
 
-  const { register, handleSubmit, formState: { errors }, reset, control } = useForm<Entity>({
+  const { register, handleSubmit, formState: { errors }, reset, control, watch, setValue } = useForm<Entity>({
     resolver: yupResolver(entitySchema) as Resolver<Entity>,
+    defaultValues: {
+        emails: [{ id: `email_${Date.now()}`, email: '', isPrimary: true }],
+        siteManagement: { projectType: 'Commercial' },
+        agreementDetails: { renewalTriggerDays: 30, minWageTriggerDays: 15 },
+        complianceDetails: { form6Applicable: false, minWageRevisionApplicable: true },
+        holidayConfig: { numberOfDays: 10, salaryRule: 'Full', billingRule: 'Full' },
+        billingControls: { uniformDeductions: false },
+        verificationData: {
+            categories: VERIFICATION_CATEGORIES.map(cat => ({
+                name: cat.name,
+                employmentPlusPolice: [...cat.empPlusPol],
+                policeOnly: [...cat.polOnly]
+            }))
+        }
+    }
+  });
+
+  const { fields: emailFields, append: appendEmail, remove: removeEmail } = useFieldArray({
+    control,
+    name: "emails"
   });
 
   const isEditing = !!initialData;
+  const watchForm6 = watch('complianceDetails.form6Applicable');
 
   useEffect(() => {
     if (isOpen) {
@@ -65,142 +215,620 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
         if (initialData) {
             reset(initialData);
         } else {
-            reset({ id: `new_${Date.now()}`, name: '', location: '', registeredAddress: '', registrationType: '', registrationNumber: '', gstNumber: '', panNumber: '', email: '', eShramNumber: '', shopAndEstablishmentCode: '', epfoCode: '', esicCode: '', psaraLicenseNumber: '', psaraValidTill: '', insuranceIds: [], policyIds: [] });
+            reset({ 
+                id: `new_${Date.now()}`, 
+                name: '', 
+                location: '', 
+                registeredAddress: '', 
+                registrationType: '', 
+                registrationNumber: '', 
+                gstNumber: '', 
+                panNumber: '', 
+                email: '', 
+                emails: [{ id: `email_${Date.now()}`, email: '', isPrimary: true }],
+                siteManagement: { projectType: 'Commercial' },
+                agreementDetails: { renewalTriggerDays: 30, minWageTriggerDays: 15 },
+                complianceDetails: { form6Applicable: false, minWageRevisionApplicable: true },
+                holidayConfig: { numberOfDays: 10, salaryRule: 'Full', billingRule: 'Full' },
+                verificationData: {
+                    categories: VERIFICATION_CATEGORIES.map(cat => ({
+                        name: cat.name,
+                        employmentPlusPolice: [...cat.empPlusPol],
+                        policeOnly: [...cat.polOnly]
+                    }))
+                },
+                insuranceIds: [], 
+                policyIds: [] 
+            });
         }
+        setPendingFiles({});
+        setActiveTab('General');
     }
   }, [initialData, reset, isOpen]);
 
+  const getTabErrors = (tab: Tab, currentErrors: any = errors) => {
+    switch (tab) {
+      case 'General':
+        return currentErrors.name || currentErrors.emails || currentErrors.gstNumber || currentErrors.panNumber || currentErrors.email || currentErrors.siteTakeoverDate;
+      case 'Management':
+        return currentErrors.siteManagement;
+      case 'Agreement':
+        return currentErrors.agreementDetails;
+      case 'Compliance':
+        return currentErrors.complianceDetails;
+      case 'Holidays':
+        return currentErrors.holidayConfig;
+      case 'Assets':
+        return currentErrors.assetTracking;
+      case 'Billing':
+        return currentErrors.billingControls;
+      case 'Verification':
+        return currentErrors.verificationData;
+      case 'Policies/Insurance':
+        return currentErrors.policyIds || currentErrors.insuranceIds;
+      default:
+        return false;
+    }
+  };
+
   const onSubmit: SubmitHandler<Entity> = (data) => {
-    onSave(data);
+    onSave(data, pendingFiles);
+  };
+
+  const onError = (errors: any) => {
+    const tabOrder: Tab[] = ['General', 'Management', 'Agreement', 'Compliance', 'Holidays', 'Assets', 'Billing', 'Verification', 'Policies/Insurance'];
+    for (const tab of tabOrder) {
+      if (getTabErrors(tab, errors)) {
+        setActiveTab(tab);
+        break;
+      }
+    }
+  };
+
+  const handleFileUpload = (field: string, file: File) => {
+    setPendingFiles(prev => ({ ...prev, [field]: file }));
   };
 
   if (!isOpen) return null;
 
-  const TabButton: React.FC<{ tabName: Tab }> = ({ tabName }) => (
-    <button
-      type="button"
-      onClick={() => setActiveTab(tabName)}
-      className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 ${activeTab === tabName ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-primary-text'}`}
-    >
-      {tabName}
-    </button>
-  );
+  const TabButton: React.FC<{ tabName: Tab }> = ({ tabName }) => {
+    const hasError = !!getTabErrors(tabName);
+    return (
+      <button
+        type="button"
+        onClick={() => setActiveTab(tabName)}
+        className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 flex items-center gap-2 transition-all ${activeTab === tabName ? 'border-accent text-accent bg-accent/5' : 'border-transparent text-muted hover:text-primary-text'}`}
+      >
+        <span>{tabName}</span>
+        {hasError && (
+          <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+        )}
+      </button>
+    );
+  };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 p-4" onClick={onClose}>
-      <div className="bg-card rounded-xl shadow-card p-6 w-full max-w-3xl my-8 mx-auto animate-fade-in-scale" onClick={e => e.stopPropagation()}>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="mb-4">
-            <h3 className="text-xl font-bold text-primary-text">{isEditing ? 'Edit Society' : 'Add New Society'}</h3>
-            <p className="text-sm text-muted">for {companyName}</p>
+    <div className="p-4 border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card w-full animate-fade-in relative">
+      <form onSubmit={handleSubmit(onSubmit, onError)}>
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <h3 className="text-2xl font-bold text-primary-text">{isEditing ? 'Edit Society' : 'Add New Society'}</h3>
+              <p className="text-sm text-muted">for {companyName}</p>
+            </div>
+            <div className="flex items-center gap-3">
+               <Button type="button" onClick={onClose} variant="secondary" className="px-6">Cancel</Button>
+               <Button type="submit" variant="primary" className="px-8 shadow-lg shadow-emerald-500/20">{isEditing ? 'Save Changes' : 'Create Profile'}</Button>
+            </div>
           </div>
           
-          <div className="border-b border-border mb-6">
-            <nav className="-mb-px flex space-x-4">
+          <div className="border-b border-border mb-6 overflow-x-auto no-scrollbar">
+            <nav className="-mb-px flex space-x-1 sm:space-x-4 min-w-max pb-1 text-base">
                 <TabButton tabName="General" />
-                <TabButton tabName="Registration" />
+                <TabButton tabName="Management" />
+                <TabButton tabName="Agreement" />
                 <TabButton tabName="Compliance" />
-                <TabButton tabName="Policies & Insurance" />
+                <TabButton tabName="Holidays" />
+                <TabButton tabName="Assets" />
+                <TabButton tabName="Billing" />
+                <TabButton tabName="Verification" />
+                <TabButton tabName="Policies/Insurance" />
             </nav>
           </div>
           
-          <div className="space-y-6 min-h-[300px]">
+          <div className="space-y-6 min-h-[450px]">
             {activeTab === 'General' && (
-                <div className="space-y-4">
-                    <Input label="Society Name (as per document)" id="name" registration={register('name')} error={errors.name?.message} />
-                    <Input label="Location / City" id="location" registration={register('location')} error={errors.location?.message} />
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input label="Society Name (as per document)" id="name" registration={register('name')} error={errors.name?.message} />
+                        <Input label="Billing Name" id="billingName" registration={register('billingName')} error={errors.billingName?.message} />
+                        <Input label="Location / City" id="location" registration={register('location')} error={errors.location?.message} />
+                        <Controller name="siteTakeoverDate" control={control} render={({ field }) => (
+                            <DatePicker label="Site Takeover Date" id="siteTakeoverDate" value={field.value} onChange={field.onChange} error={errors.siteTakeoverDate?.message} />
+                        )} />
+                    </div>
                     <Input label="Registered Address" id="registeredAddress" registration={register('registeredAddress')} error={errors.registeredAddress?.message} />
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input label="GST Number" id="gstNumber" registration={register('gstNumber')} error={errors.gstNumber?.message} placeholder="22AAAAA0000A1Z5" />
+                        <Input label="PAN Number" id="panNumber" registration={register('panNumber')} error={errors.panNumber?.message} placeholder="ABCDE1234F" />
+                        <Select label="Registration Type" id="registrationType" registration={register('registrationType')} error={errors.registrationType?.message}>
+                            <option value="">Select Type</option><option value="CIN">CIN</option><option value="ROC">ROC</option><option value="ROF">ROF</option><option value="Society">Society</option><option value="Trust">Trust</option>
+                        </Select>
+                        <Input label="Registration Number" id="registrationNumber" registration={register('registrationNumber')} error={errors.registrationNumber?.message} />
+                    </div>
+
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <label className="block text-sm font-medium text-primary-text">Email Addresses (Up to 10)</label>
+                            {emailFields.length < 10 && (
+                                <Button type="button" variant="secondary" size="sm" onClick={() => appendEmail({ id: `email_${Date.now()}`, email: '', isPrimary: false })} className="h-8 py-0">
+                                    <Plus className="h-3 w-3 mr-1" /> Add
+                                </Button>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            {emailFields.map((field, index) => (
+                                <div key={field.id} className="flex gap-2">
+                                    <div className="flex-1">
+                                        <Input 
+                                            id={`emails.${index}.email`} 
+                                            registration={register(`emails.${index}.email` as const)} 
+                                            error={errors.emails?.[index]?.email?.message} 
+                                            placeholder={index === 0 ? "Primary Email" : `Secondary Email ${index}`}
+                                        />
+                                    </div>
+                                    {index > 0 && (
+                                        <Button type="button" variant="icon" onClick={() => removeEmail(index)} className="text-destructive hover:bg-destructive/10">
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
-            {activeTab === 'Registration' && (
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                    <Select label="Registration Type" id="registrationType" registration={register('registrationType')} error={errors.registrationType?.message}>
-                        <option value="">Select Type</option><option value="CIN">CIN</option><option value="ROC">ROC</option><option value="ROF">ROF</option><option value="Society">Society</option><option value="Trust">Trust</option>
-                    </Select>
-                    <Input label="Registration Number" id="registrationNumber" registration={register('registrationNumber')} error={errors.registrationNumber?.message} />
-                    <Input label="GST Number" id="gstNumber" registration={register('gstNumber')} error={errors.gstNumber?.message} />
-                    <Input label="PAN Number" id="panNumber" registration={register('panNumber')} error={errors.panNumber?.message} />
-                    <Input label="Email Address" id="email" type="email" registration={register('email')} error={errors.email?.message} />
-                 </div>
+
+            {activeTab === 'Management' && (
+                <div className="space-y-6">
+                    <div className="bg-accent/5 border border-accent/20 p-4 rounded-xl flex gap-3">
+                        <Shield className="h-5 w-5 text-accent mt-0.5" />
+                        <p className="text-sm text-primary-text font-medium">
+                            Key Account Manager (KAM) details are restricted. Effective date is mandatory if the manager is changed.
+                        </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-accent/5 border border-accent/20 rounded-xl">
+                        <Input label="Key Account Manager (Ops Manager)" id="keyAccountManager" registration={register('siteManagement.keyAccountManager')} error={errors.siteManagement?.keyAccountManager?.message} />
+                        <Controller name="siteManagement.kamEffectiveDate" control={control} render={({ field }) => (
+                            <DatePicker label="KAM Effective Date" id="kamEffectiveDate" value={field.value} onChange={field.onChange} error={errors.siteManagement?.kamEffectiveDate?.message} />
+                        )} />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-accent/5 border border-accent/10 rounded-xl">
+                        <Input label="Site Area (Sq.ft)" id="siteAreaSqFt" type="number" registration={register('siteManagement.siteAreaSqFt')} error={errors.siteManagement?.siteAreaSqFt?.message} />
+                        <Select label="Project Type" id="projectType" registration={register('siteManagement.projectType')} error={errors.siteManagement?.projectType?.message}>
+                            <option value="Apartment">Apartment</option>
+                            <option value="Villa">Villa</option>
+                            <option value="Rowhouse">Rowhouse</option>
+                            <option value="Commercial">Commercial</option>
+                            <option value="Industrial">Industrial</option>
+                            <option value="Retail">Retail</option>
+                        </Select>
+                        <Input label="Number of Units (Apartments/Villas)" id="unitCount" type="number" registration={register('siteManagement.unitCount')} error={errors.siteManagement?.unitCount?.message} />
+                    </div>
+                </div>
             )}
+            {activeTab === 'Agreement' && (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-accent/5 border border-accent/20 rounded-xl">
+                        <Controller name="agreementDetails.fromDate" control={control} render={({ field }) => (
+                            <DatePicker label="Agreement From Date" id="agreementFrom" value={field.value} onChange={field.onChange} error={errors.agreementDetails?.fromDate?.message} />
+                        )} />
+                        <Controller name="agreementDetails.toDate" control={control} render={({ field }) => (
+                            <DatePicker label="Agreement To Date" id="agreementTo" value={field.value} onChange={field.onChange} error={errors.agreementDetails?.toDate?.message} />
+                        )} />
+                        
+                        <Input label="Auto Renewal Trigger (Days before)" id="renewalTrigger" type="number" registration={register('agreementDetails.renewalTriggerDays')} error={errors.agreementDetails?.renewalTriggerDays?.message} />
+                        <Input label="Min Wage Trigger (Days before)" id="minWageTrigger" type="number" registration={register('agreementDetails.minWageTriggerDays')} error={errors.agreementDetails?.minWageTriggerDays?.message} />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t">
+                        <UploadDocument 
+                            label="Agreement Word Copy (Soft Copy)" 
+                            file={watch('agreementDetails.wordCopyUrl') ? { name: 'Current Document', preview: watch('agreementDetails.wordCopyUrl')!, type: 'application/msword', size: 0 } as UploadedFile : null} 
+                            onFileChange={(f) => handleFileUpload('agreementDetails.wordCopy', f?.file!)} 
+                        />
+                        <UploadDocument 
+                            label="Signed Agreement Copy (Scan)" 
+                            file={watch('agreementDetails.signedCopyUrl') ? { name: 'Signed Document', preview: watch('agreementDetails.signedCopyUrl')!, type: 'application/pdf', size: 0 } as UploadedFile : null} 
+                            onFileChange={(f) => handleFileUpload('agreementDetails.signedCopy', f?.file!)} 
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+                        <Controller name="agreementDetails.agreementDate" control={control} render={({ field }) => (
+                            <DatePicker label="Agreement Date" id="agreementDate" value={field.value} onChange={field.onChange} error={errors.agreementDetails?.agreementDate?.message} />
+                        )} />
+                        <Controller name="agreementDetails.addendum1Date" control={control} render={({ field }) => (
+                            <DatePicker label="Addendum 1 Date" id="addendum1Date" value={field.value} onChange={field.onChange} error={errors.agreementDetails?.addendum1Date?.message} />
+                        )} />
+                        <Controller name="agreementDetails.addendum2Date" control={control} render={({ field }) => (
+                            <DatePicker label="Addendum 2 Date" id="addendum2Date" value={field.value} onChange={field.onChange} error={errors.agreementDetails?.addendum2Date?.message} />
+                        )} />
+                    </div>
+                </div>
+            )}
+
             {activeTab === 'Compliance' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                    <Input label="E-Shram Number" id="eShramNumber" registration={register('eShramNumber')} error={errors.eShramNumber?.message} />
-                    <Input label="Shop & Establishment Code" id="shopAndEstablishmentCode" registration={register('shopAndEstablishmentCode')} error={errors.shopAndEstablishmentCode?.message} />
-                    <Input label="EPFO Code" id="epfoCode" registration={register('epfoCode')} error={errors.epfoCode?.message} />
-                    <Input label="ESIC Code" id="esicCode" registration={register('esicCode')} error={errors.esicCode?.message} />
-                    <Input label="PSARA License Number" id="psaraLicenseNumber" registration={register('psaraLicenseNumber')} error={errors.psaraLicenseNumber?.message} />
-                    <Controller name="psaraValidTill" control={control} render={({ field }) => (
-                        <DatePicker label="PSARA Valid Till" id="psaraValidTill" value={field.value} onChange={field.onChange} error={errors.psaraValidTill?.message} />
-                    )} />
-                 </div>
-            )}
-            {activeTab === 'Policies & Insurance' && (
-                isLoading ? <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted" /> :
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <Controller
-                      name="policyIds"
-                      control={control}
-                      render={({ field }) => (
-                        <div>
-                          <h4 className="font-semibold mb-2">Policies</h4>
-                          <div className="space-y-2 max-h-48 overflow-y-auto p-3 border rounded-lg bg-page">
-                            {policies.map(policy => (
-                              <label key={policy.id} className="flex items-center p-2 rounded-md hover:bg-card transition-colors">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 text-accent border-gray-300 rounded focus:ring-accent"
-                                  checked={field.value?.includes(policy.id)}
-                                  onChange={e => {
-                                    const newValues = e.target.checked
-                                      ? [...(field.value || []), policy.id]
-                                      : (field.value || []).filter(id => id !== policy.id);
-                                    field.onChange(newValues);
-                                  }}
-                                />
-                                <span className="ml-3 text-sm">{policy.name}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    />
-                     <Controller
-                      name="insuranceIds"
-                      control={control}
-                      render={({ field }) => (
-                        <div>
-                          <h4 className="font-semibold mb-2">Insurance</h4>
-                           <div className="space-y-2 max-h-48 overflow-y-auto p-3 border rounded-lg bg-page">
-                            {insurances.map(ins => (
-                              <label key={ins.id} className="flex items-center p-2 rounded-md hover:bg-card transition-colors">
-                                <input
-                                  type="checkbox"
-                                   className="h-4 w-4 text-accent border-gray-300 rounded focus:ring-accent"
-                                  checked={field.value?.includes(ins.id)}
-                                  onChange={e => {
-                                    const newValues = e.target.checked
-                                      ? [...(field.value || []), ins.id]
-                                      : (field.value || []).filter(id => id !== ins.id);
-                                    field.onChange(newValues);
-                                  }}
-                                />
-                                <span className="ml-3 text-sm">{ins.type} - {ins.provider}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    />
+                <div className="space-y-6">
+                    <div className="bg-accent/5 border border-accent/20 p-4 rounded-xl space-y-4">
+                        <Controller name="complianceDetails.form6Applicable" control={control} render={({ field: { value, onChange } }) => (
+                            <Checkbox 
+                                id="form6Applicable" 
+                                label="Form 6 (Principal Employer Registration) Applicable" 
+                                checked={value} 
+                                onChange={onChange}
+                                labelClassName="font-bold text-primary-text"
+                            />
+                        )} />
+
+                        {watchForm6 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6 animate-fade-in">
+                                <Controller name="complianceDetails.form6ValidityFrom" control={control} render={({ field }) => (
+                                    <DatePicker label="Validity From" id="form6From" value={field.value} onChange={field.onChange} />
+                                )} />
+                                <Controller name="complianceDetails.form6ValidityTo" control={control} render={({ field }) => (
+                                    <DatePicker label="Validity To" id="form6To" value={field.value} onChange={field.onChange} />
+                                )} />
+                                <Input label="Renewal Interval (Days)" id="form6Renewal" type="number" registration={register('complianceDetails.form6RenewalInterval')} />
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="bg-accent/5 border border-accent/20 p-4 rounded-xl">
+                        <Controller name="complianceDetails.minWageRevisionApplicable" control={control} render={({ field: { value, onChange } }) => (
+                            <Checkbox 
+                                id="minWageRevision" 
+                                label="Automatic Minimum Wage Revision Trigger" 
+                                description="Automatically trigger tasks and alerts when minimum wage revisions are due based on agreement expiry."
+                                checked={value} 
+                                onChange={onChange}
+                                labelClassName="font-bold text-primary-text"
+                            />
+                        )} />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                        <Input label="E-Shram Number" id="eShramNumber" registration={register('eShramNumber')} error={errors.eShramNumber?.message} />
+                        <Input label="Shop & Establishment Code" id="shopAndEstablishmentCode" registration={register('shopAndEstablishmentCode')} error={errors.shopAndEstablishmentCode?.message} />
+                    </div>
                 </div>
             )}
+
+            {activeTab === 'Holidays' && (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-accent/5 border border-accent/20 rounded-xl">
+                        <Select label="Total Festival Holidays" id="holidayCount" registration={register('holidayConfig.numberOfDays')}>
+                            <option value={10}>10 Days</option>
+                            <option value={12}>12 Days</option>
+                        </Select>
+                        <Input label="Logic Variation (e.g. 1+1, 1.5)" id="logicVariation" registration={register('holidayConfig.logicVariation')} placeholder="Overrides default rules" />
+                        
+                        <Select label="Salary Rule for Holiday" id="salaryRule" registration={register('holidayConfig.salaryRule')}>
+                            <option value="Full">Full Payment</option>
+                            <option value="Duty">Duty Payment</option>
+                            <option value="Nil">Nil Payment</option>
+                            <option value="Category">Category Wise</option>
+                        </Select>
+                        <Select label="Billing Rule for Holiday" id="billingRule" registration={register('holidayConfig.billingRule')}>
+                            <option value="Full">Full Payment</option>
+                            <option value="Duty">Duty Payment</option>
+                            <option value="Nil">Nil Payment</option>
+                            <option value="Category">Category Wise</option>
+                        </Select>
+                    </div>
+                    
+                    <div className="space-y-4 pt-4 border-t">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-semibold flex items-center gap-2"><Calendar className="h-4 w-4" /> National & Festival Holiday List</h4>
+                            <Button type="button" variant="secondary" size="sm" onClick={() => {
+                                const holidays = watch('holidayConfig.holidays') || [];
+                                setValue('holidayConfig.holidays', [...holidays, { date: '', description: '' }]);
+                            }}>
+                                <Plus className="h-4 w-4 mr-1" /> Add Holiday
+                            </Button>
+                        </div>
+                        
+                        {(watch('holidayConfig.holidays') || []).map((_, index) => (
+                            <div key={index} className="grid grid-cols-12 gap-3 items-end bg-accent/5 p-3 rounded-lg border border-accent/20">
+                                <div className="col-span-11 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <Controller name={`holidayConfig.holidays.${index}.date`} control={control} render={({ field }) => (
+                                        <DatePicker label="Date" id={`holidayDate-${index}`} value={field.value} onChange={field.onChange} />
+                                    )} />
+                                    <Input label="Description" id={`holidayDesc-${index}`} registration={register(`holidayConfig.holidays.${index}.description` as const)} />
+                                </div>
+                                <div className="col-span-1 flex justify-center">
+                                    <Button type="button" variant="icon" onClick={() => {
+                                        const holidays = watch('holidayConfig.holidays') || [];
+                                        setValue('holidayConfig.holidays', holidays.filter((__, i) => i !== index));
+                                    }} className="text-destructive">
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+            {activeTab === 'Assets' && (
+                <div className="space-y-6">
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b pb-2">
+                            <h4 className="text-sm font-semibold flex items-center gap-2"><Wrench className="h-4 w-4" /> Tools Tracking</h4>
+                            <Button type="button" variant="secondary" size="sm" onClick={() => {
+                                const tools = watch('assetTracking.tools') || [];
+                                setValue('assetTracking.tools', [...tools, { name: '', brand: '', size: '', quantity: 1, issueDate: '' }]);
+                            }}>
+                                <Plus className="h-4 w-4 mr-1" /> Add Tool
+                            </Button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-4 max-h-[300px] overflow-y-auto pr-2">
+                            {(watch('assetTracking.tools') || []).map((_, index) => (
+                                <div key={index} className="bg-page p-4 rounded-lg border border-border/50 relative group">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <Input label="Tool Name" id={`toolName-${index}`} registration={register(`assetTracking.tools.${index}.name` as const)} />
+                                        <Input label="Brand" id={`toolBrand-${index}`} registration={register(`assetTracking.tools.${index}.brand` as const)} />
+                                        <Input label="Size" id={`toolSize-${index}`} registration={register(`assetTracking.tools.${index}.size` as const)} />
+                                        <Input label="Quantity" id={`toolQty-${index}`} type="number" registration={register(`assetTracking.tools.${index}.quantity` as const)} />
+                                        <Controller name={`assetTracking.tools.${index}.issueDate`} control={control} render={({ field }) => (
+                                            <DatePicker label="Issue Date" id={`toolDate-${index}`} value={field.value} onChange={field.onChange} />
+                                        )} />
+                                    </div>
+                                    <Button type="button" variant="icon" onClick={() => {
+                                        const tools = watch('assetTracking.tools') || [];
+                                        setValue('assetTracking.tools', tools.filter((__, i) => i !== index));
+                                    }} className="absolute -top-2 -right-2 bg-white dark:bg-card border shadow-sm text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-4 pt-6 border-t">
+                        <div className="flex items-center justify-between border-b pb-2">
+                            <h4 className="text-sm font-semibold flex items-center gap-2"><HardDrive className="h-4 w-4" /> Equipment Issuance</h4>
+                            <Button type="button" variant="secondary" size="sm" onClick={() => {
+                                const equipment = watch('assetTracking.equipment') || [];
+                                setValue('assetTracking.equipment', [...equipment, { name: '', brand: '', model: '', serial: '', accessories: '', condition: 'New', issueDate: '' }]);
+                            }}>
+                                <Plus className="h-4 w-4 mr-1" /> Add Equipment
+                            </Button>
+                        </div>
+                         <div className="grid grid-cols-1 gap-4 max-h-[300px] overflow-y-auto pr-2">
+                            {(watch('assetTracking.equipment') || []).map((_, index) => (
+                                <div key={index} className="bg-page p-4 rounded-lg border border-border/50 relative group">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <Input label="Equip. Name" id={`equipName-${index}`} registration={register(`assetTracking.equipment.${index}.name` as const)} />
+                                        <Input label="Brand" id={`equipBrand-${index}`} registration={register(`assetTracking.equipment.${index}.brand` as const)} />
+                                        <Input label="Serial #" id={`equipSerial-${index}`} registration={register(`assetTracking.equipment.${index}.serial` as const)} />
+                                        <Select label="Condition" id={`equipCond-${index}`} registration={register(`assetTracking.equipment.${index}.condition` as const)}>
+                                            <option value="New">New</option>
+                                            <option value="Old">Old</option>
+                                        </Select>
+                                        <Controller name={`assetTracking.equipment.${index}.issueDate`} control={control} render={({ field }) => (
+                                            <DatePicker label="Issue Date" id={`equipDate-${index}`} value={field.value} onChange={field.onChange} />
+                                        )} />
+                                    </div>
+                                    <Button type="button" variant="icon" onClick={() => {
+                                        const eq = watch('assetTracking.equipment') || [];
+                                        setValue('assetTracking.equipment', eq.filter((__, i) => i !== index));
+                                    }} className="absolute -top-2 -right-2 bg-white dark:bg-card border shadow-sm text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'Billing' && (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-accent/5 border border-accent/20 rounded-xl">
+                        <Controller name="billingControls.billingCycleStart" control={control} render={({ field }) => (
+                            <DatePicker label="Billing Cycle Start Date" id="billingCycle" value={field.value} onChange={field.onChange} />
+                        )} />
+                        <Controller name="billingControls.salaryDate" control={control} render={({ field }) => (
+                            <DatePicker label="Salary Date" id="salaryDate" value={field.value} onChange={field.onChange} />
+                        )} />
+                    </div>
+                    
+                    <div className="bg-accent/5 border border-accent/20 p-4 rounded-xl space-y-4">
+                        <Controller name="billingControls.uniformDeductions" control={control} render={({ field: { value, onChange } }) => (
+                            <Checkbox 
+                                id="uniformDeductions" 
+                                label="Enable Uniform Deductions" 
+                                checked={value} 
+                                onChange={onChange}
+                                labelClassName="font-bold text-primary-text"
+                            />
+                        )} />
+                        
+                        {watch('billingControls.uniformDeductions') && (
+                            <div className="animate-fade-in pl-7 border-l-2 border-accent/20 ml-2">
+                                <Input label="Deduction Category/Logic" id="deductionCat" registration={register('billingControls.deductionCategory')} placeholder="e.g. Fixed 500, % of Basic" />
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="bg-accent/5 border border-accent/20 p-4 rounded-xl flex gap-3">
+                        <CheckCircle className="h-5 w-5 text-accent mt-0.5" />
+                        <div>
+                            <h4 className="text-sm font-bold text-primary-text">Financial Linkage</h4>
+                            <p className="text-xs text-muted mt-1 font-medium">
+                                Costing sheet versioning and mapping is handled via Finance module linkage.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'Verification' && (
+                <div className="space-y-8 animate-fade-in max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="bg-accent/5 border border-accent/20 p-4 rounded-xl flex gap-3 mb-6">
+                        <Info className="h-5 w-5 text-accent mt-0.5" />
+                        <div>
+                            <h4 className="text-sm font-bold text-primary-text">Verification Requirements</h4>
+                            <p className="text-xs text-muted mt-1 font-medium">
+                                Define which roles require specific verification types. Selected roles will be enforced during employee onboarding for this society.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-10">
+                        {VERIFICATION_CATEGORIES.map((cat, catIdx) => (
+                            <div key={cat.name} className="space-y-4">
+                                <div className="flex items-center gap-2 border-b border-border pb-2">
+                                    <div className="h-2 w-2 rounded-full bg-accent" />
+                                    <h3 className="text-sm font-bold text-primary-text uppercase tracking-wider">{cat.name}</h3>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Employment + Police */}
+                                    <div className="space-y-3">
+                                        <label className="text-xs font-bold text-accent uppercase flex items-center gap-1.5">
+                                            <Shield className="h-3.5 w-3.5" /> Employment + Police
+                                        </label>
+                                        <div className="bg-accent/5 border border-accent/10 rounded-xl p-3 min-h-[100px] flex flex-wrap gap-2 content-start">
+                                            {cat.empPlusPol.length > 0 ? cat.empPlusPol.map(role => {
+                                                const currentRoles = watch(`verificationData.categories.${catIdx}.employmentPlusPolice`) || [];
+                                                const isSelected = currentRoles.includes(role);
+                                                return (
+                                                    <button
+                                                        key={role}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newRoles = isSelected 
+                                                                ? currentRoles.filter(r => r !== role)
+                                                                : [...currentRoles, role];
+                                                            setValue(`verificationData.categories.${catIdx}.employmentPlusPolice`, newRoles);
+                                                        }}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${isSelected 
+                                                            ? 'bg-accent text-white border-accent shadow-sm scale-105' 
+                                                            : 'bg-white/50 text-muted border-border hover:border-accent/30 hover:text-primary-text'}`}
+                                                    >
+                                                        {role}
+                                                    </button>
+                                                );
+                                            }) : <p className="text-[10px] text-muted italic p-2">No roles defined for this category</p>}
+                                        </div>
+                                    </div>
+
+                                    {/* Police Only */}
+                                    <div className="space-y-3">
+                                        <label className="text-xs font-bold text-primary-text uppercase flex items-center gap-1.5">
+                                            <AlertCircle className="h-3.5 w-3.5" /> Police Verification Only
+                                        </label>
+                                        <div className="bg-card/30 border border-border rounded-xl p-3 min-h-[100px] flex flex-wrap gap-2 content-start">
+                                            {cat.polOnly.length > 0 ? cat.polOnly.map(role => {
+                                                const currentRoles = watch(`verificationData.categories.${catIdx}.policeOnly`) || [];
+                                                const isSelected = currentRoles.includes(role);
+                                                return (
+                                                    <button
+                                                        key={role}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newRoles = isSelected 
+                                                                ? currentRoles.filter(r => r !== role)
+                                                                : [...currentRoles, role];
+                                                            setValue(`verificationData.categories.${catIdx}.policeOnly`, newRoles);
+                                                        }}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${isSelected 
+                                                            ? 'bg-primary-text text-white border-primary-text shadow-sm scale-105' 
+                                                            : 'bg-white/50 text-muted border-border hover:border-primary-text/30 hover:text-primary-text'}`}
+                                                    >
+                                                        {role}
+                                                    </button>
+                                                );
+                                            }) : <p className="text-[10px] text-muted italic p-2">No roles defined for this category</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'Policies/Insurance' && (
+                isLoading ? (
+                    <div className="flex justify-center p-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <Controller
+                          name="policyIds"
+                          control={control}
+                          render={({ field }) => (
+                            <div className="bg-accent/5 p-4 border border-accent/20 rounded-xl">
+                              <h4 className="font-semibold mb-2 text-primary-text">Policies</h4>
+                              <div className="space-y-2 max-h-48 overflow-y-auto p-3 border border-accent/10 rounded-lg bg-card/50">
+                                {policies.map(policy => (
+                                  <label key={policy.id} className="flex items-center p-2 rounded-md hover:bg-accent/10 transition-colors cursor-pointer group">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 text-accent border-gray-300 rounded focus:ring-accent"
+                                      checked={field.value?.includes(policy.id)}
+                                      onChange={e => {
+                                        const newValues = e.target.checked
+                                          ? [...(field.value || []), policy.id]
+                                          : (field.value || []).filter(id => id !== policy.id);
+                                        field.onChange(newValues);
+                                      }}
+                                    />
+                                    <span className="ml-3 text-sm text-primary-text group-hover:text-accent transition-colors">{policy.name}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        />
+                         <Controller
+                          name="insuranceIds"
+                          control={control}
+                          render={({ field }) => (
+                            <div className="bg-accent/5 p-4 border border-accent/20 rounded-xl">
+                              <h4 className="font-semibold mb-2 text-primary-text">Insurance</h4>
+                               <div className="space-y-2 max-h-48 overflow-y-auto p-3 border border-accent/10 rounded-lg bg-card/50">
+                                {insurances.map(ins => (
+                                  <label key={ins.id} className="flex items-center p-2 rounded-md hover:bg-accent/10 transition-colors cursor-pointer group">
+                                    <input
+                                      type="checkbox"
+                                       className="h-4 w-4 text-accent border-gray-300 rounded focus:ring-accent"
+                                      checked={field.value?.includes(ins.id)}
+                                      onChange={e => {
+                                        const newValues = e.target.checked
+                                          ? [...(field.value || []), ins.id]
+                                          : (field.value || []).filter(id => id !== ins.id);
+                                        field.onChange(newValues);
+                                      }}
+                                    />
+                                    <span className="ml-3 text-sm text-primary-text group-hover:text-accent transition-colors">{ins.type} - {ins.provider}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        />
+                    </div>
+                )
+            )}
           </div>
-          <div className="mt-8 pt-6 border-t border-border flex justify-end space-x-3">
-            <Button type="button" onClick={onClose} variant="secondary">Cancel</Button>
-            <Button type="submit">{isEditing ? 'Save Changes' : 'Add Society'}</Button>
-          </div>
+          {/* Remove bottom buttons as they are now in the top header */}
         </form>
-      </div>
     </div>
   );
 };

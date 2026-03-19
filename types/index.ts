@@ -479,6 +479,74 @@ export interface Entity {
   insuranceIds?: string[];
   policyIds?: string[];
   companyId?: string;
+
+  // Advanced Fields (Phase 1 Redesign)
+  siteTakeoverDate?: string | null;
+  billingName?: string | null;
+  emails?: { id: string; email: string; isPrimary?: boolean; }[];
+  siteManagement?: {
+    keyAccountManager?: string;
+    kamEffectiveDate?: string;
+    siteAreaSqFt?: number;
+    projectType?: string;
+    unitCount?: number;
+  };
+  agreementDetails?: {
+    fromDate?: string;
+    toDate?: string;
+    renewalTriggerDays?: number;
+    minWageTriggerDays?: number;
+    wordCopyUrl?: string;
+    signedCopyUrl?: string;
+    agreementDate?: string;
+    addendum1Date?: string;
+    addendum2Date?: string;
+    versionTracking?: { version: string; url: string; date: string; }[];
+  };
+  complianceDetails?: {
+    form6Applicable: boolean;
+    form6ValidityFrom?: string;
+    form6ValidityTo?: string;
+    form6RenewalInterval?: number;
+    minWageRevisionApplicable: boolean;
+  };
+  holidayConfig?: {
+    numberOfDays?: 10 | 12;
+    holidays?: { date: string; description: string; }[];
+    salaryRule?: 'Full' | 'Duty' | 'Nil' | 'Category';
+    billingRule?: 'Full' | 'Duty' | 'Nil' | 'Category';
+    logicVariation?: string; // 1+1, 1, 1.5, 0 etc.
+  };
+  financialLinkage?: {
+    costingSheetUrl?: string;
+    effectiveDate?: string;
+    version?: string;
+  };
+  assetTracking?: {
+    tools?: { name: string; brand: string; size: string; quantity: number; issueDate: string; imageUrl?: string; dcCopyRef?: string; }[];
+    sims?: { count: number; details: { number: string; phone: string; }[]; };
+    equipment?: { name: string; brand: string; model: string; serial: string; accessories: string; condition: 'New' | 'Old'; issueDate: string; }[];
+  };
+  intermittentEquipment?: {
+    name: string;
+    billingType: 'Billable' | 'Non-billable';
+    frequency: string;
+    durationDays: number;
+    nextTaskDate?: string;
+  }[];
+  billingControls?: {
+    billingCycleStart?: string;
+    salaryDate?: string;
+    uniformDeductions: boolean;
+    deductionCategory?: string;
+  };
+  verificationData?: {
+    categories: {
+      name: string;
+      employmentPlusPolice: string[];
+      policeOnly: string[];
+    }[];
+  };
 }
 
 export interface CompanyEmail {

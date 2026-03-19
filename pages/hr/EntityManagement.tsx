@@ -288,12 +288,32 @@ const EntityManagement: React.FC = () => {
     // Client/Entity handlers
     const handleAddClient = (companyName: string) => setEntityFormState({ isOpen: true, initialData: null, companyName });
     const handleEditClient = (entity: Entity, companyName: string) => setEntityFormState({ isOpen: true, initialData: entity, companyName });
-    const handleSaveClient = async (clientData: Entity) => {
+    const handleSaveClient = async (clientData: Entity, pendingFiles: Record<string, File>) => {
         try {
             const company = groups.flatMap(g => g.companies).find(c => c.name === entityFormState.companyName);
             if (!company) throw new Error("Company not found");
 
-            const savedClient = await api.saveEntity({ ...clientData, companyId: company.id });
+            // Process file uploads
+            const updatedClientData = { ...clientData };
+            const fileEntries = Object.entries(pendingFiles);
+            
+            if (fileEntries.length > 0) {
+                setToast({ message: 'Uploading documents...', type: 'info' as any });
+                for (const [path, file] of fileEntries) {
+                    const uploadResult = await api.uploadDocument(file, 'onboarding-documents', undefined, path);
+                    
+                    // Update nested path (e.g., 'agreementDetails.wordCopy')
+                    const pathParts = path.split('.');
+                    let current: any = updatedClientData;
+                    for (let i = 0; i < pathParts.length - 1; i++) {
+                        if (!current[pathParts[i]]) current[pathParts[i]] = {};
+                        current = current[pathParts[i]];
+                    }
+                    current[`${pathParts[pathParts.length - 1]}Url`] = uploadResult.url;
+                }
+            }
+
+            const savedClient = await api.saveEntity({ ...updatedClientData, companyId: company.id });
             
             setGroups(prev => prev.map(group => ({
                 ...group,
@@ -311,10 +331,11 @@ const EntityManagement: React.FC = () => {
                 })
             })));
 
-            setToast({ message: clientData.id.startsWith('new_') ? 'Society added.' : 'Society updated.', type: 'success' });
+            setToast({ message: clientData.id.startsWith('new_') ? 'Society added successfully.' : 'Society updated successfully.', type: 'success' });
             setEntityFormState({ isOpen: false, initialData: null, companyName: '' });
         } catch (error) {
-            setToast({ message: 'Failed to save client.', type: 'error' });
+            console.error('Save failed:', error);
+            setToast({ message: 'Failed to save client document or data.', type: 'error' });
         }
     };
 
@@ -829,11 +850,23 @@ const EntityManagement: React.FC = () => {
         );
     }
 
+    if (entityFormState.isOpen) {
+        return (
+            <div className="p-0">
+                {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
+                <EntityForm 
+                    {...entityFormState} 
+                    onClose={() => setEntityFormState(p => ({ ...p, isOpen: false }))} 
+                    onSave={handleSaveClient} 
+                />
+            </div>
+        );
+    }
+
     return (
         <div className="p-4 space-y-6">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
             <TemplateInstructionsModal isOpen={isInstructionsOpen} onClose={() => setIsInstructionsOpen(false)} />
-            {entityFormState.isOpen && <EntityForm {...entityFormState} onClose={() => setEntityFormState(p => ({ ...p, isOpen: false }))} onSave={handleSaveClient} />}
             <NameInputModal
                 isOpen={nameModalState.isOpen}
                 onClose={() => setNameModalState({ isOpen: false, mode: 'add', type: 'group', title: '', label: '' })}
