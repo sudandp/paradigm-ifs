@@ -49,7 +49,12 @@ const CompanyForm: React.FC<CompanyFormProps> = ({ isOpen, onClose, onSave, init
   }, [initialData, reset, isOpen]);
 
   const onSubmit: SubmitHandler<Partial<Company>> = (data) => {
-    onSave(data, logoFile?.file);
+    const finalData = { ...data };
+    if (!logoFile) {
+        // Logo was explicitly cleared
+        (finalData as any).logoUrl = null; 
+    }
+    onSave(finalData, logoFile?.file);
   };
 
   if (!isOpen) return null;
