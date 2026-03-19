@@ -3808,8 +3808,20 @@ export const api = {
     if (error) throw error;
     return (data || []).map(toCamelCase);
   },
-  createPolicy: async (data: Omit<Policy, 'id'>): Promise<Policy> => {
-    const { data: inserted, error } = await supabase.from('policies').insert(toSnakeCase(data)).select().single();
+  createPolicy: async (data: Omit<Policy, 'id'>, file?: File): Promise<Policy> => {
+    let fileUrl = data.fileUrl;
+
+    if (file) {
+      const fileExt = file.name.split('.').pop() || 'pdf';
+      const filePath = `policy-${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('policies').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('policies').getPublicUrl(filePath);
+      fileUrl = publicUrl;
+    }
+
+    const { data: inserted, error } = await supabase.from('policies').insert(toSnakeCase({ ...data, fileUrl })).select().single();
     if (error) throw error;
     return toCamelCase(inserted);
   },

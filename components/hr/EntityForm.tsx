@@ -10,7 +10,7 @@ import DatePicker from '../ui/DatePicker';
 import UploadDocument from '../UploadDocument';
 import { api } from '../../services/api';
 import Checkbox from '../ui/Checkbox';
-import { Loader2, Plus, Trash2, Calendar, FileText, Shield, Info, Clock, Wrench, Smartphone, HardDrive, Percent, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Plus, Trash2, Calendar, FileText, Shield, Info, Clock, Wrench, Smartphone, HardDrive, Percent, CheckCircle, AlertCircle, UploadCloud, ShieldCheck, ShieldAlert, FileWarning } from 'lucide-react';
 
 interface EntityFormProps {
   isOpen: boolean;
@@ -107,6 +107,20 @@ const entitySchema = yup.object({
   
   insuranceIds: yup.array().of(yup.string().required()).optional(),
   policyIds: yup.array().of(yup.string().required()).optional(),
+  insurances: yup.array().of(yup.object({
+    id: yup.string().required(),
+    provider: yup.string().required('Provider is required'),
+    type: yup.string().required('Type is required'),
+    policyNumber: yup.string().optional(),
+    validTill: yup.string().nullable().optional(),
+    documentUrl: yup.string().nullable().optional()
+  })).optional(),
+  policies: yup.array().of(yup.object({
+    id: yup.string().required(),
+    name: yup.string().required('Policy name is required'),
+    level: yup.string().oneOf(['BO', 'Site', 'Both']).required('Level is required'),
+    documentUrl: yup.string().nullable().optional()
+  })).optional(),
 }).defined();
 
 type Tab = 'General' | 'Management' | 'Agreement' | 'Compliance' | 'Holidays' | 'Assets' | 'Billing' | 'Verification' | 'Policies/Insurance';
@@ -171,8 +185,6 @@ const VERIFICATION_CATEGORIES = [
 
 const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initialData, companyName }) => {
   const [activeTab, setActiveTab] = useState<Tab>('General');
-  const [policies, setPolicies] = useState<Policy[]>([]);
-  const [insurances, setInsurances] = useState<Insurance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingFiles, setPendingFiles] = useState<Record<string, File>>({});
 
@@ -200,17 +212,24 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
     name: "emails"
   });
 
+  const { fields: insuranceFields, append: appendInsurance, remove: removeInsurance } = useFieldArray({
+    control,
+    name: "insurances"
+  });
+
+  const { fields: policyFields, append: appendPolicy, remove: removePolicy } = useFieldArray({
+    control,
+    name: "policies"
+  });
+
   const isEditing = !!initialData;
   const watchForm6 = watch('complianceDetails.form6Applicable');
 
   useEffect(() => {
     if (isOpen) {
         setIsLoading(true);
-        Promise.all([api.getPolicies(), api.getInsurances()]).then(([p, i]) => {
-            setPolicies(p);
-            setInsurances(i);
-            setIsLoading(false);
-        });
+        // We no longer fetch global policies/insurances here as we use site-specific ones
+        setIsLoading(false);
 
         if (initialData) {
             reset(initialData);
@@ -303,6 +322,8 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
       </div>
     );
   };
+
+
 
   const getTabErrors = (tab: Tab, currentErrors: any = errors) => {
     switch (tab) {
@@ -849,68 +870,144 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
             )}
 
             {activeTab === 'Policies/Insurance' && (
-                isLoading ? (
-                    <div className="flex justify-center p-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-accent" />
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <Controller
-                          name="policyIds"
-                          control={control}
-                          render={({ field }) => (
-                            <div className="bg-accent/5 p-4 border border-accent/20 rounded-xl">
-                              <h4 className="font-semibold mb-2 text-primary-text">Policies</h4>
-                              <div className="space-y-2 max-h-48 overflow-y-auto p-3 border border-accent/10 rounded-lg bg-card/50">
-                                {policies.map(policy => (
-                                  <label key={policy.id} className="flex items-center p-2 rounded-md hover:bg-accent/10 transition-colors cursor-pointer group">
-                                    <input
-                                      type="checkbox"
-                                      className="h-4 w-4 text-accent border-gray-300 rounded focus:ring-accent"
-                                      checked={field.value?.includes(policy.id)}
-                                      onChange={e => {
-                                        const newValues = e.target.checked
-                                          ? [...(field.value || []), policy.id]
-                                          : (field.value || []).filter(id => id !== policy.id);
-                                        field.onChange(newValues);
-                                      }}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-slide-up">
+                    {/* Insurances Section */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between px-1">
+                            <h4 className="text-lg font-bold text-primary-text flex items-center gap-2">
+                                <ShieldCheck className="h-5 w-5 text-accent" />
+                                Insurances
+                            </h4>
+                            <Button 
+                                type="button" 
+                                size="sm" 
+                                onClick={() => appendInsurance({ id: `ins_${Date.now()}`, provider: '', type: 'GMC', policyNumber: '', validTill: null, documentUrl: null })} 
+                                className="!rounded-full text-xs font-bold shadow-sm"
+                                variant="secondary"
+                            >
+                                <Plus className="h-4 w-4 mr-1" /> New Entry
+                            </Button>
+                        </div>
+                        
+                        <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar p-1">
+                            {insuranceFields.map((field, index) => (
+                                <div key={field.id} className="p-5 rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-all relative group">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => removeInsurance(index)} 
+                                        className="absolute top-4 right-4 p-2 text-muted hover:text-red-500 hover:bg-red-50 rounded-full dark:hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                    
+                                    <div className="grid grid-cols-2 gap-4 mb-5">
+                                        <div className="col-span-2 sm:col-span-1">
+                                            <Input label="Insurance Provider" id={`ins_provider_${field.id}`} registration={register(`insurances.${index}.provider`)} error={errors.insurances?.[index]?.provider?.message} placeholder="e.g. Star Health" />
+                                        </div>
+                                        <div className="col-span-2 sm:col-span-1">
+                                            <Select label="Insurance Type" id={`ins_type_${field.id}`} registration={register(`insurances.${index}.type`)} error={errors.insurances?.[index]?.type?.message}>
+                                                <option value="GMC">GMC (Group Medical)</option>
+                                                <option value="GPA">GPA (Personal Accident)</option>
+                                                <option value="WC">WC (Workmen Comp)</option>
+                                                <option value="Other">Other</option>
+                                            </Select>
+                                        </div>
+                                        <div className="col-span-2 sm:col-span-1">
+                                            <Input label="Policy Number" id={`ins_no_${field.id}`} registration={register(`insurances.${index}.policyNumber`)} placeholder="POL-123456" />
+                                        </div>
+                                        <div className="col-span-2 sm:col-span-1">
+                                            <Controller
+                                                name={`insurances.${index}.validTill`}
+                                                control={control}
+                                                render={({ field: dateField }) => (
+                                                    <DatePicker label="Valid Till" id={`ins_valid_${field.id}`} value={dateField.value} onChange={dateField.onChange} />
+                                                )}
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    <UploadDocument
+                                        label="Insurance Policy Document"
+                                        file={watch(`insurances.${index}.documentUrl`) ? { name: 'Current Policy Document', preview: watch(`insurances.${index}.documentUrl`) as string, type: 'application/pdf', size: 0 } : null}
+                                        onFileChange={(f) => f && handleFileUpload(`insurances.${index}.document`, f.file!)}
                                     />
-                                    <span className="ml-3 text-sm text-primary-text group-hover:text-accent transition-colors">{policy.name}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        />
-                         <Controller
-                          name="insuranceIds"
-                          control={control}
-                          render={({ field }) => (
-                            <div className="bg-accent/5 p-4 border border-accent/20 rounded-xl">
-                              <h4 className="font-semibold mb-2 text-primary-text">Insurance</h4>
-                               <div className="space-y-2 max-h-48 overflow-y-auto p-3 border border-accent/10 rounded-lg bg-card/50">
-                                {insurances.map(ins => (
-                                  <label key={ins.id} className="flex items-center p-2 rounded-md hover:bg-accent/10 transition-colors cursor-pointer group">
-                                    <input
-                                      type="checkbox"
-                                       className="h-4 w-4 text-accent border-gray-300 rounded focus:ring-accent"
-                                      checked={field.value?.includes(ins.id)}
-                                      onChange={e => {
-                                        const newValues = e.target.checked
-                                          ? [...(field.value || []), ins.id]
-                                          : (field.value || []).filter(id => id !== ins.id);
-                                        field.onChange(newValues);
-                                      }}
-                                    />
-                                    <span className="ml-3 text-sm text-primary-text group-hover:text-accent transition-colors">{ins.type} - {ins.provider}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        />
+                                </div>
+                            ))}
+                            
+                            {insuranceFields.length === 0 && (
+                                <div className="p-16 text-center border-2 border-dashed border-border/40 rounded-3xl bg-page/30 flex flex-col items-center justify-center">
+                                    <div className="p-4 bg-muted/5 rounded-full mb-4">
+                                        <ShieldAlert className="h-12 w-12 text-muted/30" />
+                                    </div>
+                                    <p className="text-sm font-medium text-muted mb-1 uppercase tracking-wider">No insurance records</p>
+                                    <p className="text-xs text-muted/60 italic">Add a new record for this site to get started.</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                )
+
+                    {/* Internal Policies Section */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between px-1">
+                            <h4 className="text-lg font-bold text-primary-text flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-accent" />
+                                Internal Policies
+                            </h4>
+                            <Button 
+                                type="button" 
+                                size="sm" 
+                                onClick={() => appendPolicy({ id: `pol_${Date.now()}`, name: '', level: 'Site', documentUrl: null })} 
+                                className="!rounded-full text-xs font-bold shadow-sm"
+                                variant="secondary"
+                            >
+                                <Plus className="h-4 w-4 mr-1" /> New Entry
+                            </Button>
+                        </div>
+
+                        <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar p-1">
+                            {policyFields.map((field, index) => (
+                                <div key={field.id} className="p-5 rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-all relative group">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => removePolicy(index)} 
+                                        className="absolute top-4 right-4 p-2 text-muted hover:text-red-500 hover:bg-red-50 rounded-full dark:hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                    
+                                    <div className="grid grid-cols-2 gap-4 mb-5">
+                                        <div className="col-span-2 sm:col-span-1">
+                                            <Input label="Policy Name" id={`pol_name_${field.id}`} registration={register(`policies.${index}.name`)} error={errors.policies?.[index]?.name?.message} placeholder="e.g. Leave Policy" />
+                                        </div>
+                                        <div className="col-span-2 sm:col-span-1">
+                                            <Select label="Deployment Level" id={`pol_level_${field.id}`} registration={register(`policies.${index}.level`)} error={errors.policies?.[index]?.level?.message}>
+                                                <option value="BO">Back Office Only</option>
+                                                <option value="Site">Site Only</option>
+                                                <option value="Both">Both Back Office & Site</option>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    
+                                    <UploadDocument
+                                        label="Policy Document"
+                                        file={watch(`policies.${index}.documentUrl`) ? { name: 'Current Policy Document', preview: watch(`policies.${index}.documentUrl`) as string, type: 'application/pdf', size: 0 } : null}
+                                        onFileChange={(f) => f && handleFileUpload(`policies.${index}.document`, f.file!)}
+                                    />
+                                </div>
+                            ))}
+                            
+                            {policyFields.length === 0 && (
+                                <div className="p-16 text-center border-2 border-dashed border-border/40 rounded-3xl bg-page/30 flex flex-col items-center justify-center">
+                                    <div className="p-4 bg-muted/5 rounded-full mb-4">
+                                        <FileWarning className="h-12 w-12 text-muted/30" />
+                                    </div>
+                                    <p className="text-sm font-medium text-muted mb-1 uppercase tracking-wider">No internal policies</p>
+                                    <p className="text-xs text-muted/60 italic">Upload organizational policies for this site.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
           </div>
           {/* Remove bottom buttons as they are now in the top header */}

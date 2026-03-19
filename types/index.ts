@@ -478,6 +478,8 @@ export interface Entity {
   psaraValidTill?: string | null;
   insuranceIds?: string[];
   policyIds?: string[];
+  insurances?: SiteInsurance[];
+  policies?: SitePolicy[];
   companyId?: string;
 
   // Advanced Fields (Phase 1 Redesign)
@@ -583,11 +585,28 @@ export interface CompanyInsurance {
   documentUrl?: string | null;
 }
 
+export interface SiteInsurance {
+  id: string;
+  provider: string;
+  type: string;
+  policyNumber?: string;
+  validTill?: string | null;
+  documentUrl?: string | null;
+}
+
+export interface SitePolicy {
+  id: string;
+  name: string;
+  level: 'BO' | 'Site' | 'Both';
+  documentUrl?: string | null;
+}
+
 export interface CompanyPolicy {
   id: string;
   name: string;
   documentUrl?: string | null;
   level: 'BO' | 'Site' | 'Both';
+  description?: string;
 }
 
 export interface Company {
@@ -625,6 +644,7 @@ export interface Policy {
   id: string;
   name: string;
   description?: string;
+  fileUrl?: string;
 }
 
 export type InsuranceType = 'GMC' | 'GPA' | 'WCA' | 'Other';
