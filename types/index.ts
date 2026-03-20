@@ -2109,3 +2109,88 @@ export interface EmployeeScore {
   calculatedAt: string; // ISO timestamp
   createdAt: string;
 }
+
+// =============================================
+// Costing & Resource Configuration Types
+// =============================================
+
+export type CostingStatus = 'Draft' | 'Approved';
+export type BillingCycle = 'Monthly' | 'Weekly';
+export type BillingModel = 'Per Month' | 'Per Day' | 'Per Hour' | 'Lumpsum';
+export type UnitType = 'Manpower' | 'Duty' | 'Visit' | 'Days' | 'Actuals' | 'Lumpsum';
+export type ShiftType = 'General' | '1st Shift' | '2nd Shift' | '3rd Shift' | '4th Shift';
+
+export interface ResourceShift {
+  name: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface CostingResource {
+  id: string;
+  department: string;
+  designation: string;
+  costCentre: string;
+  unitType: UnitType;
+  quantity: number | null;
+  billingRate: number | null;
+  billingModel: BillingModel;
+  total: number;
+
+  // Working Hours & Shifts
+  workingHoursStart: string;
+  workingHoursEnd: string;
+  shiftType: ShiftType;
+  shifts: ResourceShift[];
+  openShiftAllowed: boolean;
+
+  // Weekly Off
+  weeklyOffApplicable: boolean;
+  weeklyOffType: string;
+
+  // Leave
+  leaveApplicable: boolean;
+  earnedLeaveCount: number | null;
+  sickLeaveCount: number | null;
+
+  // Holiday
+  holidayBillingRule: string;
+  holidayPaymentRule: string;
+
+  // Duty Rules
+  dutyRule: string;
+
+  // Uniform Deduction
+  uniformDeduction: boolean;
+  uniformDeductionNote: string;
+
+  // Verifications
+  employmentVerification: boolean;
+  backgroundVerification: boolean;
+  policeVerification: boolean;
+}
+
+export interface AdditionalCharge {
+  id: string;
+  chargeName: string;
+  chargeType: string;
+  amount: number;
+  frequency: string;
+}
+
+export interface SiteCostingMaster {
+  id: string;
+  siteId: string;
+  siteName?: string;
+  clientName?: string;
+  effectiveFrom: string;
+  effectiveTo: string;
+  billingCycle: BillingCycle;
+  adminChargePercent: number;
+  status: CostingStatus;
+  versionNo: number;
+  resources: CostingResource[];
+  additionalCharges: AdditionalCharge[];
+  createdAt?: string;
+  updatedAt?: string;
+}

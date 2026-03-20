@@ -6074,5 +6074,96 @@ export const api = {
     }).eq('id', childId).select().single();
     if (error) throw error;
     return toCamelCase(data) as UserChild;
+  },
+
+  // =============================================
+  // Costing & Resource Configuration
+  // =============================================
+
+  getSiteCostingConfigs: async (): Promise<any[]> => {
+    const { data, error } = await supabase
+      .from('site_costing_master')
+      .select('*, organization:site_id(short_name)')
+      .order('updated_at', { ascending: false });
+    if (error && error.code !== '42P01') throw error;
+    return (data || []).map((item: any) => {
+      const camel = toCamelCase(item);
+      return {
+        ...camel.configData,
+        id: camel.id,
+        siteId: camel.siteId,
+        siteName: item.organization?.short_name || '',
+        status: camel.status,
+        versionNo: camel.versionNo,
+        createdAt: camel.createdAt,
+        updatedAt: camel.updatedAt,
+      };
+    });
+  },
+
+  getSiteCostingConfig: async (id: string): Promise<any> => {
+    const { data, error } = await supabase
+      .from('site_costing_master')
+      .select('*, organization:site_id(short_name)')
+      .eq('id', id)
+      .single();
+    if (error) throw error;
+    const camel = toCamelCase(data);
+    return {
+      ...camel.configData,
+      id: camel.id,
+      siteId: camel.siteId,
+      siteName: data.organization?.short_name || '',
+      status: camel.status,
+      versionNo: camel.versionNo,
+      createdAt: camel.createdAt,
+      updatedAt: camel.updatedAt,
+    };
+  },
+
+  saveSiteCostingConfig: async (config: any): Promise<any> => {
+    const { id, siteId, status, versionNo, createdAt, updatedAt, siteName, ...configData } = config;
+    const record = {
+      site_id: siteId,
+      status: status || 'Draft',
+      version_no: versionNo || 1,
+      config_data: toSnakeCase(configData),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (id && !id.startsWith('new_')) {
+      const { data, error } = await supabase
+        .from('site_costing_master')
+        .update(record)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return toCamelCase(data);
+    } else {
+      const { data, error } = await supabase
+        .from('site_costing_master')
+        .insert(record)
+        .select()
+        .single();
+      if (error) throw error;
+      return toCamelCase(data);
+    }
+  },
+
+  deleteSiteCostingConfig: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('site_costing_master').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  cloneSiteCostingConfig: async (id: string): Promise<any> => {
+    const existing = await api.getSiteCostingConfig(id);
+    const { id: _id, createdAt: _ca, updatedAt: _ua, ...rest } = existing;
+    return api.saveSiteCostingConfig({
+      ...rest,
+      id: `new_${Date.now()}`,
+      versionNo: (existing.versionNo || 1) + 1,
+      status: 'Draft',
+    });
   }
 };
