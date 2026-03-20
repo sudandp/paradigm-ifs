@@ -364,8 +364,24 @@ const EntityManagement: React.FC = () => {
                     }))
                 })));
             } else if (type === 'site') {
-                await api.deleteOrganization(id);
-                setOrganizations(prev => prev.filter(o => o.id !== id));
+                const entityToDelete = allClients.find(e => e.id === id);
+                const orgId = entityToDelete?.organizationId || id;
+                
+                await Promise.all([
+                    api.deleteEntity(id),
+                    api.deleteOrganization(orgId)
+                ]);
+
+                // Update groups state to remove the entity (this updates the UI list)
+                setGroups(prev => prev.map(group => ({
+                    ...group,
+                    companies: group.companies.map(company => ({
+                        ...company,
+                        entities: company.entities.filter(e => e.id !== id)
+                    }))
+                })));
+                
+                setOrganizations(prev => prev.filter(o => o.id !== orgId));
             }
             const typeLabel = type === 'site' ? 'Site' : type === 'client' ? 'Society' : type === 'company' ? 'Company / LLP / Partnership / Society' : 'Group';
             setToast({ message: `${typeLabel} '${name}' deleted.`, type: 'success' });
