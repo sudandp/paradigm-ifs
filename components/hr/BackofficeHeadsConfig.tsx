@@ -1,71 +1,17 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { api } from '../../services/api';
 import type { BackOfficeIdSeries } from '../../types';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Toast from '../ui/Toast';
-import { Loader2, Plus, Trash2, Save, Upload, Download, FileText } from 'lucide-react';
-
-const CSV_HEADERS = ['Department', 'Designation', 'Permanent ID', 'Temporary ID'];
-
-const toCSV = (data: BackOfficeIdSeries[]): string => {
-    const header = CSV_HEADERS.join(',');
-    const rows = data.map(row => 
-        [row.department, row.designation, row.permanentId, row.temporaryId]
-        .map(val => {
-            const strVal = String(val ?? '');
-            if (strVal.includes(',')) return `"${strVal}"`;
-            return strVal;
-        }).join(',')
-    );
-    return [header, ...rows].join('\n');
-};
-
-const fromCSV = (csvText: string): Partial<BackOfficeIdSeries>[] => {
-    const lines = csvText.trim().replace(/\r/g, '').split('\n');
-    if (lines.length < 2) return [];
-    
-    const rawHeaders = lines[0].split(',').map(h => h.trim());
-    
-    // Normalize headers for flexible mapping
-    const headerMap: Record<string, number> = {};
-    rawHeaders.forEach((h, i) => {
-        const normalized = h.toLowerCase().replace(/\s/g, '');
-        headerMap[normalized] = i;
-    });
-
-    return lines.slice(1).map(line => {
-        const values = line.split(',');
-        
-        const getVal = (keys: string[]) => {
-            for (const key of keys) {
-                const index = headerMap[key.toLowerCase().replace(/\s/g, '')];
-                if (index !== undefined) {
-                    let val = (values[index] || '').trim();
-                    if (val.startsWith('"') && val.endsWith('"')) {
-                        val = val.substring(1, val.length - 1).replace(/""/g, '"');
-                    }
-                    return val;
-                }
-            }
-            return '';
-        };
-
-        return {
-            department: getVal(['Department']),
-            designation: getVal(['Designation']),
-            permanentId: getVal(['Permanent ID', 'PermanentId']),
-            temporaryId: getVal(['Temporary ID', 'TemporaryId']),
-        };
-    });
-};
+import { Plus, Trash2, Save, Loader2, ChevronDown } from 'lucide-react';
 
 
 const BackofficeHeadsConfig: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-    const importRef = useRef<HTMLInputElement>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     const { register, control, handleSubmit, reset, watch } = useForm<{ series: BackOfficeIdSeries[] }>({
         defaultValues: { series: [] }
@@ -101,79 +47,26 @@ const BackofficeHeadsConfig: React.FC = () => {
     };
 
     const handleSave = async (data: { series: BackOfficeIdSeries[] }) => {
+        setIsSaving(true);
         try {
             await api.updateBackOfficeIdSeries(data.series);
             setToast({ message: 'Configuration saved successfully.', type: 'success' });
         } catch (error) {
             setToast({ message: 'Failed to save configuration.', type: 'error' });
+        } finally {
+            setIsSaving(false);
         }
     };
     
-    const handleExport = () => {
-        if (!Array.isArray(watchedFields) || watchedFields.length === 0) {
-            setToast({ message: 'No data to export.', type: 'error' });
-            return;
-        }
-        const csvData = toCSV(watchedFields);
-        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute('download', 'back_office_id_series.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    const handleDownloadTemplate = () => {
-        const csvString = CSV_HEADERS.join(',');
-        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute('download', 'id_series_template.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const text = e.target?.result as string;
-                const parsedData = fromCSV(text);
-                const newSeries = parsedData.map(d => ({
-                    id: `imported_${Date.now()}_${Math.random()}`,
-                    department: d.department || '',
-                    designation: d.designation || '',
-                    permanentId: d.permanentId || '',
-                    temporaryId: d.temporaryId || '',
-                }));
-                replace(newSeries);
-                setToast({ message: `Imported ${newSeries.length} records.`, type: 'success' });
-            } catch (error: any) {
-                setToast({ message: error.message || 'Failed to import CSV.', type: 'error' });
-            } finally {
-                if (event.target) event.target.value = '';
-            }
-        };
-        reader.readAsText(file);
-    };
 
     return (
         <form onSubmit={handleSubmit(handleSave)} className="bg-card p-6 rounded-xl shadow-card">
             {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
-            <input type="file" ref={importRef} className="hidden" accept=".csv" onChange={handleFileImport} />
 
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
                 <h3 className="text-xl font-semibold text-primary-text">Back Office Department & Emp ID Series</h3>
-                <div className="flex items-center gap-2 flex-wrap">
-                    <Button type="button" variant="outline" onClick={handleDownloadTemplate}><FileText className="mr-2 h-4 w-4" /> Template</Button>
-                    <Button type="button" variant="outline" onClick={() => importRef.current?.click()}><Upload className="mr-2 h-4 w-4" /> Import</Button>
-                    <Button type="button" variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" /> Export</Button>
-                    <Button type="submit"><Save className="mr-2 h-4 w-4" /> Save</Button>
+                <div className="flex items-center gap-2">
+                    <Button type="submit" isLoading={isSaving}><Save className="mr-2 h-4 w-4" /> Save Configuration</Button>
                 </div>
             </div>
 

@@ -8,8 +8,8 @@ import Toast from '../ui/Toast';
 import { api } from '../../services/api';
 import type { Organization, SiteCostingMaster, CostingResource as CostingResourceType, BillingModel, ResourceShift } from '../../types';
 import {
-  Plus, Trash2, Save, Loader2, Download, Upload, ArrowLeft, Copy, Edit,
-  ChevronDown, ChevronUp, CheckCircle, AlertCircle, LayoutGrid, Lock, Unlock, Settings
+  Plus, Trash2, Save, Loader2, ArrowLeft, Copy, Edit,
+  CheckCircle, AlertCircle, LayoutGrid, Lock, Unlock, Settings
 } from 'lucide-react';
 
 // ============ DEFAULTS ============
@@ -73,17 +73,6 @@ const calcResourceTotal = (r: CostingResourceType): number => {
 
 const fmt = (val: number) =>
   val.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
-
-// CSV helpers
-const CSV_HEADERS = ['Department', 'Designation', 'Cost Centre', 'Unit Type', 'Quantity', 'Billing Rate', 'Billing Model'];
-const toCSV = (resources: CostingResourceType[]): string => {
-  const header = CSV_HEADERS.join(',');
-  const rows = resources.map(r =>
-    [r.department, r.designation, r.costCentre, r.unitType, r.quantity, r.billingRate, r.billingModel]
-      .map(v => { const s = String(v ?? ''); return s.includes(',') ? `"${s}"` : s; }).join(',')
-  );
-  return [header, ...rows].join('\n');
-};
 
 // ============ EXPANDABLE ROW COMPONENT ============
 interface ResourceRowProps {
@@ -273,14 +262,13 @@ const ResourceRow: React.FC<ResourceRowProps> = ({ index, register, control, wat
 };
 
 // ============ MAIN COMPONENT ============
-const CostingResourceConfig: React.FC = () => {
+const CostingResourceConfig: React.FC<{ sites?: any[] }> = ({ sites: externalSites }) => {
   const [view, setView] = useState<'dashboard' | 'editor'>('dashboard');
-  const [sites, setSites] = useState<Organization[]>([]);
+  const [sites, setSites] = useState<any[]>(externalSites || []);
   const [configs, setConfigs] = useState<SiteCostingMaster[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const importRef = useRef<HTMLInputElement>(null);
 
   const { register, control, handleSubmit, watch, setValue, reset, getValues } = useForm<SiteCostingMaster>({ defaultValues: EMPTY_CONFIG });
   const { fields, append, remove, replace } = useFieldArray({ control, name: 'resources' });
@@ -297,17 +285,21 @@ const CostingResourceConfig: React.FC = () => {
     (async () => {
       setIsLoading(true);
       try {
-        const [sitesData, configsData] = await Promise.all([
-          api.getOrganizations(),
+        const [configsData] = await Promise.all([
           api.getSiteCostingConfigs().catch(() => []),
         ]);
-        setSites(sitesData);
+        if (externalSites) setSites(externalSites);
+        else {
+           // Fallback only if no prop
+           const sitesData = await api.getOrganizations();
+           setSites(sitesData);
+        }
         setConfigs(configsData);
       } catch {
-        try { setSites(await api.getOrganizations()); } catch { setToast({ message: 'Failed to load data.', type: 'error' }); }
+        setToast({ message: 'Failed to load configurations.', type: 'error' });
       } finally { setIsLoading(false); }
     })();
-  }, []);
+  }, [externalSites]);
 
   // ---- Calculations ----
   const { resourceSubtotal, chargesTotal, adminAmount, grandTotal } = useMemo(() => {
@@ -357,49 +349,6 @@ const CostingResourceConfig: React.FC = () => {
     setValue('additionalCharges', cur.filter((_, idx) => idx !== i));
   };
 
-  const handleDownloadTemplate = () => {
-    const blob = new Blob([CSV_HEADERS.join(',')], { type: 'text/csv' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'costing_template.csv'; a.click();
-  };
-
-  const handleExportCSV = () => {
-    const blob = new Blob([toCSV(getValues('resources'))], { type: 'text/csv' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'costing_export.csv'; a.click();
-    setToast({ message: 'Exported.', type: 'success' });
-  };
-
-  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const lines = (ev.target?.result as string).trim().replace(/\r/g, '').split('\n');
-        if (lines.length < 2) throw new Error('No data rows.');
-        const hdrs = lines[0].split(',').map(h => h.trim());
-        const resources: CostingResourceType[] = [];
-        for (let i = 1; i < lines.length; i++) {
-          const vals = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-          const row: any = {}; hdrs.forEach((h, j) => { row[h] = vals[j] || ''; });
-          resources.push({
-            ...makeDefaultResource(),
-            id: `res_imp_${Date.now()}_${i}`,
-            department: row['Department'] || '',
-            designation: row['Designation'] || '',
-            costCentre: row['Cost Centre'] || '',
-            unitType: row['Unit Type'] || 'Manpower',
-            quantity: parseFloat(row['Quantity']) || 1,
-            billingRate: parseFloat(row['Billing Rate']) || 0,
-            billingModel: (row['Billing Model'] || 'Per Month') as BillingModel,
-          });
-        }
-        replace(resources);
-        setToast({ message: `Imported ${resources.length} resources.`, type: 'success' });
-      } catch (err: any) { setToast({ message: err.message || 'Import failed.', type: 'error' }); }
-      finally { if (e.target) e.target.value = ''; }
-    };
-    reader.readAsText(file);
-  };
-
   const handleLoadManpower = async () => {
     if (!watchedSiteId) return;
     try {
@@ -422,7 +371,7 @@ const CostingResourceConfig: React.FC = () => {
     setIsSaving(true);
     try {
       const site = sites.find(s => s.id === data.siteId);
-      await api.saveSiteCostingConfig({ ...data, siteName: site?.shortName || '' });
+      await api.saveSiteCostingConfig({ ...data, siteName: site?.name || site?.shortName || '' });
       setConfigs(await api.getSiteCostingConfigs().catch(() => []));
       setToast({ message: 'Configuration saved!', type: 'success' });
       setView('dashboard');
@@ -512,7 +461,7 @@ const CostingResourceConfig: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Select label="Site *" id="costing-site" {...register('siteId', { required: true })} disabled={isLocked}>
             <option value="">Select a Site</option>
-            {sites.map(s => <option key={s.id} value={s.id}>{s.shortName}</option>)}
+            {sites.map(s => <option key={s.id} value={s.id}>{s.name || s.shortName}</option>)}
           </Select>
           <Input label="Effective From" id="eff-from" type="date" {...register('effectiveFrom')} disabled={isLocked} />
           <Input label="Effective To" id="eff-to" type="date" {...register('effectiveTo')} disabled={isLocked} />
@@ -530,11 +479,8 @@ const CostingResourceConfig: React.FC = () => {
             <h4 className="text-lg font-semibold text-primary-text">Resources</h4>
             <div className="flex items-center gap-2 flex-wrap">
               {watchedSiteId && !isLocked && (
-                <Button type="button" variant="outline" size="sm" onClick={handleLoadManpower}><Download className="h-4 w-4 mr-1" /> Load Manpower</Button>
+                <Button type="button" variant="outline" size="sm" onClick={handleLoadManpower}> Load Manpower</Button>
               )}
-              <Button type="button" variant="outline" size="sm" onClick={handleDownloadTemplate}><Download className="h-4 w-4 mr-1" /> Template</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => importRef.current?.click()} disabled={isLocked}><Upload className="h-4 w-4 mr-1" /> Import</Button>
-              <Button type="button" variant="outline" size="sm" onClick={handleExportCSV}><Download className="h-4 w-4 mr-1" /> Export</Button>
             </div>
           </div>
 
@@ -639,7 +585,6 @@ const CostingResourceConfig: React.FC = () => {
   return (
     <div className="space-y-4">
       {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
-      <input type="file" ref={importRef} className="hidden" accept=".csv" onChange={handleImportCSV} />
       {isLoading && view === 'dashboard' ? (
         <div className="flex items-center justify-center p-16"><Loader2 className="h-8 w-8 animate-spin text-accent" /></div>
       ) : view === 'dashboard' ? renderDashboard() : renderEditor()}

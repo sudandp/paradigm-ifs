@@ -5,7 +5,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { api } from '../../services/api';
 import type { OrganizationGroup, Entity, Company, RegistrationType, Organization, SiteConfiguration, UploadedFile } from '../../types';
-import { Plus, Save, Edit, Trash2, Building, ChevronRight, Upload, Download, Eye, CheckCircle, AlertCircle, Search, ClipboardList, Settings, Calculator, Users, Badge, HeartPulse, Archive, Wrench, Shirt, FileText, CalendarDays, BarChart, Mail, Sun, UserX, IndianRupee, ChevronLeft, HelpCircle, Loader2 } from 'lucide-react';
+import { Plus, Save, Edit, Trash2, Building, ChevronRight, Eye, CheckCircle, AlertCircle, Search, ClipboardList, Settings, Calculator, Users, Badge, HeartPulse, Archive, Wrench, Shirt, FileText, CalendarDays, BarChart, Mail, Sun, UserX, IndianRupee, ChevronLeft, HelpCircle, Loader2 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import EntityForm from '../../components/hr/EntityForm';
@@ -36,68 +36,7 @@ import SalaryLineItemConfig from '../../components/hr/SalaryLineItemConfig';
 
 
 
-// Helper to convert array of objects to CSV string
-const toCSV = (data: Record<string, any>[], columns: string[]): string => {
-    const header = columns.join(',');
-    const rows = data.map(row =>
-        columns.map(col => {
-            const val = row[col] === null || row[col] === undefined ? '' : String(row[col]);
-            if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-                return `"${val.replace(/"/g, '""')}"`;
-            }
-            return val;
-        }).join(',')
-    );
-    return [header, ...rows].join('\n');
-};
 
-// Helper to parse CSV string into array of objects
-const fromCSV = (csvText: string): Record<string, string>[] => {
-    const lines = csvText.trim().replace(/\r/g, '').split('\n');
-    if (lines.length < 2) return [];
-
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-    const rows: Record<string, string>[] = [];
-
-    for (let i = 1; i < lines.length; i++) {
-        const row: Record<string, string> = {};
-        // Regex for CSV parsing, handles quoted fields containing commas.
-        const values = lines[i].match(/(?<=,|^)(?:"(?:[^"]|"")*"|[^,]*)/g) || [];
-
-        headers.forEach((header, index) => {
-            let value = (values[index] || '').trim();
-            if (value.startsWith('"') && value.endsWith('"')) {
-                value = value.substring(1, value.length - 1).replace(/""/g, '"');
-            }
-            row[header] = value;
-        });
-        rows.push(row);
-    }
-    return rows;
-};
-
-
-const entityCsvColumns = [
-    'Group Id', 'Group Name', 'Company Id', 'Company Name', 'Entity Id', 'Entity Name', 'Organization Id', 'Location', 'Registered Address',
-    'Registration Type', 'Registration Number', 'GST Number', 'PAN Number', 'Email', 'E Shram Number',
-    'Shop and Establishment Code', 'EPFO Code', 'ESIC Code', 'PSARA License Number', 'PSARA Valid Till'
-];
-
-const siteConfigCsvColumns = [
-    'Organization Id', 'Organization Name', 'Location', 'Entity Id', 'Billing Name', 'Registered Address',
-    'GST Number', 'PAN Number', 'Email 1', 'Email 2', 'Email 3', 'E Shram Number', 'Shop and Establishment Code',
-    'Key Account Manager', 'Site Area (Sq Ft)', 'Project Type', 'Apartment Count', 'Agreement Details', 'Site Operations'
-];
-
-const triggerDownload = (data: BlobPart, fileName: string) => {
-    const blob = new Blob([data], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-};
 
 const NameInputModal: React.FC<{
     isOpen: boolean;
@@ -166,7 +105,6 @@ const EntityManagement: React.FC = () => {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [expanded, setExpanded] = useState<Record<string, boolean>>({});
     const [activeSubcategory, setActiveSubcategory] = useState<string>('client_structure');
-    const importRef = useRef<HTMLInputElement>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [viewingClients, setViewingClients] = useState<{ companyName: string; clients: Entity[] } | null>(null);
     const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
@@ -499,231 +437,7 @@ const EntityManagement: React.FC = () => {
     };
 
 
-    const handleExport = () => {
-        let csvData: string;
-        let fileName: string;
-        let columns: string[];
 
-        if (activeSubcategory === 'client_structure') {
-            columns = entityCsvColumns;
-            const flatData = groups.flatMap(group =>
-                group.companies.flatMap(company =>
-                    company.entities.map(entity => ({
-                        'Group Id': group.id,
-                        'Group Name': group.name,
-                        'Company Id': company.id,
-                        'Company Name': company.name,
-                        'Entity Id': entity.id,
-                        'Entity Name': entity.name,
-                        'Organization Id': entity.organizationId || '',
-                        'Location': entity.location || '',
-                        'Registered Address': entity.registeredAddress || '',
-                        'Registration Type': entity.registrationType || '',
-                        'Registration Number': entity.registrationNumber || '',
-                        'GST Number': entity.gstNumber || '',
-                        'PAN Number': entity.panNumber || '',
-                        'Email': entity.email || '',
-                        'E Shram Number': entity.eShramNumber || '',
-                        'Shop and Establishment Code': entity.shopAndEstablishmentCode || '',
-                        'EPFO Code': entity.epfoCode || '',
-                        'ESIC Code': entity.esicCode || '',
-                        'PSARA License Number': entity.psaraLicenseNumber || '',
-                        'PSARA Valid Till': entity.psaraValidTill || '',
-                    }))
-                )
-            );
-            csvData = toCSV(flatData, columns);
-            fileName = 'client_structure_export.csv';
-        } else if (activeSubcategory === 'site_configuration') {
-            columns = siteConfigCsvColumns;
-            const dataToExport = organizations.map(org => {
-                const entity = allClients.find(e => e.organizationId === org.id);
-                return {
-                    'Organization Id': org.id,
-                    'Organization Name': org.shortName,
-                    'Location': entity?.location || '',
-                    'Entity Id': entity?.id || '',
-                    'Billing Name': entity?.billingName || '',
-                    'Registered Address': entity?.registeredAddress || '',
-                    'GST Number': entity?.gstNumber || '',
-                    'PAN Number': entity?.panNumber || '',
-                    'Email 1': entity?.emails?.[0]?.email || '',
-                    'Email 2': entity?.emails?.[1]?.email || '',
-                    'Email 3': entity?.emails?.[2]?.email || '',
-                    'E Shram Number': entity?.eShramNumber || '',
-                    'Shop and Establishment Code': entity?.shopAndEstablishmentCode || '',
-                    'Key Account Manager': entity?.siteManagement?.keyAccountManager || '',
-                    'Site Area (Sq Ft)': entity?.siteManagement?.siteAreaSqFt || '',
-                };
-            });
-            csvData = toCSV(dataToExport, columns);
-            fileName = 'site_configuration_export.csv';
-        } else {
-            setToast({ message: `Export not implemented for this view.`, type: 'error' });
-            return;
-        }
-
-        triggerDownload(csvData, fileName);
-        setToast({ message: 'Data exported successfully.', type: 'success' });
-    };
-
-    const handleDownloadTemplate = () => {
-        let columns: string[];
-        let fileName: string;
-
-        if (activeSubcategory === 'client_structure') {
-            columns = entityCsvColumns;
-            fileName = 'client_structure_template.csv';
-        } else if (activeSubcategory === 'site_configuration') {
-            columns = siteConfigCsvColumns;
-            fileName = 'site_configuration_template.csv';
-        } else {
-            setToast({ message: `Template not available for this view.`, type: 'error' });
-            return;
-        }
-        triggerDownload(columns.join(','), fileName);
-    };
-
-    const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const text = e.target?.result as string;
-                if (!text) throw new Error("File is empty.");
-
-                const lines = text.trim().replace(/\r/g, '').split('\n');
-                if (lines.length < 1) throw new Error("CSV file is empty.");
-                const fileHeaders = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-
-                if (activeSubcategory === 'client_structure') {
-                    if (fileHeaders.join(',') !== entityCsvColumns.join(',')) {
-                        throw new Error(`Header mismatch. Please use the downloaded template.`);
-                    }
-
-                    const parsedData = fromCSV(text);
-                    if (parsedData.length === 0) throw new Error("No data rows found.");
-
-                    const newGroupsMap = new Map<string, { group: OrganizationGroup, companiesMap: Map<string, Company> }>();
-
-                    for (const row of parsedData) {
-                        const groupId = row['Group Id'] || row.GroupId;
-                        const groupName = row['Group Name'] || row.GroupName;
-                        const companyId = row['Company Id'] || row.CompanyId;
-                        const companyName = row['Company Name'] || row.CompanyName;
-
-                        if (!newGroupsMap.has(groupId)) {
-                            newGroupsMap.set(groupId, {
-                                group: { id: groupId, name: groupName, locations: [], companies: [] },
-                                companiesMap: new Map<string, Company>()
-                            });
-                        }
-
-                        const groupData = newGroupsMap.get(groupId)!;
-
-                        if (!groupData.companiesMap.has(companyId)) {
-                            groupData.companiesMap.set(companyId, { id: companyId, name: companyName, entities: [] });
-                        }
-
-                        const companyData = groupData.companiesMap.get(companyId)!;
-
-                        const entity: Entity = {
-                            id: row['Entity Id'] || row.EntityId,
-                            name: row['Entity Name'] || row.EntityName,
-                            organizationId: row['Organization Id'] || row.organizationId,
-                            location: row['Location'] || row.Location,
-                            registeredAddress: row['Registered Address'] || row.RegisteredAddress,
-                            registrationType: (row['Registration Type'] || row.RegistrationType) as RegistrationType || '',
-                            registrationNumber: row['Registration Number'] || row.RegistrationNumber,
-                            gstNumber: row['GST Number'] || row.GSTNumber,
-                            panNumber: row['PAN Number'] || row.PANNumber,
-                            email: row['Email'] || row.Email,
-                            eShramNumber: row['E Shram Number'] || row.EShramNumber,
-                            shopAndEstablishmentCode: row['Shop and Establishment Code'] || row.ShopAndEstablishmentCode,
-                            epfoCode: row['EPFO Code'] || row.EPFOCode,
-                            esicCode: row['ESIC Code'] || row.ESICCode,
-                            psaraLicenseNumber: row['PSARA License Number'] || row.PSARALicenseNumber,
-                            psaraValidTill: row['PSARA Valid Till'] || row.PSARAValidTill,
-                        };
-
-                        companyData.entities.push(entity);
-                    }
-
-                    const newGroups: OrganizationGroup[] = Array.from(newGroupsMap.values()).map(gData => {
-                        gData.group.companies = Array.from(gData.companiesMap.values());
-                        return gData.group;
-                    });
-
-                    setGroups(newGroups);
-                    setToast({ message: `Successfully imported ${parsedData.length} society records.`, type: 'success' });
-
-                } else if (activeSubcategory === 'site_configuration') {
-                    if (fileHeaders.join(',') !== siteConfigCsvColumns.join(',')) {
-                        throw new Error(`Header mismatch. Please use the downloaded template.`);
-                    }
-
-                    const importedData = fromCSV(text);
-                    if (importedData.length === 0) throw new Error("No data rows found.");
-
-                    const newAllClients = [...allClients];
-                    importedData.forEach(row => {
-                        const orgId = row['Organization Id'];
-                        const existingIndex = newAllClients.findIndex(e => e.organizationId === orgId);
-                        const entityData: Partial<Entity> = {
-                            organizationId: orgId,
-                            location: row['Location'],
-                            billingName: row['Billing Name'],
-                            registeredAddress: row['Registered Address'],
-                            gstNumber: row['GST Number'],
-                            panNumber: row['PAN Number'],
-                            emails: [
-                                { id: `email_1_${Date.now()}`, email: row['Email 1'] || '', isPrimary: true },
-                                { id: `email_2_${Date.now()}`, email: row['Email 2'] || '', isPrimary: false },
-                                { id: `email_3_${Date.now()}`, email: row['Email 3'] || '', isPrimary: false },
-                            ].filter(e => e.email),
-                            eShramNumber: row['E Shram Number'],
-                            shopAndEstablishmentCode: row['Shop and Establishment Code'],
-                            siteManagement: {
-                                keyAccountManager: row['Key Account Manager'],
-                                siteAreaSqFt: Number(row['Site Area (Sq Ft)']) || 0
-                            }
-                        };
-
-                        if (existingIndex >= 0) {
-                            newAllClients[existingIndex] = { ...newAllClients[existingIndex], ...entityData };
-                        } else {
-                            newAllClients.push({
-                                id: `new_${Date.now()}_${Math.random()}`,
-                                name: row['Organization Name'],
-                                ...entityData
-                            } as (Entity & { companyName: string }));
-                        }
-                    });
-                    
-                    setGroups(prev => prev.map(group => ({
-                        ...group,
-                        companies: group.companies.map(company => ({
-                            ...company,
-                            entities: company.entities.map(entity => {
-                                const updated = newAllClients.find(e => e.id === entity.id);
-                                return updated ? (updated as Entity) : entity;
-                            })
-                        }))
-                    })));
-                    setToast({ message: "Imported site configurations. Click 'Save All Changes' to persist.", type: 'success' });
-                } else {
-                    setToast({ message: `Import not implemented for this view.`, type: 'error' });
-                }
-            } catch (error: any) {
-                setToast({ message: error.message || 'Failed to import CSV.', type: 'error' });
-            } finally {
-                if (event.target) event.target.value = '';
-            }
-        };
-        reader.readAsText(file);
-    };
 
 
     const renderContent = () => {
@@ -733,11 +447,6 @@ const EntityManagement: React.FC = () => {
                     <div className="border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card">
                         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
                             <Button onClick={() => navigate('/hr/entity-management/add-group')} style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }} className="border hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all duration-300"><Plus className="mr-2 h-4" />Add Group</Button>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <Button type="button" variant="outline" onClick={handleDownloadTemplate} className="hover:bg-gray-100"><FileText className="mr-2 h-4 w-4" /> Template</Button>
-                                <Button type="button" variant="outline" onClick={() => importRef.current?.click()} className="hover:bg-gray-100"><Upload className="mr-2 h-4 w-4" /> Import</Button>
-                                <Button type="button" variant="outline" onClick={handleExport} className="hover:bg-gray-100"><Download className="mr-2 h-4 w-4" /> Export</Button>
-                            </div>
                         </div>
                         <div className="space-y-2">
                             {filteredGroups.map(group => (
@@ -857,7 +566,7 @@ const EntityManagement: React.FC = () => {
                         </div>
                     </div>
                 );
-            case 'costing_resource': return <CostingResourceConfig />;
+            case 'costing_resource': return <CostingResourceConfig sites={allClients} />;
             case 'backoffice_heads': return <BackofficeHeadsConfig />;
             case 'staff_designation': return <StaffDesignationConfig />;
             case 'gmc_policy': return <GmcPolicyConfig />;
@@ -946,7 +655,6 @@ const EntityManagement: React.FC = () => {
                 {!isMobile && (
                     <div className="flex items-center gap-2 flex-wrap">
                         <Button variant="outline" onClick={() => setIsInstructionsOpen(true)} className="hover:bg-gray-100"><HelpCircle className="mr-2 h-4 w-4" /> Help</Button>
-                        <input type="file" ref={importRef} className="hidden" accept=".csv" onChange={handleImport} />
                         <Button onClick={handleSaveAll} style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }} className="border hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all duration-300"><Save className="mr-2 h-4 w-4" /> Save All Changes</Button>
                     </div>
                 )}
@@ -956,7 +664,6 @@ const EntityManagement: React.FC = () => {
                 <div className="flex flex-col gap-3 mb-4">
                     <Button onClick={handleSaveAll} style={{ backgroundColor: '#006B3F', color: '#FFFFFF', borderColor: '#005632' }} className="w-full justify-center border hover:opacity-90 text-white shadow-lg hover:shadow-xl transition-all duration-300"><Save className="mr-2 h-4 w-4" /> Save All Changes</Button>
                     <Button variant="outline" onClick={() => setIsInstructionsOpen(true)} className="w-full justify-center hover:bg-gray-100"><HelpCircle className="mr-2 h-4 w-4" /> Help</Button>
-                    <input type="file" ref={importRef} className="hidden" accept=".csv" onChange={handleImport} />
                 </div>
             )}
 
