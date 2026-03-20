@@ -461,6 +461,7 @@ export type RegistrationType = 'CIN' | 'ROC' | 'ROF' | 'Society' | 'Trust' | '';
 
 export interface Entity {
   id: string;
+  status?: 'draft' | 'completed';
   name: string;
   organizationId?: string;
   location?: string;

@@ -5,7 +5,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { api } from '../../services/api';
 import type { OrganizationGroup, Entity, Company, RegistrationType, Organization, SiteConfiguration, UploadedFile } from '../../types';
-import { Plus, Save, Edit, Trash2, Building, ChevronRight, Eye, CheckCircle, AlertCircle, Search, ClipboardList, Settings, Calculator, Users, Badge, HeartPulse, Archive, Wrench, Shirt, FileText, CalendarDays, BarChart, Mail, Sun, UserX, IndianRupee, ChevronLeft, HelpCircle, Loader2 } from 'lucide-react';
+import { Plus, Save, Edit, Trash2, Building, ChevronRight, Eye, CheckCircle, AlertCircle, Search, ClipboardList, Settings, Calculator, Users, Badge, HeartPulse, Archive, Wrench, Shirt, FileText, CalendarDays, BarChart, Mail, Sun, UserX, IndianRupee, ChevronLeft, HelpCircle, Loader2, Clock } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 import EntityForm from '../../components/hr/EntityForm';
@@ -540,11 +540,14 @@ const EntityManagement: React.FC = () => {
                                                         <span>{entity.name}</span>
                                                     </div>
                                                 </td>
-                                                <td data-label="Status" className="px-4 py-3">
-                                                    {isConfigured ?
-                                                        <span className="flex items-center text-green-600"><CheckCircle className="h-4 w-4 mr-1" /> Complete</span> :
-                                                        <span className="flex items-center text-yellow-600"><AlertCircle className="h-4 w-4 mr-1" /> Incomplete</span>
-                                                    }
+                                                 <td data-label="Status" className="px-4 py-3">
+                                                    {entity.status === 'draft' ? (
+                                                        <span className="flex items-center text-orange-600 bg-orange-50 px-2 py-1 rounded-full text-xs font-bold w-fit border border-orange-200"><Clock className="h-3 w-3 mr-1" /> Draft</span>
+                                                    ) : isConfigured ? (
+                                                        <span className="flex items-center text-green-600 px-2 py-1 bg-green-50 rounded-full text-xs font-bold w-fit border border-green-200"><CheckCircle className="h-3 w-3 mr-1" /> Complete</span>
+                                                    ) : (
+                                                        <span className="flex items-center text-yellow-600 px-2 py-1 bg-yellow-50 rounded-full text-xs font-bold w-fit border border-yellow-200"><AlertCircle className="h-3 w-3 mr-1" /> Incomplete</span>
+                                                    )}
                                                 </td>
                                                 <td data-label="Actions" className="px-4 py-3">
                                                     <div className="flex items-center gap-2">
@@ -680,8 +683,8 @@ const EntityManagement: React.FC = () => {
                 />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <nav className="md:col-span-1">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <nav className="md:col-span-3 lg:col-span-2">
                     {isMobile ? (
                         <Select
                             label="Configuration Section"
@@ -710,7 +713,7 @@ const EntityManagement: React.FC = () => {
                         </div>
                     )}
                 </nav>
-                <main className="md:col-span-3">
+                <main className="md:col-span-9 lg:col-span-10">
                     {isLoading ? <Loader2 className="h-8 w-8 animate-spin text-accent mx-auto mt-16" /> : renderContent()}
                 </main>
             </div>

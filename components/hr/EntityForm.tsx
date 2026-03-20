@@ -10,7 +10,7 @@ import DatePicker from '../ui/DatePicker';
 import UploadDocument from '../UploadDocument';
 import { api } from '../../services/api';
 import Checkbox from '../ui/Checkbox';
-import { Loader2, Plus, Trash2, Calendar, FileText, Shield, Info, Clock, Wrench, Smartphone, HardDrive, Percent, CheckCircle, AlertCircle, UploadCloud, ShieldCheck, ShieldAlert, FileWarning } from 'lucide-react';
+import { Loader2, Plus, Trash2, Calendar, FileText, Shield, Info, Clock, Wrench, Smartphone, HardDrive, Percent, CheckCircle, AlertCircle, UploadCloud, ShieldCheck, ShieldAlert, FileWarning, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface EntityFormProps {
   isOpen: boolean;
@@ -23,6 +23,7 @@ interface EntityFormProps {
 
 const entitySchema = yup.object({
   id: yup.string().required(),
+  status: yup.string().oneOf(['draft', 'completed']).optional(),
   name: yup.string().required('Society name is required'),
   organizationId: yup.string().optional(),
   location: yup.string().optional(),
@@ -216,6 +217,7 @@ const VERIFICATION_CATEGORIES = [
 
 const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initialData, companyName, companies }) => {
   const [activeTab, setActiveTab] = useState<Tab>('General');
+  const [completedTabs, setCompletedTabs] = useState<Set<Tab>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [pendingFiles, setPendingFiles] = useState<Record<string, File>>({});
 
@@ -283,6 +285,7 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
 
         if (initialData) {
             reset(initialData);
+            setCompletedTabs(new Set<Tab>(['General', 'Management', 'Agreement', 'Compliance', 'Holidays', 'Assets', 'Billing', 'Verification', 'Policies/Insurance']));
         } else {
             reset({ 
                 id: `new_${Date.now()}`, 
@@ -309,6 +312,7 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
                 insuranceIds: [], 
                 policyIds: [] 
             });
+            setCompletedTabs(new Set());
         }
         setPendingFiles({});
         setActiveTab('General');
@@ -401,7 +405,15 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
   };
 
   const onSubmit: SubmitHandler<Entity> = (data) => {
-    onSave(data, pendingFiles);
+    const finalData = { ...data, status: 'completed' as const };
+    onSave(finalData, pendingFiles);
+  };
+
+  const onSaveDraft = () => {
+    const data = watch();
+    const draftData = { ...data, status: 'draft' as const };
+    // Skip full validation for draft
+    onSave(draftData, pendingFiles);
   };
 
   const onError = (errors: any) => {
@@ -414,6 +426,30 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
     }
   };
 
+  const handleNext = async () => {
+    const tabOrder: Tab[] = ['General', 'Management', 'Agreement', 'Compliance', 'Holidays', 'Assets', 'Billing', 'Verification', 'Policies/Insurance'];
+    const currentIndex = tabOrder.indexOf(activeTab);
+    
+    // Mark current tab as completed
+    setCompletedTabs(prev => {
+        const next = new Set(prev);
+        next.add(activeTab);
+        return next;
+    });
+
+    if (currentIndex < tabOrder.length - 1) {
+      setActiveTab(tabOrder[currentIndex + 1]);
+    }
+  };
+
+  const handleBack = () => {
+    const tabOrder: Tab[] = ['General', 'Management', 'Agreement', 'Compliance', 'Holidays', 'Assets', 'Billing', 'Verification', 'Policies/Insurance'];
+    const currentIndex = tabOrder.indexOf(activeTab);
+    if (currentIndex > 0) {
+      setActiveTab(tabOrder[currentIndex - 1]);
+    }
+  };
+
   const handleFileUpload = (field: string, file: File) => {
     setPendingFiles(prev => ({ ...prev, [field]: file }));
   };
@@ -422,6 +458,8 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
 
   const TabButton: React.FC<{ tabName: Tab }> = ({ tabName }) => {
     const hasError = !!getTabErrors(tabName);
+    const isCompleted = completedTabs.has(tabName);
+    
     return (
       <button
         type="button"
@@ -429,9 +467,11 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
         className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 flex items-center gap-2 transition-all ${activeTab === tabName ? 'border-accent text-accent bg-accent/5' : 'border-transparent text-muted hover:text-primary-text'}`}
       >
         <span>{tabName}</span>
-        {hasError && (
+        {hasError ? (
           <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
-        )}
+        ) : isCompleted ? (
+          <CheckCircle className="h-4 w-4 text-green-500" />
+        ) : null}
       </button>
     );
   };
@@ -446,7 +486,17 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
             </div>
             <div className="flex items-center gap-3">
                <Button type="button" onClick={onClose} variant="secondary" className="px-6">Cancel</Button>
-               <Button type="submit" variant="primary" className="px-8 shadow-lg shadow-emerald-500/20">{isEditing ? 'Save Changes' : 'Create Profile'}</Button>
+               {!isEditing && (
+                   <Button type="button" onClick={onSaveDraft} variant="outline" className="px-6 border-accent text-accent hover:bg-accent/5">Save Draft</Button>
+               )}
+               <Button 
+                    type="submit" 
+                    variant="primary" 
+                    className={`px-8 shadow-lg shadow-emerald-500/20 ${(completedTabs.size < 9 && !isEditing) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={completedTabs.size < 9 && !isEditing}
+                >
+                    {isEditing ? 'Save Changes' : 'Create Profile'}
+                </Button>
             </div>
           </div>
           
@@ -1108,6 +1158,33 @@ const EntityForm: React.FC<EntityFormProps> = ({ isOpen, onClose, onSave, initia
                             )}
                         </div>
                     </div>
+                </div>
+            )}
+          </div>
+          
+          <div className="flex justify-between items-center pt-8 border-t border-border mt-8">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleBack}
+              disabled={activeTab === 'General'}
+              className="flex items-center gap-2"
+            >
+              <ChevronLeft className="h-4 w-4" /> Back
+            </Button>
+            
+            {activeTab !== 'Policies/Insurance' ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={handleNext}
+                  className="flex items-center gap-2 bg-accent hover:bg-accent-dark"
+                >
+                  Save & Next <ChevronRight className="h-4 w-4" />
+                </Button>
+            ) : (
+                <div className="text-sm text-muted italic flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" /> All sections ready. Click Create Profile above to complete.
                 </div>
             )}
           </div>

@@ -293,7 +293,7 @@ const MainLayout: React.FC = () => {
             <aside 
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
-                className={`flex flex-col flex-shrink-0 transition-[width] duration-300 cubic-bezier(0.4,0,0.2,1) will-change-[width] ${isMobile ? (!isSidebarExpanded ? 'w-16' : 'w-64') : (isTablet ? (!isSidebarExpanded ? 'w-16' : 'w-64') : (!isSidebarExpanded ? 'w-16' : 'w-72'))} ${isMobile ? 'bg-[#041b0f]' : 'bg-white border-r border-gray-200/60'} ${isMobile ? 'fixed left-0 top-0 bottom-0 z-50' : ''}`}
+                className={`flex flex-col flex-shrink-0 transition-[width] duration-300 cubic-bezier(0.4,0,0.2,1) will-change-[width] ${isMobile ? (!isSidebarExpanded ? 'w-16' : 'w-64') : (isTablet ? (!isSidebarExpanded ? 'w-16' : 'w-56') : (!isSidebarExpanded ? 'w-16' : 'w-60'))} ${isMobile ? 'bg-[#041b0f]' : 'bg-white border-r border-gray-200/60'} ${isMobile ? 'fixed left-0 top-0 bottom-0 z-50' : ''}`}
             >
                 <div className="flex-1 overflow-y-auto overflow-x-hidden">
                     <SidebarContent
