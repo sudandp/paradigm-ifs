@@ -1535,6 +1535,10 @@ export const api = {
     if (error) throw error;
     return toCamelCase(data);
   },
+  deleteOrganization: async (id: string): Promise<void> => {
+    const { error } = await supabase.from('organizations').delete().eq('id', id);
+    if (error) throw error;
+  },
   getOrganizationStructure: async (): Promise<OrganizationGroup[]> => {
     const { data: groups, error: groupsError } = await supabase.from('organization_groups').select('*');
     if (groupsError) throw groupsError;

@@ -191,7 +191,7 @@ const EntityManagement: React.FC = () => {
         groupName: string;
         initialData: Partial<Company> | null;
     }>({ isOpen: false, mode: 'add', groupId: '', groupName: '', initialData: null });
-    const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean; type: 'group' | 'company' | 'client'; id: string; name: string }>({ isOpen: false, type: 'group', id: '', name: '' });
+    const [deleteModalState, setDeleteModalState] = useState<{ isOpen: boolean; type: 'group' | 'company' | 'client' | 'site'; id: string; name: string }>({ isOpen: false, type: 'group', id: '', name: '' });
 
     const allClients = useMemo(() => {
         return groups.flatMap(g => g.companies.flatMap(c => c.entities.map(e => ({ ...e, companyName: c.name }))));
@@ -340,7 +340,7 @@ const EntityManagement: React.FC = () => {
         }
     };
 
-    const handleDeleteClick = (type: 'group' | 'company' | 'client', id: string, name: string) => setDeleteModalState({ isOpen: true, type, id, name });
+    const handleDeleteClick = (type: 'group' | 'company' | 'client' | 'site', id: string, name: string) => setDeleteModalState({ isOpen: true, type, id, name });
 
     const handleConfirmDelete = async () => {
         const { type, id, name } = deleteModalState;
@@ -363,8 +363,11 @@ const EntityManagement: React.FC = () => {
                         entities: company.entities.filter(e => e.id !== id)
                     }))
                 })));
+            } else if (type === 'site') {
+                await api.deleteOrganization(id);
+                setOrganizations(prev => prev.filter(o => o.id !== id));
             }
-            const typeLabel = type === 'client' ? 'Society' : type === 'company' ? 'Company / LLP / Partnership / Society' : 'Group';
+            const typeLabel = type === 'site' ? 'Site' : type === 'client' ? 'Society' : type === 'company' ? 'Company / LLP / Partnership / Society' : 'Group';
             setToast({ message: `${typeLabel} '${name}' deleted.`, type: 'success' });
         } catch (error) {
             setToast({ message: `Failed to delete ${type}.`, type: 'error' });
@@ -776,6 +779,12 @@ const EntityManagement: React.FC = () => {
                     </div>
                 );
             case 'site_configuration':
+                // Build the site config list from entities in the hierarchy (allClients)
+                // This ensures societies added via Client Structure automatically appear here
+                const siteConfigEntities = allClients.filter(client => {
+                    if (!searchTerm.trim()) return true;
+                    return client.name.toLowerCase().includes(searchTerm.toLowerCase());
+                });
                 return (
                     <div className="border-0 shadow-none md:bg-card md:p-6 md:rounded-xl md:shadow-card">
                         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
@@ -796,15 +805,14 @@ const EntityManagement: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border md:bg-card md:divide-y-0">
-                                    {filteredOrganizations.map(org => {
-                                        const entity = allClients.find(e => e.organizationId === org.id);
-                                        const isConfigured = !!entity && (!!entity.billingName || !!entity.siteManagement?.keyAccountManager);
+                                    {siteConfigEntities.map(entity => {
+                                        const isConfigured = !!entity.billingName || !!entity.siteManagement?.keyAccountManager;
                                         return (
-                                            <tr key={org.id}>
+                                            <tr key={entity.id}>
                                                 <td data-label="Site Name" className="px-4 py-3 font-medium">
                                                     <div className="flex items-center gap-3">
                                                         <Building className="h-5 w-5 text-muted" />
-                                                        <span>{org.shortName}</span>
+                                                        <span>{entity.name}</span>
                                                     </div>
                                                 </td>
                                                 <td data-label="Status" className="px-4 py-3">
@@ -814,24 +822,16 @@ const EntityManagement: React.FC = () => {
                                                     }
                                                 </td>
                                                 <td data-label="Actions" className="px-4 py-3">
-                                                    <Button size="sm" variant="outline" onClick={() => {
-                                                        if (entity) {
+                                                    <div className="flex items-center gap-2">
+                                                        <Button size="sm" variant="outline" onClick={() => {
                                                             setEntityFormState({ isOpen: true, initialData: entity, companyName: entity.companyName || '' });
-                                                        } else {
-                                                            // Create a skeleton entity linked to this org
-                                                            setEntityFormState({ 
-                                                                isOpen: true, 
-                                                                initialData: { 
-                                                                    id: `new_${Date.now()}`, 
-                                                                    name: org.shortName, 
-                                                                    organizationId: org.id 
-                                                                } as Entity, 
-                                                                companyName: '' 
-                                                            });
-                                                        }
-                                                    }}>
-                                                        <Eye className="mr-2 h-4 w-4" /> View / Edit
-                                                    </Button>
+                                                        }}>
+                                                            <Eye className="mr-2 h-4 w-4" /> View / Edit
+                                                        </Button>
+                                                        <Button size="sm" variant="outline" onClick={() => handleDeleteClick('site', entity.id, entity.name)} className="text-red-500 border-red-300 hover:bg-red-50">
+                                                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                                        </Button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
